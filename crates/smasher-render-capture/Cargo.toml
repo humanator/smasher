@@ -1,0 +1,26 @@
+[package]
+name = "smasher-render-capture"
+description = "Headless-Chromium screenshot capture for design-factory candidates"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+smasher-attractor.workspace = true
+axum = "0.8"
+tower-http = { version = "0.6", features = ["fs"] }
+chromiumoxide = "0.7"
+tokio.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+reqwest = { workspace = true, features = ["json"] }
+tokio-test.workspace = true
+tracing-subscriber.workspace = true

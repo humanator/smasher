@@ -8,6 +8,7 @@ members = [
     "crates/smasher-web",
     "crates/smasher-conformance",
     "crates/smasher-system-lint",
+    "crates/smasher-render-capture",
 ]
 
 [workspace.package]
@@ -75,6 +76,7 @@ smasher-agent = { path = "crates/smasher-agent" }
 smasher-attractor = { path = "crates/smasher-attractor" }
 smasher-web = { path = "crates/smasher-web" }
 smasher-system-lint = { path = "crates/smasher-system-lint" }
+smasher-render-capture = { path = "crates/smasher-render-capture" }
 
 # TUI framework
 boba = { git = "https://github.com/2389-research/boba.git", rev = "78b5e8a" }

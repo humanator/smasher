@@ -250,8 +250,12 @@ async fn submit_pipeline(
             model.clone(),
             spawn_working_dir.clone(),
         ));
+        let render_capture_backend =
+            Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+                llm_tool_backend as Arc<dyn ToolBackend>,
+            ));
         let tool_backend = Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
-            llm_tool_backend as Arc<dyn ToolBackend>,
+            render_capture_backend as Arc<dyn ToolBackend>,
         ));
 
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.
@@ -562,8 +566,12 @@ async fn resume_run(
             model.clone(),
             spawn_working_dir.clone(),
         ));
+        let render_capture_backend =
+            Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+                llm_tool_backend as Arc<dyn ToolBackend>,
+            ));
         let tool_backend = Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
-            llm_tool_backend as Arc<dyn ToolBackend>,
+            render_capture_backend as Arc<dyn ToolBackend>,
         ));
 
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.

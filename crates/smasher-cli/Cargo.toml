@@ -14,6 +14,7 @@ smasher-agent.workspace = true
 smasher-attractor.workspace = true
 smasher-web.workspace = true
 smasher-system-lint.workspace = true
+smasher-render-capture.workspace = true
 
 async-trait.workspace = true
 clap.workspace = true
