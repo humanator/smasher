@@ -25,6 +25,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(api_routes)
         .merge(question_routes)
         .nest_service("/static", ServeDir::new(static_dir))
+        .nest_service("/candidate-artifacts", ServeDir::new("runs"))
         .with_state(state)
 }
 
@@ -121,9 +122,70 @@ async fn shutdown_signal() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode};
+    use tower::ServiceExt;
 
     #[test]
     fn default_port_is_21541() {
         assert_eq!(DEFAULT_PORT, 21541);
+    }
+
+    fn test_state() -> AppState {
+        let client = smasher_llm::client::Client::from_env();
+        AppState::new(client, "test-model".into(), "/tmp".into())
+    }
+
+    #[tokio::test]
+    async fn candidate_artifacts_mount_serves_a_real_file() {
+        let dir = std::path::Path::new("runs/run-server-test/artifacts/candidate-server-test");
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join("screenshot.png"), b"not a real png, just bytes").unwrap();
+
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/candidate-artifacts/run-server-test/artifacts/candidate-server-test/screenshot.png")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        std::fs::remove_dir_all("runs/run-server-test").ok();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        assert_eq!(content_type, "image/png");
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"not a real png, just bytes");
+    }
+
+    #[tokio::test]
+    async fn candidate_artifacts_mount_does_not_escape_its_root() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/candidate-artifacts/..%2f..%2fCargo.toml")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_ne!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn static_mount_is_unaffected_by_the_new_candidate_artifacts_mount() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/static/style.css")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }
