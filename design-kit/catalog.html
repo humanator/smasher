@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!-- ABOUTME: Style-guide / demo page for every design-kit component and its states. -->
+  <!-- ABOUTME: Opened directly in a browser (or via a Playwright file:// URL) — no server needed. -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Design Kit Catalog</title>
+  <link rel="stylesheet" href="../crates/smasher-web/static/style.css" />
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="components.css" />
+  <style>
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+    }
+    .catalog-header {
+      padding: var(--radius-lg) var(--radius-lg) 0;
+      max-width: var(--container-max);
+      margin: 0 auto;
+    }
+    .catalog-header h1 {
+      font-family: var(--font-display);
+    }
+    .catalog-body {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--radius-lg) 3rem;
+    }
+    .catalog-section {
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <header class="catalog-header">
+    <h1>Component Kit</h1>
+    <p>Design-factory component catalog — button, input, drawer, modal, list-row.</p>
+  </header>
+  <main class="catalog-body">
+    <!-- Component sections are added here, one per component task. -->
+  </main>
+  <script src="components.js" defer></script>
+</body>
+</html>

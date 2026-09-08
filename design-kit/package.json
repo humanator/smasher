@@ -1,0 +1,12 @@
+{
+  "name": "design-kit-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:lint": "node test/lint-tokens.mjs",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

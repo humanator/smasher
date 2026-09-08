@@ -1,0 +1,9 @@
+/* ABOUTME: New design tokens for design-kit components not already covered by */
+/* ABOUTME: smasher-web's style.css palette — overlay/backdrop and stacking order only. */
+
+:root {
+  --overlay-bg: rgba(17, 24, 39, 0.4);
+  --z-overlay: 200;
+  --z-drawer: 210;
+  --z-modal: 220;
+}
