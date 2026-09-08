@@ -16,7 +16,7 @@ use smasher_attractor::rendering::{
     CachedRenderer, GraphRenderer, NodeExecutionStatus, RenderFormat, StatusGraphvizRenderer,
 };
 
-use crate::candidates::CandidateSummary;
+use crate::candidates::{self, CandidateSummary};
 use crate::error::WebError;
 use crate::state::{AppState, RunSummary};
 
@@ -99,7 +99,6 @@ struct TokenTemplate {
 
 #[derive(Template)]
 #[template(path = "candidate_gallery.html")]
-#[allow(dead_code)]
 struct CandidateGalleryTemplate {
     run_id: String,
     candidates: Vec<CandidateSummary>,
@@ -151,6 +150,7 @@ pub fn router() -> Router<AppState> {
         .route("/runs/{id}/status", get(run_status))
         .route("/runs/{id}/tokens", get(run_tokens))
         .route("/runs/{id}/questions", get(run_questions))
+        .route("/runs/{id}/candidates", get(run_candidates))
 }
 
 // ---------------------------------------------------------------------------
@@ -535,6 +535,23 @@ async fn run_questions(
     }))
 }
 
+async fn run_candidates(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, WebError> {
+    {
+        let runs = state.runs.read().await;
+        runs.get(&id)
+            .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+    }
+
+    let candidates = candidates::scan_candidates(&id);
+    Ok(HtmlTemplate(CandidateGalleryTemplate {
+        run_id: id,
+        candidates,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -608,6 +625,120 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// Insert a minimal RunRecord directly into state for handler testing,
+    /// mirroring `routes::api::tests::insert_test_record`.
+    async fn insert_test_record(state: &AppState, id: &str) {
+        use crate::state::RunRecord;
+        use chrono::Utc;
+        use smasher_attractor::dot::parser;
+        use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
+        use smasher_attractor::graph;
+        use smasher_attractor::http_interviewer::HttpInterviewer;
+        use smasher_attractor::state::RunStatus;
+        use std::sync::Arc;
+        use tokio_util::sync::CancellationToken;
+
+        let dot_graph = parser::parse("digraph { a -> b }").unwrap();
+        let resolved = graph::resolve(&dot_graph).unwrap();
+        let record = RunRecord {
+            id: id.into(),
+            dot_source: "digraph { a -> b }".into(),
+            graph: resolved,
+            status: RunStatus::Running,
+            started_at: Utc::now(),
+            completed_at: None,
+            emitter: Arc::new(PipelineEventEmitter::default()),
+            event_log: Arc::new(PipelineEventLog::new()),
+            cancellation: CancellationToken::new(),
+            interviewer: HttpInterviewer::new(),
+            variables: HashMap::new(),
+            error: None,
+            input_tokens: Arc::new(AtomicU64::new(0)),
+            output_tokens: Arc::new(AtomicU64::new(0)),
+            run_working_dir: None,
+        };
+        state.runs.write().await.insert(id.into(), record);
+    }
+
+    #[tokio::test]
+    async fn run_candidates_not_found() {
+        let app = router().with_state(test_state());
+        let req = Request::builder()
+            .uri("/runs/nonexistent/candidates")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn run_candidates_returns_empty_state_for_run_with_no_artifacts() {
+        let state = test_state();
+        insert_test_record(&state, "run-candidates-empty").await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri("/runs/run-candidates-empty/candidates")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("No candidates yet"));
+    }
+
+    #[tokio::test]
+    async fn run_candidates_returns_candidate_cards_for_real_fixture_artifacts() {
+        use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
+
+        let run_id = "run-candidates-with-fixtures";
+        let candidate_dir = std::path::Path::new("runs")
+            .join(run_id)
+            .join("artifacts")
+            .join("candidate-fixture");
+        std::fs::create_dir_all(&candidate_dir).unwrap();
+        let manifest = Manifest {
+            captured_at: chrono::Utc::now(),
+            viewport: Viewport {
+                width: 1280,
+                height: 800,
+            },
+            candidate_dir: "/tmp/candidate-fixture".into(),
+            exit_status: ExitStatus::Success,
+        };
+        std::fs::write(
+            candidate_dir.join("manifest.json"),
+            serde_json::to_string(&manifest).unwrap(),
+        )
+        .unwrap();
+
+        let state = test_state();
+        insert_test_record(&state, run_id).await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri(format!("/runs/{run_id}/candidates"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("candidate-fixture"));
+        assert!(html.contains(
+            "/candidate-artifacts/run-candidates-with-fixtures/artifacts/candidate-fixture/screenshot.png"
+        ));
     }
 
     #[test]
