@@ -16,6 +16,7 @@ use smasher_attractor::rendering::{
     CachedRenderer, GraphRenderer, NodeExecutionStatus, RenderFormat, StatusGraphvizRenderer,
 };
 
+use crate::candidates::CandidateSummary;
 use crate::error::WebError;
 use crate::state::{AppState, RunSummary};
 
@@ -94,6 +95,14 @@ struct QuestionCardTemplate {
 struct TokenTemplate {
     input_tokens: u64,
     output_tokens: u64,
+}
+
+#[derive(Template)]
+#[template(path = "candidate_gallery.html")]
+#[allow(dead_code)]
+struct CandidateGalleryTemplate {
+    run_id: String,
+    candidates: Vec<CandidateSummary>,
 }
 
 // ---------------------------------------------------------------------------
@@ -599,5 +608,64 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn candidate_gallery_template_renders_success_and_failure_cards() {
+        use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
+
+        let viewport = Viewport {
+            width: 1280,
+            height: 800,
+        };
+        let candidates = vec![
+            CandidateSummary {
+                candidate_id: "candidate-a".into(),
+                screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
+                    .into(),
+                manifest: Manifest {
+                    captured_at: chrono::Utc::now(),
+                    viewport,
+                    candidate_dir: "/tmp/candidate-a".into(),
+                    exit_status: ExitStatus::Success,
+                },
+            },
+            CandidateSummary {
+                candidate_id: "candidate-b".into(),
+                screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-b/screenshot.png"
+                    .into(),
+                manifest: Manifest {
+                    captured_at: chrono::Utc::now(),
+                    viewport,
+                    candidate_dir: "/tmp/candidate-b".into(),
+                    exit_status: ExitStatus::Failed {
+                        reason: "chromium launch failed".into(),
+                    },
+                },
+            },
+        ];
+
+        let html = CandidateGalleryTemplate {
+            run_id: "run-1".into(),
+            candidates,
+        }
+        .render()
+        .unwrap();
+
+        assert!(html.contains("/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"));
+        assert!(html.contains("chromium launch failed"));
+        assert!(html.contains("candidate-card-failed"));
+    }
+
+    #[test]
+    fn candidate_gallery_template_renders_empty_state() {
+        let html = CandidateGalleryTemplate {
+            run_id: "run-1".into(),
+            candidates: vec![],
+        }
+        .render()
+        .unwrap();
+
+        assert!(html.contains("No candidates yet"));
     }
 }
