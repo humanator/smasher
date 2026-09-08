@@ -64,6 +64,23 @@
         </li>
       </ul>
     </section>
+
+    <section class="catalog-section">
+      <h2>Drawer</h2>
+      <button class="btn" type="button" data-drawer-trigger="example-drawer">Open drawer</button>
+
+      <div class="drawer-overlay" data-drawer-overlay="example-drawer" hidden></div>
+      <div class="drawer" id="example-drawer" role="dialog" aria-modal="true" aria-label="Example drawer" hidden>
+        <div class="drawer-header">
+          <h3>Example drawer</h3>
+          <button class="btn btn-small" type="button" data-drawer-close="example-drawer">Close</button>
+        </div>
+        <div class="drawer-body">
+          <p>Drawer content goes here.</p>
+          <input class="input" type="text" placeholder="Focusable field inside the drawer" />
+        </div>
+      </div>
+    </section>
   </main>
   <script src="components.js" defer></script>
 </body>

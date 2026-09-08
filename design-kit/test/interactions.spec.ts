@@ -57,3 +57,54 @@ test.describe('List-row', () => {
     await expect(plain).not.toHaveAttribute('tabindex', '0');
   });
 });
+
+test.describe('Drawer', () => {
+  test('opens on trigger click and returns focus to the trigger on close', async ({ page }) => {
+    const trigger = page.getByRole('button', { name: 'Open drawer' });
+    const drawer = page.getByRole('dialog', { name: 'Example drawer' });
+
+    await expect(drawer).toBeHidden();
+    await trigger.click();
+    await expect(drawer).toBeVisible();
+
+    await drawer.getByRole('button', { name: 'Close' }).click();
+    await expect(drawer).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test('closes on Escape', async ({ page }) => {
+    await page.getByRole('button', { name: 'Open drawer' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Example drawer' });
+    await expect(drawer).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(drawer).toBeHidden();
+  });
+
+  test('closes on backdrop click', async ({ page }) => {
+    await page.getByRole('button', { name: 'Open drawer' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Example drawer' });
+    await expect(drawer).toBeVisible();
+
+    await page.locator('[data-drawer-overlay="example-drawer"]').click({ position: { x: 5, y: 5 } });
+    await expect(drawer).toBeHidden();
+  });
+
+  test('traps Tab focus between the drawer\'s own focusable elements', async ({ page }) => {
+    await page.getByRole('button', { name: 'Open drawer' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Example drawer' });
+    const closeButton = drawer.getByRole('button', { name: 'Close' });
+    const field = drawer.getByPlaceholder('Focusable field inside the drawer');
+
+    // Focus starts on the first focusable element inside the drawer.
+    await expect(closeButton).toBeFocused();
+
+    // Shift+Tab from the first element wraps to the last.
+    await page.keyboard.press('Shift+Tab');
+    await expect(field).toBeFocused();
+
+    // Tab from the last element wraps back to the first.
+    await page.keyboard.press('Tab');
+    await expect(closeButton).toBeFocused();
+  });
+});

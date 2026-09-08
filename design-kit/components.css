@@ -120,3 +120,45 @@
 .list-row-action.is-active {
   background: var(--blue-dim);
 }
+
+/* Drawer
+   ============================================================ */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  z-index: var(--z-overlay);
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 22rem;
+  max-width: 90vw;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-drawer);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.drawer-header h3 {
+  font-family: var(--font-display);
+  margin: 0;
+}
+
+.drawer-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
