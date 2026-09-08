@@ -1,0 +1,42 @@
+<!-- ABOUTME: Fixture candidate composed entirely from design-kit component snippets. -->
+<!-- ABOUTME: Should pass both token-adherence and kit-component-usage checks. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Clean candidate</title>
+  <link rel="stylesheet" href="/design-kit/tokens.css" />
+  <link rel="stylesheet" href="/design-kit/components.css" />
+</head>
+<body>
+  <button class="btn" type="button">Default action</button>
+  <button class="btn btn-primary" type="button">Primary action</button>
+
+  <div class="field">
+    <label for="example-input">Example input</label>
+    <input class="input" type="text" id="example-input" placeholder="Type something…" />
+  </div>
+
+  <ul class="list">
+    <li class="list-row">Plain row — no action</li>
+    <li class="list-row list-row-action" tabindex="0" role="button" aria-pressed="false">
+      Actionable row — press Enter or Space
+    </li>
+  </ul>
+
+  <button class="btn" type="button" data-modal-trigger="example-modal">Open modal</button>
+  <div class="modal-overlay" data-modal-overlay="example-modal" hidden></div>
+  <div class="modal" id="example-modal" role="dialog" aria-modal="true" aria-label="Example modal" hidden>
+    <div class="modal-header">
+      <h3>Example modal</h3>
+      <button class="btn btn-small" type="button" data-modal-close="example-modal">Close</button>
+    </div>
+    <div class="modal-body">
+      <p>Modal content goes here.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" type="button" data-modal-close="example-modal">Confirm</button>
+    </div>
+  </div>
+</body>
+</html>

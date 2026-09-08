@@ -1,0 +1,24 @@
+<!-- ABOUTME: Fixture candidate with deliberate design-system drift. -->
+<!-- ABOUTME: Should fail both token-adherence and kit-component-usage checks. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Violating candidate</title>
+  <style>
+    .custom-panel {
+      color: #ff0000;
+      padding: 12px;
+    }
+  </style>
+</head>
+<body>
+  <button style="color: red">Custom button</button>
+
+  <input type="text" placeholder="No kit class" />
+
+  <div class="custom-panel" role="dialog">
+    Custom dialog missing aria-modal and hidden
+  </div>
+</body>
+</html>
