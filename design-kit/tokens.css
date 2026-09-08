@@ -19,4 +19,9 @@
   --space-4: 1rem;
   --space-5: 1.25rem;
   --space-6: 1.5rem;
+
+  /* Shared focus ring — a single token so every focusable kit component
+     (input, and later drawer/modal triggers) references one shadow value
+     instead of hand-rolling raw px/color box-shadows in components.css. */
+  --focus-ring: 0 0 0 3px var(--blue-dim);
 }

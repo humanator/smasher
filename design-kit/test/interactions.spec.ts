@@ -23,3 +23,17 @@ test.describe('Button', () => {
     await expect(page.getByRole('button', { name: 'Disabled action' })).toBeDisabled();
   });
 });
+
+test.describe('Input', () => {
+  test('shows a visible focus state distinct from its resting state', async ({ page }) => {
+    const input = page.getByRole('textbox', { name: 'Example input' });
+    await expect(input).toBeVisible();
+
+    const resting = await input.evaluate((el) => getComputedStyle(el).boxShadow);
+    await input.focus();
+    const focused = await input.evaluate((el) => getComputedStyle(el).boxShadow);
+
+    expect(focused).not.toBe(resting);
+    expect(focused).not.toBe('none');
+  });
+});
