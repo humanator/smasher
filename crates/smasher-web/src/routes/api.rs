@@ -28,7 +28,7 @@ use smasher_attractor::rendering::{
     CachedRenderer, GraphRenderer, NodeExecutionStatus, RenderFormat, StatusGraphvizRenderer,
 };
 use smasher_attractor::state::{Checkpoint, Context, RunStatus};
-use smasher_attractor::tool_handler::ToolHandler;
+use smasher_attractor::tool_handler::{ToolBackend, ToolHandler};
 use smasher_attractor::transforms;
 
 use crate::backend::{AgentCodergenBackend, LlmManagerBackend, LlmToolBackend};
@@ -245,10 +245,13 @@ async fn submit_pipeline(
             model.clone(),
             spawn_working_dir.clone(),
         ));
-        let tool_backend = Arc::new(LlmToolBackend::new(
+        let llm_tool_backend = Arc::new(LlmToolBackend::new(
             Arc::clone(&client),
             model.clone(),
             spawn_working_dir.clone(),
+        ));
+        let tool_backend = Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+            llm_tool_backend as Arc<dyn ToolBackend>,
         ));
 
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.
@@ -554,10 +557,13 @@ async fn resume_run(
             model.clone(),
             spawn_working_dir.clone(),
         ));
-        let tool_backend = Arc::new(LlmToolBackend::new(
+        let llm_tool_backend = Arc::new(LlmToolBackend::new(
             Arc::clone(&client),
             model.clone(),
             spawn_working_dir.clone(),
+        ));
+        let tool_backend = Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+            llm_tool_backend as Arc<dyn ToolBackend>,
         ));
 
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.

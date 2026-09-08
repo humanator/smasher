@@ -74,6 +74,7 @@ smasher-llm = { path = "crates/smasher-llm" }
 smasher-agent = { path = "crates/smasher-agent" }
 smasher-attractor = { path = "crates/smasher-attractor" }
 smasher-web = { path = "crates/smasher-web" }
+smasher-render-capture = { path = "crates/smasher-render-capture" }
 
 # TUI framework
 boba = { git = "https://github.com/2389-research/boba.git", rev = "78b5e8a" }

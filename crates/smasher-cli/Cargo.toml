@@ -13,6 +13,7 @@ smasher-llm.workspace = true
 smasher-agent.workspace = true
 smasher-attractor.workspace = true
 smasher-web.workspace = true
+smasher-render-capture.workspace = true
 
 async-trait.workspace = true
 clap.workspace = true

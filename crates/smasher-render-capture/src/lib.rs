@@ -73,6 +73,7 @@ mod tests {
 
     #[tokio::test]
     async fn capture_writes_screenshot_and_manifest_to_output_dir() {
+        let _guard = capture::BROWSER_TEST_LOCK.lock().await;
         let output_dir = tempfile::tempdir().unwrap();
         let viewport = Viewport {
             width: capture::VIEWPORT_WIDTH,

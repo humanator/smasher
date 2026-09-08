@@ -176,7 +176,7 @@ async fn submit_run(
     use smasher_attractor::manager_handler::ManagerHandler;
     use smasher_attractor::parallel::ParallelHandler;
     use smasher_attractor::state::{Context, RunStatus};
-    use smasher_attractor::tool_handler::ToolHandler;
+    use smasher_attractor::tool_handler::{ToolBackend, ToolHandler};
     use smasher_attractor::transforms;
 
     use crate::backend::{AgentCodergenBackend, LlmManagerBackend, LlmToolBackend};
@@ -326,10 +326,13 @@ async fn submit_run(
             model.clone(),
             run_working_dir.clone(),
         ));
-        let tool_backend = Arc::new(LlmToolBackend::new(
+        let llm_tool_backend = Arc::new(LlmToolBackend::new(
             Arc::clone(&client),
             model.clone(),
             run_working_dir.clone(),
+        ));
+        let tool_backend = Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+            llm_tool_backend as Arc<dyn ToolBackend>,
         ));
 
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.

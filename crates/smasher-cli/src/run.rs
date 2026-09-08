@@ -31,7 +31,7 @@ use smasher_attractor::rendering::{CachedRenderer, GraphRenderer, GraphvizRender
 use smasher_attractor::state::Context;
 use smasher_attractor::state::Outcome;
 use smasher_attractor::stylesheet::Stylesheet;
-use smasher_attractor::tool_handler::ToolHandler;
+use smasher_attractor::tool_handler::{ToolBackend, ToolHandler};
 use smasher_attractor::transforms;
 
 use std::io::IsTerminal;
@@ -1082,10 +1082,13 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
         ));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
 
-        let tool_backend = Arc::new(crate::llm_backends::LlmToolBackend::new(
+        let llm_tool_backend = Arc::new(crate::llm_backends::LlmToolBackend::new(
             Arc::clone(client),
             args.model.clone(),
             effective_working_dir.clone(),
+        ));
+        let tool_backend = Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+            llm_tool_backend as Arc<dyn ToolBackend>,
         ));
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
     }
