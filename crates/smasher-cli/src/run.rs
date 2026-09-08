@@ -1087,6 +1087,9 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
             args.model.clone(),
             effective_working_dir.clone(),
         ));
+        let tool_backend = Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
+            tool_backend,
+        ));
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
     }
 

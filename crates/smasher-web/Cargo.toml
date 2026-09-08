@@ -12,6 +12,7 @@ path = "src/main.rs"
 smasher-llm.workspace = true
 smasher-agent.workspace = true
 smasher-attractor.workspace = true
+smasher-system-lint.workspace = true
 
 axum = { version = "0.8", features = ["macros"] }
 askama = "0.12"
