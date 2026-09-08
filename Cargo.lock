@@ -3019,6 +3019,7 @@ dependencies = [
  "axum",
  "chromiumoxide",
  "chrono",
+ "futures",
  "reqwest",
  "serde",
  "serde_json",
@@ -3027,6 +3028,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tower-http",
+ "tracing-subscriber",
  "uuid",
 ]
 
