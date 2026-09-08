@@ -37,3 +37,23 @@ test.describe('Input', () => {
     expect(focused).not.toBe('none');
   });
 });
+
+test.describe('List-row', () => {
+  test('actionable row is keyboard-focusable and activates on Enter and Space', async ({ page }) => {
+    const row = page.getByRole('button', { name: /Actionable row/ });
+    await expect(row).toHaveAttribute('aria-pressed', 'false');
+
+    await row.focus();
+    await page.keyboard.press('Enter');
+    await expect(row).toHaveAttribute('aria-pressed', 'true');
+
+    await page.keyboard.press('Space');
+    await expect(row).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('plain row carries no button role or tabindex', async ({ page }) => {
+    const plain = page.locator('.list-row', { hasText: 'Plain row' });
+    await expect(plain).not.toHaveAttribute('role', 'button');
+    await expect(plain).not.toHaveAttribute('tabindex', '0');
+  });
+});
