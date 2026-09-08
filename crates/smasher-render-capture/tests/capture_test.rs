@@ -20,6 +20,11 @@ fn design_kit_dir() -> PathBuf {
 #[tokio::test]
 async fn captures_a_real_png_of_the_fixture_candidate() {
     let _ = tracing_subscriber::fmt::try_init();
+    let _guard = tokio::task::spawn_blocking(
+        smasher_render_capture::testing::acquire_browser_test_lock,
+    )
+    .await
+    .unwrap();
     let handle = start_server(&fixture_candidate_dir(), &design_kit_dir())
         .await
         .expect("server should start against the fixture candidate");

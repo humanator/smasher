@@ -142,7 +142,9 @@ mod tests {
 
     #[tokio::test]
     async fn render_capture_produces_artifact_and_never_touches_fallback() {
-        let _guard = crate::capture::BROWSER_TEST_LOCK.lock().await;
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
         let fallback = Arc::new(RecordingFallback::new());
         let backend = HybridToolBackend::new(fallback.clone());
 

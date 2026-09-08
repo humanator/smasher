@@ -1,0 +1,17 @@
+digraph RenderCaptureE2E {
+  graph [
+    goal="Prove that a render_capture Tool node dispatches natively through smasher run, making zero LLM calls."
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+  Render1 [
+    shape=parallelogram,
+    label="Render Capture",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"e2e-render-capture-fixture\", \"candidate_id\": \"fixture\"}"
+  ];
+  Exit [shape=Msquare, label="Exit"];
+
+  Start -> Render1;
+  Render1 -> Exit;
+}

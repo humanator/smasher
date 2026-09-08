@@ -5,6 +5,7 @@ pub mod backend;
 pub mod capture;
 pub mod manifest;
 pub mod server;
+pub mod testing;
 
 use std::path::{Path, PathBuf};
 
@@ -73,7 +74,9 @@ mod tests {
 
     #[tokio::test]
     async fn capture_writes_screenshot_and_manifest_to_output_dir() {
-        let _guard = capture::BROWSER_TEST_LOCK.lock().await;
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
         let output_dir = tempfile::tempdir().unwrap();
         let viewport = Viewport {
             width: capture::VIEWPORT_WIDTH,

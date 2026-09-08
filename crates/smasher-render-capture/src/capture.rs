@@ -13,14 +13,6 @@ use crate::manifest::Viewport;
 pub const VIEWPORT_WIDTH: u32 = 1280;
 pub const VIEWPORT_HEIGHT: u32 = 800;
 
-/// Serializes this crate's real-headless-Chromium unit/lib tests within a single
-/// test binary. Launching more than one real Chrome instance concurrently is
-/// flaky on this machine (resource contention, not a code bug) — tests that call
-/// `capture_screenshot` or `capture()` directly should hold this lock for their
-/// duration. `tests/capture_test.rs` runs in its own process and doesn't need it.
-#[cfg(test)]
-pub(crate) static BROWSER_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
 #[derive(Debug, Error)]
 pub enum CaptureError {
     #[error("candidate directory has no index.html: {0}")]
