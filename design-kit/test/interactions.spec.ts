@@ -14,3 +14,12 @@ test.beforeEach(async ({ page }) => {
 test('catalog page loads with a title', async ({ page }) => {
   await expect(page.locator('h1')).toHaveText('Component Kit');
 });
+
+test.describe('Button', () => {
+  test('renders default, primary, small, and disabled variants', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Default action' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Primary action' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Small action' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Disabled action' })).toBeDisabled();
+  });
+});

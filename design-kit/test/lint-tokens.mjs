@@ -14,8 +14,10 @@ const SPACING_PROPERTIES = new Set([
   'outline', 'outline-color', 'box-shadow', 'border-radius',
   'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
   'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'gap', 'row-gap', 'column-gap', 'font-size',
+  'gap', 'row-gap', 'column-gap',
 ]);
+// Note: font-size is intentionally excluded — the spec's token rule covers
+// color, radius, spacing-scale, and shadow values, not typography scale.
 
 // Raw values allowed without a token (e.g. hairline borders).
 const ALLOWED_RAW_VALUES = new Set(['1px', '0', '0px']);

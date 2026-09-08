@@ -6,4 +6,17 @@
   --z-overlay: 200;
   --z-drawer: 210;
   --z-modal: 220;
+  /* style.css has no token for text-on-accent-color (it uses raw #fff);
+     the kit's strict "no raw colors in components.css" rule needs one. */
+  --on-accent: #fff;
+
+  /* style.css also has no spacing scale (it uses bare rem values
+     throughout); components.css's lint rule requires padding/gap/margin
+     to be token-backed, so the kit defines a small scale here. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
 }
