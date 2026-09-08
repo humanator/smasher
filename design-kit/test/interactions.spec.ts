@@ -108,3 +108,54 @@ test.describe('Drawer', () => {
     await expect(closeButton).toBeFocused();
   });
 });
+
+test.describe('Modal', () => {
+  test('opens on trigger click and returns focus to the trigger on close', async ({ page }) => {
+    const trigger = page.getByRole('button', { name: 'Open modal' });
+    const modal = page.getByRole('dialog', { name: 'Example modal' });
+
+    await expect(modal).toBeHidden();
+    await trigger.click();
+    await expect(modal).toBeVisible();
+
+    await modal.getByRole('button', { name: 'Close' }).click();
+    await expect(modal).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test('closes on Escape', async ({ page }) => {
+    await page.getByRole('button', { name: 'Open modal' }).click();
+    const modal = page.getByRole('dialog', { name: 'Example modal' });
+    await expect(modal).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(modal).toBeHidden();
+  });
+
+  test('closes on backdrop click', async ({ page }) => {
+    await page.getByRole('button', { name: 'Open modal' }).click();
+    const modal = page.getByRole('dialog', { name: 'Example modal' });
+    await expect(modal).toBeVisible();
+
+    await page.locator('[data-modal-overlay="example-modal"]').click({ position: { x: 5, y: 5 } });
+    await expect(modal).toBeHidden();
+  });
+
+  test('traps Tab focus between the modal\'s own focusable elements', async ({ page }) => {
+    await page.getByRole('button', { name: 'Open modal' }).click();
+    const modal = page.getByRole('dialog', { name: 'Example modal' });
+    const closeButton = modal.getByRole('button', { name: 'Close' });
+    const confirmButton = modal.getByRole('button', { name: 'Confirm' });
+
+    // Focus starts on the first focusable element inside the modal.
+    await expect(closeButton).toBeFocused();
+
+    // Shift+Tab from the first element wraps to the last.
+    await page.keyboard.press('Shift+Tab');
+    await expect(confirmButton).toBeFocused();
+
+    // Tab from the last element wraps back to the first.
+    await page.keyboard.press('Tab');
+    await expect(closeButton).toBeFocused();
+  });
+});

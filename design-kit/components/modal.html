@@ -1,0 +1,17 @@
+<!-- ABOUTME: Modal component snippet — trigger button, backdrop overlay, and centered panel. -->
+<!-- ABOUTME: Reuses the same open/close/focus-trap/Escape/backdrop-click behavior as drawer. -->
+<button class="btn" type="button" data-modal-trigger="example-modal">Open modal</button>
+
+<div class="modal-overlay" data-modal-overlay="example-modal" hidden></div>
+<div class="modal" id="example-modal" role="dialog" aria-modal="true" aria-label="Example modal" hidden>
+  <div class="modal-header">
+    <h3>Example modal</h3>
+    <button class="btn btn-small" type="button" data-modal-close="example-modal">Close</button>
+  </div>
+  <div class="modal-body">
+    <p>Modal content goes here.</p>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-primary" type="button" data-modal-close="example-modal">Confirm</button>
+  </div>
+</div>
