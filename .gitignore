@@ -1,6 +1,7 @@
 /target
 /bin/
 /artifacts/
+/runs/
 .scratch/
 .env
 .workgraph/
