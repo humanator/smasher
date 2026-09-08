@@ -7,6 +7,8 @@ use chromiumoxide::page::ScreenshotParams;
 use futures::StreamExt;
 use thiserror::Error;
 
+use crate::manifest::Viewport;
+
 /// Fixed capture viewport for this slice (see `SPEC-render-capture.md` assumption 9).
 pub const VIEWPORT_WIDTH: u32 = 1280;
 pub const VIEWPORT_HEIGHT: u32 = 800;
@@ -22,10 +24,16 @@ pub enum CaptureError {
 }
 
 /// Launches headless Chromium, navigates to `url`, and returns PNG bytes captured
-/// at the fixed 1280x800 viewport. Shuts the browser down before returning.
-pub async fn capture_screenshot(url: &str) -> Result<Vec<u8>, CaptureError> {
+/// at `viewport`. Shuts the browser down before returning.
+pub async fn capture_screenshot(url: &str, viewport: Viewport) -> Result<Vec<u8>, CaptureError> {
+    // chromiumoxide defaults to a single fixed, shared profile directory reused by
+    // every launch. Leftover state from a prior run (crash flags, session restore)
+    // then leaks into this one, so give each capture its own fresh profile.
+    let user_data_dir = tempfile::tempdir().map_err(|e| CaptureError::BrowserLaunch(e.to_string()))?;
+
     let config = BrowserConfig::builder()
-        .window_size(VIEWPORT_WIDTH, VIEWPORT_HEIGHT)
+        .window_size(viewport.width, viewport.height)
+        .user_data_dir(user_data_dir.path())
         // Real Google Chrome's default New Tab Page embeds a "OneGoogleBar" iframe
         // that fires a navigation event chromiumoxide's CDP bindings can't
         // deserialize, killing the whole CDP connection. Starting on a blank tab

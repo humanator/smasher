@@ -3,7 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
-use smasher_render_capture::capture::capture_screenshot;
+use smasher_render_capture::capture::{VIEWPORT_HEIGHT, VIEWPORT_WIDTH, capture_screenshot};
+use smasher_render_capture::manifest::Viewport;
 use smasher_render_capture::server::start_server;
 
 const PNG_MAGIC: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -24,7 +25,11 @@ async fn captures_a_real_png_of_the_fixture_candidate() {
         .expect("server should start against the fixture candidate");
 
     let url = format!("http://{}/index.html", handle.addr);
-    let png = capture_screenshot(&url)
+    let viewport = Viewport {
+        width: VIEWPORT_WIDTH,
+        height: VIEWPORT_HEIGHT,
+    };
+    let png = capture_screenshot(&url, viewport)
         .await
         .expect("headless Chromium should capture a screenshot");
 
