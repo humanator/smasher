@@ -16,6 +16,7 @@ pub fn build_router(state: AppState) -> Router {
     let api_routes = crate::routes::api::router();
     let page_routes = crate::routes::pages::router();
     let question_routes = crate::routes::questions::router();
+    let gallery_routes = crate::routes::gallery::router();
 
     // Resolve static dir relative to the crate manifest, not the cwd.
     let static_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("static");
@@ -24,6 +25,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(page_routes)
         .merge(api_routes)
         .merge(question_routes)
+        .merge(gallery_routes)
         .nest_service("/static", ServeDir::new(static_dir))
         .nest_service("/candidate-artifacts", ServeDir::new("runs"))
         .with_state(state)

@@ -2,5 +2,6 @@
 // ABOUTME: Groups API, page, and question route handlers.
 
 pub mod api;
+pub mod gallery;
 pub mod pages;
 pub mod questions;
