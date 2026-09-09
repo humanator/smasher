@@ -1,3 +1,4 @@
+{% import "_candidate_card.html" as candidate_card %}
 <div class="gate-card" data-question-id="{{ question_id }}">
   {% match expected_count %}
     {% when Some with (expected) %}
@@ -8,14 +9,7 @@
   <div class="candidate-grid">
     {% for c in candidates %}
     {% if c.failed() %}
-    <div class="candidate-card candidate-card-failed">
-      <div class="candidate-id">{{ c.candidate_id }}</div>
-      {% match c.failure_reason() %}
-        {% when Some with (reason) %}
-        <p class="candidate-failure-reason">{{ reason }}</p>
-        {% when None %}
-      {% endmatch %}
-    </div>
+    {% call candidate_card::failed_card(c, false) %}
     {% else %}
     <label class="candidate-card">
       <input type="checkbox" name="selected" value="{{ c.candidate_id }}">

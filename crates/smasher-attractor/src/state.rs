@@ -285,6 +285,20 @@ impl Context {
             Err(_) => HashMap::new(),
         }
     }
+
+    /// Create an independent copy of this context with one additional
+    /// key-value pair set.
+    ///
+    /// Unlike `set`, this does not mutate the shared context (its `inner` is
+    /// an `Arc`, so clones alias the same map). Use this when a single call
+    /// needs to see an extra value — e.g. the originating node id — without
+    /// racing concurrently-running siblings that hold the same `Context`
+    /// (such as branches dispatched by a `Parallel` node).
+    pub fn with_extra(&self, key: impl Into<String>, value: serde_json::Value) -> Context {
+        let mut data = self.snapshot();
+        data.insert(key.into(), value);
+        Context::from(data)
+    }
 }
 
 /// The result of executing a single pipeline node.

@@ -536,7 +536,17 @@ async fn run_questions(
         .get(&id)
         .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
     let pending = record.interviewer.list_questions();
-    let oldest_qid = pending.questions.first().map(|q| q.id.clone());
+    let gate = find_gallery_gate(&record.graph);
+    // Match the gallery gate to the question *it* raised, not whichever
+    // question happens to be oldest — a Parallel fan-out can have another
+    // node's question pending at the same time.
+    let gallery_question_id = gate.and_then(|g| {
+        pending
+            .questions
+            .iter()
+            .find(|q| q.node_id.as_deref() == Some(g.id.as_str()))
+            .map(|q| q.id.clone())
+    });
     let questions: Vec<TemplateQuestion> = pending
         .questions
         .into_iter()
@@ -545,8 +555,8 @@ async fn run_questions(
 
     // Gallery gate card: first gallery node + pending questions + candidates.
     // Renders alongside (not instead of) the plain question cards.
-    let gallery_gate_html = find_gallery_gate(&record.graph).and_then(|gate| {
-        let question_id = oldest_qid?;
+    let gallery_gate_html = gate.and_then(|gate| {
+        let question_id = gallery_question_id?;
         let found = candidates::scan_candidates(&id);
         if found.is_empty() {
             return None;
@@ -901,10 +911,13 @@ mod tests {
         interviewer
     }
 
-    /// Push a genuinely pending question with a known id.
+    /// Push a genuinely pending question with a known id, optionally
+    /// attributed to the node that raised it (as the real ask()/approve()
+    /// call path does via `NODE_ID_CONTEXT_KEY`).
     fn push_pending_qid(
         interviewer: &smasher_attractor::http_interviewer::HttpInterviewer,
         qid: &str,
+        node_id: Option<&str>,
     ) {
         use smasher_attractor::http_interviewer::{PendingQuestion, QuestionKind};
         use std::time::Instant;
@@ -916,6 +929,7 @@ mod tests {
             choices: vec![],
             kind: QuestionKind::FreeForm,
             created_at: Instant::now(),
+            node_id: node_id.map(String::from),
             answer_tx: Some(tx),
         });
     }
@@ -973,7 +987,7 @@ mod tests {
 
         let state = test_state();
         let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
-        push_pending_qid(&interviewer, "q1");
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
 
         let (status, html) = get_questions_html(state, run_id).await;
         std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
@@ -1005,7 +1019,7 @@ mod tests {
         let run_id = "gate-card-plain";
         let state = test_state();
         let interviewer = insert_graph_record(&state, run_id, PLAIN_DOT).await;
-        push_pending_qid(&interviewer, "q1");
+        push_pending_qid(&interviewer, "q1", None);
 
         let (status, html) = get_questions_html(state, run_id).await;
 
@@ -1019,7 +1033,7 @@ mod tests {
         let run_id = "gate-card-no-candidates";
         let state = test_state();
         let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
-        push_pending_qid(&interviewer, "q1");
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
 
         let (status, html) = get_questions_html(state, run_id).await;
 

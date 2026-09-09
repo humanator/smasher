@@ -53,6 +53,26 @@ pub struct GraphNode {
     pub attrs: HashMap<String, NodeAttrValue>,
 }
 
+impl GraphNode {
+    /// Returns true when this node is an authoring-convention gallery gate:
+    /// an `Interviewer` node carrying `gallery="true"`.
+    ///
+    /// This is the single canonical definition of "gallery gate" — callers
+    /// in other crates (e.g. `smasher-web`'s dashboard routes) should use
+    /// this rather than re-deriving the check from `NodeType`/`NodeAttrValue`.
+    pub fn is_gallery_gate(&self) -> bool {
+        // NOTE: the DOT parser coerces the string "true" into a boolean, so a
+        // quoted gallery="true" arrives here as Bool(true), not String("true").
+        // Accept both spellings.
+        let gallery = match self.attrs.get("gallery") {
+            Some(NodeAttrValue::Bool(true)) => true,
+            Some(NodeAttrValue::String(s)) if s == "true" => true,
+            _ => false,
+        };
+        gallery && self.node_type == NodeType::Interviewer
+    }
+}
+
 /// A resolved graph edge with extracted metadata.
 #[derive(Debug, Clone)]
 pub struct GraphEdge {
@@ -1116,5 +1136,53 @@ mod tests {
             g.graph_attrs.get("goal"),
             Some(&NodeAttrValue::String("Build a thing".to_string()))
         );
+    }
+
+    // ---------------------------------------------------------------
+    // GraphNode::is_gallery_gate
+    // ---------------------------------------------------------------
+
+    fn interviewer_node(gallery: Option<NodeAttrValue>) -> GraphNode {
+        let mut attrs = HashMap::new();
+        if let Some(v) = gallery {
+            attrs.insert("gallery".to_string(), v);
+        }
+        GraphNode {
+            id: "gate".to_string(),
+            node_type: NodeType::Interviewer,
+            label: None,
+            attrs,
+        }
+    }
+
+    #[test]
+    fn is_gallery_gate_true_for_bool_true_attr() {
+        assert!(interviewer_node(Some(NodeAttrValue::Bool(true))).is_gallery_gate());
+    }
+
+    #[test]
+    fn is_gallery_gate_true_for_string_true_attr() {
+        // The DOT parser coerces `gallery="true"` into a bool, but an
+        // explicit string spelling should still be accepted.
+        assert!(
+            interviewer_node(Some(NodeAttrValue::String("true".to_string()))).is_gallery_gate()
+        );
+    }
+
+    #[test]
+    fn is_gallery_gate_false_without_attr() {
+        assert!(!interviewer_node(None).is_gallery_gate());
+    }
+
+    #[test]
+    fn is_gallery_gate_false_for_bool_false_attr() {
+        assert!(!interviewer_node(Some(NodeAttrValue::Bool(false))).is_gallery_gate());
+    }
+
+    #[test]
+    fn is_gallery_gate_false_for_non_interviewer_node_type() {
+        let mut node = interviewer_node(Some(NodeAttrValue::Bool(true)));
+        node.node_type = NodeType::Tool;
+        assert!(!node.is_gallery_gate());
     }
 }

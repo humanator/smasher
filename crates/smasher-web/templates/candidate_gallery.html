@@ -1,3 +1,4 @@
+{% import "_candidate_card.html" as candidate_card %}
 <div class="candidate-gallery" data-run-id="{{ run_id }}">
 {% if candidates.is_empty() %}
     <p class="empty-state">No candidates yet.</p>
@@ -5,15 +6,7 @@
     <div class="candidate-grid">
         {% for candidate in candidates %}
         {% if candidate.failed() %}
-        <div class="candidate-card candidate-card-failed">
-            <div class="candidate-id">{{ candidate.candidate_id }}</div>
-            <div class="candidate-captured-at">{{ candidate.manifest.captured_at }}</div>
-            {% match candidate.failure_reason() %}
-                {% when Some with (reason) %}
-                <p class="candidate-failure-reason">{{ reason }}</p>
-                {% when None %}
-            {% endmatch %}
-        </div>
+        {% call candidate_card::failed_card(candidate, true) %}
         {% else %}
         <div class="candidate-card">
             <img src="{{ candidate.screenshot_url }}" alt="{{ candidate.candidate_id }}" class="candidate-thumbnail">

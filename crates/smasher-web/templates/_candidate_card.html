@@ -1,0 +1,13 @@
+{% macro failed_card(c, show_captured_at) %}
+<div class="candidate-card candidate-card-failed">
+    <div class="candidate-id">{{ c.candidate_id }}</div>
+    {% if show_captured_at %}
+    <div class="candidate-captured-at">{{ c.manifest.captured_at }}</div>
+    {% endif %}
+    {% match c.failure_reason() %}
+        {% when Some with (reason) %}
+        <p class="candidate-failure-reason">{{ reason }}</p>
+        {% when None %}
+    {% endmatch %}
+</div>
+{% endmacro %}

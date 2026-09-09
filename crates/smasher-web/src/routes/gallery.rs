@@ -79,16 +79,11 @@ pub fn validate_decision(
 
 /// Returns true when the node is an authoring-convention gallery gate:
 /// an Interviewer node carrying `gallery="true"`.
+///
+/// Thin wrapper around the canonical `GraphNode::is_gallery_gate` — kept here
+/// so existing callers in this module don't need to change.
 pub fn is_gallery_gate(node: &GraphNode) -> bool {
-    // NOTE: the DOT parser coerces the string "true" into a boolean, so a
-    // quoted gallery="true" arrives here as Bool(true), not String("true").
-    // Accept both spellings.
-    let gallery = match node.attrs.get("gallery") {
-        Some(NodeAttrValue::Bool(true)) => true,
-        Some(NodeAttrValue::String(s)) if s == "true" => true,
-        _ => false,
-    };
-    gallery && node.node_type == smasher_attractor::graph::NodeType::Interviewer
+    node.is_gallery_gate()
 }
 
 /// Locate the first gallery gate node in the graph, if any.
@@ -147,32 +142,50 @@ async fn submit_gallery_decision(
     Path((id, qid)): Path<(String, String)>,
     Json(req): Json<GateDecisionRequest>,
 ) -> Result<Json<AnswerQuestionResponse>, WebError> {
-    let runs = state.runs.read().await;
-    let record = runs
-        .get(&id)
-        .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+    // Resolve everything needed from the run record and release the lock
+    // before the synchronous candidate scan below, rather than holding the
+    // `runs` read lock (blocking every other handler that touches this map)
+    // for the duration of a filesystem walk.
+    let interviewer = {
+        let runs = state.runs.read().await;
+        let record = runs
+            .get(&id)
+            .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
 
-    if !record
-        .interviewer
-        .list_questions()
-        .questions
-        .iter()
-        .any(|q| q.id == qid)
-    {
-        return Ok(Json(AnswerQuestionResponse {
-            success: false,
-            error: Some(format!("question not found: {qid}")),
-        }));
-    }
+        // The question must belong to the gallery gate node itself, not just
+        // exist somewhere in the pending queue — a Parallel fan-out can leave
+        // another node's question pending at the same time, and answering
+        // through this endpoint must never misroute that unrelated question.
+        let gate_id = find_gallery_gate(&record.graph).map(|g| g.id.clone());
+        let belongs_to_gate = gate_id.is_some()
+            && record
+                .interviewer
+                .list_questions()
+                .questions
+                .iter()
+                .any(|q| q.id == qid && q.node_id == gate_id);
+
+        if !belongs_to_gate {
+            return Ok(Json(AnswerQuestionResponse {
+                success: false,
+                error: Some(format!("question not found: {qid}")),
+            }));
+        }
+
+        record.interviewer.clone()
+    };
 
     let decision = GateDecision {
         selected: req.selected,
         decision: req.decision,
     };
-    let candidates = candidates::scan_candidates(&id);
+    let run_id = id.clone();
+    let candidates = tokio::task::spawn_blocking(move || candidates::scan_candidates(&run_id))
+        .await
+        .map_err(|e| WebError::Internal(format!("candidate scan task panicked: {e}")))?;
     let canonical =
         validate_decision(&candidates, &decision).map_err(WebError::BadRequest)?;
-    Ok(Json(record.interviewer.answer_question(&qid, &canonical)))
+    Ok(Json(interviewer.answer_question(&qid, &canonical)))
 }
 
 #[cfg(test)]
@@ -323,11 +336,21 @@ mod tests {
         use std::sync::atomic::AtomicU64;
         use tokio_util::sync::CancellationToken;
 
-        let dot_graph = parser::parse("digraph { a -> b }").unwrap();
+        // Must contain a real gallery gate node (matching the id
+        // `spawn_pending_ask` attributes its question to) so
+        // `submit_gallery_decision`'s node-id check has a gate to match.
+        let dot_source = r#"digraph {
+            Start [shape=Mdiamond];
+            Gate1 [shape=hexagon, label="Human: pick direction(s)", gallery="true"];
+            Next [shape=box];
+            Start -> Gate1;
+            Gate1 -> Next [label="proceed"];
+        }"#;
+        let dot_graph = parser::parse(dot_source).unwrap();
         let resolved = graph::resolve(&dot_graph).unwrap();
         let record = crate::state::RunRecord {
             id: id.into(),
-            dot_source: "digraph { a -> b }".into(),
+            dot_source: dot_source.into(),
             graph: resolved,
             status: RunStatus::Running,
             started_at: Utc::now(),
@@ -353,12 +376,15 @@ mod tests {
         tokio::task::JoinHandle<Result<String, smasher_attractor::interviewer::InterviewerError>>,
         String,
     ) {
-        use smasher_attractor::interviewer::Interviewer;
+        use smasher_attractor::interviewer::{Interviewer, NODE_ID_CONTEXT_KEY};
         use smasher_attractor::state::Context;
 
         let waiter = interviewer.clone();
         let handle = tokio::spawn(async move {
-            let ctx = Context::new();
+            // Attribute the question to "Gate1", matching the gallery gate
+            // node in `insert_test_record_with`'s graph, the same way
+            // HumanGateHandler::execute does via Context::with_extra.
+            let ctx = Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("Gate1"));
             waiter.ask("Human: pick direction(s)", &ctx).await
         });
         let qid = loop {
@@ -536,6 +562,86 @@ mod tests {
 
         std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
         interviewer.answer_question(&qid, "cleanup");
+    }
+
+    #[tokio::test]
+    async fn decision_rejects_qid_belonging_to_a_different_node() {
+        // Regression for the Parallel fan-out bug: a non-gallery node's
+        // question can be pending at the same time as the gallery gate's
+        // (and even enqueued first). Answering through this endpoint with
+        // that *other* question's id must be rejected, not misroute an
+        // unrelated node's answer.
+        use smasher_attractor::interviewer::{Interviewer, NODE_ID_CONTEXT_KEY};
+        use smasher_attractor::state::Context;
+
+        let run_id = "gallery-decision-cross-node";
+        write_fixture_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        let interviewer = smasher_attractor::http_interviewer::HttpInterviewer::new();
+        insert_test_record_with(&state, run_id, interviewer.clone()).await;
+
+        // Enqueue the unrelated node's question first, so it's the oldest —
+        // `spawn_pending_ask` assumes an empty queue (it grabs `.first()`),
+        // so with two pending questions we find each one by its node id
+        // instead, to avoid the two asks colliding on the same qid.
+        async fn wait_for_qid_from(
+            interviewer: &smasher_attractor::http_interviewer::HttpInterviewer,
+            node_id: &str,
+        ) -> String {
+            loop {
+                let questions = interviewer.list_questions();
+                if let Some(q) = questions
+                    .questions
+                    .iter()
+                    .find(|q| q.node_id.as_deref() == Some(node_id))
+                {
+                    return q.id.clone();
+                }
+                tokio::task::yield_now().await;
+            }
+        }
+
+        let other_waiter = interviewer.clone();
+        let other_handle = tokio::spawn(async move {
+            let ctx = Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("OtherNode"));
+            other_waiter.ask("Unrelated question", &ctx).await
+        });
+        let other_qid = wait_for_qid_from(&interviewer, "OtherNode").await;
+
+        let gate_waiter = interviewer.clone();
+        let ask_handle = tokio::spawn(async move {
+            let ctx = Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("Gate1"));
+            gate_waiter.ask("Human: pick direction(s)", &ctx).await
+        });
+        let gate_qid = wait_for_qid_from(&interviewer, "Gate1").await;
+
+        let app = router().with_state(state.clone());
+        let req = post_json(
+            post_decision_uri(run_id, &other_qid),
+            serde_json::json!({"selected": ["candidate-a"], "decision": "proceed"}),
+        );
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: AnswerQuestionResponse = serde_json::from_slice(&body).unwrap();
+        assert!(
+            !parsed.success,
+            "must not answer a question belonging to a different node"
+        );
+
+        // Both questions are still pending — neither was misrouted.
+        let pending = interviewer.list_questions();
+        assert!(pending.questions.iter().any(|q| q.id == other_qid));
+        assert!(pending.questions.iter().any(|q| q.id == gate_qid));
+
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        interviewer.answer_question(&other_qid, "cleanup-other");
+        interviewer.answer_question(&gate_qid, "cleanup-gate");
+        other_handle.await.unwrap().unwrap();
+        ask_handle.await.unwrap().unwrap();
     }
 
     // ---------------------------------------------------------------

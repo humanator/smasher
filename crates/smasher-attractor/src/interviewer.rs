@@ -12,6 +12,17 @@ use crate::graph::{GraphNode, NodeAttrValue, NodeType};
 use crate::handler::{Handler, HandlerError};
 use crate::state::{Context, Outcome};
 
+/// Context key under which the id of the node currently asking a question is
+/// stashed for the duration of a single `Interviewer` call.
+///
+/// `Interviewer` implementations that need to attribute a question to its
+/// originating node (e.g. `HttpInterviewer`, so a dashboard gallery-gate card
+/// can be matched to the right pending question) read it via
+/// `context.get_string(NODE_ID_CONTEXT_KEY)`. It is set on a scoped copy of
+/// the context (see `Context::with_extra`), never on the shared context
+/// itself, since concurrent `Parallel` branches hold the same `Context`.
+pub const NODE_ID_CONTEXT_KEY: &str = "__question_node_id";
+
 /// Errors that can occur during an interview interaction.
 #[derive(Debug, thiserror::Error)]
 pub enum InterviewerError {
@@ -608,12 +619,17 @@ impl Handler for InterviewerHandler {
             },
         };
 
+        // Scoped copy of the context carrying this node's id, so an
+        // Interviewer that attributes questions to nodes (e.g. HttpInterviewer)
+        // can do so without racing sibling branches under a Parallel node.
+        let scoped_context = context.with_extra(NODE_ID_CONTEXT_KEY, json!(node.id));
+
         // Determine the interaction mode and execute.
         // All modes set `preferred_label` on the outcome to the user's response,
         // enabling edge routing to match the response against outgoing edge labels.
         if let Some(NodeAttrValue::Bool(true)) = node.attrs.get("approve") {
             // Approval mode: yes/no question.
-            match self.interviewer.approve(&question, context).await {
+            match self.interviewer.approve(&question, &scoped_context).await {
                 Ok(approved) => {
                     let response = if approved { "yes" } else { "no" };
                     context.set(format!("_interview_{}", node.id), json!(response));
@@ -628,7 +644,7 @@ impl Handler for InterviewerHandler {
             let options: Vec<String> = opts_str.split(',').map(|s| s.trim().to_string()).collect();
             match self
                 .interviewer
-                .ask_with_options(&question, &options, context)
+                .ask_with_options(&question, &options, &scoped_context)
                 .await
             {
                 Ok(response) => {
@@ -641,7 +657,7 @@ impl Handler for InterviewerHandler {
             }
         } else {
             // Free-form question mode.
-            match self.interviewer.ask(&question, context).await {
+            match self.interviewer.ask(&question, &scoped_context).await {
                 Ok(response) => {
                     context.set(format!("_interview_{}", node.id), json!(&response));
                     Ok(Outcome::success_with(json!({"response": &response}))
@@ -800,21 +816,36 @@ impl Handler for HumanGateHandler {
         let effective_timeout = self.resolve_timeout(node);
         let effective_default = self.resolve_default_choice(node);
 
+        // Scoped copy of the context carrying this node's id, so an
+        // Interviewer that attributes questions to nodes (e.g. HttpInterviewer)
+        // can do so without racing sibling branches under a Parallel node.
+        let scoped_context = context.with_extra(NODE_ID_CONTEXT_KEY, json!(node.id));
+
         // Ask the human, with optional timeout.
         let ask_result = match effective_timeout {
             Some(duration) => {
-                match tokio::time::timeout(duration, self.interviewer.ask(&question, context)).await
+                match tokio::time::timeout(
+                    duration,
+                    self.interviewer.ask(&question, &scoped_context),
+                )
+                .await
                 {
                     Ok(result) => result,
                     Err(_elapsed) => Err(InterviewerError::Timeout),
                 }
             }
-            None => self.interviewer.ask(&question, context).await,
+            None => self.interviewer.ask(&question, &scoped_context).await,
         };
 
         match ask_result {
             Ok(response) => {
-                if let Some(gallery) = parse_gallery_answer(&response) {
+                // Only a gate authored as a gallery gate (`gallery="true"`)
+                // reinterprets its answer as a structured selection — a plain
+                // human gate whose free-text answer happens to look like that
+                // JSON shape must not have its response silently rewritten.
+                if node.is_gallery_gate()
+                    && let Some(gallery) = parse_gallery_answer(&response)
+                {
                     let decision = gallery.decision.trim().to_string();
                     context.set(
                         &node.id,
@@ -875,6 +906,55 @@ mod tests {
             node_type,
             label: Some(label.to_string()),
             attrs: HashMap::new(),
+        }
+    }
+
+    /// An interviewer that records the `NODE_ID_CONTEXT_KEY` value it observes
+    /// on each call's `Context`, so tests can assert what a handler threaded
+    /// through without depending on `HttpInterviewer`.
+    struct NodeIdCapturingInterviewer {
+        response: String,
+        seen_node_ids: Mutex<Vec<Option<String>>>,
+    }
+
+    impl NodeIdCapturingInterviewer {
+        fn new(response: impl Into<String>) -> Self {
+            Self {
+                response: response.into(),
+                seen_node_ids: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn seen_node_ids(&self) -> Vec<Option<String>> {
+            self.seen_node_ids.lock().expect("lock poisoned").clone()
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Interviewer for NodeIdCapturingInterviewer {
+        async fn ask(&self, _question: &str, context: &Context) -> Result<String, InterviewerError> {
+            self.seen_node_ids
+                .lock()
+                .expect("lock poisoned")
+                .push(context.get_string(NODE_ID_CONTEXT_KEY));
+            Ok(self.response.clone())
+        }
+
+        async fn ask_with_options(
+            &self,
+            question: &str,
+            _options: &[String],
+            context: &Context,
+        ) -> Result<String, InterviewerError> {
+            self.ask(question, context).await
+        }
+
+        async fn approve(
+            &self,
+            message: &str,
+            context: &Context,
+        ) -> Result<bool, InterviewerError> {
+            Ok(self.ask(message, context).await? == "yes")
         }
     }
 
@@ -2565,6 +2645,8 @@ mod tests {
             "question".to_string(),
             NodeAttrValue::String("Pick direction(s)".to_string()),
         );
+        node.attrs
+            .insert("gallery".to_string(), NodeAttrValue::Bool(true));
 
         let ctx = Context::new();
         let result = handler.execute(&node, &ctx).await.unwrap();
@@ -2595,5 +2677,111 @@ mod tests {
 
         let stored = ctx.get_string("legacy1");
         assert_eq!(stored, Some("yes".to_string()));
+    }
+
+    #[tokio::test]
+    async fn human_gate_without_gallery_attr_does_not_reinterpret_json_shaped_answer() {
+        // A plain (non-gallery) human gate whose free-text answer happens to
+        // deserialize into the gallery JSON shape must be stored verbatim,
+        // not silently reinterpreted as a structured gallery decision.
+        let queue = Arc::new(QueueInterviewer::new());
+        queue.push_response(r#"{"selected":["a","b"],"decision":"proceed"}"#);
+        let handler = HumanGateHandler::new(queue);
+
+        let mut node = make_node("plain-gate", NodeType::Interviewer);
+        node.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("Paste the JSON".to_string()),
+        );
+        // Deliberately no `gallery` attr.
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+        assert!(result.is_success());
+        assert_eq!(
+            result.preferred_label(),
+            Some(r#"{"selected":["a","b"],"decision":"proceed"}"#)
+        );
+
+        let stored = ctx.get_string("plain-gate");
+        assert_eq!(
+            stored,
+            Some(r#"{"selected":["a","b"],"decision":"proceed"}"#.to_string())
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Node id threading (Context::with_extra / NODE_ID_CONTEXT_KEY)
+    // ---------------------------------------------------------------
+
+    #[tokio::test]
+    async fn human_gate_handler_passes_node_id_via_scoped_context() {
+        let interviewer = Arc::new(NodeIdCapturingInterviewer::new("yes"));
+        let handler = HumanGateHandler::new(interviewer.clone());
+
+        let mut node = make_node("gate-a", NodeType::Interviewer);
+        node.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("Continue?".to_string()),
+        );
+
+        let ctx = Context::new();
+        handler.execute(&node, &ctx).await.unwrap();
+
+        assert_eq!(
+            interviewer.seen_node_ids(),
+            vec![Some("gate-a".to_string())]
+        );
+        // The scoped context must not leak into the shared context that
+        // sibling branches under a Parallel node also hold.
+        assert_eq!(ctx.get_string(NODE_ID_CONTEXT_KEY), None);
+    }
+
+    #[tokio::test]
+    async fn interviewer_handler_passes_node_id_via_scoped_context() {
+        let interviewer = Arc::new(NodeIdCapturingInterviewer::new("yes"));
+        let handler = InterviewerHandler::new(interviewer.clone());
+
+        let node = make_node_with_label("gate-b", NodeType::Interviewer, "Continue?");
+
+        let ctx = Context::new();
+        handler.execute(&node, &ctx).await.unwrap();
+
+        assert_eq!(
+            interviewer.seen_node_ids(),
+            vec![Some("gate-b".to_string())]
+        );
+        assert_eq!(ctx.get_string(NODE_ID_CONTEXT_KEY), None);
+    }
+
+    #[tokio::test]
+    async fn concurrent_human_gates_do_not_cross_attribute_node_ids() {
+        // Regression for the Parallel fan-out bug: two HumanGateHandler nodes
+        // sharing the same Context and running concurrently must each see
+        // their own node id, never each other's.
+        let interviewer = Arc::new(NodeIdCapturingInterviewer::new("yes"));
+        let handler_a = HumanGateHandler::new(interviewer.clone());
+        let handler_b = HumanGateHandler::new(interviewer.clone());
+
+        let mut node_a = make_node("gate-a", NodeType::Interviewer);
+        node_a.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("A?".to_string()),
+        );
+        let mut node_b = make_node("gate-b", NodeType::Interviewer);
+        node_b.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("B?".to_string()),
+        );
+
+        let ctx = Context::new();
+        let (_, _) = tokio::join!(
+            handler_a.execute(&node_a, &ctx),
+            handler_b.execute(&node_b, &ctx),
+        );
+
+        let mut seen = interviewer.seen_node_ids();
+        seen.sort();
+        assert_eq!(seen, vec![Some("gate-a".to_string()), Some("gate-b".to_string())]);
     }
 }

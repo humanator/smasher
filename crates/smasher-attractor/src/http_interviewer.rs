@@ -8,7 +8,7 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use crate::interviewer::{Interviewer, InterviewerError};
+use crate::interviewer::{Interviewer, InterviewerError, NODE_ID_CONTEXT_KEY};
 use crate::server::{HttpMethod, Route};
 use crate::state::Context;
 
@@ -47,6 +47,15 @@ pub struct PendingQuestion {
     pub kind: QuestionKind,
     /// When this question was enqueued.
     pub created_at: Instant,
+    /// Id of the graph node that raised this question, if known.
+    ///
+    /// Populated from the `Interviewer` call's `Context` (see
+    /// `crate::interviewer::NODE_ID_CONTEXT_KEY`). Callers that need to
+    /// attribute a pending question to a specific node — e.g. matching a
+    /// dashboard gallery-gate card to the question its own gate raised,
+    /// rather than to whichever question happens to be oldest — should use
+    /// this instead of assuming queue order.
+    pub node_id: Option<String>,
     /// Channel to send the answer back to the awaiting interviewer call.
     pub answer_tx: Option<oneshot::Sender<String>>,
 }
@@ -58,6 +67,7 @@ impl std::fmt::Debug for PendingQuestion {
             .field("question", &self.question)
             .field("choices", &self.choices)
             .field("kind", &self.kind)
+            .field("node_id", &self.node_id)
             .field("has_answer_tx", &self.answer_tx.is_some())
             .finish()
     }
@@ -99,6 +109,7 @@ impl QuestionQueue {
                 question: pq.question.clone(),
                 choices: pq.choices.clone(),
                 kind: pq.kind.clone(),
+                node_id: pq.node_id.clone(),
             })
             .collect()
     }
@@ -148,6 +159,9 @@ pub struct QuestionSummary {
     pub choices: Vec<String>,
     /// What kind of question this is.
     pub kind: QuestionKind,
+    /// Id of the graph node that raised this question, if known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_id: Option<String>,
 }
 
 /// Response body for GET /api/v1/questions.
@@ -271,6 +285,7 @@ impl HttpInterviewer {
         question: &str,
         choices: Vec<String>,
         kind: QuestionKind,
+        node_id: Option<String>,
     ) -> oneshot::Receiver<String> {
         let (tx, rx) = oneshot::channel();
         let id = uuid::Uuid::new_v4().to_string();
@@ -280,6 +295,7 @@ impl HttpInterviewer {
             choices,
             kind,
             created_at: Instant::now(),
+            node_id,
             answer_tx: Some(tx),
         };
         self.queue.push(pending);
@@ -295,8 +311,9 @@ impl Default for HttpInterviewer {
 
 #[async_trait::async_trait]
 impl Interviewer for HttpInterviewer {
-    async fn ask(&self, question: &str, _context: &Context) -> Result<String, InterviewerError> {
-        let rx = self.enqueue(question, vec![], QuestionKind::FreeForm);
+    async fn ask(&self, question: &str, context: &Context) -> Result<String, InterviewerError> {
+        let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
+        let rx = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id);
         rx.await
             .map_err(|_| InterviewerError::Other("answer channel closed".to_string()))
     }
@@ -305,15 +322,22 @@ impl Interviewer for HttpInterviewer {
         &self,
         question: &str,
         options: &[String],
-        _context: &Context,
+        context: &Context,
     ) -> Result<String, InterviewerError> {
-        let rx = self.enqueue(question, options.to_vec(), QuestionKind::MultipleChoice);
+        let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
+        let rx = self.enqueue(
+            question,
+            options.to_vec(),
+            QuestionKind::MultipleChoice,
+            node_id,
+        );
         rx.await
             .map_err(|_| InterviewerError::Other("answer channel closed".to_string()))
     }
 
-    async fn approve(&self, message: &str, _context: &Context) -> Result<bool, InterviewerError> {
-        let rx = self.enqueue(message, vec![], QuestionKind::Approval);
+    async fn approve(&self, message: &str, context: &Context) -> Result<bool, InterviewerError> {
+        let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
+        let rx = self.enqueue(message, vec![], QuestionKind::Approval, node_id);
         let answer = rx
             .await
             .map_err(|_| InterviewerError::Other("answer channel closed".to_string()))?;
@@ -384,6 +408,7 @@ mod tests {
             question: "What color?".to_string(),
             choices: vec!["red".to_string(), "blue".to_string()],
             kind: QuestionKind::MultipleChoice,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         };
@@ -409,6 +434,7 @@ mod tests {
             question: "Approve?".to_string(),
             choices: vec![],
             kind: QuestionKind::Approval,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         };
@@ -437,6 +463,7 @@ mod tests {
                 question: format!("Question {i}"),
                 choices: vec![],
                 kind: QuestionKind::FreeForm,
+                node_id: None,
                 created_at: Instant::now(),
                 answer_tx: Some(tx),
             };
@@ -474,6 +501,7 @@ mod tests {
             question: "Pick a color".to_string(),
             choices: vec!["red".to_string(), "blue".to_string()],
             kind: QuestionKind::MultipleChoice,
+            node_id: None,
         };
 
         let json_str = serde_json::to_string(&summary).unwrap();
@@ -499,12 +527,14 @@ mod tests {
                     question: "Name?".to_string(),
                     choices: vec![],
                     kind: QuestionKind::FreeForm,
+                    node_id: None,
                 },
                 QuestionSummary {
                     id: "q2".to_string(),
                     question: "Deploy?".to_string(),
                     choices: vec![],
                     kind: QuestionKind::Approval,
+                    node_id: None,
                 },
             ],
         };
@@ -576,6 +606,7 @@ mod tests {
             question: "Already here?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         });
@@ -593,6 +624,41 @@ mod tests {
         let iv = HttpInterviewer::new();
         let response = iv.list_questions();
         assert!(response.questions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn ask_records_node_id_from_context() {
+        let iv = HttpInterviewer::new();
+        let ctx = Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("node-1"));
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move { iv_clone.ask("question?", &ctx).await });
+
+        // Give the enqueue a moment to land, then inspect the queued summary.
+        tokio::task::yield_now().await;
+        let questions = iv.list_questions().questions;
+        assert_eq!(questions.len(), 1);
+        assert_eq!(questions[0].node_id.as_deref(), Some("node-1"));
+
+        iv.answer_question(&questions[0].id, "answer");
+        handle.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn ask_without_node_id_in_context_leaves_it_none() {
+        let iv = HttpInterviewer::new();
+        let ctx = Context::new();
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move { iv_clone.ask("question?", &ctx).await });
+
+        tokio::task::yield_now().await;
+        let questions = iv.list_questions().questions;
+        assert_eq!(questions.len(), 1);
+        assert_eq!(questions[0].node_id, None);
+
+        iv.answer_question(&questions[0].id, "answer");
+        handle.await.unwrap().unwrap();
     }
 
     // ---------------------------------------------------------------
@@ -618,6 +684,7 @@ mod tests {
             question: "What?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         });
@@ -642,6 +709,7 @@ mod tests {
             question: "What?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         });
@@ -661,6 +729,7 @@ mod tests {
             question: "What?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         });
@@ -1005,6 +1074,7 @@ mod tests {
             question: "Debug?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         };
@@ -1022,6 +1092,7 @@ mod tests {
             question: "No sender?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: None,
         };
@@ -1047,6 +1118,7 @@ mod tests {
                         question: format!("Thread question {i}"),
                         choices: vec![],
                         kind: QuestionKind::FreeForm,
+                        node_id: None,
                         created_at: Instant::now(),
                         answer_tx: Some(tx),
                     });
@@ -1075,6 +1147,7 @@ mod tests {
             question: "Will receiver be dropped?".to_string(),
             choices: vec![],
             kind: QuestionKind::FreeForm,
+            node_id: None,
             created_at: Instant::now(),
             answer_tx: Some(tx),
         });
