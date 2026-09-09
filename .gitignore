@@ -6,3 +6,4 @@
 .env
 .workgraph/
 *.db
+/docs/design-factory/
