@@ -659,6 +659,33 @@ impl Handler for InterviewerHandler {
 }
 
 // ---------------------------------------------------------------------------
+// Gallery gate structured answers
+// ---------------------------------------------------------------------------
+
+/// Structured decision posted by the gallery gate dashboard card.
+///
+/// `selected` holds the chosen candidate ids (possibly empty for reject-all);
+/// `decision` names the outgoing edge to follow (e.g. `proceed`, `iterate`).
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+pub struct GalleryAnswer {
+    pub selected: Vec<String>,
+    pub decision: String,
+}
+
+/// Parse a raw gate answer as a structured gallery decision.
+///
+/// Returns `None` when the response is not gallery-shaped JSON or when
+/// `decision` is blank after trimming, so callers fall through to the
+/// legacy plain-string path.
+pub fn parse_gallery_answer(response: &str) -> Option<GalleryAnswer> {
+    let answer: GalleryAnswer = serde_json::from_str(response).ok()?;
+    if answer.decision.trim().is_empty() {
+        return None;
+    }
+    Some(answer)
+}
+
+// ---------------------------------------------------------------------------
 // HumanGateHandler
 // ---------------------------------------------------------------------------
 
@@ -787,6 +814,17 @@ impl Handler for HumanGateHandler {
 
         match ask_result {
             Ok(response) => {
+                if let Some(gallery) = parse_gallery_answer(&response) {
+                    let decision = gallery.decision.trim().to_string();
+                    context.set(
+                        &node.id,
+                        json!({"selected": gallery.selected, "decision": decision}),
+                    );
+                    return Ok(Outcome::success_with(
+                        json!({"selected": gallery.selected, "decision": decision}),
+                    )
+                    .with_preferred_label(&decision));
+                }
                 context.set(&node.id, json!(&response));
                 Ok(Outcome::success_with(json!({"response": &response}))
                     .with_preferred_label(&response))
@@ -2491,5 +2529,71 @@ mod tests {
                 .to_string()
                 .contains("response channel dropped")
         );
+    }
+
+    // ---------------------------------------------------------------
+    // Gallery gate structured-answer tests (Task 1)
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn parse_gallery_answer_accepts_structured_decision() {
+        let parsed = super::parse_gallery_answer(r#"{"selected":["a"],"decision":"proceed"}"#);
+        assert!(parsed.is_some());
+        let answer = parsed.unwrap();
+        assert_eq!(answer.selected, vec!["a".to_string()]);
+        assert_eq!(answer.decision, "proceed");
+    }
+
+    #[test]
+    fn parse_gallery_answer_rejects_empty_object() {
+        assert!(super::parse_gallery_answer("{}").is_none());
+    }
+
+    #[test]
+    fn parse_gallery_answer_rejects_blank_decision() {
+        assert!(super::parse_gallery_answer(r#"{"selected":[],"decision":"  "}"#).is_none());
+    }
+
+    #[tokio::test]
+    async fn human_gate_stores_structured_gallery_answer_as_object() {
+        let queue = Arc::new(QueueInterviewer::new());
+        queue.push_response(r#"{"selected":["a","b"],"decision":"proceed"}"#);
+        let handler = HumanGateHandler::new(queue);
+
+        let mut node = make_node("gallery1", NodeType::Interviewer);
+        node.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("Pick direction(s)".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+        assert!(result.is_success());
+        assert_eq!(result.preferred_label(), Some("proceed"));
+
+        let stored = ctx.get("gallery1").expect("context holds gallery decision");
+        assert_eq!(stored["selected"], json!(["a", "b"]));
+        assert_eq!(stored["decision"], json!("proceed"));
+    }
+
+    #[tokio::test]
+    async fn human_gate_legacy_plain_answer_unchanged() {
+        let queue = Arc::new(QueueInterviewer::new());
+        queue.push_response("yes");
+        let handler = HumanGateHandler::new(queue);
+
+        let mut node = make_node("legacy1", NodeType::Interviewer);
+        node.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("Continue?".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+        assert!(result.is_success());
+        assert_eq!(result.preferred_label(), Some("yes"));
+
+        let stored = ctx.get_string("legacy1");
+        assert_eq!(stored, Some("yes".to_string()));
     }
 }
