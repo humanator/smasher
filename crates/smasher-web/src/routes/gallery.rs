@@ -5,7 +5,9 @@ use axum::extract::{Path, State};
 use axum::routing::post;
 use axum::{Json, Router};
 use serde::Deserialize;
+use std::collections::HashMap;
 
+use smasher_attractor::graph::{Graph, GraphNode, NodeAttrValue};
 use smasher_attractor::http_interviewer::AnswerQuestionResponse;
 
 use crate::candidates::{self, CandidateSummary};
@@ -69,6 +71,71 @@ pub fn validate_decision(
         "decision": trimmed,
     }))
     .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Gate lookup + candidate_count resolution (dashboard card support)
+// ---------------------------------------------------------------------------
+
+/// Returns true when the node is an authoring-convention gallery gate:
+/// an Interviewer node carrying `gallery="true"`.
+pub fn is_gallery_gate(node: &GraphNode) -> bool {
+    // NOTE: the DOT parser coerces the string "true" into a boolean, so a
+    // quoted gallery="true" arrives here as Bool(true), not String("true").
+    // Accept both spellings.
+    let gallery = match node.attrs.get("gallery") {
+        Some(NodeAttrValue::Bool(true)) => true,
+        Some(NodeAttrValue::String(s)) if s == "true" => true,
+        _ => false,
+    };
+    gallery && node.node_type == smasher_attractor::graph::NodeType::Interviewer
+}
+
+/// Locate the first gallery gate node in the graph, if any.
+pub fn find_gallery_gate(graph: &Graph) -> Option<&GraphNode> {
+    graph.nodes.iter().find(|n| is_gallery_gate(n))
+}
+
+/// Resolve the expected candidate count for a gate card: display + warning,
+/// never enforcement.
+///
+/// A `candidates=N` launch variable overrides everything; otherwise the
+/// gate node's `candidate_count` attr accepts an integer literal or
+/// `phase_default(<phase>)` with `discover=4`, `define=2`, `deliver=1`.
+/// Returns `None` when no count is configured.
+pub fn resolve_candidate_count(
+    node: &GraphNode,
+    variables: &HashMap<String, String>,
+) -> Option<usize> {
+    if let Some(var) = variables.get("candidates") {
+        return var.trim().parse::<usize>().ok().filter(|&n| n > 0);
+    }
+    match node.attrs.get("candidate_count") {
+        Some(NodeAttrValue::Number(n)) if *n > 0.0 => Some(*n as usize),
+        Some(NodeAttrValue::String(s)) => {
+            let s = s.trim();
+            if let Ok(n) = s.parse::<usize>() {
+                return if n > 0 { Some(n) } else { None };
+            }
+            phase_default(s)
+        }
+        _ => None,
+    }
+}
+
+/// Map `phase_default(<phase>)` to its gallery size: discover=4, define=2,
+/// deliver=1. Returns `None` for anything else.
+fn phase_default(s: &str) -> Option<usize> {
+    let phase = s
+        .strip_prefix("phase_default(")?
+        .strip_suffix(")")?
+        .trim();
+    match phase {
+        "discover" => Some(4),
+        "define" => Some(2),
+        "deliver" => Some(1),
+        _ => None,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -469,5 +536,109 @@ mod tests {
 
         std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
         interviewer.answer_question(&qid, "cleanup");
+    }
+
+    // ---------------------------------------------------------------
+    // Gate lookup + candidate_count unit tests
+    // ---------------------------------------------------------------
+
+    fn gallery_dot() -> &'static str {
+        r#"digraph {
+            Start [shape=Mdiamond];
+            Gate1 [shape=hexagon, label="Human: pick direction(s)", gallery="true", candidate_count="phase_default(discover)"];
+            NextA [shape=box];
+            NextB [shape=box];
+            Start -> Gate1;
+            Gate1 -> NextA [label="proceed"];
+            Gate1 -> NextB [label="iterate"];
+        }"#
+    }
+
+    fn resolve_graph(dot: &str) -> smasher_attractor::graph::Graph {
+        let parsed = smasher_attractor::dot::parser::parse(dot).unwrap();
+        smasher_attractor::graph::resolve(&parsed).unwrap()
+    }
+
+    #[test]
+    fn find_gallery_gate_locates_hexagon_gate() {
+        let graph = resolve_graph(gallery_dot());
+        let gate = find_gallery_gate(&graph).expect("gate should be found");
+        assert_eq!(gate.id, "Gate1");
+    }
+
+    #[test]
+    fn find_gallery_gate_ignores_non_gallery_graph() {
+        let graph = resolve_graph("digraph { Start [shape=Mdiamond]; A [shape=box]; End [shape=Msquare]; Start -> A -> End; }");
+        assert!(find_gallery_gate(&graph).is_none());
+    }
+
+    #[test]
+    fn find_gallery_gate_ignores_diamond_conditional() {
+        // shape=diamond maps to Conditional, which never pauses — not a gate.
+        let graph = resolve_graph(
+            r#"digraph {
+                Start [shape=Mdiamond];
+                Gate1 [shape=diamond, label="Human: pick", gallery="true"];
+                End [shape=Msquare];
+                Start -> Gate1 -> End;
+            }"#,
+        );
+        assert!(find_gallery_gate(&graph).is_none());
+    }
+
+    fn gate_node(dot: &str) -> smasher_attractor::graph::GraphNode {
+        resolve_graph(dot)
+            .nodes
+            .into_iter()
+            .find(|n| n.id == "Gate1")
+            .unwrap()
+    }
+
+    #[test]
+    fn resolve_candidate_count_reads_integer_literal() {
+        let node = gate_node(
+            r#"digraph { Start [shape=Mdiamond]; Gate1 [shape=hexagon, candidate_count="3"]; End [shape=Msquare]; Start -> Gate1 -> End; }"#,
+        );
+        assert_eq!(resolve_candidate_count(&node, &HashMap::new()), Some(3));
+    }
+
+    #[test]
+    fn resolve_candidate_count_reads_phase_defaults() {
+        for (phase, expected) in [("discover", 4), ("define", 2), ("deliver", 1)] {
+            let dot = format!(
+                r#"digraph {{ Start [shape=Mdiamond]; Gate1 [shape=hexagon, candidate_count="phase_default({phase})"]; End [shape=Msquare]; Start -> Gate1 -> End; }}"#
+            );
+            let node = gate_node(&dot);
+            assert_eq!(
+                resolve_candidate_count(&node, &HashMap::new()),
+                Some(expected),
+                "phase {phase}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_candidate_count_launch_var_overrides_attr() {
+        let node = gate_node(
+            r#"digraph { Start [shape=Mdiamond]; Gate1 [shape=hexagon, candidate_count="3"]; End [shape=Msquare]; Start -> Gate1 -> End; }"#,
+        );
+        let vars = HashMap::from([("candidates".to_string(), "6".to_string())]);
+        assert_eq!(resolve_candidate_count(&node, &vars), Some(6));
+    }
+
+    #[test]
+    fn resolve_candidate_count_returns_none_when_unconfigured() {
+        let node = gate_node(
+            r#"digraph { Start [shape=Mdiamond]; Gate1 [shape=hexagon]; End [shape=Msquare]; Start -> Gate1 -> End; }"#,
+        );
+        assert_eq!(resolve_candidate_count(&node, &HashMap::new()), None);
+    }
+
+    #[test]
+    fn resolve_candidate_count_returns_none_for_garbage() {
+        let node = gate_node(
+            r#"digraph { Start [shape=Mdiamond]; Gate1 [shape=hexagon, candidate_count="lots"]; End [shape=Msquare]; Start -> Gate1 -> End; }"#,
+        );
+        assert_eq!(resolve_candidate_count(&node, &HashMap::new()), None);
     }
 }
