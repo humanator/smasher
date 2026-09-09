@@ -88,6 +88,7 @@ impl From<smasher_attractor::http_interviewer::QuestionSummary> for TemplateQues
 struct QuestionCardTemplate {
     run_id: String,
     questions: Vec<TemplateQuestion>,
+    gallery_gate_html: Option<String>,
 }
 
 #[derive(Template)]
@@ -102,6 +103,16 @@ struct TokenTemplate {
 struct CandidateGalleryTemplate {
     run_id: String,
     candidates: Vec<CandidateSummary>,
+}
+
+#[derive(Template)]
+#[template(path = "gallery_gate.html")]
+struct GalleryGateTemplate {
+    run_id: String,
+    question_id: String,
+    candidates: Vec<CandidateSummary>,
+    expected_count: Option<usize>,
+    outgoing_edges: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -518,20 +529,53 @@ async fn run_questions(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, WebError> {
+    use crate::routes::gallery::{find_gallery_gate, resolve_candidate_count};
+
     let runs = state.runs.read().await;
     let record = runs
         .get(&id)
         .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
-    let questions: Vec<TemplateQuestion> = record
-        .interviewer
-        .list_questions()
+    let pending = record.interviewer.list_questions();
+    let oldest_qid = pending.questions.first().map(|q| q.id.clone());
+    let questions: Vec<TemplateQuestion> = pending
         .questions
         .into_iter()
         .map(TemplateQuestion::from)
         .collect();
+
+    // Gallery gate card: first gallery node + pending questions + candidates.
+    // Renders alongside (not instead of) the plain question cards.
+    let gallery_gate_html = find_gallery_gate(&record.graph).and_then(|gate| {
+        let question_id = oldest_qid?;
+        let found = candidates::scan_candidates(&id);
+        if found.is_empty() {
+            return None;
+        }
+        let expected_count = resolve_candidate_count(gate, &record.variables);
+        let outgoing_edges: Vec<String> = record
+            .graph
+            .edges_from(&gate.id)
+            .into_iter()
+            .map(|e| e.label.clone().unwrap_or_else(|| e.to.clone()))
+            .collect();
+        GalleryGateTemplate {
+            run_id: id.clone(),
+            question_id,
+            candidates: found,
+            expected_count,
+            outgoing_edges,
+        }
+        .render()
+        .map_err(|e| {
+            tracing::error!(error = %e, "gallery gate template render failed");
+        })
+        .ok()
+    });
+
     Ok(HtmlTemplate(QuestionCardTemplate {
         run_id: id,
         questions,
+        gallery_gate_html,
     }))
 }
 
@@ -798,5 +842,205 @@ mod tests {
         .unwrap();
 
         assert!(html.contains("No candidates yet"));
+    }
+
+    // ---------------------------------------------------------------
+    // Gate card (gallery-gate) tests
+    // ---------------------------------------------------------------
+
+    const GALLERY_DOT: &str = r#"digraph {
+        Start [shape=Mdiamond];
+        Gate1 [shape=hexagon, label="Human: pick direction(s)", gallery="true", candidate_count="phase_default(discover)"];
+        NextA [shape=box];
+        NextB [shape=box];
+        Start -> Gate1;
+        Gate1 -> NextA [label="proceed"];
+        Gate1 -> NextB [label="iterate"];
+    }"#;
+
+    const PLAIN_DOT: &str =
+        "digraph { Start [shape=Mdiamond]; A [shape=box]; End [shape=Msquare]; Start -> A -> End; }";
+
+    /// Insert a RunRecord with the given DOT graph, returning its interviewer
+    /// (shares the queue with the stored record).
+    async fn insert_graph_record(
+        state: &AppState,
+        id: &str,
+        dot: &str,
+    ) -> smasher_attractor::http_interviewer::HttpInterviewer {
+        use crate::state::RunRecord;
+        use chrono::Utc;
+        use smasher_attractor::dot::parser;
+        use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
+        use smasher_attractor::graph;
+        use smasher_attractor::http_interviewer::HttpInterviewer;
+        use smasher_attractor::state::RunStatus;
+        use std::sync::Arc;
+
+        let parsed = parser::parse(dot).unwrap();
+        let resolved = graph::resolve(&parsed).unwrap();
+        let interviewer = HttpInterviewer::new();
+        let record = RunRecord {
+            id: id.into(),
+            dot_source: dot.into(),
+            graph: resolved,
+            status: RunStatus::Running,
+            started_at: Utc::now(),
+            completed_at: None,
+            emitter: Arc::new(PipelineEventEmitter::default()),
+            event_log: Arc::new(PipelineEventLog::new()),
+            cancellation: tokio_util::sync::CancellationToken::new(),
+            interviewer: interviewer.clone(),
+            variables: HashMap::new(),
+            error: None,
+            input_tokens: Arc::new(AtomicU64::new(0)),
+            output_tokens: Arc::new(AtomicU64::new(0)),
+            run_working_dir: None,
+        };
+        state.runs.write().await.insert(id.into(), record);
+        interviewer
+    }
+
+    /// Push a genuinely pending question with a known id.
+    fn push_pending_qid(
+        interviewer: &smasher_attractor::http_interviewer::HttpInterviewer,
+        qid: &str,
+    ) {
+        use smasher_attractor::http_interviewer::{PendingQuestion, QuestionKind};
+        use std::time::Instant;
+
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        interviewer.queue().push(PendingQuestion {
+            id: qid.into(),
+            question: "Human: pick direction(s)".into(),
+            choices: vec![],
+            kind: QuestionKind::FreeForm,
+            created_at: Instant::now(),
+            answer_tx: Some(tx),
+        });
+    }
+
+    fn write_gate_manifest(run_id: &str, candidate_id: &str, failed: bool) {
+        use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
+
+        let dir = std::path::Path::new("runs")
+            .join(run_id)
+            .join("artifacts")
+            .join(candidate_id);
+        std::fs::create_dir_all(&dir).unwrap();
+        let manifest = Manifest {
+            captured_at: chrono::Utc::now(),
+            viewport: Viewport {
+                width: 1280,
+                height: 800,
+            },
+            candidate_dir: "/tmp/candidate".into(),
+            exit_status: if failed {
+                ExitStatus::Failed {
+                    reason: "boom".into(),
+                }
+            } else {
+                ExitStatus::Success
+            },
+        };
+        std::fs::write(
+            dir.join("manifest.json"),
+            serde_json::to_string(&manifest).unwrap(),
+        )
+        .unwrap();
+    }
+
+    async fn get_questions_html(state: AppState, run_id: &str) -> (StatusCode, String) {
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri(format!("/runs/{run_id}/questions"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    #[tokio::test]
+    async fn run_questions_shows_gate_card_for_paused_gallery_run() {
+        let run_id = "gate-card-paused";
+        write_gate_manifest(run_id, "candidate-a", false);
+        write_gate_manifest(run_id, "candidate-b", false);
+        write_gate_manifest(run_id, "candidate-c", true);
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_pending_qid(&interviewer, "q1");
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains(r#"<div class="gate-card""#), "gate card missing:\n{html}");
+        assert!(html.contains(r#"data-question-id="q1""#));
+        assert!(html.contains(
+            "/api/runs/gate-card-paused/gallery/q1/decision"
+        ));
+        // Live candidates get checkboxes; the failed one does not.
+        assert!(html.contains(r#"value="candidate-a""#));
+        assert!(html.contains(r#"value="candidate-b""#));
+        assert!(!html.contains(r#"value="candidate-c""#));
+        // Expected-vs-found hint + one button per outgoing edge.
+        assert!(html.contains("Expected 4, found 3"));
+        assert!(html.contains(">proceed<"));
+        assert!(html.contains(">iterate<"));
+        // Lint-badge slot + reject-all note + click-to-expand anchor.
+        assert!(html.contains("lint-badge-slot"));
+        assert!(html.contains("reject-all"));
+        assert!(html.contains("target=\"_blank\""));
+        // Plain cards still render alongside.
+        assert!(html.contains("question-card"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_plain_for_non_gallery_run() {
+        let run_id = "gate-card-plain";
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, PLAIN_DOT).await;
+        push_pending_qid(&interviewer, "q1");
+
+        let (status, html) = get_questions_html(state, run_id).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(!html.contains("data-question-id="));
+        assert!(html.contains("question-card"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_no_gate_card_without_candidates() {
+        let run_id = "gate-card-no-candidates";
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_pending_qid(&interviewer, "q1");
+
+        let (status, html) = get_questions_html(state, run_id).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(!html.contains("data-question-id="));
+        assert!(html.contains("question-card"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_no_gate_card_without_pending() {
+        let run_id = "gate-card-no-pending";
+        write_gate_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        insert_graph_record(&state, run_id, GALLERY_DOT).await;
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(!html.contains("data-question-id="));
+        assert!(html.contains("No pending questions."));
     }
 }

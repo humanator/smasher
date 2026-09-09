@@ -1,3 +1,8 @@
+{% match gallery_gate_html %}
+{% when Some with (gate) %}
+{{ gate|safe }}
+{% when None %}
+{% endmatch %}
 {% for q in questions %}
 <div class="question-card">
     <div class="question-header">

@@ -1,0 +1,66 @@
+<div class="gate-card" data-question-id="{{ question_id }}">
+  {% match expected_count %}
+    {% when Some with (expected) %}
+    <p class="gate-hint">Expected {{ expected }}, found {{ candidates.len() }}</p>
+    {% when None %}
+    <p class="gate-hint">Found {{ candidates.len() }} candidate(s)</p>
+  {% endmatch %}
+  <div class="candidate-grid">
+    {% for c in candidates %}
+    {% if c.failed() %}
+    <div class="candidate-card candidate-card-failed">
+      <div class="candidate-id">{{ c.candidate_id }}</div>
+      {% match c.failure_reason() %}
+        {% when Some with (reason) %}
+        <p class="candidate-failure-reason">{{ reason }}</p>
+        {% when None %}
+      {% endmatch %}
+    </div>
+    {% else %}
+    <label class="candidate-card">
+      <input type="checkbox" name="selected" value="{{ c.candidate_id }}">
+      <a href="{{ c.screenshot_url }}" target="_blank">
+        <img src="{{ c.screenshot_url }}" alt="Candidate {{ c.candidate_id }}" class="candidate-thumbnail">
+      </a>
+      <span class="candidate-id">{{ c.candidate_id }}</span>
+      <span class="lint-badge-slot" data-candidate="{{ c.candidate_id }}"></span>
+    </label>
+    {% endif %}
+    {% endfor %}
+  </div>
+  <div class="gate-decision-bar">
+    {% for edge in outgoing_edges %}
+    <button type="button" class="btn btn-primary btn-small gate-decision-btn" data-decision="{{ edge }}">{{ edge }}</button>
+    {% endfor %}
+  </div>
+  <p class="gate-note">No boxes checked + an iterate edge = reject-all and re-roll.</p>
+  <p class="gate-error" aria-live="polite"></p>
+<script>
+(function(card) {
+  var err = card.querySelector(".gate-error");
+  var done = false;
+  card.querySelectorAll(".gate-decision-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      if (done) { return; }
+      var selected = Array.prototype.map.call(
+        card.querySelectorAll("input[name='selected']:checked"),
+        function(el) { return el.value; });
+      fetch("/api/runs/{{ run_id }}/gallery/{{ question_id }}/decision", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({selected: selected, decision: btn.dataset.decision})
+      }).then(function(resp) {
+        if (!resp.ok) {
+          return resp.json().then(function(j) { throw new Error(j.error || resp.statusText); });
+        }
+        return resp.json();
+      }).then(function(j) {
+        if (!j.success) { throw new Error(j.error || "decision not accepted"); }
+        done = true;
+        card.innerHTML = '<p class="gate-done">Decision recorded — resuming…</p>';
+      }).catch(function(e) { err.textContent = e.message; });
+    });
+  });
+})(document.currentScript.closest(".gate-card"));
+</script>
+</div>
