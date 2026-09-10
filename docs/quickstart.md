@@ -359,8 +359,8 @@ approve before the pipeline proceeds.
 
 ### Timeout and Defaults
 
-The `HumanGateHandler` supports optional timeout and default responses. Configure them via node
-attributes:
+The free-form path of `InterviewerHandler` supports optional timeout and default responses.
+Configure them via node attributes:
 
 | Node Attribute          | Description                                              |
 |-------------------------|----------------------------------------------------------|

@@ -19,7 +19,7 @@ use smasher_attractor::events::{PipelineEvent, PipelineEventEmitter, PipelineEve
 use smasher_attractor::graph;
 use smasher_attractor::handler::{CodergenHandler, HandlerRegistry, default_registry};
 use smasher_attractor::http_interviewer::HttpInterviewer;
-use smasher_attractor::interviewer::{HumanGateHandler, InterviewerHandler};
+use smasher_attractor::interviewer::InterviewerHandler;
 use smasher_attractor::lint::LintRunner;
 use smasher_attractor::log_sink::LogSink;
 use smasher_attractor::manager_handler::ManagerHandler;
@@ -270,18 +270,12 @@ async fn submit_pipeline(
         child_registry.register(Arc::new(InterviewerHandler::new(Arc::clone(
             &interviewer_arc,
         ))));
-        child_registry.register(Arc::new(HumanGateHandler::new(Arc::clone(
-            &interviewer_arc,
-        ))));
         child_registry.register(Arc::new(ManagerHandler::new(child_manager)));
         child_registry.register(Arc::new(ToolHandler::new(child_tool)));
 
         let mut registry = default_registry();
         registry.register(Arc::new(CodergenHandler::new(backend)));
-        registry.register(Arc::new(InterviewerHandler::new(Arc::clone(
-            &interviewer_arc,
-        ))));
-        registry.register(Arc::new(HumanGateHandler::new(interviewer_arc)));
+        registry.register(Arc::new(InterviewerHandler::new(interviewer_arc)));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
         registry.register(Arc::new(ParallelHandler::new(Arc::new(child_registry))));
@@ -586,18 +580,12 @@ async fn resume_run(
         child_registry.register(Arc::new(InterviewerHandler::new(Arc::clone(
             &interviewer_arc,
         ))));
-        child_registry.register(Arc::new(HumanGateHandler::new(Arc::clone(
-            &interviewer_arc,
-        ))));
         child_registry.register(Arc::new(ManagerHandler::new(child_manager)));
         child_registry.register(Arc::new(ToolHandler::new(child_tool)));
 
         let mut registry = default_registry();
         registry.register(Arc::new(CodergenHandler::new(backend)));
-        registry.register(Arc::new(InterviewerHandler::new(Arc::clone(
-            &interviewer_arc,
-        ))));
-        registry.register(Arc::new(HumanGateHandler::new(interviewer_arc)));
+        registry.register(Arc::new(InterviewerHandler::new(interviewer_arc)));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
         registry.register(Arc::new(ParallelHandler::new(Arc::new(child_registry))));

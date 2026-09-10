@@ -383,7 +383,7 @@ mod tests {
         let handle = tokio::spawn(async move {
             // Attribute the question to "Gate1", matching the gallery gate
             // node in `insert_test_record_with`'s graph, the same way
-            // HumanGateHandler::execute does via Context::with_extra.
+            // InterviewerHandler::execute does via Context::with_extra.
             let ctx = Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("Gate1"));
             waiter.ask("Human: pick direction(s)", &ctx).await
         });

@@ -22,7 +22,7 @@ use smasher_attractor::handler::{
     CodergenBackend, CodergenHandler, HandlerError, default_registry,
 };
 use smasher_attractor::interviewer::{
-    AutoApproveInterviewer, ChannelInterviewer, ConsoleInterviewer, HumanGateHandler, Interviewer,
+    AutoApproveInterviewer, ChannelInterviewer, ConsoleInterviewer, Interviewer,
     InterviewerHandler, TimeoutInterviewer,
 };
 use smasher_attractor::manager_handler::ManagerHandler;
@@ -1068,10 +1068,12 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
         Arc::new(ConsoleInterviewer::from_stdio())
     };
 
-    // Register interviewer-dependent handlers. Only register InterviewerHandler since
-    // HumanGateHandler handles the same NodeType and would be shadowed by first-registered.
-    registry.register(Arc::new(InterviewerHandler::new(interviewer.clone())));
-    registry.register(Arc::new(HumanGateHandler::new(interviewer)));
+    // Register the interviewer-dependent handler. InterviewerHandler is the
+    // single handler for NodeType::Interviewer (approve/options/free-form,
+    // plus timeout/default_choice and gallery-gate structured answers) —
+    // HandlerRegistry dispatches to the first handler whose `handles()`
+    // matches, so only one handler may ever claim this node type.
+    registry.register(Arc::new(InterviewerHandler::new(interviewer)));
 
     // Register manager and tool handlers with LLM backends (skipped for shell backend).
     if let Some(ref client) = client {

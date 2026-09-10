@@ -245,23 +245,31 @@ branches with bounded concurrency. It returns a `ParallelResult` containing:
 
 ## InterviewerHandler
 
-Handles `Interviewer` nodes. Poses questions to a human or automated interviewer
-and captures responses.
+The single handler registered for `Interviewer` nodes. Poses questions to a
+human or automated interviewer and captures responses. Supports approval,
+multiple-choice, and free-form modes; the free-form path additionally
+supports an optional timeout with a default-choice fallback, and reinterprets
+its answer as a structured gallery decision on gates authored with
+`gallery="true"`.
 
 | Property | Value |
 |----------|-------|
 | **Name** | `interviewer` |
 | **Node type** | `Interviewer` |
 | **DOT shape** | `oval` or `ellipse` |
-| **Context key** | `_interview_{node_id}` |
+| **Context key** | `{node_id}` |
 
 ### Attributes
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `question` | String | No | The question to ask. Falls back to node label. |
+| `question` | String | No | The question to ask. Falls back to `prompt`, then node label. |
+| `prompt` | String | No | Fallback for `question`. |
 | `options` | String | No | Comma-separated list of answer options (multiple choice). |
 | `approve` | Bool | No | If true, use the approval flow instead of free-form question. |
+| `human.timeout_secs` | Number | No | Free-form mode only: seconds to wait before using `human.default_choice`. |
+| `human.default_choice` | String | No | Free-form mode only: default answer if the timeout expires. |
+| `gallery` | Bool | No | Free-form mode only: reinterpret the answer as `{"selected": [...], "decision": "..."}`. |
 
 ### Interviewer Trait
 
@@ -287,36 +295,13 @@ trait Interviewer: Send + Sync {
 
 ### Context Storage
 
-The interviewer response string is stored in context under `_interview_{node_id}`.
+The response (a plain string, or `{"selected": [...], "decision": "..."}` for
+a gallery gate) is stored in context directly under the node's ID.
 
----
-
-## HumanGateHandler
-
-A specialized handler for human approval gates with timeout and default behavior.
-
-| Property | Value |
-|----------|-------|
-| **Name** | `human_gate` |
-| **Node type** | `Interviewer` |
-
-### Attributes
-
-| Attribute | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `question` | String | No | The approval question. Falls back to `prompt`, then label. |
-| `prompt` | String | No | Alias for `question`. |
-| `human.timeout_secs` | Number | No | Seconds to wait before using default choice. |
-| `human.default_choice` | String | No | Default answer if timeout expires. |
-
-### Behavior
-
-1. Reads the question from `question`, `prompt`, or label (in that order).
-2. If a timeout is configured, wraps the interviewer in a `TimeoutInterviewer`.
-3. Calls `approve()` on the interviewer.
-4. On approval: returns `Success` with the response stored under the node ID.
-5. On rejection: returns `Failure("Human gate rejected")`.
-6. On timeout: uses `default_choice` if available, otherwise returns `Failure`.
+`HandlerRegistry` dispatches to the first registered handler whose
+`handles()` matches a node's type, so exactly one handler may ever be
+registered for `NodeType::Interviewer` in a given registry — `InterviewerHandler`
+is that handler everywhere it's wired up (`smasher-cli`, `smasher-web`).
 
 ---
 

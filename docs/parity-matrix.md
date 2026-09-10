@@ -59,8 +59,7 @@ Last verified: 2026-03-06 against the `tui-attractor` branch (commit 94c23df).
 | `CodergenHandler` | Implemented | Extracts model/prompt/system_prompt from attrs, stores result in context |
 | `ToolHandler` + `ToolBackend` trait | Implemented | `execute_tool(name, args)`, stores `_tool_{node_id}` in context |
 | `ManagerHandler` + `ManagerBackend` trait | Implemented | `coordinate(task, config)`, stores `_manager_{node_id}` in context |
-| `InterviewerHandler` + `Interviewer` trait | Implemented | `ask()`, `ask_with_options()`, `approve()` |
-| `HumanGateHandler` (builder pattern) | Implemented | Timeout, default choice, node-attribute overrides |
+| `InterviewerHandler` + `Interviewer` trait (builder pattern) | Implemented | `ask()`, `ask_with_options()`, `approve()`, timeout + default choice, node-attribute overrides |
 | `AutoApproveInterviewer` | Implemented | Always approves/returns configured response |
 | `QueueInterviewer` | Implemented | Pre-loaded answer queue |
 | `CallbackInterviewer` | Implemented | Custom closure-based answering |
