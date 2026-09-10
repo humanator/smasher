@@ -1,0 +1,51 @@
+digraph GalleryGateShowcase {
+  graph [
+    goal="Exercise the gallery gate end-to-end: render_capture produces real candidates on disk, a shape=hexagon gallery=\"true\" gate pauses for human selection, and proceed/iterate edges route on the recorded decision.",
+    rankdir=LR
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+
+  // --- Three real render_capture candidates, chained (no fan-in join tested yet) ---
+  Render1 [
+    shape=parallelogram,
+    label="Render Candidate A",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"gallery-gate-showcase\", \"candidate_id\": \"candidate-a\"}"
+  ];
+  Render2 [
+    shape=parallelogram,
+    label="Render Candidate B",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"gallery-gate-showcase\", \"candidate_id\": \"candidate-b\"}"
+  ];
+  Render3 [
+    shape=parallelogram,
+    label="Render Candidate C",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"gallery-gate-showcase\", \"candidate_id\": \"candidate-c\"}"
+  ];
+
+  // --- Gallery gate: Interviewer shape + gallery="true", not shape=diamond ---
+  Gate1 [
+    shape=hexagon,
+    label="Pick your favorite candidate(s)",
+    gallery="true",
+    candidate_count=3
+  ];
+
+  Proceed [shape=box, label="Proceed to polish"];
+  Iterate [shape=box, label="Iterate on candidates"];
+  Exit [shape=Msquare, label="Exit"];
+
+  Start -> Render1;
+  Render1 -> Render2;
+  Render2 -> Render3;
+  Render3 -> Gate1;
+
+  Gate1 -> Proceed [label="proceed"];
+  Gate1 -> Iterate [label="iterate"];
+
+  Proceed -> Exit;
+  Iterate -> Exit;
+}
