@@ -1,0 +1,19 @@
+[package]
+name = "smasher-task-critic-synthesis"
+description = "Vision-model usability critique (task_critic) and recommendation synthesis (synthesis) for design-factory candidates"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+smasher-attractor.workspace = true
+smasher-llm.workspace = true
+base64.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+uuid.workspace = true

@@ -1,0 +1,215 @@
+// ABOUTME: TaskCriticSynthesisToolBackend: ToolBackend impl dispatching "task_critic" and
+// ABOUTME: "synthesis" natively. Falls back to a wrapped Arc<dyn ToolBackend> for everything else.
+
+use std::sync::Arc;
+
+use serde_json::{Value, json};
+use smasher_attractor::handler::HandlerError;
+use smasher_attractor::state::{Context, Outcome};
+use smasher_attractor::tool_handler::ToolBackend;
+use smasher_llm::client::Client;
+
+use crate::report::artifact_dir;
+use crate::task_critic;
+
+/// Dispatches `"task_critic"` and `"synthesis"` to their native implementations,
+/// falling back to `fallback` (typically the wrapped `SystemLintToolBackend`) for
+/// every other tool name.
+pub struct TaskCriticSynthesisToolBackend {
+    fallback: Arc<dyn ToolBackend>,
+    client: Client,
+    task_critic_model: String,
+    #[allow(dead_code)] // wired into run_synthesis in Task 5
+    synthesis_model: String,
+}
+
+impl TaskCriticSynthesisToolBackend {
+    pub fn new(
+        fallback: Arc<dyn ToolBackend>,
+        task_critic_model: String,
+        synthesis_model: String,
+    ) -> Self {
+        Self {
+            fallback,
+            client: Client::from_env(),
+            task_critic_model,
+            synthesis_model,
+        }
+    }
+
+    async fn run_task_critic(&self, args: &Value) -> Result<Outcome, HandlerError> {
+        let report =
+            match task_critic::run_task_critic(&self.client, &self.task_critic_model, args).await {
+                Ok(report) => report,
+                Err(e) => return Ok(Outcome::failure(e.to_string())),
+            };
+
+        let run_id = args.get("run_id").and_then(Value::as_str).unwrap_or("");
+        let candidate_id = args
+            .get("candidate_id")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let output_dir = artifact_dir(run_id, candidate_id);
+        if let Err(e) = std::fs::create_dir_all(&output_dir) {
+            return Ok(Outcome::failure(format!(
+                "failed to create artifact dir {}: {e}",
+                output_dir.display()
+            )));
+        }
+
+        let report_path = output_dir.join("critic-report.json");
+        let json_body = match serde_json::to_string_pretty(&report) {
+            Ok(body) => body,
+            Err(e) => return Ok(Outcome::failure(format!("failed to serialize report: {e}"))),
+        };
+        if let Err(e) = std::fs::write(&report_path, json_body) {
+            return Ok(Outcome::failure(format!(
+                "failed to write {}: {e}",
+                report_path.display()
+            )));
+        }
+
+        Ok(Outcome::success_with(json!({
+            "artifact_dir": output_dir,
+            "report": report,
+        })))
+    }
+
+    async fn run_synthesis(&self, _args: &Value) -> Result<Outcome, HandlerError> {
+        // Lands in Task 5 (SPEC-task-critic-synthesis.md). The dispatch shape is
+        // final now so Task 5 only has to fill this in, not restructure the backend.
+        Ok(Outcome::failure(
+            "synthesis: not yet implemented (lands in Task 5, SPEC-task-critic-synthesis.md)",
+        ))
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolBackend for TaskCriticSynthesisToolBackend {
+    async fn execute_tool(
+        &self,
+        tool_name: &str,
+        args: &Value,
+        context: &Context,
+    ) -> Result<Outcome, HandlerError> {
+        match tool_name {
+            "task_critic" => self.run_task_critic(args).await,
+            "synthesis" => self.run_synthesis(args).await,
+            _ => self.fallback.execute_tool(tool_name, args, context).await,
+        }
+    }
+
+    fn available_tools(&self) -> Vec<String> {
+        vec!["task_critic".to_string(), "synthesis".to_string()]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use serde_json::json;
+
+    use super::*;
+
+    struct RecordingFallback {
+        called: AtomicBool,
+    }
+
+    impl RecordingFallback {
+        fn new() -> Self {
+            Self {
+                called: AtomicBool::new(false),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ToolBackend for RecordingFallback {
+        async fn execute_tool(
+            &self,
+            _tool_name: &str,
+            _args: &Value,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
+            self.called.store(true, Ordering::SeqCst);
+            Ok(Outcome::success())
+        }
+
+        fn available_tools(&self) -> Vec<String> {
+            vec!["fallback_tool".to_string()]
+        }
+    }
+
+    fn backend_with_recording_fallback() -> (TaskCriticSynthesisToolBackend, Arc<RecordingFallback>)
+    {
+        let fallback = Arc::new(RecordingFallback::new());
+        let backend = TaskCriticSynthesisToolBackend::new(
+            fallback.clone(),
+            "claude-sonnet-4-20250514".to_string(),
+            "claude-3-5-haiku-20241022".to_string(),
+        );
+        (backend, fallback)
+    }
+
+    #[test]
+    fn available_tools_returns_task_critic_and_synthesis() {
+        let (backend, _fallback) = backend_with_recording_fallback();
+        assert_eq!(
+            backend.available_tools(),
+            vec!["task_critic".to_string(), "synthesis".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn unknown_tool_name_reaches_the_fallback() {
+        let (backend, fallback) = backend_with_recording_fallback();
+
+        let outcome = backend
+            .execute_tool("some_other_tool", &json!({}), &Context::default())
+            .await
+            .expect("fallback should succeed");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+        assert!(fallback.called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn task_critic_missing_screenshot_fails_and_never_touches_fallback() {
+        let (backend, fallback) = backend_with_recording_fallback();
+        let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
+        let args = json!({
+            "run_id": run_id,
+            "candidate_id": "no-such-candidate",
+            "persona": "new user",
+            "task": "find settings",
+        });
+
+        let outcome = backend
+            .execute_tool("task_critic", &args, &Context::default())
+            .await
+            .expect("execute_tool itself should not error");
+
+        match outcome {
+            Outcome::Failure { error, .. } => {
+                assert!(error.contains("missing artifact"));
+            }
+            other => panic!("expected Failure, got {other:?}"),
+        }
+        assert!(!fallback.called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn synthesis_dispatch_never_touches_fallback() {
+        let (backend, fallback) = backend_with_recording_fallback();
+
+        let outcome = backend
+            .execute_tool("synthesis", &json!({}), &Context::default())
+            .await
+            .expect("execute_tool itself should not error");
+
+        assert!(matches!(outcome, Outcome::Failure { .. }));
+        assert!(!fallback.called.load(Ordering::SeqCst));
+    }
+}
