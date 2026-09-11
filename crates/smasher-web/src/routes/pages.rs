@@ -574,31 +574,33 @@ async fn run_questions(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, WebError> {
-    use crate::routes::gallery::{find_gallery_gate, resolve_candidate_count};
+    use crate::routes::gallery::{find_gallery_gate_for_node, resolve_candidate_count};
 
     let runs = state.runs.read().await;
     let record = runs
         .get(&id)
         .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
     let pending = record.interviewer.list_questions();
-    let gate = find_gallery_gate(&record.graph);
-    // Match the gallery gate to the question *it* raised, not whichever
-    // question happens to be oldest — a Parallel fan-out can have another
-    // node's question pending at the same time.
-    let gallery_question_id = gate.and_then(|g| {
-        pending
-            .questions
-            .iter()
-            .find(|q| q.node_id.as_deref() == Some(g.id.as_str()))
-            .map(|q| q.id.clone())
+    // Find whichever pending question actually belongs to a gallery gate, and
+    // use *that* gate — not just the graph's first gallery-shaped node. A
+    // pipeline with more than one gallery gate (e.g. a Discover gate and a
+    // separate Define gate) would otherwise only ever render a gate card for
+    // the first one, silently degrading every later gate to a plain
+    // free-text question card.
+    let pending_gallery = pending.questions.iter().find_map(|q| {
+        let node_id = q.node_id.as_deref()?;
+        let gate = find_gallery_gate_for_node(&record.graph, node_id)?;
+        Some((q.id.clone(), gate))
     });
+    let gallery_question_id = pending_gallery.as_ref().map(|(qid, _)| qid.clone());
+    let gate = pending_gallery.map(|(_, gate)| gate);
     let questions: Vec<TemplateQuestion> = pending
         .questions
         .into_iter()
         .map(TemplateQuestion::from)
         .collect();
 
-    // Gallery gate card: first gallery node + pending questions + candidates.
+    // Gallery gate card: the pending gallery gate + its candidates.
     // Renders alongside (not instead of) the plain question cards.
     let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
     let gallery_gate_html = gate.and_then(|gate| {
@@ -1107,6 +1109,46 @@ mod tests {
         assert!(html.contains("target=\"_blank\""));
         // Plain cards still render alongside.
         assert!(html.contains("question-card"));
+    }
+
+    /// Two gallery gates in one graph (e.g. a Discover gate feeding a
+    /// separate Define gate) — a real scenario for the design-factory
+    /// pipeline, not a hypothetical edge case. Found live: the second gate's
+    /// question degraded to a plain free-text card because the lookup always
+    /// grabbed the graph's *first* gallery-shaped node, then failed to match
+    /// it against the actually-pending question and gave up.
+    const TWO_GALLERY_GATES_DOT: &str = r#"digraph {
+        Start [shape=Mdiamond];
+        Gate1 [shape=hexagon, label="Discover gate", gallery="true"];
+        Middle [shape=box];
+        Gate2 [shape=hexagon, label="Define gate", gallery="true"];
+        Next [shape=box];
+        Start -> Gate1;
+        Gate1 -> Middle [label="proceed"];
+        Middle -> Gate2;
+        Gate2 -> Next [label="proceed"];
+    }"#;
+
+    #[tokio::test]
+    async fn run_questions_shows_gate_card_for_the_second_of_two_gallery_gates() {
+        let run_id = "gate-card-second-gate";
+        write_gate_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, TWO_GALLERY_GATES_DOT).await;
+        // Gate1's question is long done; only Gate2's is pending.
+        push_pending_qid(&interviewer, "q1", Some("Gate2"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            html.contains(r#"<div class="gate-card""#),
+            "gate card missing for the second gallery gate:\n{html}"
+        );
+        assert!(html.contains(r#"data-question-id="q1""#));
+        assert!(html.contains(&format!("/api/runs/{run_id}/gallery/q1/decision")));
     }
 
     #[tokio::test]

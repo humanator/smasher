@@ -87,8 +87,24 @@ pub fn is_gallery_gate(node: &GraphNode) -> bool {
 }
 
 /// Locate the first gallery gate node in the graph, if any.
+///
+/// Only correct for graphs with at most one gallery gate. A pipeline with
+/// more than one (e.g. a Discover gate and a separate Define gate) needs
+/// `find_gallery_gate_for_node` instead — this always returns the *first*
+/// gallery node regardless of which one, if any, currently has a pending
+/// question.
 pub fn find_gallery_gate(graph: &Graph) -> Option<&GraphNode> {
     graph.nodes.iter().find(|n| is_gallery_gate(n))
+}
+
+/// Locate the gallery gate node with the given id, if one exists.
+///
+/// Unlike `find_gallery_gate`, this works correctly when a graph has more
+/// than one gallery gate: callers pass the node id a *specific pending
+/// question* names, so the right gate is found regardless of how many other
+/// gallery gates exist elsewhere in the graph.
+pub fn find_gallery_gate_for_node<'a>(graph: &'a Graph, node_id: &str) -> Option<&'a GraphNode> {
+    graph.node(node_id).filter(|n| is_gallery_gate(n))
 }
 
 /// Resolve the expected candidate count for a gate card: display + warning,
@@ -152,18 +168,20 @@ async fn submit_gallery_decision(
             .get(&id)
             .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
 
-        // The question must belong to the gallery gate node itself, not just
-        // exist somewhere in the pending queue — a Parallel fan-out can leave
+        // The question must belong to *a* gallery gate node, not just exist
+        // somewhere in the pending queue — a Parallel fan-out can leave
         // another node's question pending at the same time, and answering
         // through this endpoint must never misroute that unrelated question.
-        let gate_id = find_gallery_gate(&record.graph).map(|g| g.id.clone());
-        let belongs_to_gate = gate_id.is_some()
-            && record
-                .interviewer
-                .list_questions()
-                .questions
-                .iter()
-                .any(|q| q.id == qid && q.node_id == gate_id);
+        // Matched by the question's own node id, not "the first gallery gate
+        // in the graph" — a pipeline with more than one gallery gate (e.g. a
+        // Discover gate and a separate Define gate) would otherwise only ever
+        // let the first one's questions through this endpoint.
+        let belongs_to_gate = record.interviewer.list_questions().questions.iter().any(|q| {
+            q.id == qid
+                && q.node_id
+                    .as_deref()
+                    .is_some_and(|nid| find_gallery_gate_for_node(&record.graph, nid).is_some())
+        });
 
         if !belongs_to_gate {
             return Ok(Json(AnswerQuestionResponse {
