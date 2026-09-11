@@ -20,6 +20,11 @@ use crate::candidates::{self, CandidateSummary};
 use crate::error::WebError;
 use crate::state::{AppState, RunSummary};
 
+/// Default vision-capable model for `task_critic` (overridable per node via `args["model"]`).
+const TASK_CRITIC_MODEL: &str = "claude-sonnet-4-20250514";
+/// Default cheap model for `synthesis` (overridable per node via `args["model"]`).
+const SYNTHESIS_MODEL: &str = "claude-3-5-haiku-20241022";
+
 // ---------------------------------------------------------------------------
 // Template structs
 // ---------------------------------------------------------------------------
@@ -355,9 +360,17 @@ async fn submit_run(
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
             ));
-        let tool_backend = Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
-            render_capture_backend as Arc<dyn ToolBackend>,
-        ));
+        let system_lint_backend =
+            Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
+                render_capture_backend as Arc<dyn ToolBackend>,
+            ));
+        let tool_backend = Arc::new(
+            smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
+                system_lint_backend as Arc<dyn ToolBackend>,
+                TASK_CRITIC_MODEL.to_string(),
+                SYNTHESIS_MODEL.to_string(),
+            ),
+        );
 
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.
         // Clone the backends as trait object Arcs for the child registry.

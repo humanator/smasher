@@ -14,6 +14,7 @@ smasher-agent.workspace = true
 smasher-attractor.workspace = true
 smasher-system-lint.workspace = true
 smasher-render-capture.workspace = true
+smasher-task-critic-synthesis.workspace = true
 
 axum = { version = "0.8", features = ["macros"] }
 askama = "0.12"
