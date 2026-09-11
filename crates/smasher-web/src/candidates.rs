@@ -1,9 +1,11 @@
-// ABOUTME: Candidate discovery for the gallery-view dashboard section.
-// ABOUTME: Validates ids and scans a run's render-capture artifacts on disk.
+// ABOUTME: Candidate discovery for the gallery-view dashboard section, plus reading a
+// ABOUTME: candidate's lint/critic/synthesis reports for the gate card's scorecards.
 
 use std::path::Path;
 
 use smasher_render_capture::manifest::{ExitStatus, Manifest};
+use smasher_system_lint::LintReport;
+use smasher_task_critic_synthesis::{CriticReport, Recommendation, SynthesisReport};
 
 /// Rejects ids that could escape a filesystem path when joined into one:
 /// empty strings, or any string containing `/`, `\`, or `..`.
@@ -75,6 +77,81 @@ fn scan_candidates_in(base: &Path, run_id: &str) -> Vec<CandidateSummary> {
 
     candidates.sort_by(|a, b| a.candidate_id.cmp(&b.candidate_id));
     candidates
+}
+
+/// A candidate's lint/critic/synthesis reports, whichever of the three have been
+/// written so far. Missing files are expected (a run can reach the gate before
+/// the critics finish, or before they exist on the pipeline at all) — not errors.
+#[derive(Debug, Clone, Default)]
+pub struct CandidateScorecard {
+    pub lint: Option<LintReport>,
+    pub critic: Option<CriticReport>,
+    pub synthesis: Option<SynthesisReport>,
+}
+
+impl CandidateScorecard {
+    pub fn lint_passed(&self) -> Option<bool> {
+        self.lint.as_ref().map(LintReport::passed)
+    }
+
+    pub fn lint_violations(&self) -> Vec<&str> {
+        self.lint
+            .iter()
+            .flat_map(|r| r.checks.iter())
+            .flat_map(|c| c.violations.iter())
+            .map(String::as_str)
+            .collect()
+    }
+
+    pub fn critic_success(&self) -> Option<bool> {
+        self.critic.as_ref().map(|c| c.success)
+    }
+
+    pub fn critic_friction(&self) -> &[String] {
+        self.critic
+            .as_ref()
+            .map(|c| c.friction.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn synthesis_recommendation_label(&self) -> Option<&'static str> {
+        self.synthesis.as_ref().map(|s| match s.recommendation {
+            Recommendation::Proceed => "proceed",
+            Recommendation::Iterate => "iterate",
+        })
+    }
+
+    pub fn synthesis_reasons(&self) -> &[String] {
+        self.synthesis
+            .as_ref()
+            .map(|s| s.reasons.as_slice())
+            .unwrap_or(&[])
+    }
+}
+
+/// Reads whichever of `lint-report.json`/`critic-report.json`/`synthesis-report.json`
+/// exist under `runs/<run_id>/artifacts/<candidate_id>/`. Callers pass already-
+/// validated ids (e.g. from `scan_candidates`); this never touches disk outside
+/// that directory since it only ever joins path segments, never parses them.
+pub fn read_scorecard(run_id: &str, candidate_id: &str) -> CandidateScorecard {
+    read_scorecard_in(Path::new("."), run_id, candidate_id)
+}
+
+fn read_scorecard_in(base: &Path, run_id: &str, candidate_id: &str) -> CandidateScorecard {
+    let dir = base
+        .join("runs")
+        .join(run_id)
+        .join("artifacts")
+        .join(candidate_id);
+
+    let read_json =
+        |filename: &str| -> Option<String> { std::fs::read_to_string(dir.join(filename)).ok() };
+
+    CandidateScorecard {
+        lint: read_json("lint-report.json").and_then(|s| serde_json::from_str(&s).ok()),
+        critic: read_json("critic-report.json").and_then(|s| serde_json::from_str(&s).ok()),
+        synthesis: read_json("synthesis-report.json").and_then(|s| serde_json::from_str(&s).ok()),
+    }
 }
 
 #[cfg(test)]
@@ -176,5 +253,85 @@ mod tests {
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].candidate_id, "candidate-good");
+    }
+
+    fn candidate_dir(base: &Path, run_id: &str, candidate_id: &str) -> PathBuf {
+        let dir = base
+            .join("runs")
+            .join(run_id)
+            .join("artifacts")
+            .join(candidate_id);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn read_scorecard_returns_default_when_no_reports_exist() {
+        let base = tempfile::tempdir().unwrap();
+        candidate_dir(base.path(), "run-1", "candidate-a");
+
+        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+
+        assert!(scorecard.lint.is_none());
+        assert!(scorecard.critic.is_none());
+        assert!(scorecard.synthesis.is_none());
+        assert_eq!(scorecard.lint_passed(), None);
+        assert!(scorecard.lint_violations().is_empty());
+        assert_eq!(scorecard.critic_success(), None);
+        assert!(scorecard.critic_friction().is_empty());
+        assert_eq!(scorecard.synthesis_recommendation_label(), None);
+    }
+
+    #[test]
+    fn read_scorecard_parses_a_failing_lint_report() {
+        let base = tempfile::tempdir().unwrap();
+        let dir = candidate_dir(base.path(), "run-1", "candidate-a");
+        std::fs::write(
+            dir.join("lint-report.json"),
+            r#"{"checks": [{"name": "token-adherence", "passed": false, "violations": ["raw hex color"]}]}"#,
+        )
+        .unwrap();
+
+        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+
+        assert_eq!(scorecard.lint_passed(), Some(false));
+        assert_eq!(scorecard.lint_violations(), vec!["raw hex color"]);
+    }
+
+    #[test]
+    fn read_scorecard_parses_critic_and_synthesis_reports() {
+        let base = tempfile::tempdir().unwrap();
+        let dir = candidate_dir(base.path(), "run-1", "candidate-a");
+        std::fs::write(
+            dir.join("critic-report.json"),
+            r#"{"persona": "new user", "task": "find settings", "success": false, "friction": ["hidden menu"], "notes": "gave up"}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("synthesis-report.json"),
+            r#"{"recommendation": "iterate", "reasons": ["critic found friction"]}"#,
+        )
+        .unwrap();
+
+        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+
+        assert_eq!(scorecard.critic_success(), Some(false));
+        assert_eq!(scorecard.critic_friction(), &["hidden menu".to_string()]);
+        assert_eq!(scorecard.synthesis_recommendation_label(), Some("iterate"));
+        assert_eq!(
+            scorecard.synthesis_reasons(),
+            &["critic found friction".to_string()]
+        );
+    }
+
+    #[test]
+    fn read_scorecard_ignores_a_malformed_report_rather_than_panicking() {
+        let base = tempfile::tempdir().unwrap();
+        let dir = candidate_dir(base.path(), "run-1", "candidate-a");
+        std::fs::write(dir.join("lint-report.json"), "not json").unwrap();
+
+        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+
+        assert!(scorecard.lint.is_none());
     }
 }

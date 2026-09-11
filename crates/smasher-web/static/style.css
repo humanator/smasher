@@ -1281,3 +1281,56 @@ textarea::placeholder {
 .lint-badge-slot:empty {
   display: none;
 }
+
+.lint-badge-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+}
+
+.scorecard-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+}
+
+.scorecard-badge-pass {
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.scorecard-badge-fail {
+  color: var(--red);
+  background: var(--red-dim);
+}
+
+.scorecard-violation,
+.scorecard-reason {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.scorecard-recommendation {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 0.15rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.scorecard-recommendation-proceed {
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.scorecard-recommendation-iterate {
+  color: var(--amber);
+  background: var(--amber-dim);
+}

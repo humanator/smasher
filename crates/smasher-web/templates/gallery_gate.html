@@ -7,17 +7,42 @@
     <p class="gate-hint">Found {{ candidates.len() }} candidate(s)</p>
   {% endmatch %}
   <div class="candidate-grid">
-    {% for c in candidates %}
-    {% if c.failed() %}
-    {% call candidate_card::failed_card(c, false) %}
+    {% for gc in candidates %}
+    {% if gc.summary.failed() %}
+    {% call candidate_card::failed_card(gc.summary, false) %}
     {% else %}
     <label class="candidate-card">
-      <input type="checkbox" name="selected" value="{{ c.candidate_id }}">
-      <a href="{{ c.screenshot_url }}" target="_blank">
-        <img src="{{ c.screenshot_url }}" alt="Candidate {{ c.candidate_id }}" class="candidate-thumbnail">
+      <input type="checkbox" name="selected" value="{{ gc.summary.candidate_id }}">
+      <a href="{{ gc.summary.screenshot_url }}" target="_blank">
+        <img src="{{ gc.summary.screenshot_url }}" alt="Candidate {{ gc.summary.candidate_id }}" class="candidate-thumbnail">
       </a>
-      <span class="candidate-id">{{ c.candidate_id }}</span>
-      <span class="lint-badge-slot" data-candidate="{{ c.candidate_id }}"></span>
+      <span class="candidate-id">{{ gc.summary.candidate_id }}</span>
+      <div class="lint-badge-slot" data-candidate="{{ gc.summary.candidate_id }}">{% if let Some(passed) = gc.scorecard.lint_passed() -%}
+          {%- if passed -%}
+          <span class="scorecard-badge scorecard-badge-pass">lint: pass</span>
+          {%- else -%}
+          <span class="scorecard-badge scorecard-badge-fail">lint: fail</span>
+          {%- for v in gc.scorecard.lint_violations() %}
+          <span class="scorecard-violation">{{ v }}</span>
+          {%- endfor -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- if let Some(success) = gc.scorecard.critic_success() -%}
+          {%- if success -%}
+          <span class="scorecard-badge scorecard-badge-pass">critic: success</span>
+          {%- else -%}
+          <span class="scorecard-badge scorecard-badge-fail">critic: friction</span>
+          {%- for f in gc.scorecard.critic_friction() %}
+          <span class="scorecard-violation">{{ f }}</span>
+          {%- endfor -%}
+          {%- endif -%}
+        {%- endif -%}
+        {%- if let Some(label) = gc.scorecard.synthesis_recommendation_label() -%}
+          <span class="scorecard-recommendation scorecard-recommendation-{{ label }}">synthesis: {{ label }}</span>
+          {%- for reason in gc.scorecard.synthesis_reasons() %}
+          <span class="scorecard-reason">{{ reason }}</span>
+          {%- endfor -%}
+        {%- endif %}</div>
     </label>
     {% endif %}
     {% endfor %}

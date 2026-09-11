@@ -16,7 +16,7 @@ use smasher_attractor::rendering::{
     CachedRenderer, GraphRenderer, NodeExecutionStatus, RenderFormat, StatusGraphvizRenderer,
 };
 
-use crate::candidates::{self, CandidateSummary};
+use crate::candidates::{self, CandidateScorecard, CandidateSummary};
 use crate::error::WebError;
 use crate::state::{AppState, RunSummary};
 
@@ -110,12 +110,19 @@ struct CandidateGalleryTemplate {
     candidates: Vec<CandidateSummary>,
 }
 
+/// One gate-card candidate: its render-capture summary plus whichever of its
+/// lint/critic/synthesis reports have been written so far.
+struct GateCandidate {
+    summary: CandidateSummary,
+    scorecard: CandidateScorecard,
+}
+
 #[derive(Template)]
 #[template(path = "gallery_gate.html")]
 struct GalleryGateTemplate {
     run_id: String,
     question_id: String,
-    candidates: Vec<CandidateSummary>,
+    candidates: Vec<GateCandidate>,
     expected_count: Option<usize>,
     outgoing_edges: Vec<String>,
 }
@@ -568,6 +575,13 @@ async fn run_questions(
         if found.is_empty() {
             return None;
         }
+        let candidates: Vec<GateCandidate> = found
+            .into_iter()
+            .map(|summary| {
+                let scorecard = candidates::read_scorecard(&id, &summary.candidate_id);
+                GateCandidate { summary, scorecard }
+            })
+            .collect();
         let expected_count = resolve_candidate_count(gate, &record.variables);
         let outgoing_edges: Vec<String> = record
             .graph
@@ -578,7 +592,7 @@ async fn run_questions(
         GalleryGateTemplate {
             run_id: id.clone(),
             question_id,
-            candidates: found,
+            candidates,
             expected_count,
             outgoing_edges,
         }
@@ -1019,6 +1033,56 @@ mod tests {
         assert!(html.contains("target=\"_blank\""));
         // Plain cards still render alongside.
         assert!(html.contains("question-card"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_gate_card_shows_scorecards_for_the_right_candidate() {
+        let run_id = "gate-card-scorecards";
+        write_gate_manifest(run_id, "candidate-a", false);
+        write_gate_manifest(run_id, "candidate-b", false);
+
+        let artifacts_dir = std::path::Path::new("runs").join(run_id).join("artifacts");
+        std::fs::write(
+            artifacts_dir.join("candidate-a").join("lint-report.json"),
+            r#"{"checks": [{"name": "token-adherence", "passed": false, "violations": ["raw hex color #fff"]}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            artifacts_dir.join("candidate-a").join("critic-report.json"),
+            r#"{"persona": "new user", "task": "find settings", "success": false, "friction": ["settings hidden in overflow menu"], "notes": "gave up"}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            artifacts_dir.join("candidate-a").join("synthesis-report.json"),
+            r#"{"recommendation": "iterate", "reasons": ["lint failed and critic found friction"]}"#,
+        )
+        .unwrap();
+        // candidate-b deliberately has no reports: the pipeline hasn't run
+        // critics against it yet, and its card should show no scorecard data.
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("lint: fail"), "missing lint badge:\n{html}");
+        assert!(html.contains("raw hex color #fff"));
+        assert!(html.contains("critic: friction"));
+        assert!(html.contains("settings hidden in overflow menu"));
+        assert!(html.contains("synthesis: iterate"));
+        assert!(html.contains("lint failed and critic found friction"));
+
+        // Scorecard content must land on candidate-a's own slot, not candidate-b's:
+        // candidate-b has no reports, so its slot div must be truly empty (no
+        // stray whitespace either) for the existing `.lint-badge-slot:empty`
+        // CSS rule to hide it.
+        assert!(
+            html.contains(r#"data-candidate="candidate-b"></div>"#),
+            "candidate-b slot is not empty:\n{html}"
+        );
     }
 
     #[tokio::test]
