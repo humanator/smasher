@@ -1,0 +1,132 @@
+digraph ProductDesignFactory {
+  graph [
+    goal="Discover a product design direction, define it against real usability and design-system critique, and deliver a pruned, accessible build.",
+    rankdir=LR,
+    default_max_retry=2
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+  Exit  [shape=Msquare, label="Exit"];
+
+  // --- Discover: wide exploration, cheap kit-based candidates ---
+
+  IAOptions [
+    shape=box,
+    label="Build interaction approaches from kit",
+    prompt="Given this task and the shared component kit, build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/<id>/. Compose from kit components; do not reinvent them."
+  ];
+
+  // Real render_capture is one-candidate-per-call, so Discover's 4 candidates
+  // are 4 sequential Tool nodes into one gate — the same proven topology as
+  // examples/gallery_gate_showcase.dot (no fan-in-into-gate has been tested).
+  RenderDiscoverA [
+    shape=parallelogram,
+    label="Render candidate A",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-a\"}"
+  ];
+  RenderDiscoverB [
+    shape=parallelogram,
+    label="Render candidate B",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-b\"}"
+  ];
+  RenderDiscoverC [
+    shape=parallelogram,
+    label="Render candidate C",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-c\"}"
+  ];
+  RenderDiscoverD [
+    shape=parallelogram,
+    label="Render candidate D",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-d\"}"
+  ];
+
+  GalleryGate1 [
+    shape=hexagon,
+    gallery="true",
+    label="Human: pick direction(s)",
+    candidate_count="phase_default(discover)"
+  ];
+
+  // --- Define: build out the chosen direction, critique it two ways ---
+
+  Implement [
+    shape=box,
+    label="Implement chosen direction",
+    prompt="Build out the selected pattern under ./build/define/ using the kit, existing tokens, and components."
+  ];
+
+  RenderDefine [
+    shape=parallelogram,
+    label="Render + capture build",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-system-lint/fixtures/clean-candidate\", \"candidate_id\": \"define\"}"
+  ];
+
+  CritiqueParallel [shape=component, label="Critique (Parallel)"];
+
+  SystemLint [
+    shape=parallelogram,
+    label="Design-system check",
+    tool="system_lint",
+    args="{\"candidate_dir\": \"crates/smasher-system-lint/fixtures/clean-candidate\", \"candidate_id\": \"define\"}"
+  ];
+
+  TaskCritic [
+    shape=parallelogram,
+    label="Usability critic",
+    tool="task_critic",
+    args="{\"candidate_id\": \"define\", \"persona\": \"a new user unfamiliar with the product\", \"task\": \"find the primary call-to-action button\"}"
+  ];
+
+  CritiqueJoin [shape=tripleoctagon, label="Critique Join"];
+
+  Synthesis [
+    shape=parallelogram,
+    label="Synthesise critiques",
+    tool="synthesis",
+    args="{\"candidate_id\": \"define\"}"
+  ];
+
+  GalleryGate2 [
+    shape=hexagon,
+    gallery="true",
+    label="Human: reaction, next step",
+    candidate_count="phase_default(define)"
+  ];
+
+  // --- Deliver: prune, check accessibility ---
+
+  Prune [
+    shape=box,
+    label="Cut non-value elements",
+    prompt="Remove anything not serving the task from ./build/define/. Prefer kit/native components over custom ones."
+  ];
+
+  // No real axe-core integration exists yet (deliberately deferred — see
+  // design-factory/tasks/todo.md Task 10). This is a placeholder shell command
+  // standing in for a future native `a11y_check` tool, not a real audit.
+  A11yCheck [
+    shape=parallelogram,
+    label="Accessibility check (stub — axe-core wiring deferred)",
+    tool_command="echo 'axe-core stub: no violations (placeholder, not a real audit)'"
+  ];
+
+  Start -> IAOptions;
+  IAOptions -> RenderDiscoverA -> RenderDiscoverB -> RenderDiscoverC -> RenderDiscoverD -> GalleryGate1;
+
+  GalleryGate1 -> Implement [label="proceed"];
+
+  Implement -> RenderDefine -> CritiqueParallel;
+  CritiqueParallel -> SystemLint -> CritiqueJoin;
+  CritiqueParallel -> TaskCritic -> CritiqueJoin;
+  CritiqueJoin -> Synthesis -> GalleryGate2;
+
+  GalleryGate2 -> Implement [label="iterate"];
+  GalleryGate2 -> Prune     [label="proceed"];
+
+  Prune -> A11yCheck -> Exit;
+}

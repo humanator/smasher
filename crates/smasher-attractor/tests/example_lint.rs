@@ -50,6 +50,7 @@ const EXAMPLES: &[&str] = &[
     "consensus_task_parity.dot",
     "megaplan.dot",
     "megaplan_quality.dot",
+    "product_design_factory.dot",
     "semport.dot",
     "semport_thematic.dot",
     "sprint_exec.dot",
@@ -104,6 +105,18 @@ fn megaplan_quality_passes_lint() {
     assert!(
         !report.has_errors(),
         "megaplan_quality.dot has lint errors: {:?}",
+        report.errors()
+    );
+}
+
+#[test]
+fn product_design_factory_passes_lint() {
+    let g = load_example("product_design_factory.dot");
+    let runner = LintRunner::with_builtins();
+    let report = runner.run(&g);
+    assert!(
+        !report.has_errors(),
+        "product_design_factory.dot has lint errors: {:?}",
         report.errors()
     );
 }

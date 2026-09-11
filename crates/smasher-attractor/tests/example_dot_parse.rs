@@ -309,6 +309,129 @@ fn sprint_exec_has_cross_model_critiques() {
 }
 
 // ============================================================================
+// product_design_factory.dot
+// ============================================================================
+
+#[test]
+fn product_design_factory_parses_and_resolves() {
+    let g = load_example("product_design_factory.dot");
+    assert!(!g.nodes.is_empty());
+    assert!(!g.edges.is_empty());
+}
+
+#[test]
+fn product_design_factory_has_start_and_exit() {
+    let g = load_example("product_design_factory.dot");
+    assert_eq!(g.start_nodes().len(), 1);
+    assert!(!g.exit_nodes().is_empty());
+}
+
+#[test]
+fn product_design_factory_has_two_gallery_gates() {
+    let g = load_example("product_design_factory.dot");
+    for id in ["GalleryGate1", "GalleryGate2"] {
+        let gate = g.node(id).unwrap_or_else(|| panic!("missing {id}"));
+        assert_eq!(
+            gate.node_type,
+            NodeType::Interviewer,
+            "{id} should resolve to an Interviewer node (hexagon), not Conditional (diamond)"
+        );
+        assert!(
+            gate.is_gallery_gate(),
+            "{id} should carry gallery=\"true\" so the human-gate path treats it as a gallery decision"
+        );
+    }
+}
+
+#[test]
+fn product_design_factory_has_critique_parallel_fanout_and_join() {
+    let g = load_example("product_design_factory.dot");
+    let parallel = g
+        .node("CritiqueParallel")
+        .expect("missing CritiqueParallel");
+    assert_eq!(parallel.node_type, NodeType::Parallel);
+    let join = g.node("CritiqueJoin").expect("missing CritiqueJoin");
+    assert_eq!(join.node_type, NodeType::FanIn);
+}
+
+#[test]
+fn product_design_factory_has_native_tool_dispatch_for_every_pipeline_tool() {
+    let g = load_example("product_design_factory.dot");
+    for (id, tool) in [
+        ("RenderDiscoverA", "render_capture"),
+        ("RenderDefine", "render_capture"),
+        ("SystemLint", "system_lint"),
+        ("TaskCritic", "task_critic"),
+        ("Synthesis", "synthesis"),
+    ] {
+        let node = g.node(id).unwrap_or_else(|| panic!("missing {id}"));
+        assert_eq!(node.node_type, NodeType::Tool);
+        match node.attrs.get("tool") {
+            Some(smasher_attractor::graph::NodeAttrValue::String(t)) => assert_eq!(t, tool),
+            other => panic!("{id} tool attr should be {tool:?}, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn product_design_factory_gates_route_on_the_edge_matching_the_decision() {
+    let g = load_example("product_design_factory.dot");
+
+    let gate1_edges: Vec<_> = g
+        .edges_from("GalleryGate1")
+        .into_iter()
+        .filter_map(|e| e.label.as_deref())
+        .collect();
+    assert_eq!(gate1_edges, vec!["proceed"]);
+
+    let mut gate2_edges: Vec<_> = g
+        .edges_from("GalleryGate2")
+        .into_iter()
+        .filter_map(|e| e.label.as_deref())
+        .collect();
+    gate2_edges.sort();
+    assert_eq!(gate2_edges, vec!["iterate", "proceed"]);
+}
+
+/// Engine-level proof (no LLM, no browser, no HTTP) that a real gallery
+/// decision against this exact fixture graph — not a synthetic one — routes
+/// through the same `HandlerRegistry` -> `InterviewerHandler` -> `select_edge`
+/// path production code uses, landing on the edge the decision named rather
+/// than falling through to an alphabetical tiebreak.
+#[tokio::test]
+async fn product_design_factory_gate2_answers_route_to_the_named_edge() {
+    use smasher_attractor::edge::select_edge;
+    use smasher_attractor::handler::HandlerRegistry;
+    use smasher_attractor::interviewer::{InterviewerHandler, QueueInterviewer};
+    use smasher_attractor::state::Context;
+    use std::sync::Arc;
+
+    let g = load_example("product_design_factory.dot");
+    let gate = g.node("GalleryGate2").expect("missing GalleryGate2");
+
+    for decision in ["iterate", "proceed"] {
+        let queue = Arc::new(QueueInterviewer::new());
+        queue.push_response(format!(r#"{{"selected":["define"],"decision":"{decision}"}}"#));
+
+        let mut registry = HandlerRegistry::new();
+        registry.register(Arc::new(InterviewerHandler::new(queue)));
+
+        let ctx = Context::new();
+        let outcome = registry.execute(gate, &ctx).await.unwrap();
+        assert_eq!(outcome.preferred_label(), Some(decision));
+
+        let edge = select_edge(&g, "GalleryGate2", &ctx, Some(&outcome))
+            .unwrap()
+            .expect("an edge should be selected");
+        assert_eq!(
+            edge.label.as_deref(),
+            Some(decision),
+            "a {decision:?} decision must route down the {decision:?} edge, not fall through to a tiebreak"
+        );
+    }
+}
+
+// ============================================================================
 // vulnerability_analyzer.dot
 // ============================================================================
 
