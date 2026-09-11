@@ -1,0 +1,10 @@
+{
+  "persona": "a first-time user on a small mobile screen",
+  "task": "cancel their subscription",
+  "success": false,
+  "friction": [
+    "the cancel option is nested three menus deep",
+    "no visible 'cancel subscription' label anywhere on the billing page"
+  ],
+  "notes": "Gave up after 45 seconds of searching; the flow relies on a small overflow menu that is easy to miss."
+}

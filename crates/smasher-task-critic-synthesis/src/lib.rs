@@ -6,4 +6,4 @@ pub mod report;
 pub mod synthesis;
 pub mod task_critic;
 
-pub use report::{CriticError, CriticReport};
+pub use report::{CriticError, CriticReport, Recommendation, SynthesisReport};

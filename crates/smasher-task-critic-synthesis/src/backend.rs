@@ -1,8 +1,10 @@
 // ABOUTME: TaskCriticSynthesisToolBackend: ToolBackend impl dispatching "task_critic" and
 // ABOUTME: "synthesis" natively. Falls back to a wrapped Arc<dyn ToolBackend> for everything else.
 
+use std::path::Path;
 use std::sync::Arc;
 
+use serde::Serialize;
 use serde_json::{Value, json};
 use smasher_attractor::handler::HandlerError;
 use smasher_attractor::state::{Context, Outcome};
@@ -10,7 +12,31 @@ use smasher_attractor::tool_handler::ToolBackend;
 use smasher_llm::client::Client;
 
 use crate::report::artifact_dir;
-use crate::task_critic;
+use crate::{synthesis, task_critic};
+
+/// Writes `report` as pretty JSON to `output_dir/filename`, creating `output_dir`
+/// first. Returns a plain error message (never a `HandlerError`/`Outcome`) on any
+/// I/O/serialization problem, letting the caller decide how to surface it.
+fn write_report_artifact<T: Serialize>(
+    output_dir: &Path,
+    filename: &str,
+    report: &T,
+) -> Result<(), String> {
+    std::fs::create_dir_all(output_dir).map_err(|e| {
+        format!(
+            "failed to create artifact dir {}: {e}",
+            output_dir.display()
+        )
+    })?;
+
+    let report_path = output_dir.join(filename);
+    let json_body = serde_json::to_string_pretty(report)
+        .map_err(|e| format!("failed to serialize report: {e}"))?;
+    std::fs::write(&report_path, json_body)
+        .map_err(|e| format!("failed to write {}: {e}", report_path.display()))?;
+
+    Ok(())
+}
 
 /// Dispatches `"task_critic"` and `"synthesis"` to their native implementations,
 /// falling back to `fallback` (typically the wrapped `SystemLintToolBackend`) for
@@ -19,7 +45,6 @@ pub struct TaskCriticSynthesisToolBackend {
     fallback: Arc<dyn ToolBackend>,
     client: Client,
     task_critic_model: String,
-    #[allow(dead_code)] // wired into run_synthesis in Task 5
     synthesis_model: String,
 }
 
@@ -50,23 +75,8 @@ impl TaskCriticSynthesisToolBackend {
             .and_then(Value::as_str)
             .unwrap_or("");
         let output_dir = artifact_dir(run_id, candidate_id);
-        if let Err(e) = std::fs::create_dir_all(&output_dir) {
-            return Ok(Outcome::failure(format!(
-                "failed to create artifact dir {}: {e}",
-                output_dir.display()
-            )));
-        }
-
-        let report_path = output_dir.join("critic-report.json");
-        let json_body = match serde_json::to_string_pretty(&report) {
-            Ok(body) => body,
-            Err(e) => return Ok(Outcome::failure(format!("failed to serialize report: {e}"))),
-        };
-        if let Err(e) = std::fs::write(&report_path, json_body) {
-            return Ok(Outcome::failure(format!(
-                "failed to write {}: {e}",
-                report_path.display()
-            )));
+        if let Err(msg) = write_report_artifact(&output_dir, "critic-report.json", &report) {
+            return Ok(Outcome::failure(msg));
         }
 
         Ok(Outcome::success_with(json!({
@@ -75,12 +85,27 @@ impl TaskCriticSynthesisToolBackend {
         })))
     }
 
-    async fn run_synthesis(&self, _args: &Value) -> Result<Outcome, HandlerError> {
-        // Lands in Task 5 (SPEC-task-critic-synthesis.md). The dispatch shape is
-        // final now so Task 5 only has to fill this in, not restructure the backend.
-        Ok(Outcome::failure(
-            "synthesis: not yet implemented (lands in Task 5, SPEC-task-critic-synthesis.md)",
-        ))
+    async fn run_synthesis(&self, args: &Value) -> Result<Outcome, HandlerError> {
+        let report = match synthesis::run_synthesis(&self.client, &self.synthesis_model, args).await
+        {
+            Ok(report) => report,
+            Err(e) => return Ok(Outcome::failure(e.to_string())),
+        };
+
+        let run_id = args.get("run_id").and_then(Value::as_str).unwrap_or("");
+        let candidate_id = args
+            .get("candidate_id")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let output_dir = artifact_dir(run_id, candidate_id);
+        if let Err(msg) = write_report_artifact(&output_dir, "synthesis-report.json", &report) {
+            return Ok(Outcome::failure(msg));
+        }
+
+        Ok(Outcome::success_with(json!({
+            "artifact_dir": output_dir,
+            "report": report,
+        })))
     }
 }
 

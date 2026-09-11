@@ -1,4 +1,4 @@
-// ABOUTME: CriticReport/CriticError and the artifact_dir() path helper.
+// ABOUTME: CriticReport/SynthesisReport/CriticError and the artifact_dir() path helper.
 // ABOUTME: Pure data and path logic; parsing/prompting lives in task_critic.rs and synthesis.rs.
 
 use std::path::PathBuf;
@@ -15,6 +15,22 @@ pub struct CriticReport {
     pub success: bool,
     pub friction: Vec<String>,
     pub notes: String,
+}
+
+/// `synthesis`'s verdict: whether the pipeline should proceed with this candidate
+/// or iterate on it, reconciling `system_lint`'s and `task_critic`'s reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Recommendation {
+    Proceed,
+    Iterate,
+}
+
+/// `synthesis`'s output: a recommendation plus reasons citing both input reports.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SynthesisReport {
+    pub recommendation: Recommendation,
+    pub reasons: Vec<String>,
 }
 
 #[derive(Debug, Error)]
@@ -88,5 +104,28 @@ mod tests {
             response: "not json at all".to_string(),
         };
         assert!(err.to_string().contains("not json at all"));
+    }
+
+    #[test]
+    fn synthesis_report_serde_roundtrip() {
+        let report = SynthesisReport {
+            recommendation: Recommendation::Iterate,
+            reasons: vec!["lint clean but critic found friction".to_string()],
+        };
+        let json = serde_json::to_string(&report).unwrap();
+        let back: SynthesisReport = serde_json::from_str(&json).unwrap();
+        assert_eq!(report, back);
+    }
+
+    #[test]
+    fn recommendation_serializes_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&Recommendation::Proceed).unwrap(),
+            "\"proceed\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Recommendation::Iterate).unwrap(),
+            "\"iterate\""
+        );
     }
 }

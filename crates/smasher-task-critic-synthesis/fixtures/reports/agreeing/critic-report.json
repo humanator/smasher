@@ -1,0 +1,7 @@
+{
+  "persona": "a new user unfamiliar with the product",
+  "task": "find the primary call-to-action button",
+  "success": true,
+  "friction": [],
+  "notes": "The CTA button was immediately visible above the fold with clear, high-contrast styling."
+}

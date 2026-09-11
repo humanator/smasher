@@ -1,0 +1,6 @@
+{
+  "checks": [
+    { "name": "token-adherence", "passed": true, "violations": [] },
+    { "name": "kit-component-usage", "passed": true, "violations": [] }
+  ]
+}
