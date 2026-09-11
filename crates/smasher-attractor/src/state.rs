@@ -507,6 +507,14 @@ impl Outcome {
 
     // ----- Accessor methods -----
 
+    /// Returns the output data, if set (Success and PartialSuccess only).
+    pub fn data(&self) -> Option<&serde_json::Value> {
+        match self {
+            Self::Success { data, .. } | Self::PartialSuccess { data, .. } => data.as_ref(),
+            _ => None,
+        }
+    }
+
     /// Returns the preferred label, if set (Success and PartialSuccess only).
     pub fn preferred_label(&self) -> Option<&str> {
         match self {
@@ -1540,6 +1548,21 @@ mod tests {
         // Builder is a no-op on non-applicable variants.
         let o2 = Outcome::failure("err").with_preferred_label("ignored");
         assert_eq!(o2.preferred_label(), None);
+    }
+
+    #[test]
+    fn outcome_data_accessor() {
+        let o = Outcome::success_with(json!({"selected": ["a"], "decision": "proceed"}));
+        assert_eq!(
+            o.data(),
+            Some(&json!({"selected": ["a"], "decision": "proceed"}))
+        );
+
+        // None on variants with no data field.
+        let o2 = Outcome::success();
+        assert_eq!(o2.data(), None);
+        let o3 = Outcome::failure("err");
+        assert_eq!(o3.data(), None);
     }
 
     #[test]

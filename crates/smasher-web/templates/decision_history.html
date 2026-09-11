@@ -1,0 +1,16 @@
+<div class="decision-history">
+{% if decisions.is_empty() %}
+    <p class="empty-state">No gate decisions yet.</p>
+{% else %}
+    <ul class="decision-list">
+        {% for d in decisions %}
+        <li class="decision-entry">
+            <span class="decision-node">{{ d.node_id }}</span>
+            <span class="decision-edge">{{ d.decision }}</span>
+            <span class="decision-candidates">{{ d.selected.join(", ") }}</span>
+            <span class="decision-timestamp">{{ d.timestamp }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+</div>

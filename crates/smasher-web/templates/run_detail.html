@@ -71,6 +71,15 @@
                 hx-swap="innerHTML">
             </div>
         </section>
+
+        <section class="decision-history-section">
+            <h3>Decision History</h3>
+            <div id="decision-history-list"
+                hx-get="/runs/{{ run.id }}/decisions"
+                hx-trigger="load, every 5s"
+                hx-swap="innerHTML">
+            </div>
+        </section>
     </div>
 
     <section class="run-meta">

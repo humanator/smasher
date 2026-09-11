@@ -110,6 +110,32 @@ struct CandidateGalleryTemplate {
     candidates: Vec<CandidateSummary>,
 }
 
+/// Template-friendly gate decision: candidate ids joined for display, timestamp
+/// pre-formatted, decision-vs-log kept separate from `crate::sse`'s event rendering.
+struct TemplateDecision {
+    node_id: String,
+    selected: Vec<String>,
+    decision: String,
+    timestamp: String,
+}
+
+impl From<crate::decision_history::GalleryDecision> for TemplateDecision {
+    fn from(d: crate::decision_history::GalleryDecision) -> Self {
+        Self {
+            node_id: d.node_id,
+            selected: d.selected,
+            decision: d.decision,
+            timestamp: d.timestamp.to_rfc3339(),
+        }
+    }
+}
+
+#[derive(Template)]
+#[template(path = "decision_history.html")]
+struct DecisionHistoryTemplate {
+    decisions: Vec<TemplateDecision>,
+}
+
 /// One gate-card candidate: its render-capture summary plus whichever of its
 /// lint/critic/synthesis reports have been written so far.
 struct GateCandidate {
@@ -174,6 +200,7 @@ pub fn router() -> Router<AppState> {
         .route("/runs/{id}/tokens", get(run_tokens))
         .route("/runs/{id}/questions", get(run_questions))
         .route("/runs/{id}/candidates", get(run_candidates))
+        .route("/runs/{id}/decisions", get(run_decisions))
 }
 
 // ---------------------------------------------------------------------------
@@ -625,6 +652,24 @@ async fn run_candidates(
         run_id: id,
         candidates,
     }))
+}
+
+async fn run_decisions(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, WebError> {
+    let runs = state.runs.read().await;
+    let record = runs
+        .get(&id)
+        .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+
+    let events = record.event_log.events();
+    let decisions = crate::decision_history::gallery_decisions(&events, &record.graph)
+        .into_iter()
+        .map(TemplateDecision::from)
+        .collect();
+
+    Ok(HtmlTemplate(DecisionHistoryTemplate { decisions }))
 }
 
 #[cfg(test)]
@@ -1128,4 +1173,81 @@ mod tests {
         assert!(!html.contains("data-question-id="));
         assert!(html.contains("No pending questions."));
     }
+
+    // ---------------------------------------------------------------
+    // Decision history
+    // ---------------------------------------------------------------
+
+    async fn get_html(state: AppState, uri: &str) -> (StatusCode, String) {
+        let app = router().with_state(state);
+        let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, String::from_utf8_lossy(&body).into_owned())
+    }
+
+    fn push_gate_completed(
+        state: &AppState,
+        run_id: &str,
+        node_id: &str,
+        selected: &[&str],
+        decision: &str,
+    ) {
+        use smasher_attractor::events::PipelineEvent;
+        use smasher_attractor::state::Outcome;
+
+        let runs = state.runs.try_read().unwrap();
+        let record = runs.get(run_id).unwrap();
+        record.event_log.push(PipelineEvent::NodeCompleted {
+            node_id: node_id.into(),
+            outcome: Outcome::success_with(serde_json::json!({
+                "selected": selected,
+                "decision": decision,
+            }))
+            .with_preferred_label(decision),
+            duration_ms: 0,
+            timestamp: chrono::Utc::now(),
+        });
+    }
+
+    #[tokio::test]
+    async fn run_decisions_empty_state_for_run_with_no_gate_decisions() {
+        let run_id = "decisions-empty";
+        let state = test_state();
+        insert_graph_record(&state, run_id, GALLERY_DOT).await;
+
+        let (status, html) = get_html(state, &format!("/runs/{run_id}/decisions")).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("No gate decisions yet."));
+    }
+
+    #[tokio::test]
+    async fn run_decisions_lists_recorded_gate_decisions() {
+        let run_id = "decisions-recorded";
+        let state = test_state();
+        insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_gate_completed(&state, run_id, "Gate1", &["candidate-a"], "proceed");
+        push_gate_completed(&state, run_id, "Gate1", &["candidate-b"], "iterate");
+
+        let (status, html) = get_html(state, &format!("/runs/{run_id}/decisions")).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("Gate1"));
+        assert!(html.contains("candidate-a"));
+        assert!(html.contains("proceed"));
+        assert!(html.contains("candidate-b"));
+        assert!(html.contains("iterate"));
+    }
+
+    #[tokio::test]
+    async fn run_decisions_not_found_for_unknown_run() {
+        let state = test_state();
+        let (status, _) = get_html(state, "/runs/no-such-run/decisions").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
 }

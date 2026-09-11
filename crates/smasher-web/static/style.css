@@ -1334,3 +1334,48 @@ textarea::placeholder {
   color: var(--amber);
   background: var(--amber-dim);
 }
+
+/* ============================================================
+   Decision History
+   ============================================================ */
+.decision-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.decision-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+}
+
+.decision-entry:last-child {
+  border-bottom: none;
+}
+
+.decision-node {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.decision-edge {
+  color: var(--blue);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.decision-candidates {
+  color: var(--text-secondary);
+}
+
+.decision-timestamp {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
