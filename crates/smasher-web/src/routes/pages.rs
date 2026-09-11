@@ -1250,4 +1250,92 @@ mod tests {
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
+    // ---------------------------------------------------------------
+    // Branch picker: more than two outgoing edges (Task 8)
+    // ---------------------------------------------------------------
+
+    const THREE_EDGE_GALLERY_DOT: &str = r#"digraph {
+        Start [shape=Mdiamond];
+        Gate1 [shape=hexagon, label="Pick a direction", gallery="true"];
+        Polish [shape=box];
+        Redo [shape=box];
+        Fork [shape=box];
+        Start -> Gate1;
+        Gate1 -> Polish [label="proceed"];
+        Gate1 -> Redo [label="iterate"];
+        Gate1 -> Fork [label="fork-new-direction"];
+    }"#;
+
+    #[tokio::test]
+    async fn run_questions_gate_card_shows_a_button_per_outgoing_edge_beyond_two() {
+        let run_id = "gate-card-three-edges";
+        write_gate_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, THREE_EDGE_GALLERY_DOT).await;
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains(">proceed<"));
+        assert!(html.contains(">iterate<"));
+        assert!(html.contains(">fork-new-direction<"));
+        assert_eq!(html.matches("class=\"btn btn-primary btn-small gate-decision-btn\"").count(), 3);
+    }
+
+    #[tokio::test]
+    async fn run_questions_gate_card_hint_honors_candidates_launch_var_override() {
+        use crate::state::RunRecord;
+        use smasher_attractor::dot::parser;
+        use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
+        use smasher_attractor::graph;
+        use smasher_attractor::http_interviewer::HttpInterviewer;
+        use smasher_attractor::state::RunStatus;
+        use std::sync::Arc;
+
+        // Same DOT as the standard gate fixture (`candidate_count="phase_default(discover)"`,
+        // i.e. 4 by default), but with a launch-time `candidates` variable set —
+        // the mechanism this project uses instead of a dedicated `--candidates N`
+        // flag, since `smasher run --var candidates=N` already threads a launch
+        // variable into `RunRecord.variables` and `resolve_candidate_count` reads
+        // it first. No DOT edit needed.
+        let run_id = "gate-card-candidates-override";
+        write_gate_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        let parsed = parser::parse(GALLERY_DOT).unwrap();
+        let resolved = graph::resolve(&parsed).unwrap();
+        let interviewer = HttpInterviewer::new();
+        let mut variables = HashMap::new();
+        variables.insert("candidates".to_string(), "2".to_string());
+        let record = RunRecord {
+            id: run_id.into(),
+            dot_source: GALLERY_DOT.into(),
+            graph: resolved,
+            status: RunStatus::Running,
+            started_at: chrono::Utc::now(),
+            completed_at: None,
+            emitter: Arc::new(PipelineEventEmitter::default()),
+            event_log: Arc::new(PipelineEventLog::new()),
+            cancellation: tokio_util::sync::CancellationToken::new(),
+            interviewer: interviewer.clone(),
+            variables,
+            error: None,
+            input_tokens: Arc::new(AtomicU64::new(0)),
+            output_tokens: Arc::new(AtomicU64::new(0)),
+            run_working_dir: None,
+        };
+        state.runs.write().await.insert(run_id.into(), record);
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        // Without the override this would read "Expected 4, found 1"
+        // (phase_default(discover)) — the launch var wins.
+        assert!(html.contains("Expected 2, found 1"), "hint not overridden:\n{html}");
+    }
 }
