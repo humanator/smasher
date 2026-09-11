@@ -53,9 +53,11 @@ fn parse_response(text: &str) -> Result<SynthesisReport, CriticError> {
 /// Runs `synthesis` against a candidate's already-written `lint-report.json` and
 /// `critic-report.json`.
 ///
-/// `args`: `{run_id, candidate_id, model?}`. A missing `lint-report.json` or
-/// `critic-report.json` fails with `CriticError::MissingArtifact` naming the exact
-/// missing file, before any network call is attempted.
+/// `args`: `{run_id, candidate_id, model?, provider?}`. A missing
+/// `lint-report.json` or `critic-report.json` fails with
+/// `CriticError::MissingArtifact` naming the exact missing file, before any
+/// network call is attempted. `provider` overrides model-name-based provider
+/// inference — see `task_critic::run_task_critic`'s doc comment for why.
 pub async fn run_synthesis(
     client: &Client,
     default_model: &str,
@@ -67,6 +69,7 @@ pub async fn run_synthesis(
         .get("model")
         .and_then(Value::as_str)
         .unwrap_or(default_model);
+    let provider = args.get("provider").and_then(Value::as_str);
 
     let lint_report = read_report_artifact(run_id, candidate_id, "lint-report.json")?;
     let critic_report = read_report_artifact(run_id, candidate_id, "critic-report.json")?;
@@ -74,9 +77,12 @@ pub async fn run_synthesis(
     let prompt =
         format!("lint-report.json:\n{lint_report}\n\ncritic-report.json:\n{critic_report}");
 
-    let request = Request::new(model, vec![Message::user(prompt)])
+    let mut request = Request::new(model, vec![Message::user(prompt)])
         .system_prompt(SYNTHESIS_SYSTEM_PROMPT)
         .temperature(0.0);
+    if let Some(provider) = provider {
+        request = request.provider(provider);
+    }
 
     let response =
         client
