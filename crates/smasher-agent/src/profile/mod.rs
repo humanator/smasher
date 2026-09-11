@@ -270,7 +270,11 @@ pub fn profile_for_model(model: &str) -> Box<dyn ProviderProfile> {
         Some(Provider::Anthropic) => Box::new(AnthropicProfile),
         Some(Provider::OpenAi) => Box::new(OpenAiProfile),
         Some(Provider::Gemini) => Box::new(GeminiProfile),
-        None => Box::new(AnthropicProfile),
+        // `infer_provider` never returns `Some(Provider::Ollama)` — Ollama model
+        // names are arbitrary user-installed tags with no reliable prefix to
+        // infer from — so this arm is unreachable today; it falls through to
+        // the same default as an unrecognized model.
+        Some(Provider::Ollama) | None => Box::new(AnthropicProfile),
     }
 }
 

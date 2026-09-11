@@ -3,6 +3,7 @@
 
 pub mod anthropic;
 pub mod gemini;
+pub mod ollama;
 pub mod openai;
 
 use std::pin::Pin;

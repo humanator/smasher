@@ -13,6 +13,7 @@ pub enum Provider {
     Anthropic,
     OpenAi,
     Gemini,
+    Ollama,
 }
 
 impl fmt::Display for Provider {
@@ -21,6 +22,7 @@ impl fmt::Display for Provider {
             Provider::Anthropic => write!(f, "anthropic"),
             Provider::OpenAi => write!(f, "openai"),
             Provider::Gemini => write!(f, "gemini"),
+            Provider::Ollama => write!(f, "ollama"),
         }
     }
 }
@@ -33,6 +35,7 @@ impl FromStr for Provider {
             "anthropic" => Ok(Provider::Anthropic),
             "openai" => Ok(Provider::OpenAi),
             "gemini" | "google" => Ok(Provider::Gemini),
+            "ollama" => Ok(Provider::Ollama),
             other => Err(format!("unknown provider: {other}")),
         }
     }
@@ -517,6 +520,9 @@ pub fn get_latest_model(provider: Provider) -> Option<&'static ModelInfo> {
         Provider::Anthropic => "claude-opus-4-6",
         Provider::OpenAi => "gpt-5.2",
         Provider::Gemini => "gemini-2.5-pro",
+        // Ollama serves whatever the user has pulled or has cloud access to —
+        // there is no fixed flagship model to point at.
+        Provider::Ollama => return None,
     };
     CATALOG.iter().find(|m| m.id == target_id)
 }
@@ -575,6 +581,26 @@ pub fn lookup_model_or_default(model_id: &str) -> ModelInfo {
             aliases: &[],
             context_window: 1_000_000,
             max_output_tokens: 8_000,
+            supports_images: true,
+            supports_tool_use: true,
+            supports_streaming: true,
+            supports_thinking: false,
+            supports_reasoning: false,
+            supports_json_mode: true,
+            supports_system_prompt: true,
+            input_cost_per_million: None,
+            output_cost_per_million: None,
+        },
+        // Reached only when `Provider::Ollama` is passed explicitly (never via
+        // `infer_provider`, which never returns it) — capabilities genuinely vary
+        // per user-installed/cloud model, so this is a deliberately generic guess.
+        Provider::Ollama => ModelInfo {
+            id: "unknown",
+            provider: Provider::Ollama,
+            display_name: "Unknown Ollama Model",
+            aliases: &[],
+            context_window: 32_000,
+            max_output_tokens: 4_000,
             supports_images: true,
             supports_tool_use: true,
             supports_streaming: true,
@@ -1003,6 +1029,18 @@ mod tests {
         assert!(models.iter().all(|m| m.provider == Provider::Gemini));
     }
 
+    #[test]
+    fn models_for_provider_ollama_is_empty() {
+        // No static catalog for Ollama: models are whatever the user pulled
+        // locally or has access to on Ollama Cloud, not a fixed list.
+        assert!(models_for_provider(Provider::Ollama).is_empty());
+    }
+
+    #[test]
+    fn get_latest_model_ollama_returns_none() {
+        assert!(get_latest_model(Provider::Ollama).is_none());
+    }
+
     // ── Provider display / serde ──────────────────────────────────────
 
     #[test]
@@ -1010,11 +1048,17 @@ mod tests {
         assert_eq!(Provider::Anthropic.to_string(), "anthropic");
         assert_eq!(Provider::OpenAi.to_string(), "openai");
         assert_eq!(Provider::Gemini.to_string(), "gemini");
+        assert_eq!(Provider::Ollama.to_string(), "ollama");
     }
 
     #[test]
     fn provider_serde_roundtrip() {
-        for provider in [Provider::Anthropic, Provider::OpenAi, Provider::Gemini] {
+        for provider in [
+            Provider::Anthropic,
+            Provider::OpenAi,
+            Provider::Gemini,
+            Provider::Ollama,
+        ] {
             let json = serde_json::to_string(&provider).unwrap();
             let back: Provider = serde_json::from_str(&json).unwrap();
             assert_eq!(provider, back);
@@ -1034,6 +1078,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&Provider::Gemini).unwrap(),
             "\"gemini\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Provider::Ollama).unwrap(),
+            "\"ollama\""
         );
     }
 
@@ -1163,6 +1211,7 @@ mod tests {
         assert_eq!("openai".parse::<Provider>().unwrap(), Provider::OpenAi);
         assert_eq!("gemini".parse::<Provider>().unwrap(), Provider::Gemini);
         assert_eq!("google".parse::<Provider>().unwrap(), Provider::Gemini);
+        assert_eq!("ollama".parse::<Provider>().unwrap(), Provider::Ollama);
     }
 
     #[test]
@@ -1174,6 +1223,7 @@ mod tests {
         assert_eq!("OPENAI".parse::<Provider>().unwrap(), Provider::OpenAi);
         assert_eq!("Gemini".parse::<Provider>().unwrap(), Provider::Gemini);
         assert_eq!("GOOGLE".parse::<Provider>().unwrap(), Provider::Gemini);
+        assert_eq!("OLLAMA".parse::<Provider>().unwrap(), Provider::Ollama);
     }
 
     #[test]
@@ -1185,7 +1235,12 @@ mod tests {
 
     #[test]
     fn provider_from_str_roundtrips_with_display() {
-        for provider in [Provider::Anthropic, Provider::OpenAi, Provider::Gemini] {
+        for provider in [
+            Provider::Anthropic,
+            Provider::OpenAi,
+            Provider::Gemini,
+            Provider::Ollama,
+        ] {
             let s = provider.to_string();
             let back: Provider = s.parse().unwrap();
             assert_eq!(provider, back);

@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::provider::anthropic::AnthropicAdapter;
 use crate::provider::gemini::GeminiAdapter;
+use crate::provider::ollama::OllamaAdapter;
 use crate::provider::openai::OpenAiAdapter;
 use crate::provider::{ProviderAdapter, StreamResponse};
 use crate::types::{Error, Provider, Request, Response, infer_provider};
@@ -56,6 +57,12 @@ impl Client {
     ///   - `OPENAI_BASE_URL` → optional custom base URL
     /// - `GEMINI_API_KEY` or `GOOGLE_API_KEY` → registers Gemini adapter
     ///   - `GEMINI_BASE_URL` → optional custom base URL
+    /// - `OLLAMA_API_KEY` → registers Ollama adapter (Ollama Cloud, defaults to
+    ///   `https://ollama.com`)
+    ///   - `OLLAMA_BASE_URL` → optional custom base URL, e.g. a local
+    ///     `ollama serve` instance (`http://localhost:11434`), which proxies
+    ///     authenticated requests to Cloud `-cloud` models transparently and
+    ///     does not itself validate the API key
     pub fn from_env() -> Self {
         let mut client = Self::new();
 
@@ -86,6 +93,15 @@ impl Client {
                 GeminiAdapter::new(key)
             };
             client.register_provider(Provider::Gemini, Arc::new(adapter));
+        }
+
+        if let Ok(key) = std::env::var("OLLAMA_API_KEY") {
+            let adapter = if let Ok(base_url) = std::env::var("OLLAMA_BASE_URL") {
+                OllamaAdapter::with_base_url(key, base_url)
+            } else {
+                OllamaAdapter::new(key)
+            };
+            client.register_provider(Provider::Ollama, Arc::new(adapter));
         }
 
         client
