@@ -46,35 +46,46 @@ pub struct TaskCriticSynthesisToolBackend {
     client: Client,
     task_critic_model: String,
     synthesis_model: String,
+    artifacts_base: std::path::PathBuf,
 }
 
 impl TaskCriticSynthesisToolBackend {
+    /// `artifacts_base` is the current run's own artifact directory — see
+    /// `smasher_render_capture::backend::HybridToolBackend::new`.
     pub fn new(
         fallback: Arc<dyn ToolBackend>,
         task_critic_model: String,
         synthesis_model: String,
+        artifacts_base: std::path::PathBuf,
     ) -> Self {
         Self {
             fallback,
             client: Client::from_env(),
             task_critic_model,
             synthesis_model,
+            artifacts_base,
         }
     }
 
     async fn run_task_critic(&self, args: &Value) -> Result<Outcome, HandlerError> {
-        let report =
-            match task_critic::run_task_critic(&self.client, &self.task_critic_model, args).await {
-                Ok(report) => report,
-                Err(e) => return Ok(Outcome::failure(e.to_string())),
-            };
-
-        let run_id = args.get("run_id").and_then(Value::as_str).unwrap_or("");
         let candidate_id = args
             .get("candidate_id")
             .and_then(Value::as_str)
             .unwrap_or("");
-        let output_dir = artifact_dir(run_id, candidate_id);
+        let output_dir = artifact_dir(&self.artifacts_base, candidate_id);
+
+        let report = match task_critic::run_task_critic(
+            &self.client,
+            &self.task_critic_model,
+            &output_dir,
+            args,
+        )
+        .await
+        {
+            Ok(report) => report,
+            Err(e) => return Ok(Outcome::failure(e.to_string())),
+        };
+
         if let Err(msg) = write_report_artifact(&output_dir, "critic-report.json", &report) {
             return Ok(Outcome::failure(msg));
         }
@@ -86,18 +97,24 @@ impl TaskCriticSynthesisToolBackend {
     }
 
     async fn run_synthesis(&self, args: &Value) -> Result<Outcome, HandlerError> {
-        let report = match synthesis::run_synthesis(&self.client, &self.synthesis_model, args).await
+        let candidate_id = args
+            .get("candidate_id")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let output_dir = artifact_dir(&self.artifacts_base, candidate_id);
+
+        let report = match synthesis::run_synthesis(
+            &self.client,
+            &self.synthesis_model,
+            &output_dir,
+            args,
+        )
+        .await
         {
             Ok(report) => report,
             Err(e) => return Ok(Outcome::failure(e.to_string())),
         };
 
-        let run_id = args.get("run_id").and_then(Value::as_str).unwrap_or("");
-        let candidate_id = args
-            .get("candidate_id")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let output_dir = artifact_dir(run_id, candidate_id);
         if let Err(msg) = write_report_artifact(&output_dir, "synthesis-report.json", &report) {
             return Ok(Outcome::failure(msg));
         }
@@ -169,11 +186,18 @@ mod tests {
 
     fn backend_with_recording_fallback() -> (TaskCriticSynthesisToolBackend, Arc<RecordingFallback>)
     {
+        backend_with_artifacts_base(std::path::PathBuf::from("/tmp/unused"))
+    }
+
+    fn backend_with_artifacts_base(
+        artifacts_base: std::path::PathBuf,
+    ) -> (TaskCriticSynthesisToolBackend, Arc<RecordingFallback>) {
         let fallback = Arc::new(RecordingFallback::new());
         let backend = TaskCriticSynthesisToolBackend::new(
             fallback.clone(),
             "claude-sonnet-4-20250514".to_string(),
             "claude-3-5-haiku-20241022".to_string(),
+            artifacts_base,
         );
         (backend, fallback)
     }
@@ -202,10 +226,9 @@ mod tests {
 
     #[tokio::test]
     async fn task_critic_missing_screenshot_fails_and_never_touches_fallback() {
-        let (backend, fallback) = backend_with_recording_fallback();
-        let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
+        let tmp = tempfile::tempdir().unwrap();
+        let (backend, fallback) = backend_with_artifacts_base(tmp.path().to_path_buf());
         let args = json!({
-            "run_id": run_id,
             "candidate_id": "no-such-candidate",
             "persona": "new user",
             "task": "find settings",

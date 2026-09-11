@@ -5,7 +5,7 @@ use std::path::Path;
 
 use serde_json::json;
 use smasher_llm::client::Client;
-use smasher_task_critic_synthesis::report::{CriticError, artifact_dir};
+use smasher_task_critic_synthesis::report::CriticError;
 use smasher_task_critic_synthesis::task_critic::run_task_critic;
 
 fn fixture_screenshot_bytes() -> Vec<u8> {
@@ -13,25 +13,23 @@ fn fixture_screenshot_bytes() -> Vec<u8> {
         .expect("fixture screenshot.png must exist")
 }
 
-fn place_fixture_screenshot(run_id: &str, candidate_id: &str) {
-    let dir = artifact_dir(run_id, candidate_id);
-    std::fs::create_dir_all(&dir).expect("create artifact dir");
-    std::fs::write(dir.join("screenshot.png"), fixture_screenshot_bytes())
+fn place_fixture_screenshot(candidate_dir: &Path) {
+    std::fs::create_dir_all(candidate_dir).expect("create artifact dir");
+    std::fs::write(candidate_dir.join("screenshot.png"), fixture_screenshot_bytes())
         .expect("write fixture screenshot");
 }
 
 #[tokio::test]
 async fn missing_screenshot_fails_before_any_network_call() {
     let client = Client::new(); // no providers registered
-    let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
+    let tmp = tempfile::tempdir().unwrap();
     let args = json!({
-        "run_id": run_id,
         "candidate_id": "no-such-candidate",
         "persona": "new user",
         "task": "find settings",
     });
 
-    let err = run_task_critic(&client, "claude-sonnet-4-20250514", &args)
+    let err = run_task_critic(&client, "claude-sonnet-4-20250514", tmp.path(), &args)
         .await
         .expect_err("missing screenshot.png must fail");
 
@@ -41,25 +39,22 @@ async fn missing_screenshot_fails_before_any_network_call() {
 #[tokio::test]
 #[ignore = "makes a real, billed call to a vision-capable model; requires a provider API key"]
 async fn live_call_against_fixture_screenshot_produces_legible_report() {
-    let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
-    let candidate_id = "critic-fixture-candidate";
-    place_fixture_screenshot(&run_id, candidate_id);
+    let tmp = tempfile::tempdir().unwrap();
+    let candidate_dir = tmp.path();
+    place_fixture_screenshot(candidate_dir);
 
     let client = Client::from_env();
     let args = json!({
-        "run_id": run_id,
-        "candidate_id": candidate_id,
+        "candidate_id": "critic-fixture-candidate",
         "persona": "a new user unfamiliar with the product",
         "task": "find the primary call-to-action button",
     });
 
-    let report = run_task_critic(&client, "claude-sonnet-4-20250514", &args)
+    let report = run_task_critic(&client, "claude-sonnet-4-20250514", candidate_dir, &args)
         .await
         .expect("live task_critic call should succeed with a real API key");
 
     assert_eq!(report.persona, "a new user unfamiliar with the product");
     assert_eq!(report.task, "find the primary call-to-action button");
     // success/friction/notes come from the live model; only shape is asserted here.
-
-    std::fs::remove_dir_all(format!("runs/{run_id}")).ok();
 }

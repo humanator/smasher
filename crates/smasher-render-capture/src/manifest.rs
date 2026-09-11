@@ -1,7 +1,7 @@
 // ABOUTME: Manifest struct describing a completed capture run.
 // ABOUTME: Also holds the artifact path helper deriving run/candidate output paths.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,12 +28,13 @@ pub enum ExitStatus {
     Failed { reason: String },
 }
 
-/// Derives the artifact output directory `runs/<run_id>/artifacts/<candidate_id>/`.
-pub fn artifact_dir(run_id: &str, candidate_id: &str) -> PathBuf {
-    PathBuf::from("runs")
-        .join(run_id)
-        .join("artifacts")
-        .join(candidate_id)
+/// Derives a candidate's artifact directory `<artifacts_base>/<candidate_id>/`.
+/// `artifacts_base` is the run's own artifact directory (e.g. from
+/// `RunDirectory::manifest().directories.artifacts`), not a hardcoded path —
+/// this is what keeps every tool's output under the one real run directory
+/// instead of a second, CWD-relative tree.
+pub fn artifact_dir(artifacts_base: &Path, candidate_id: &str) -> PathBuf {
+    artifacts_base.join(candidate_id)
 }
 
 #[cfg(test)]
@@ -81,11 +82,11 @@ mod tests {
     }
 
     #[test]
-    fn artifact_dir_joins_run_and_candidate_id() {
-        let path = artifact_dir("run-123", "candidate-abc");
+    fn artifact_dir_joins_base_and_candidate_id() {
+        let path = artifact_dir(Path::new("/data/artifacts/run-123/artifacts"), "candidate-abc");
         assert_eq!(
             path,
-            std::path::PathBuf::from("runs/run-123/artifacts/candidate-abc")
+            std::path::PathBuf::from("/data/artifacts/run-123/artifacts/candidate-abc")
         );
     }
 }

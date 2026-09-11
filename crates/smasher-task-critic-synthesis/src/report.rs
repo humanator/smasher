@@ -1,7 +1,7 @@
 // ABOUTME: CriticReport/SynthesisReport/CriticError and the artifact_dir() path helper.
 // ABOUTME: Pure data and path logic; parsing/prompting lives in task_critic.rs and synthesis.rs.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -35,23 +35,17 @@ pub struct SynthesisReport {
 
 #[derive(Debug, Error)]
 pub enum CriticError {
-    #[error("missing artifact for {run_id}/{candidate_id}: {path}")]
-    MissingArtifact {
-        run_id: String,
-        candidate_id: String,
-        path: String,
-    },
+    #[error("missing artifact for candidate {candidate_id}: {path}")]
+    MissingArtifact { candidate_id: String, path: String },
     #[error("model response was not valid JSON: {response}")]
     UnparseableResponse { response: String },
 }
 
-/// Derives the artifact directory `runs/<run_id>/artifacts/<candidate_id>/`, the same
-/// layout `system-lint` and `render-capture` already read and write.
-pub fn artifact_dir(run_id: &str, candidate_id: &str) -> PathBuf {
-    PathBuf::from("runs")
-        .join(run_id)
-        .join("artifacts")
-        .join(candidate_id)
+/// Derives a candidate's artifact directory `<artifacts_base>/<candidate_id>/`, the
+/// same layout `system-lint` and `render-capture` already read and write.
+/// `artifacts_base` is the run's own artifact directory, not a hardcoded path.
+pub fn artifact_dir(artifacts_base: &Path, candidate_id: &str) -> PathBuf {
+    artifacts_base.join(candidate_id)
 }
 
 #[cfg(test)]
@@ -77,24 +71,23 @@ mod tests {
     }
 
     #[test]
-    fn artifact_dir_joins_run_and_candidate_id() {
-        let path = artifact_dir("run-123", "candidate-abc");
+    fn artifact_dir_joins_base_and_candidate_id() {
+        let path = artifact_dir(Path::new("/data/artifacts/run-123/artifacts"), "candidate-abc");
         assert_eq!(
             path,
-            std::path::PathBuf::from("runs/run-123/artifacts/candidate-abc")
+            std::path::PathBuf::from("/data/artifacts/run-123/artifacts/candidate-abc")
         );
     }
 
     #[test]
     fn missing_artifact_error_message_names_the_path() {
         let err = CriticError::MissingArtifact {
-            run_id: "run-1".to_string(),
             candidate_id: "cand-1".to_string(),
-            path: "runs/run-1/artifacts/cand-1/screenshot.png".to_string(),
+            path: "/data/artifacts/run-1/artifacts/cand-1/screenshot.png".to_string(),
         };
         assert_eq!(
             err.to_string(),
-            "missing artifact for run-1/cand-1: runs/run-1/artifacts/cand-1/screenshot.png"
+            "missing artifact for candidate cand-1: /data/artifacts/run-1/artifacts/cand-1/screenshot.png"
         );
     }
 

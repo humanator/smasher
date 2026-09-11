@@ -233,6 +233,7 @@ async fn submit_pipeline(
     let client = Arc::clone(&state.client);
     let spawn_working_dir = run_working_dir.clone();
     let checkpoint_dir = run_directory.manifest().directories.checkpoints.clone();
+    let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
     tokio::spawn(async move {
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
@@ -258,16 +259,19 @@ async fn submit_pipeline(
         let render_capture_backend =
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
                 TASK_CRITIC_MODEL.to_string(),
                 SYNTHESIS_MODEL.to_string(),
+                candidate_artifacts_dir.clone(),
             ),
         );
 
@@ -551,6 +555,7 @@ async fn resume_run(
     let runs = Arc::clone(&state.runs);
     let client = Arc::clone(&state.client);
     let spawn_working_dir = run_working_dir;
+    let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
     tokio::spawn(async move {
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
@@ -576,16 +581,19 @@ async fn resume_run(
         let render_capture_backend =
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
                 TASK_CRITIC_MODEL.to_string(),
                 SYNTHESIS_MODEL.to_string(),
+                candidate_artifacts_dir.clone(),
             ),
         );
 

@@ -368,6 +368,7 @@ async fn submit_run(
     let runs = Arc::clone(&state.runs);
     let client = Arc::clone(&state.client);
     let checkpoint_dir = run_directory.manifest().directories.checkpoints.clone();
+    let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
     tokio::spawn(async move {
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
@@ -393,16 +394,19 @@ async fn submit_run(
         let render_capture_backend =
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
                 TASK_CRITIC_MODEL.to_string(),
                 SYNTHESIS_MODEL.to_string(),
+                candidate_artifacts_dir.clone(),
             ),
         );
 
@@ -596,16 +600,18 @@ async fn run_questions(
 
     // Gallery gate card: first gallery node + pending questions + candidates.
     // Renders alongside (not instead of) the plain question cards.
+    let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
     let gallery_gate_html = gate.and_then(|gate| {
         let question_id = gallery_question_id?;
-        let found = candidates::scan_candidates(&id);
+        let found = candidates::scan_candidates(&artifacts_base, &id);
         if found.is_empty() {
             return None;
         }
         let candidates: Vec<GateCandidate> = found
             .into_iter()
             .map(|summary| {
-                let scorecard = candidates::read_scorecard(&id, &summary.candidate_id);
+                let scorecard =
+                    candidates::read_scorecard(&artifacts_base, &id, &summary.candidate_id);
                 GateCandidate { summary, scorecard }
             })
             .collect();
@@ -647,7 +653,8 @@ async fn run_candidates(
             .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
     }
 
-    let candidates = candidates::scan_candidates(&id);
+    let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
+    let candidates = candidates::scan_candidates(&artifacts_base, &id);
     Ok(HtmlTemplate(CandidateGalleryTemplate {
         run_id: id,
         candidates,
@@ -682,6 +689,34 @@ mod tests {
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
         AppState::new(client, "test-model".into(), "/tmp".into())
+    }
+
+    /// A `test_state()` rooted at a fresh temp dir, for tests that need to write
+    /// real candidate artifacts and read them back through a run's real
+    /// `{data_dir}/artifacts/<run_id>/artifacts/` tree rather than sharing `/tmp`.
+    fn test_state_with_data_dir() -> (AppState, tempfile::TempDir) {
+        let data_dir = tempfile::tempdir().unwrap();
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            data_dir.path().display().to_string(),
+        );
+        (state, data_dir)
+    }
+
+    /// `{data_dir}/artifacts/<run_id>/artifacts/<candidate_id>/`, the real layout
+    /// a `RunDirectory` creates and `candidates::scan_candidates` reads back.
+    fn candidate_fixture_dir(
+        data_dir: &std::path::Path,
+        run_id: &str,
+        candidate_id: &str,
+    ) -> std::path::PathBuf {
+        data_dir
+            .join("artifacts")
+            .join(run_id)
+            .join("artifacts")
+            .join(candidate_id)
     }
 
     #[tokio::test]
@@ -818,10 +853,8 @@ mod tests {
         use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
 
         let run_id = "run-candidates-with-fixtures";
-        let candidate_dir = std::path::Path::new("runs")
-            .join(run_id)
-            .join("artifacts")
-            .join("candidate-fixture");
+        let (state, data_dir) = test_state_with_data_dir();
+        let candidate_dir = candidate_fixture_dir(data_dir.path(), run_id, "candidate-fixture");
         std::fs::create_dir_all(&candidate_dir).unwrap();
         let manifest = Manifest {
             captured_at: chrono::Utc::now(),
@@ -838,7 +871,6 @@ mod tests {
         )
         .unwrap();
 
-        let state = test_state();
         insert_test_record(&state, run_id).await;
         let app = router().with_state(state);
 
@@ -847,8 +879,6 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
-
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
 
         assert_eq!(resp.status(), StatusCode::OK);
         let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
@@ -1003,10 +1033,9 @@ mod tests {
     fn write_gate_manifest(run_id: &str, candidate_id: &str, failed: bool) {
         use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
 
-        let dir = std::path::Path::new("runs")
-            .join(run_id)
-            .join("artifacts")
-            .join(candidate_id);
+        // Matches test_state()'s data_dir ("/tmp"): candidates live under
+        // {data_dir}/artifacts/<run_id>/artifacts/<candidate_id>/.
+        let dir = candidate_fixture_dir(std::path::Path::new("/tmp"), run_id, candidate_id);
         std::fs::create_dir_all(&dir).unwrap();
         let manifest = Manifest {
             captured_at: chrono::Utc::now(),
@@ -1056,7 +1085,7 @@ mod tests {
         push_pending_qid(&interviewer, "q1", Some("Gate1"));
 
         let (status, html) = get_questions_html(state, run_id).await;
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
 
         assert_eq!(status, StatusCode::OK);
         assert!(html.contains(r#"<div class="gate-card""#), "gate card missing:\n{html}");
@@ -1086,7 +1115,7 @@ mod tests {
         write_gate_manifest(run_id, "candidate-a", false);
         write_gate_manifest(run_id, "candidate-b", false);
 
-        let artifacts_dir = std::path::Path::new("runs").join(run_id).join("artifacts");
+        let artifacts_dir = std::path::Path::new("/tmp/artifacts").join(run_id).join("artifacts");
         std::fs::write(
             artifacts_dir.join("candidate-a").join("lint-report.json"),
             r#"{"checks": [{"name": "token-adherence", "passed": false, "violations": ["raw hex color #fff"]}]}"#,
@@ -1110,7 +1139,7 @@ mod tests {
         push_pending_qid(&interviewer, "q1", Some("Gate1"));
 
         let (status, html) = get_questions_html(state, run_id).await;
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
 
         assert_eq!(status, StatusCode::OK);
         assert!(html.contains("lint: fail"), "missing lint badge:\n{html}");
@@ -1167,7 +1196,7 @@ mod tests {
         insert_graph_record(&state, run_id, GALLERY_DOT).await;
 
         let (status, html) = get_questions_html(state, run_id).await;
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
 
         assert_eq!(status, StatusCode::OK);
         assert!(!html.contains("data-question-id="));
@@ -1276,7 +1305,7 @@ mod tests {
         push_pending_qid(&interviewer, "q1", Some("Gate1"));
 
         let (status, html) = get_questions_html(state, run_id).await;
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
 
         assert_eq!(status, StatusCode::OK);
         assert!(html.contains(">proceed<"));
@@ -1331,7 +1360,7 @@ mod tests {
         push_pending_qid(&interviewer, "q1", Some("Gate1"));
 
         let (status, html) = get_questions_html(state, run_id).await;
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
 
         assert_eq!(status, StatusCode::OK);
         // Without the override this would read "Expected 4, found 1"

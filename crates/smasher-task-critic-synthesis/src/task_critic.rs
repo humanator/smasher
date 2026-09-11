@@ -1,6 +1,8 @@
 // ABOUTME: task_critic pipeline tool: one real vision-model call judging whether a named
 // ABOUTME: persona can complete a named task against the candidate's captured screenshot.
 
+use std::path::Path;
+
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::Deserialize;
@@ -8,7 +10,7 @@ use serde_json::Value;
 use smasher_llm::client::Client;
 use smasher_llm::types::{ContentPart, ImageData, ImageSourceType, Message, Request, Role};
 
-use crate::report::{CriticError, CriticReport, artifact_dir};
+use crate::report::{CriticError, CriticReport};
 
 const CRITIC_SYSTEM_PROMPT: &str = "You are a usability critic. You are shown a screenshot of \
 a UI candidate, a persona, and a task that persona is trying to complete. Judge whether the \
@@ -46,9 +48,12 @@ fn parse_response(text: &str, persona: &str, task: &str) -> Result<CriticReport,
     })
 }
 
-/// Runs `task_critic` against the candidate's already-captured `screenshot.png`.
+/// Runs `task_critic` against the candidate's already-captured `screenshot.png`
+/// in `candidate_dir` (the candidate's own artifact directory, resolved by the
+/// caller from the run's real artifact base — see
+/// `smasher_render_capture::manifest::artifact_dir`).
 ///
-/// `args`: `{run_id, candidate_id, persona, task, model?, provider?}`. A missing
+/// `args`: `{candidate_id, persona, task, model?, provider?}`. A missing
 /// `screenshot.png` fails with `CriticError::MissingArtifact` before any network
 /// call is attempted. `provider` overrides the model-name-based provider
 /// inference `Client::complete()` otherwise does — needed for providers like
@@ -57,9 +62,9 @@ fn parse_response(text: &str, persona: &str, task: &str) -> Result<CriticReport,
 pub async fn run_task_critic(
     client: &Client,
     default_model: &str,
+    candidate_dir: &Path,
     args: &Value,
 ) -> Result<CriticReport, CriticError> {
-    let run_id = arg_str(args, "run_id");
     let candidate_id = arg_str(args, "candidate_id");
     let persona = arg_str(args, "persona");
     let task = arg_str(args, "task");
@@ -69,9 +74,8 @@ pub async fn run_task_critic(
         .unwrap_or(default_model);
     let provider = args.get("provider").and_then(Value::as_str);
 
-    let screenshot_path = artifact_dir(run_id, candidate_id).join("screenshot.png");
+    let screenshot_path = candidate_dir.join("screenshot.png");
     let screenshot = std::fs::read(&screenshot_path).map_err(|_| CriticError::MissingArtifact {
-        run_id: run_id.to_string(),
         candidate_id: candidate_id.to_string(),
         path: screenshot_path.display().to_string(),
     })?;
@@ -158,15 +162,14 @@ mod tests {
         // UnparseableResponse (client error), not MissingArtifact — so asserting
         // the variant here also proves call ordering.
         let client = Client::new();
-        let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
+        let tmp = tempfile::tempdir().unwrap();
         let args = serde_json::json!({
-            "run_id": run_id,
             "candidate_id": "no-such-candidate",
             "persona": "new user",
             "task": "find settings",
         });
 
-        let err = run_task_critic(&client, "claude-sonnet-4-20250514", &args)
+        let err = run_task_critic(&client, "claude-sonnet-4-20250514", tmp.path(), &args)
             .await
             .expect_err("missing screenshot.png must fail");
 
@@ -181,12 +184,10 @@ mod tests {
         // "couldn't infer a provider for this model name" from "explicitly
         // routed to ollama, which just isn't configured on this client".
         let client = Client::new();
-        let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
-        let candidate_id = "provider-override-candidate";
-        let dir = artifact_dir(&run_id, candidate_id);
-        std::fs::create_dir_all(&dir).unwrap();
+        let tmp = tempfile::tempdir().unwrap();
+        let candidate_dir = tmp.path();
         std::fs::write(
-            dir.join("screenshot.png"),
+            candidate_dir.join("screenshot.png"),
             std::fs::read(
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("fixtures/candidate/screenshot.png"),
@@ -196,8 +197,7 @@ mod tests {
         .unwrap();
 
         let base_args = serde_json::json!({
-            "run_id": run_id,
-            "candidate_id": candidate_id,
+            "candidate_id": "provider-override-candidate",
             "persona": "new user",
             "task": "find settings",
         });
@@ -205,7 +205,7 @@ mod tests {
         // Ollama model names (e.g. "gemma4:31b-cloud") have no prefix
         // `infer_provider` recognizes, so without an override this fails with
         // "not found" (ModelNotFound), never reaching provider configuration.
-        let no_override_err = run_task_critic(&client, "gemma4:31b-cloud", &base_args)
+        let no_override_err = run_task_critic(&client, "gemma4:31b-cloud", candidate_dir, &base_args)
             .await
             .unwrap_err();
         let CriticError::UnparseableResponse { response } = no_override_err else {
@@ -215,7 +215,7 @@ mod tests {
 
         let mut args_with_provider = base_args.clone();
         args_with_provider["provider"] = serde_json::json!("ollama");
-        let override_err = run_task_critic(&client, "gemma4:31b-cloud", &args_with_provider)
+        let override_err = run_task_critic(&client, "gemma4:31b-cloud", candidate_dir, &args_with_provider)
             .await
             .unwrap_err();
         let CriticError::UnparseableResponse { response } = override_err else {
@@ -225,7 +225,5 @@ mod tests {
             response.contains("ollama") && response.contains("not configured"),
             "got: {response}"
         );
-
-        std::fs::remove_dir_all(format!("runs/{run_id}")).ok();
     }
 }

@@ -9,26 +9,33 @@
 // headless Chromium for render_capture. #[ignore]'d: real network + real model calls,
 // unlike this crate's other e2e tests which mock the LLM to prove zero calls.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use smasher_system_lint::LintReport;
 use smasher_task_critic_synthesis::{CriticReport, Recommendation, SynthesisReport};
 use smasher_web::candidates::read_scorecard;
 
-const RUN_ID: &str = "e2e-critique-loop-fixture";
 const CANDIDATE_ID: &str = "candidate";
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-fn artifact_dir(repo_root: &std::path::Path) -> PathBuf {
-    repo_root
-        .join("runs")
-        .join(RUN_ID)
-        .join("artifacts")
-        .join(CANDIDATE_ID)
+/// `smasher run` assigns its own run id and prints `Run directory: <path>` to
+/// stderr (an absolute path under `{cwd}/artifacts/<run_id>/`) — parse that
+/// rather than assuming any particular id, since the engine's run directory is
+/// now the one real artifact tree every tool writes under.
+fn parse_run_directory(stderr: &str) -> PathBuf {
+    stderr
+        .lines()
+        .find_map(|line| line.strip_prefix("Run directory: "))
+        .map(PathBuf::from)
+        .expect("smasher run should print its run directory to stderr")
+}
+
+fn artifact_dir(run_directory: &Path) -> PathBuf {
+    run_directory.join("artifacts").join(CANDIDATE_ID)
 }
 
 #[tokio::test]
@@ -40,8 +47,6 @@ async fn critique_loop_produces_real_artifacts_and_scorecard_data() {
             .unwrap();
 
     let repo_root = repo_root();
-    let artifact_dir = artifact_dir(&repo_root);
-    std::fs::remove_dir_all(&artifact_dir).ok();
 
     let ollama_api_key =
         std::env::var("OLLAMA_API_KEY").expect("OLLAMA_API_KEY must be set for this test");
@@ -65,12 +70,15 @@ async fn critique_loop_produces_real_artifacts_and_scorecard_data() {
         .output()
         .expect("failed to run smasher binary");
 
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         output.status.success(),
-        "smasher run should exit 0\nstdout: {}\nstderr: {}",
+        "smasher run should exit 0\nstdout: {}\nstderr: {stderr}",
         String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
     );
+
+    let run_directory = parse_run_directory(&stderr);
+    let artifact_dir = artifact_dir(&run_directory);
 
     // render_capture's artifacts.
     assert!(artifact_dir.join("screenshot.png").is_file());
@@ -110,19 +118,20 @@ async fn critique_loop_produces_real_artifacts_and_scorecard_data() {
 
     // The exact same read path smasher-web's gate card uses to build its
     // scorecards — proving a real gate view of this run would show real data,
-    // not just that the raw artifact files happen to exist. read_scorecard
-    // resolves "runs/..." relative to the current process's cwd (this test
-    // binary's, which cargo sets to the crate dir, not repo_root), same as
-    // the `smasher` subprocess above resolved it relative to the cwd we gave
-    // it — so briefly cd into repo_root to match.
-    let original_cwd = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&repo_root).unwrap();
-    let scorecard = read_scorecard(RUN_ID, CANDIDATE_ID);
-    std::env::set_current_dir(original_cwd).unwrap();
+    // not just that the raw artifact files happen to exist. `read_scorecard`
+    // takes the artifacts_base (the run directory's parent) and the run id
+    // (its own basename) — the same relationship `AppState.data_dir` /
+    // `RunDirectory` has in the web server.
+    let artifacts_base = run_directory.parent().expect("run directory has a parent");
+    let run_id = run_directory
+        .file_name()
+        .and_then(|n| n.to_str())
+        .expect("run directory has a valid basename");
+    let scorecard = read_scorecard(artifacts_base, run_id, CANDIDATE_ID);
 
     assert!(scorecard.lint_passed().is_some());
     assert!(scorecard.critic_success().is_some());
     assert!(scorecard.synthesis_recommendation_label().is_some());
 
-    std::fs::remove_dir_all(&artifact_dir).ok();
+    std::fs::remove_dir_all(&run_directory).ok();
 }

@@ -1,24 +1,30 @@
 // ABOUTME: End-to-end proof that a render_capture Tool node dispatches natively
 // ABOUTME: through `smasher run`, producing a real artifact and making zero LLM calls.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use wiremock::MockServer;
 
-const RUN_ID: &str = "e2e-render-capture-fixture";
 const CANDIDATE_ID: &str = "fixture";
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-fn artifact_dir(repo_root: &std::path::Path) -> PathBuf {
-    repo_root
-        .join("runs")
-        .join(RUN_ID)
-        .join("artifacts")
-        .join(CANDIDATE_ID)
+/// `smasher run` assigns its own run id and prints `Run directory: <path>` to
+/// stderr (an absolute path under `{cwd}/artifacts/<run_id>/`) — parse that
+/// rather than assuming any particular id.
+fn parse_run_directory(stderr: &str) -> PathBuf {
+    stderr
+        .lines()
+        .find_map(|line| line.strip_prefix("Run directory: "))
+        .map(PathBuf::from)
+        .expect("smasher run should print its run directory to stderr")
+}
+
+fn artifact_dir(run_directory: &Path) -> PathBuf {
+    run_directory.join("artifacts").join(CANDIDATE_ID)
 }
 
 #[tokio::test]
@@ -38,8 +44,6 @@ async fn render_capture_pipeline_makes_zero_llm_calls() {
     let mock_server = MockServer::start().await;
 
     let repo_root = repo_root();
-    let artifact_dir = artifact_dir(&repo_root);
-    std::fs::remove_dir_all(&artifact_dir).ok();
 
     let output = Command::new(env!("CARGO_BIN_EXE_smasher"))
         .current_dir(&repo_root)
@@ -57,12 +61,15 @@ async fn render_capture_pipeline_makes_zero_llm_calls() {
         .output()
         .expect("failed to run smasher binary");
 
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         output.status.success(),
-        "smasher run should exit 0\nstdout: {}\nstderr: {}",
+        "smasher run should exit 0\nstdout: {}\nstderr: {stderr}",
         String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
     );
+
+    let run_directory = parse_run_directory(&stderr);
+    let artifact_dir = artifact_dir(&run_directory);
 
     assert!(
         artifact_dir.join("screenshot.png").is_file(),
@@ -84,5 +91,5 @@ async fn render_capture_pipeline_makes_zero_llm_calls() {
         "expected zero LLM calls, but the mock server received: {received:?}"
     );
 
-    std::fs::remove_dir_all(&artifact_dir).ok();
+    std::fs::remove_dir_all(&run_directory).ok();
 }

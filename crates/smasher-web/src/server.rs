@@ -20,6 +20,11 @@ pub fn build_router(state: AppState) -> Router {
 
     // Resolve static dir relative to the crate manifest, not the cwd.
     let static_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("static");
+    // Every run's candidates live under `{data_dir}/artifacts/<run_id>/artifacts/`
+    // (the same tree `RunDirectory` creates), so this mount root plus the
+    // `/candidate-artifacts/<run_id>/artifacts/<candidate_id>/...` URL scheme
+    // resolves straight through with no rewriting.
+    let candidate_artifacts_dir = std::path::Path::new(&state.data_dir).join("artifacts");
 
     Router::new()
         .merge(page_routes)
@@ -27,7 +32,10 @@ pub fn build_router(state: AppState) -> Router {
         .merge(question_routes)
         .merge(gallery_routes)
         .nest_service("/static", ServeDir::new(static_dir))
-        .nest_service("/candidate-artifacts", ServeDir::new("runs"))
+        .nest_service(
+            "/candidate-artifacts",
+            ServeDir::new(candidate_artifacts_dir),
+        )
         .with_state(state)
 }
 
@@ -140,18 +148,25 @@ mod tests {
 
     #[tokio::test]
     async fn candidate_artifacts_mount_serves_a_real_file() {
-        let dir = std::path::Path::new("runs/run-server-test/artifacts/candidate-server-test");
-        std::fs::create_dir_all(dir).unwrap();
+        let data_dir = tempfile::tempdir().unwrap();
+        let dir = data_dir
+            .path()
+            .join("artifacts/run-server-test/artifacts/candidate-server-test");
+        std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("screenshot.png"), b"not a real png, just bytes").unwrap();
 
-        let app = build_router(test_state());
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            data_dir.path().display().to_string(),
+        );
+        let app = build_router(state);
         let req = Request::builder()
             .uri("/candidate-artifacts/run-server-test/artifacts/candidate-server-test/screenshot.png")
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
-
-        std::fs::remove_dir_all("runs/run-server-test").ok();
 
         assert_eq!(resp.status(), StatusCode::OK);
         let content_type = resp

@@ -180,9 +180,12 @@ async fn submit_gallery_decision(
         decision: req.decision,
     };
     let run_id = id.clone();
-    let candidates = tokio::task::spawn_blocking(move || candidates::scan_candidates(&run_id))
-        .await
-        .map_err(|e| WebError::Internal(format!("candidate scan task panicked: {e}")))?;
+    let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
+    let candidates = tokio::task::spawn_blocking(move || {
+        candidates::scan_candidates(&artifacts_base, &run_id)
+    })
+    .await
+    .map_err(|e| WebError::Internal(format!("candidate scan task panicked: {e}")))?;
     let canonical =
         validate_decision(&candidates, &decision).map_err(WebError::BadRequest)?;
     Ok(Json(interviewer.answer_question(&qid, &canonical)))
@@ -292,7 +295,9 @@ mod tests {
     }
 
     fn write_fixture_manifest(run_id: &str, candidate_id: &str, failed: bool) {
-        let dir = std::path::Path::new("runs")
+        // Matches test_state()'s data_dir ("/tmp"): candidates live under
+        // {data_dir}/artifacts/<run_id>/artifacts/<candidate_id>/.
+        let dir = std::path::Path::new("/tmp/artifacts")
             .join(run_id)
             .join("artifacts")
             .join(candidate_id);
@@ -442,7 +447,7 @@ mod tests {
             serde_json::json!({"selected": ["candidate-a"], "decision": "proceed"})
         );
 
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
     }
 
     #[tokio::test]
@@ -483,7 +488,7 @@ mod tests {
         let pending = interviewer.list_questions();
         assert!(pending.questions.iter().any(|q| q.id == real_qid));
 
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
         // Abandon the spawned asker by answering directly so it does not linger.
         interviewer.answer_question(&real_qid, "cleanup");
     }
@@ -509,7 +514,7 @@ mod tests {
         let pending = interviewer.list_questions();
         assert!(pending.questions.iter().any(|q| q.id == qid));
 
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
         interviewer.answer_question(&qid, "cleanup");
     }
 
@@ -535,7 +540,7 @@ mod tests {
         let pending = interviewer.list_questions();
         assert!(pending.questions.iter().any(|q| q.id == qid));
 
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
         interviewer.answer_question(&qid, "cleanup");
     }
 
@@ -560,7 +565,7 @@ mod tests {
         let pending = interviewer.list_questions();
         assert!(pending.questions.iter().any(|q| q.id == qid));
 
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
         interviewer.answer_question(&qid, "cleanup");
     }
 
@@ -637,7 +642,7 @@ mod tests {
         assert!(pending.questions.iter().any(|q| q.id == other_qid));
         assert!(pending.questions.iter().any(|q| q.id == gate_qid));
 
-        std::fs::remove_dir_all(std::path::Path::new("runs").join(run_id)).ok();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
         interviewer.answer_question(&other_qid, "cleanup-other");
         interviewer.answer_question(&gate_qid, "cleanup-gate");
         other_handle.await.unwrap().unwrap();

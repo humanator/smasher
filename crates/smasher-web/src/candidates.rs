@@ -34,19 +34,17 @@ impl CandidateSummary {
     }
 }
 
-/// Scans `./runs/<run_id>/artifacts/` for candidate subdirectories with a
-/// parseable `manifest.json`. Missing directories, unreadable entries, and
-/// unparseable manifests are skipped rather than erroring the whole scan.
-pub fn scan_candidates(run_id: &str) -> Vec<CandidateSummary> {
-    scan_candidates_in(Path::new("."), run_id)
-}
-
-fn scan_candidates_in(base: &Path, run_id: &str) -> Vec<CandidateSummary> {
+/// Scans `<artifacts_base>/<run_id>/artifacts/` for candidate subdirectories
+/// with a parseable `manifest.json`. `artifacts_base` is `{data_dir}/artifacts`
+/// — the same directory `RunDirectory` creates each run under. Missing
+/// directories, unreadable entries, and unparseable manifests are skipped
+/// rather than erroring the whole scan.
+pub fn scan_candidates(artifacts_base: &Path, run_id: &str) -> Vec<CandidateSummary> {
     if !valid_id(run_id) {
         return Vec::new();
     }
 
-    let artifacts_dir = base.join("runs").join(run_id).join("artifacts");
+    let artifacts_dir = artifacts_base.join(run_id).join("artifacts");
     let Ok(entries) = std::fs::read_dir(&artifacts_dir) else {
         return Vec::new();
     };
@@ -130,16 +128,11 @@ impl CandidateScorecard {
 }
 
 /// Reads whichever of `lint-report.json`/`critic-report.json`/`synthesis-report.json`
-/// exist under `runs/<run_id>/artifacts/<candidate_id>/`. Callers pass already-
-/// validated ids (e.g. from `scan_candidates`); this never touches disk outside
-/// that directory since it only ever joins path segments, never parses them.
-pub fn read_scorecard(run_id: &str, candidate_id: &str) -> CandidateScorecard {
-    read_scorecard_in(Path::new("."), run_id, candidate_id)
-}
-
-fn read_scorecard_in(base: &Path, run_id: &str, candidate_id: &str) -> CandidateScorecard {
-    let dir = base
-        .join("runs")
+/// exist under `<artifacts_base>/<run_id>/artifacts/<candidate_id>/`. Callers pass
+/// already-validated ids (e.g. from `scan_candidates`); this never touches disk
+/// outside that directory since it only ever joins path segments, never parses them.
+pub fn read_scorecard(artifacts_base: &Path, run_id: &str, candidate_id: &str) -> CandidateScorecard {
+    let dir = artifacts_base
         .join(run_id)
         .join("artifacts")
         .join(candidate_id);
@@ -162,7 +155,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn write_manifest(dir: &Path, candidate_id: &str, exit_status: ExitStatus) {
-        let candidate_dir = dir.join("runs/run-1/artifacts").join(candidate_id);
+        let candidate_dir = dir.join("run-1/artifacts").join(candidate_id);
         std::fs::create_dir_all(&candidate_dir).unwrap();
         let manifest = Manifest {
             captured_at: Utc::now(),
@@ -196,12 +189,13 @@ mod tests {
     #[test]
     fn scan_candidates_returns_empty_when_artifacts_dir_missing() {
         let base = tempfile::tempdir().unwrap();
-        assert!(scan_candidates_in(base.path(), "no-such-run").is_empty());
+        assert!(scan_candidates(base.path(), "no-such-run").is_empty());
     }
 
     #[test]
     fn scan_candidates_rejects_traversal_run_id_before_touching_disk() {
-        assert!(scan_candidates("../escape").is_empty());
+        let base = tempfile::tempdir().unwrap();
+        assert!(scan_candidates(base.path(), "../escape").is_empty());
     }
 
     #[test]
@@ -216,7 +210,7 @@ mod tests {
             },
         );
 
-        let candidates = scan_candidates_in(base.path(), "run-1");
+        let candidates = scan_candidates(base.path(), "run-1");
 
         assert_eq!(candidates.len(), 2);
 
@@ -236,7 +230,7 @@ mod tests {
     #[test]
     fn scan_candidates_skips_subdir_with_missing_or_malformed_manifest() {
         let base = tempfile::tempdir().unwrap();
-        let artifacts_dir = base.path().join("runs/run-1/artifacts");
+        let artifacts_dir = base.path().join("run-1/artifacts");
 
         // No manifest.json at all.
         std::fs::create_dir_all(artifacts_dir.join("no-manifest")).unwrap();
@@ -249,7 +243,7 @@ mod tests {
         // One valid one, to confirm the scan doesn't just bail out entirely.
         write_manifest(base.path(), "candidate-good", ExitStatus::Success);
 
-        let candidates = scan_candidates_in(base.path(), "run-1");
+        let candidates = scan_candidates(base.path(), "run-1");
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].candidate_id, "candidate-good");
@@ -257,7 +251,6 @@ mod tests {
 
     fn candidate_dir(base: &Path, run_id: &str, candidate_id: &str) -> PathBuf {
         let dir = base
-            .join("runs")
             .join(run_id)
             .join("artifacts")
             .join(candidate_id);
@@ -270,7 +263,7 @@ mod tests {
         let base = tempfile::tempdir().unwrap();
         candidate_dir(base.path(), "run-1", "candidate-a");
 
-        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+        let scorecard = read_scorecard(base.path(), "run-1", "candidate-a");
 
         assert!(scorecard.lint.is_none());
         assert!(scorecard.critic.is_none());
@@ -292,7 +285,7 @@ mod tests {
         )
         .unwrap();
 
-        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+        let scorecard = read_scorecard(base.path(), "run-1", "candidate-a");
 
         assert_eq!(scorecard.lint_passed(), Some(false));
         assert_eq!(scorecard.lint_violations(), vec!["raw hex color"]);
@@ -313,7 +306,7 @@ mod tests {
         )
         .unwrap();
 
-        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+        let scorecard = read_scorecard(base.path(), "run-1", "candidate-a");
 
         assert_eq!(scorecard.critic_success(), Some(false));
         assert_eq!(scorecard.critic_friction(), &["hidden menu".to_string()]);
@@ -330,7 +323,7 @@ mod tests {
         let dir = candidate_dir(base.path(), "run-1", "candidate-a");
         std::fs::write(dir.join("lint-report.json"), "not json").unwrap();
 
-        let scorecard = read_scorecard_in(base.path(), "run-1", "candidate-a");
+        let scorecard = read_scorecard(base.path(), "run-1", "candidate-a");
 
         assert!(scorecard.lint.is_none());
     }

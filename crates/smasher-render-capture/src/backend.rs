@@ -1,7 +1,7 @@
 // ABOUTME: HybridToolBackend: dispatches `render_capture` natively, falls back
 // ABOUTME: to a wrapped `ToolBackend` (e.g. `LlmToolBackend`) for every other tool.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde_json::{Value, json};
@@ -16,11 +16,18 @@ use crate::manifest::{self, Viewport};
 /// `fallback` (typically the existing LLM-mediated backend) for every other tool.
 pub struct HybridToolBackend {
     fallback: Arc<dyn ToolBackend>,
+    artifacts_base: PathBuf,
 }
 
 impl HybridToolBackend {
-    pub fn new(fallback: Arc<dyn ToolBackend>) -> Self {
-        Self { fallback }
+    /// `artifacts_base` is the current run's own artifact directory (e.g.
+    /// `RunDirectory::manifest().directories.artifacts`) — every candidate this
+    /// backend captures is written under `artifacts_base/<candidate_id>/`.
+    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf) -> Self {
+        Self {
+            fallback,
+            artifacts_base,
+        }
     }
 
     async fn run_render_capture(&self, args: &Value) -> Result<Outcome, HandlerError> {
@@ -28,16 +35,12 @@ impl HybridToolBackend {
             .get("candidate_dir")
             .and_then(Value::as_str)
             .ok_or_else(|| HandlerError::Other("render_capture: missing candidate_dir".into()))?;
-        let run_id = args
-            .get("run_id")
-            .and_then(Value::as_str)
-            .ok_or_else(|| HandlerError::Other("render_capture: missing run_id".into()))?;
         let candidate_id = args
             .get("candidate_id")
             .and_then(Value::as_str)
             .ok_or_else(|| HandlerError::Other("render_capture: missing candidate_id".into()))?;
 
-        let output_dir = manifest::artifact_dir(run_id, candidate_id);
+        let output_dir = manifest::artifact_dir(&self.artifacts_base, candidate_id);
         let viewport = Viewport {
             width: capture::VIEWPORT_WIDTH,
             height: capture::VIEWPORT_HEIGHT,
@@ -121,7 +124,7 @@ mod tests {
     #[test]
     fn available_tools_returns_exactly_render_capture() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = HybridToolBackend::new(fallback);
+        let backend = HybridToolBackend::new(fallback, PathBuf::from("/tmp/unused"));
 
         assert_eq!(backend.available_tools(), vec!["render_capture".to_string()]);
     }
@@ -129,7 +132,7 @@ mod tests {
     #[tokio::test]
     async fn unknown_tool_name_reaches_the_fallback() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = HybridToolBackend::new(fallback.clone());
+        let backend = HybridToolBackend::new(fallback.clone(), PathBuf::from("/tmp/unused"));
 
         let outcome = backend
             .execute_tool("some_other_tool", &json!({}), &Context::default())
@@ -146,13 +149,13 @@ mod tests {
             .await
             .unwrap();
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = HybridToolBackend::new(fallback.clone());
+        let tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = tmp.path().to_path_buf();
+        let backend = HybridToolBackend::new(fallback.clone(), artifacts_base.clone());
 
-        let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
         let candidate_id = "test-candidate";
         let args = json!({
             "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
-            "run_id": run_id,
             "candidate_id": candidate_id,
         });
 
@@ -164,10 +167,8 @@ mod tests {
         assert!(matches!(outcome, Outcome::Success { .. }));
         assert!(!fallback.called.load(Ordering::SeqCst));
 
-        let artifact_dir = crate::manifest::artifact_dir(&run_id, candidate_id);
+        let artifact_dir = crate::manifest::artifact_dir(&artifacts_base, candidate_id);
         assert!(artifact_dir.join("screenshot.png").is_file());
         assert!(artifact_dir.join("manifest.json").is_file());
-
-        std::fs::remove_dir_all(format!("runs/{run_id}")).ok();
     }
 }

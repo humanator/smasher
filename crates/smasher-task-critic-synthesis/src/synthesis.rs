@@ -1,12 +1,14 @@
 // ABOUTME: synthesis pipeline tool: one real text-only LLM call reconciling system_lint's
 // ABOUTME: lint-report.json and task_critic's critic-report.json into a proceed/iterate call.
 
+use std::path::Path;
+
 use serde::Deserialize;
 use serde_json::Value;
 use smasher_llm::client::Client;
 use smasher_llm::types::{Message, Request};
 
-use crate::report::{CriticError, Recommendation, SynthesisReport, artifact_dir};
+use crate::report::{CriticError, Recommendation, SynthesisReport};
 
 const SYNTHESIS_SYSTEM_PROMPT: &str = "You are reconciling two reports about a UI candidate: \
 a deterministic design-system lint report and a usability critic's task report. Decide \
@@ -26,13 +28,12 @@ fn arg_str<'a>(args: &'a Value, field: &str) -> &'a str {
 }
 
 fn read_report_artifact(
-    run_id: &str,
+    candidate_dir: &Path,
     candidate_id: &str,
     filename: &str,
 ) -> Result<String, CriticError> {
-    let path = artifact_dir(run_id, candidate_id).join(filename);
+    let path = candidate_dir.join(filename);
     std::fs::read_to_string(&path).map_err(|_| CriticError::MissingArtifact {
-        run_id: run_id.to_string(),
         candidate_id: candidate_id.to_string(),
         path: path.display().to_string(),
     })
@@ -51,9 +52,10 @@ fn parse_response(text: &str) -> Result<SynthesisReport, CriticError> {
 }
 
 /// Runs `synthesis` against a candidate's already-written `lint-report.json` and
-/// `critic-report.json`.
+/// `critic-report.json` in `candidate_dir` (the candidate's own artifact
+/// directory, resolved by the caller from the run's real artifact base).
 ///
-/// `args`: `{run_id, candidate_id, model?, provider?}`. A missing
+/// `args`: `{candidate_id, model?, provider?}`. A missing
 /// `lint-report.json` or `critic-report.json` fails with
 /// `CriticError::MissingArtifact` naming the exact missing file, before any
 /// network call is attempted. `provider` overrides model-name-based provider
@@ -61,9 +63,9 @@ fn parse_response(text: &str) -> Result<SynthesisReport, CriticError> {
 pub async fn run_synthesis(
     client: &Client,
     default_model: &str,
+    candidate_dir: &Path,
     args: &Value,
 ) -> Result<SynthesisReport, CriticError> {
-    let run_id = arg_str(args, "run_id");
     let candidate_id = arg_str(args, "candidate_id");
     let model = args
         .get("model")
@@ -71,8 +73,8 @@ pub async fn run_synthesis(
         .unwrap_or(default_model);
     let provider = args.get("provider").and_then(Value::as_str);
 
-    let lint_report = read_report_artifact(run_id, candidate_id, "lint-report.json")?;
-    let critic_report = read_report_artifact(run_id, candidate_id, "critic-report.json")?;
+    let lint_report = read_report_artifact(candidate_dir, candidate_id, "lint-report.json")?;
+    let critic_report = read_report_artifact(candidate_dir, candidate_id, "critic-report.json")?;
 
     let prompt =
         format!("lint-report.json:\n{lint_report}\n\ncritic-report.json:\n{critic_report}");
@@ -138,20 +140,17 @@ mod tests {
         // UnparseableResponse (client error), not MissingArtifact — asserting the
         // variant also proves call ordering.
         let client = Client::new();
-        let run_id = format!("test-run-{}", uuid::Uuid::new_v4());
-        let candidate_id = "no-critic-report-candidate";
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
 
         // Only lint-report.json exists; critic-report.json is deliberately absent.
-        let dir = artifact_dir(&run_id, candidate_id);
-        std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("lint-report.json"), r#"{"checks": []}"#).unwrap();
 
         let args = serde_json::json!({
-            "run_id": run_id,
-            "candidate_id": candidate_id,
+            "candidate_id": "no-critic-report-candidate",
         });
 
-        let err = run_synthesis(&client, "claude-3-5-haiku-20241022", &args)
+        let err = run_synthesis(&client, "claude-3-5-haiku-20241022", dir, &args)
             .await
             .expect_err("missing critic-report.json must fail");
 
@@ -162,7 +161,5 @@ mod tests {
             other => panic!("expected MissingArtifact, got {other:?}"),
         }
         assert!(!dir.join("synthesis-report.json").exists());
-
-        std::fs::remove_dir_all(format!("runs/{run_id}")).ok();
     }
 }

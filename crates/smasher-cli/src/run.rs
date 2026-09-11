@@ -1094,19 +1094,23 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
             args.model.clone(),
             effective_working_dir.clone(),
         ));
+        let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
         let render_capture_backend =
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
+                candidate_artifacts_dir.clone(),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
                 TASK_CRITIC_MODEL.to_string(),
                 SYNTHESIS_MODEL.to_string(),
+                candidate_artifacts_dir.clone(),
             ),
         );
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
