@@ -1,0 +1,43 @@
+digraph CritiqueLoopE2E {
+  graph [
+    goal="Prove the critique loop end-to-end through smasher run: render_capture -> system_lint + task_critic -> synthesis, all producing real artifacts a gallery gate card would read (see smasher-web's candidates::read_scorecard)."
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+
+  Render1 [
+    shape=parallelogram,
+    label="Render Candidate",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"e2e-critique-loop-fixture\", \"candidate_id\": \"candidate\"}"
+  ];
+
+  SystemLint [
+    shape=parallelogram,
+    label="System Lint",
+    tool="system_lint",
+    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"e2e-critique-loop-fixture\", \"candidate_id\": \"candidate\"}"
+  ];
+
+  TaskCritic [
+    shape=parallelogram,
+    label="Usability Critic",
+    tool="task_critic",
+    args="{\"run_id\": \"e2e-critique-loop-fixture\", \"candidate_id\": \"candidate\", \"persona\": \"a new user unfamiliar with the product\", \"task\": \"find the primary call-to-action button\", \"provider\": \"ollama\", \"model\": \"gemma4:31b-cloud\"}"
+  ];
+
+  Synthesis [
+    shape=parallelogram,
+    label="Synthesise Critiques",
+    tool="synthesis",
+    args="{\"run_id\": \"e2e-critique-loop-fixture\", \"candidate_id\": \"candidate\", \"provider\": \"ollama\", \"model\": \"gemma4:31b-cloud\"}"
+  ];
+
+  Exit [shape=Msquare, label="Exit"];
+
+  Start -> Render1;
+  Render1 -> SystemLint;
+  SystemLint -> TaskCritic;
+  TaskCritic -> Synthesis;
+  Synthesis -> Exit;
+}
