@@ -77,6 +77,7 @@ impl CodergenBackend for AgentCodergenBackend {
         &self,
         prompt: &str,
         model: Option<&str>,
+        provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError> {
         let model_id = model.unwrap_or(&self.default_model);
@@ -106,11 +107,14 @@ impl CodergenBackend for AgentCodergenBackend {
         let emitter = EventEmitter::default();
         let mut rx = emitter.subscribe();
 
-        let config = SessionConfig::default()
+        let mut config = SessionConfig::default()
             .with_model(model_id)
             .with_max_turns(50)
             .with_system_prompt(&system_prompt)
             .with_working_directory(&self.working_dir);
+        if let Some(provider) = provider {
+            config = config.with_provider(provider);
+        }
 
         // Spawn event listener for tool call logging to stderr.
         tokio::spawn(async move {
@@ -192,10 +196,11 @@ impl CodergenBackend for ClaudeCliBackend {
     async fn generate(
         &self,
         prompt: &str,
-        // The model parameter is intentionally not forwarded to the claude CLI —
-        // the CLI uses its own model selection. Per-node model overrides only
-        // apply to the agent backend.
+        // The model/provider parameters are intentionally not forwarded to the
+        // claude CLI — the CLI uses its own model selection. Per-node
+        // model/provider overrides only apply to the agent backend.
         _model: Option<&str>,
+        _provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError> {
         // Build context summary from pipeline state, same logic as AgentCodergenBackend.
@@ -551,6 +556,7 @@ impl CodergenBackend for ShellCodergenBackend {
         &self,
         prompt: &str,
         _model: Option<&str>,
+        _provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError> {
         let mut cmd = tokio::process::Command::new("sh");
@@ -1599,7 +1605,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        backend.generate("test prompt", None, &ctx).await.unwrap();
+        backend.generate("test prompt", None, None, &ctx).await.unwrap();
 
         let captured = std::fs::read_to_string(&args_file).unwrap();
         assert!(
@@ -1648,7 +1654,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("test", None, &ctx).await.unwrap();
+        let result = backend.generate("test", None, None, &ctx).await.unwrap();
 
         match result {
             Outcome::Success {
@@ -1697,7 +1703,7 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         ctx.set("_current_node_id", serde_json::json!("node1"));
-        backend.generate("test", None, &ctx).await.unwrap();
+        backend.generate("test", None, None, &ctx).await.unwrap();
         drop(emitter);
 
         let mut agent_messages = Vec::new();
@@ -1751,7 +1757,7 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         ctx.set("_current_node_id", serde_json::json!("coder_node"));
-        backend.generate("test", None, &ctx).await.unwrap();
+        backend.generate("test", None, None, &ctx).await.unwrap();
         drop(emitter);
 
         let mut tool_starts = Vec::new();
@@ -1835,7 +1841,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("test prompt", None, &ctx).await.unwrap();
+        let result = backend.generate("test prompt", None, None, &ctx).await.unwrap();
 
         match result {
             Outcome::Success {
@@ -1877,7 +1883,7 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         backend
-            .generate("my special prompt", None, &ctx)
+            .generate("my special prompt", None, None, &ctx)
             .await
             .unwrap();
 
@@ -1918,7 +1924,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("test prompt", None, &ctx).await;
+        let result = backend.generate("test prompt", None, None, &ctx).await;
 
         assert!(result.is_err(), "non-zero exit should produce an error");
         let err = result.unwrap_err();
@@ -1952,7 +1958,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("test prompt", None, &ctx).await;
+        let result = backend.generate("test prompt", None, None, &ctx).await;
 
         // Non-abort timeout returns Ok(Outcome::failure), not Err
         let outcome = result.expect("timeout should return Ok(failure), not Err");
@@ -1991,7 +1997,7 @@ mod tests {
         let ctx = smasher_attractor::state::Context::new();
 
         // First timeout: returns Ok(failure) with "1/2"
-        let outcome1 = backend.generate("test", None, &ctx).await.unwrap();
+        let outcome1 = backend.generate("test", None, None, &ctx).await.unwrap();
         assert!(outcome1.is_failure());
         let msg1 = format!("{outcome1:?}");
         assert!(
@@ -2001,7 +2007,7 @@ mod tests {
 
         // Second timeout: triggers abort (returns Err)
         let err2 = backend
-            .generate("test", None, &ctx)
+            .generate("test", None, None, &ctx)
             .await
             .unwrap_err()
             .to_string();
@@ -2043,7 +2049,7 @@ mod tests {
         ctx.set("project_name", serde_json::json!("my_project"));
         ctx.set("_internal", serde_json::json!("hidden"));
 
-        backend.generate("do the thing", None, &ctx).await.unwrap();
+        backend.generate("do the thing", None, None, &ctx).await.unwrap();
 
         let captured = std::fs::read_to_string(&prompt_file).unwrap();
         assert!(
@@ -2089,7 +2095,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        backend.generate("test", None, &ctx).await.unwrap();
+        backend.generate("test", None, None, &ctx).await.unwrap();
 
         let captured_pwd = std::fs::read_to_string(&pwd_file).unwrap();
         let captured_pwd = captured_pwd.trim();
@@ -2185,7 +2191,7 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         let result = backend
-            .generate("echo 'hello from shell'", None, &ctx)
+            .generate("echo 'hello from shell'", None, None, &ctx)
             .await
             .unwrap();
 
@@ -2210,7 +2216,7 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         let result = backend
-            .generate("echo 'oops' >&2; exit 1", None, &ctx)
+            .generate("echo 'oops' >&2; exit 1", None, None, &ctx)
             .await
             .unwrap();
 
@@ -2234,7 +2240,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("pwd", None, &ctx).await.unwrap();
+        let result = backend.generate("pwd", None, None, &ctx).await.unwrap();
 
         match result {
             Outcome::Success {
@@ -2258,7 +2264,7 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("sleep 30", None, &ctx).await;
+        let result = backend.generate("sleep 30", None, None, &ctx).await;
 
         assert!(result.is_err(), "timeout should produce an error");
         let err = result.unwrap_err();
@@ -2285,6 +2291,7 @@ mod tests {
         let result = backend
             .generate(
                 "echo $SMASHER_CTX_project_name; echo \"internal=${SMASHER_CTX__internal:-unset}\"",
+                None,
                 None,
                 &ctx,
             )
@@ -2317,7 +2324,7 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         let result = backend
-            .generate("echo 'line1'; echo 'line2'", None, &ctx)
+            .generate("echo 'line1'; echo 'line2'", None, None, &ctx)
             .await
             .unwrap();
 

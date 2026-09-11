@@ -68,6 +68,7 @@ impl CodergenBackend for AgentCodergenBackend {
         &self,
         prompt: &str,
         model: Option<&str>,
+        provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError> {
         let model_id = model.unwrap_or(&self.default_model);
@@ -185,11 +186,14 @@ impl CodergenBackend for AgentCodergenBackend {
             }
         });
 
-        let config = SessionConfig::default()
+        let mut config = SessionConfig::default()
             .with_model(model_id)
             .with_max_turns(50)
             .with_system_prompt(&system_prompt)
             .with_working_directory(&self.working_dir);
+        if let Some(provider) = provider {
+            config = config.with_provider(provider);
+        }
 
         let mut session = Session::new(
             config,

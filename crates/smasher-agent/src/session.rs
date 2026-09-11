@@ -291,6 +291,9 @@ impl Session {
             smasher_llm::types::Request::new(&self.config.model, self.state.messages.clone())
                 .system_prompt(system_prompt);
 
+        if let Some(ref provider) = self.config.provider {
+            request = request.provider(provider.clone());
+        }
         if let Some(max_tokens) = self.config.max_tokens {
             request = request.max_tokens(max_tokens);
         }
@@ -1069,6 +1072,67 @@ mod tests {
         assert_eq!(output.turns_used, 1);
         assert_eq!(output.total_usage.input_tokens, 10);
         assert_eq!(output.total_usage.output_tokens, 20);
+    }
+
+    /// A provider adapter that records every `Request` it's asked to complete,
+    /// for asserting what `Session` actually sent — not just what it returned.
+    struct ProviderCapturingAdapter {
+        responses: Arc<Mutex<VecDeque<Response>>>,
+        captured: Arc<Mutex<Vec<Request>>>,
+    }
+
+    #[async_trait]
+    impl ProviderAdapter for ProviderCapturingAdapter {
+        fn provider_name(&self) -> &str {
+            "ollama"
+        }
+
+        async fn complete(&self, request: &Request) -> Result<Response, LlmError> {
+            self.captured.lock().unwrap().push(request.clone());
+            let mut queue = self.responses.lock().unwrap();
+            queue.pop_front().ok_or_else(|| LlmError::Other {
+                message: "no more mock responses".into(),
+                retryable: false,
+            })
+        }
+
+        async fn stream(&self, _request: &Request) -> Result<StreamResponse, LlmError> {
+            Err(LlmError::Other {
+                message: "streaming not implemented in mock".into(),
+                retryable: false,
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn session_config_with_provider_overrides_model_name_inference() {
+        // "ollama-test-model" matches none of infer_provider's hardcoded
+        // prefixes (claude-/gpt-/gemini-), so without an explicit provider
+        // override this would fail to resolve any adapter at all.
+        let captured = Arc::new(Mutex::new(Vec::new()));
+        let adapter = ProviderCapturingAdapter {
+            responses: Arc::new(Mutex::new(VecDeque::from([text_response("ok")]))),
+            captured: Arc::clone(&captured),
+        };
+        let mut client = smasher_llm::client::Client::new();
+        client.register_provider(Provider::Ollama, Arc::new(adapter));
+
+        let config = SessionConfig::default()
+            .with_model("ollama-test-model")
+            .with_provider("ollama");
+        let mut session = Session::new(
+            config,
+            Arc::new(client),
+            ToolRegistry::new(),
+            EventEmitter::default(),
+        );
+
+        let output = session.process_input("hello").await.unwrap();
+
+        assert_eq!(output.text.as_deref(), Some("ok"));
+        let sent = captured.lock().unwrap();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].provider.as_deref(), Some("ollama"));
     }
 
     #[tokio::test]

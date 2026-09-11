@@ -51,6 +51,7 @@ impl CodergenBackend for AgentCodergenBackend {
         &self,
         prompt: &str,
         model: Option<&str>,
+        provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError> {
         let model_id = model.unwrap_or(&self.default_model);
@@ -78,11 +79,14 @@ impl CodergenBackend for AgentCodergenBackend {
         let emitter = EventEmitter::default();
         let mut rx = emitter.subscribe();
 
-        let config = SessionConfig::default()
+        let mut config = SessionConfig::default()
             .with_model(model_id)
             .with_max_turns(50)
             .with_system_prompt(&system_prompt)
             .with_working_directory(&self.working_dir);
+        if let Some(provider) = provider {
+            config = config.with_provider(provider);
+        }
 
         tokio::spawn(async move {
             use smasher_agent::types::SessionEvent;

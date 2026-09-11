@@ -223,10 +223,14 @@ impl CodergenBackend for MockCodergenBackend {
         &self,
         prompt: &str,
         model: Option<&str>,
+        provider: Option<&str>,
         _context: &Context,
     ) -> Result<Outcome, HandlerError> {
         let model_id = model.unwrap_or("gpt-4o");
-        let request = Request::new(model_id, vec![Message::user(prompt)]).max_tokens(1000);
+        let mut request = Request::new(model_id, vec![Message::user(prompt)]).max_tokens(1000);
+        if let Some(provider) = provider {
+            request = request.provider(provider);
+        }
         match self.client.complete(request).await {
             Ok(response) => {
                 let text = response.text().unwrap_or_default();

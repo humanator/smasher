@@ -101,10 +101,17 @@ pub trait Handler: Send + Sync {
 #[async_trait::async_trait]
 pub trait CodergenBackend: Send + Sync {
     /// Execute a code generation task.
+    ///
+    /// `provider` overrides the model-name-based provider inference
+    /// `Client::complete()` otherwise does — needed for providers whose model
+    /// names (e.g. Ollama's `"gemma4:31b-cloud"`) have no recognizable prefix
+    /// to infer from. Backends that don't route through `smasher-llm::Client`
+    /// (e.g. a raw CLI/shell backend) may ignore it.
     async fn generate(
         &self,
         prompt: &str,
         model: Option<&str>,
+        provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError>;
 }
@@ -235,6 +242,13 @@ impl Handler for CodergenHandler {
             _ => None,
         };
 
+        // Determine optional provider override (e.g. "ollama" for model names
+        // infer_provider can't recognize).
+        let provider = match node.attrs.get("provider") {
+            Some(NodeAttrValue::String(s)) => Some(s.as_str()),
+            _ => None,
+        };
+
         // Store the current node id so the backend can tag agent-level events.
         context.set("_current_node_id", json!(node.id));
 
@@ -247,7 +261,7 @@ impl Handler for CodergenHandler {
             _ => &self.default_backend,
         };
 
-        backend.generate(&prompt, model, context).await
+        backend.generate(&prompt, model, provider, context).await
     }
 
     fn handles(&self, node_type: &NodeType) -> bool {
@@ -362,13 +376,15 @@ mod tests {
             &self,
             prompt: &str,
             _model: Option<&str>,
+            _provider: Option<&str>,
             _context: &Context,
         ) -> Result<Outcome, HandlerError> {
             Ok(Outcome::success_with(json!({"generated": prompt})))
         }
     }
 
-    /// A CodergenBackend that captures the model parameter for verification.
+    /// A CodergenBackend that captures the model and provider parameters for
+    /// verification.
     struct ModelCapturingBackend;
 
     #[async_trait::async_trait]
@@ -377,10 +393,11 @@ mod tests {
             &self,
             prompt: &str,
             model: Option<&str>,
+            provider: Option<&str>,
             _context: &Context,
         ) -> Result<Outcome, HandlerError> {
             Ok(Outcome::success_with(
-                json!({"prompt": prompt, "model": model}),
+                json!({"prompt": prompt, "model": model, "provider": provider}),
             ))
         }
     }
@@ -640,6 +657,63 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn codergen_handler_passes_provider_to_backend() {
+        let backend = Arc::new(ModelCapturingBackend);
+        let handler = CodergenHandler::new(backend);
+
+        let mut node = make_node("cg5", NodeType::Codergen);
+        node.attrs.insert(
+            "prompt".to_string(),
+            NodeAttrValue::String("do something".to_string()),
+        );
+        node.attrs.insert(
+            "model".to_string(),
+            NodeAttrValue::String("gemma4:31b-cloud".to_string()),
+        );
+        node.attrs.insert(
+            "provider".to_string(),
+            NodeAttrValue::String("ollama".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert_eq!(data["model"], "gemma4:31b-cloud");
+                assert_eq!(data["provider"], "ollama");
+            }
+            other => panic!("expected success, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn codergen_handler_provider_defaults_to_none_without_attr() {
+        let backend = Arc::new(ModelCapturingBackend);
+        let handler = CodergenHandler::new(backend);
+
+        let mut node = make_node("cg6", NodeType::Codergen);
+        node.attrs.insert(
+            "prompt".to_string(),
+            NodeAttrValue::String("do something".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert!(data["provider"].is_null());
+            }
+            other => panic!("expected success, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn codergen_handler_handles_only_codergen_nodes() {
         let backend = Arc::new(TestCodergenBackend);
         let handler = CodergenHandler::new(backend);
@@ -664,6 +738,7 @@ mod tests {
             &self,
             prompt: &str,
             _model: Option<&str>,
+            _provider: Option<&str>,
             _context: &Context,
         ) -> Result<Outcome, HandlerError> {
             Ok(Outcome::success_with(

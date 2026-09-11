@@ -77,6 +77,10 @@ pub enum SessionEvent {
 pub struct SessionConfig {
     /// The model to use for this session.
     pub model: String,
+    /// Optional provider override, bypassing model-name-based inference —
+    /// needed for providers whose model names (e.g. Ollama's
+    /// `"gemma4:31b-cloud"`) have no recognizable prefix to infer from.
+    pub provider: Option<String>,
     /// Optional system prompt override.
     pub system_prompt: Option<String>,
     /// Maximum turns before the session is forcibly ended.
@@ -105,6 +109,7 @@ impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             model: "claude-sonnet-4-20250514".into(),
+            provider: None,
             max_turns: 100,
             max_tokens: Some(8192),
             temperature: None,
@@ -124,6 +129,12 @@ impl SessionConfig {
     /// Set the model for this session.
     pub fn with_model(mut self, model: impl Into<String>) -> Self {
         self.model = model.into();
+        self
+    }
+
+    /// Override the provider, bypassing model-name-based inference.
+    pub fn with_provider(mut self, provider: impl Into<String>) -> Self {
+        self.provider = Some(provider.into());
         self
     }
 
