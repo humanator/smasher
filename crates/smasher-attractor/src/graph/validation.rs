@@ -37,6 +37,7 @@ pub fn validate(graph: &Graph) -> Vec<LintWarning> {
     warnings.extend(check_conditional_without_condition(graph));
     warnings.extend(check_duplicate_edge(graph));
     warnings.extend(check_missing_label(graph));
+    warnings.extend(check_parallel_fanin_shape(graph));
     warnings
 }
 
@@ -280,6 +281,87 @@ fn check_missing_label(graph: &Graph) -> Vec<LintWarning> {
             node_id: Some(n.id.clone()),
         })
         .collect()
+}
+
+/// Rule: parallel_fanin_shape (Error) - Parallel node branches must each converge,
+/// within at most one hop, on the same shared FanIn node.
+fn check_parallel_fanin_shape(graph: &Graph) -> Vec<LintWarning> {
+    let mut warnings = Vec::new();
+
+    for parallel_node in graph
+        .nodes
+        .iter()
+        .filter(|n| n.node_type == NodeType::Parallel)
+    {
+        let branches = graph.edges_from(&parallel_node.id);
+
+        if branches.len() < 2 {
+            warnings.push(LintWarning {
+                rule: "parallel_too_few_branches".to_string(),
+                severity: Severity::Error,
+                message: format!(
+                    "Parallel node '{}' has fewer than 2 outgoing edges",
+                    parallel_node.id
+                ),
+                node_id: Some(parallel_node.id.clone()),
+            });
+            continue;
+        }
+
+        // Resolve each branch to the FanIn node it reaches within at most one hop.
+        let mut resolved: Vec<(&str, Option<&str>)> = Vec::new();
+        for edge in &branches {
+            let branch_id = edge.to.as_str();
+            let fan_in = match graph.node(branch_id) {
+                Some(n) if n.node_type == NodeType::FanIn => Some(branch_id),
+                Some(_) => match graph.edges_from(branch_id).as_slice() {
+                    [only] => graph
+                        .node(only.to.as_str())
+                        .filter(|n| n.node_type == NodeType::FanIn)
+                        .map(|_| only.to.as_str()),
+                    _ => None,
+                },
+                None => None,
+            };
+
+            if fan_in.is_none() {
+                warnings.push(LintWarning {
+                    rule: "parallel_branch_not_single_hop".to_string(),
+                    severity: Severity::Error,
+                    message: format!(
+                        "Parallel node '{}' branch '{}' does not resolve to a FanIn \
+                         node within one hop",
+                        parallel_node.id, branch_id
+                    ),
+                    node_id: Some(branch_id.to_string()),
+                });
+            }
+
+            resolved.push((branch_id, fan_in));
+        }
+
+        if let Some(expected) = resolved.iter().find_map(|(_, f)| *f) {
+            for (branch_id, fan_in) in &resolved {
+                if let Some(actual) = fan_in
+                    && *actual != expected
+                {
+                    warnings.push(LintWarning {
+                        rule: "parallel_ambiguous_fanin".to_string(),
+                        severity: Severity::Error,
+                        message: format!(
+                            "Parallel node '{}' branch '{}' converges on FanIn \
+                             '{}', which differs from sibling branches converging \
+                             on '{}'",
+                            parallel_node.id, branch_id, actual, expected
+                        ),
+                        node_id: Some(branch_id.to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    warnings
 }
 
 #[cfg(test)]
@@ -536,5 +618,191 @@ mod tests {
         );
         let warnings = validate(&graph);
         assert!(has_rule(&warnings, "missing_label"));
+    }
+
+    // ---------------------------------------------------------------
+    // check_parallel_fanin_shape tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn parallel_fanin_too_few_branches_detected() {
+        let graph = make_graph_with(
+            None,
+            vec![
+                make_node("start", NodeType::Start),
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+                make_node("exit", NodeType::Exit),
+            ],
+            vec![
+                make_edge("start", "par"),
+                make_edge("par", "a"),
+                make_edge("a", "fanin"),
+                make_edge("fanin", "exit"),
+            ],
+        );
+        let warnings = check_parallel_fanin_shape(&graph);
+        assert!(has_rule(&warnings, "parallel_too_few_branches"));
+        let w = warnings
+            .iter()
+            .find(|w| w.rule == "parallel_too_few_branches")
+            .unwrap();
+        assert_eq!(w.severity, Severity::Error);
+        assert_eq!(w.node_id.as_deref(), Some("par"));
+    }
+
+    #[test]
+    fn parallel_fanin_valid_two_branch_produces_no_warnings() {
+        let graph = make_graph_with(
+            None,
+            vec![
+                make_node("start", NodeType::Start),
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("b", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+                make_node("exit", NodeType::Exit),
+            ],
+            vec![
+                make_edge("start", "par"),
+                make_edge("par", "a"),
+                make_edge("par", "b"),
+                make_edge("a", "fanin"),
+                make_edge("b", "fanin"),
+                make_edge("fanin", "exit"),
+            ],
+        );
+        let warnings = check_parallel_fanin_shape(&graph);
+        assert!(
+            warnings.is_empty(),
+            "expected no warnings, got: {:?}",
+            warnings
+        );
+    }
+
+    #[test]
+    fn parallel_fanin_mismatched_fanin_detected() {
+        let graph = make_graph_with(
+            None,
+            vec![
+                make_node("start", NodeType::Start),
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("b", NodeType::Generic),
+                make_node("fanin1", NodeType::FanIn),
+                make_node("fanin2", NodeType::FanIn),
+                make_node("exit", NodeType::Exit),
+            ],
+            vec![
+                make_edge("start", "par"),
+                make_edge("par", "a"),
+                make_edge("par", "b"),
+                make_edge("a", "fanin1"),
+                make_edge("b", "fanin2"),
+                make_edge("fanin1", "exit"),
+                make_edge("fanin2", "exit"),
+            ],
+        );
+        let warnings = check_parallel_fanin_shape(&graph);
+        assert!(has_rule(&warnings, "parallel_ambiguous_fanin"));
+        let w = warnings
+            .iter()
+            .find(|w| w.rule == "parallel_ambiguous_fanin")
+            .unwrap();
+        assert_eq!(w.severity, Severity::Error);
+        assert_eq!(w.node_id.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn parallel_fanin_direct_to_fanin_branch_is_valid() {
+        let graph = make_graph_with(
+            None,
+            vec![
+                make_node("start", NodeType::Start),
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+                make_node("exit", NodeType::Exit),
+            ],
+            vec![
+                make_edge("start", "par"),
+                make_edge("par", "a"),
+                make_edge("par", "fanin"), // zero-work branch straight to FanIn
+                make_edge("a", "fanin"),
+                make_edge("fanin", "exit"),
+            ],
+        );
+        let warnings = check_parallel_fanin_shape(&graph);
+        assert!(
+            warnings.is_empty(),
+            "expected no warnings, got: {:?}",
+            warnings
+        );
+    }
+
+    #[test]
+    fn parallel_fanin_branch_not_single_hop_detected() {
+        let graph = make_graph_with(
+            None,
+            vec![
+                make_node("start", NodeType::Start),
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("b", NodeType::Generic),
+                make_node("c", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+                make_node("exit", NodeType::Exit),
+            ],
+            vec![
+                make_edge("start", "par"),
+                make_edge("par", "a"),
+                make_edge("par", "b"),
+                make_edge("a", "fanin"),
+                // "b" has two outgoing edges, so it can't be a single-hop branch.
+                make_edge("b", "c"),
+                make_edge("b", "fanin"),
+                make_edge("c", "fanin"),
+                make_edge("fanin", "exit"),
+            ],
+        );
+        let warnings = check_parallel_fanin_shape(&graph);
+        assert!(has_rule(&warnings, "parallel_branch_not_single_hop"));
+        let w = warnings
+            .iter()
+            .find(|w| w.rule == "parallel_branch_not_single_hop")
+            .unwrap();
+        assert_eq!(w.severity, Severity::Error);
+        assert_eq!(w.node_id.as_deref(), Some("b"));
+    }
+
+    /// Spec-critical: the real `product_design_factory.dot` fixture's
+    /// `CritiqueParallel -> {SystemLint, TaskCritic} -> CritiqueJoin` shape must
+    /// produce zero warnings from this rule.
+    #[test]
+    fn parallel_fanin_shape_clean_on_real_product_design_factory_fixture() {
+        use crate::dot::parser;
+
+        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let path = workspace_root
+            .join("examples")
+            .join("product_design_factory.dot");
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        let dot = parser::parse(&source)
+            .unwrap_or_else(|e| panic!("failed to parse {}: {e}", path.display()));
+        let graph = super::super::resolve(&dot)
+            .unwrap_or_else(|e| panic!("failed to resolve {}: {e}", path.display()));
+
+        let warnings = check_parallel_fanin_shape(&graph);
+        assert!(
+            warnings.is_empty(),
+            "expected no parallel/fanin warnings on product_design_factory.dot, got: {:?}",
+            warnings
+        );
     }
 }
