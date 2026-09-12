@@ -42,6 +42,10 @@ use crate::fidelity::{FidelityConfig, FidelityProcessor};
 use crate::goals::{GoalError, GoalGate};
 use crate::graph::{Graph, GraphNode, NodeAttrValue, NodeType};
 use crate::handler::{HandlerError, HandlerRegistry};
+use crate::parallel::{
+    BranchResolutionError, ParallelConfig, ParallelError, ParallelResult, execute_parallel,
+    parallel_attrs_from_node, resolve_parallel_branches,
+};
 use crate::retry::{RetryPolicy, RetryState, compute_delay};
 use crate::state::{Checkpoint, Context, Outcome};
 use crate::stats::{NodeStats, OutcomeKind, PipelineStats};
@@ -167,6 +171,10 @@ pub enum EngineError {
     UnroutableFailure { node_id: String, error: String },
     #[error("composition error: {0}")]
     Composition(#[from] crate::composition::CompositionError),
+    #[error("parallel branch resolution failed: {0}")]
+    ParallelBranchResolution(#[from] BranchResolutionError),
+    #[error("parallel execution failed: {0}")]
+    ParallelExecution(#[from] ParallelError),
 }
 
 /// Tracks how many times each loop_restart edge has been traversed.
@@ -429,6 +437,25 @@ impl Engine {
             .await
     }
 
+    /// Dispatch a `Parallel` node's already-resolved branches concurrently.
+    ///
+    /// Kept as its own `async fn` (rather than inlined into `execute_loop`)
+    /// because borrowing `&self.graph` across an `.await` from deep inside
+    /// `execute_loop`'s own nested loop/async-block defeats rustc's Send
+    /// inference for the outer future — see Task 3's commit message.
+    async fn dispatch_parallel_branches(
+        &self,
+        branch_node_ids: &[String],
+        parallel_config: &ParallelConfig,
+        context: &Context,
+    ) -> Result<ParallelResult, EngineError> {
+        let branch_nodes: Vec<&GraphNode> = branch_node_ids
+            .iter()
+            .filter_map(|id| self.graph.node(id))
+            .collect();
+        Ok(execute_parallel(branch_nodes, &self.registry, context, parallel_config).await?)
+    }
+
     /// The core execution loop shared by `run` and `run_from_checkpoint`.
     async fn execute_loop(
         &self,
@@ -443,6 +470,10 @@ impl Engine {
         let pipeline_start = std::time::Instant::now();
         let mut failure_signatures: HashMap<u64, (String, String, u32)> = HashMap::new();
         let mut node_timings: Vec<NodeStats> = Vec::new();
+        // Set by a Parallel node's fan-out dispatch to hand the FanIn node its
+        // aggregate outcome directly, bypassing a redundant ParallelHandler call
+        // that would otherwise overwrite it with a generic shell success.
+        let mut pending_outcome_override: Option<Outcome> = None;
 
         // Emit PipelineStarted event.
         let graph_name = self
@@ -547,20 +578,23 @@ impl Engine {
                 timestamp: Utc::now(),
             });
 
-            // Execute the handler for this node.
-            // Handler errors are converted to failure outcomes so that normal
-            // event flow (NodeFailed, edge selection, failure routing) still
-            // runs. This ensures the TUI and headless output always see the
-            // error instead of the pipeline silently dying.
-            let mut outcome = match self.registry.execute(node, &context).await {
-                Ok(o) => o,
-                Err(handler_err) => {
-                    tracing::error!(
-                        node = %current_node_id,
-                        error = %handler_err,
-                        "handler error, converting to failure outcome"
-                    );
-                    Outcome::failure(handler_err.to_string())
+            // Execute the handler for this node — unless a Parallel node's
+            // fan-out dispatch already computed this node's (the FanIn's)
+            // outcome directly, in which case use that instead of a redundant
+            // handler call that would overwrite it with a generic shell outcome.
+            let mut outcome = if let Some(pending) = pending_outcome_override.take() {
+                pending
+            } else {
+                match self.registry.execute(node, &context).await {
+                    Ok(o) => o,
+                    Err(handler_err) => {
+                        tracing::error!(
+                            node = %current_node_id,
+                            error = %handler_err,
+                            "handler error, converting to failure outcome"
+                        );
+                        Outcome::failure(handler_err.to_string())
+                    }
                 }
             };
 
@@ -752,6 +786,138 @@ impl Engine {
                     ));
                 }
                 break;
+            }
+
+            // A Parallel node fans out to all its branches concurrently instead
+            // of taking a single outgoing edge like every other node type. Once
+            // every branch finishes, the shared FanIn node picks up with an
+            // aggregate outcome (via `pending_outcome_override`) and normal
+            // single-node dispatch/edge-selection resumes from there.
+            if node.node_type == NodeType::Parallel {
+                let resolved = resolve_parallel_branches(&self.graph, &current_node_id)?;
+                let parallel_config = parallel_attrs_from_node(node, &ParallelConfig::default());
+
+                *last_progress.lock().await = std::time::Instant::now();
+
+                for branch_id in &resolved.branch_node_ids {
+                    if let Some(branch) = self.graph.node(branch_id) {
+                        self.emit(PipelineEvent::NodeStarted {
+                            node_id: branch.id.clone(),
+                            node_type: format!("{:?}", branch.node_type),
+                            timestamp: Utc::now(),
+                        });
+                    }
+                }
+
+                let branch_start = std::time::Instant::now();
+                // Dispatched through a dedicated helper (rather than inline here)
+                // because calling an async fn that borrows `&self.graph` across
+                // an `.await` from this deeply nested loop otherwise defeats
+                // rustc's Send inference for the outer future (see Task 3 commit
+                // message for the concrete error this sidesteps).
+                let parallel_result = self
+                    .dispatch_parallel_branches(&resolved.branch_node_ids, &parallel_config, &context)
+                    .await?;
+                let branch_duration_ms = branch_start.elapsed().as_millis() as u64;
+
+                *last_progress.lock().await = std::time::Instant::now();
+
+                for branch_id in &resolved.branch_node_ids {
+                    let branch_outcome = parallel_result
+                        .outcomes
+                        .get(branch_id)
+                        .cloned()
+                        .unwrap_or_else(|| Outcome::failure("branch produced no outcome"));
+
+                    let branch_outcome_kind = match &branch_outcome {
+                        Outcome::Success { .. } | Outcome::PartialSuccess { .. } => {
+                            OutcomeKind::Success
+                        }
+                        Outcome::Failure { .. } => OutcomeKind::Failure,
+                        Outcome::Retry { .. } => OutcomeKind::Retry,
+                        Outcome::Skip { .. } => OutcomeKind::Skip,
+                    };
+                    node_timings.push(NodeStats {
+                        node_id: branch_id.clone(),
+                        duration_ms: branch_duration_ms,
+                        outcome_kind: branch_outcome_kind,
+                    });
+
+                    if branch_outcome.is_failure() {
+                        self.emit(PipelineEvent::NodeFailed {
+                            node_id: branch_id.clone(),
+                            error: format!("{:?}", branch_outcome),
+                            duration_ms: branch_duration_ms,
+                            timestamp: Utc::now(),
+                        });
+                    } else {
+                        self.emit(PipelineEvent::NodeCompleted {
+                            node_id: branch_id.clone(),
+                            outcome: branch_outcome.clone(),
+                            duration_ms: branch_duration_ms,
+                            timestamp: Utc::now(),
+                        });
+                    }
+
+                    if let Some(ref store) = self.config.artifact_store
+                        && let Ok(value) = serde_json::to_value(&branch_outcome)
+                    {
+                        store.store(branch_id, "outcome", "application/json", value);
+                    }
+
+                    steps += 1;
+                    node_outcomes.insert(branch_id.clone(), branch_outcome);
+                    if !visited_nodes.contains(branch_id) {
+                        visited_nodes.push(branch_id.clone());
+                    }
+                }
+
+                // Auto-checkpoint after the fan-out, same as the single-node path.
+                if self.config.enable_checkpointing
+                    && let Some(ref checkpoint_dir) = self.config.checkpoint_dir
+                {
+                    let mut cp =
+                        Checkpoint::new(graph_name.clone(), current_node_id.clone(), &context);
+                    for id in &visited_nodes {
+                        cp.mark_visited(id);
+                    }
+                    for (id, out) in &node_outcomes {
+                        cp.add_outcome(id, out.clone());
+                    }
+                    match cp.to_json() {
+                        Ok(json_str) => {
+                            let cp_path = checkpoint_dir.join("checkpoint.json");
+                            if let Err(e) = std::fs::write(&cp_path, &json_str) {
+                                tracing::warn!(
+                                    path = %cp_path.display(),
+                                    error = %e,
+                                    "failed to write auto-save checkpoint"
+                                );
+                            } else {
+                                self.emit(PipelineEvent::CheckpointCreated {
+                                    node_id: current_node_id.clone(),
+                                    timestamp: Utc::now(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "failed to serialize auto-save checkpoint");
+                        }
+                    }
+                }
+
+                let aggregate = if parallel_result.all_succeeded() {
+                    Outcome::success()
+                } else {
+                    Outcome::failure(format!(
+                        "parallel branch(es) failed: {}",
+                        parallel_result.failed.join(", ")
+                    ))
+                };
+
+                pending_outcome_override = Some(aggregate);
+                current_node_id = resolved.fan_in_id;
+                continue;
             }
 
             // Inject outcome status into context so condition expressions like

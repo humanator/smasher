@@ -2,8 +2,10 @@
 // ABOUTME: Supports bounded concurrency and result aggregation across parallel branches.
 
 use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
 
+use futures::future::Future;
 use futures::stream::{self, StreamExt};
 use serde_json::json;
 
@@ -26,6 +28,28 @@ impl Default for ParallelConfig {
             max_concurrency: 10,
             fail_fast: false,
         }
+    }
+}
+
+/// Read `max_concurrency`/`fail_fast` overrides from a `Parallel` node's attrs,
+/// falling back to `defaults` for whichever attribute the node doesn't set.
+///
+/// Shared by `ParallelHandler::execute` and `Engine::execute_loop`'s concurrent
+/// dispatch so the two call sites can't drift apart on attr-parsing rules.
+pub fn parallel_attrs_from_node(node: &GraphNode, defaults: &ParallelConfig) -> ParallelConfig {
+    let max_concurrency = match node.attrs.get("max_concurrency") {
+        Some(NodeAttrValue::Number(n)) => *n as usize,
+        _ => defaults.max_concurrency,
+    };
+
+    let fail_fast = match node.attrs.get("fail_fast") {
+        Some(NodeAttrValue::Bool(b)) => *b,
+        _ => defaults.fail_fast,
+    };
+
+    ParallelConfig {
+        max_concurrency,
+        fail_fast,
     }
 }
 
@@ -190,6 +214,9 @@ pub enum ParallelError {
     MergeFailed(#[from] MergeError),
 }
 
+/// A single branch's boxed, pinned dispatch future, paired with its node ID.
+type BranchFuture<'a> = Pin<Box<dyn Future<Output = (String, Result<Outcome, HandlerError>)> + Send + 'a>>;
+
 /// Execute a set of graph nodes concurrently via the handler registry.
 ///
 /// Each node is dispatched through `registry.execute()`. Results are collected
@@ -216,14 +243,28 @@ pub async fn execute_parallel(
     }
 
     // Build a stream of futures, one per node, and buffer them to limit concurrency.
-    let mut result_stream = stream::iter(nodes.iter().map(|node| {
-        let node_id = node.id.clone();
-        async move {
-            let outcome = registry.execute(node, context).await;
-            (node_id, outcome)
-        }
-    }))
-    .buffer_unordered(config.max_concurrency);
+    //
+    // Each future is boxed and pinned explicitly (rather than left as an opaque
+    // `impl Future` produced by the `.map()` closure) so rustc can verify `Send`
+    // for the resulting stream against a concrete trait object type. Without
+    // this, the borrowed `&GraphNode`/`&Context`/`&HandlerRegistry` captured by
+    // the async block only prove `Send` for one specific inferred lifetime,
+    // which fails higher-ranked `Send` checks at any call site that needs this
+    // future to be `Send` generically (e.g. inside `tokio::spawn` elsewhere in
+    // the workspace).
+    let futures: Vec<BranchFuture<'_>> = nodes
+        .iter()
+        .map(|node| {
+            let node_id = node.id.clone();
+            let fut = async move {
+                let outcome = registry.execute(node, context).await;
+                (node_id, outcome)
+            };
+            Box::pin(fut) as BranchFuture<'_>
+        })
+        .collect();
+
+    let mut result_stream = stream::iter(futures).buffer_unordered(config.max_concurrency);
 
     while let Some((node_id, result)) = result_stream.next().await {
         match result {
@@ -416,15 +457,10 @@ impl Handler for ParallelHandler {
 
     async fn execute(&self, node: &GraphNode, _context: &Context) -> Result<Outcome, HandlerError> {
         // Read optional overrides from node attributes.
-        let max_concurrency = match node.attrs.get("max_concurrency") {
-            Some(NodeAttrValue::Number(n)) => *n as usize,
-            _ => self.config.max_concurrency,
-        };
-
-        let fail_fast = match node.attrs.get("fail_fast") {
-            Some(NodeAttrValue::Bool(b)) => *b,
-            _ => self.config.fail_fast,
-        };
+        let ParallelConfig {
+            max_concurrency,
+            fail_fast,
+        } = parallel_attrs_from_node(node, &self.config);
 
         let merge_strategy_str = match self.merge_strategy {
             MergeStrategy::LastWriteWins => "last_write_wins",

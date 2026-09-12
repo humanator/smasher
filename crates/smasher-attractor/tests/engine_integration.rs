@@ -1,14 +1,15 @@
 // ABOUTME: Integration tests for the pipeline execution engine.
 // ABOUTME: Exercises multi-node traversal, checkpointing, handlers, retries, and error cases.
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 use serde_json::json;
 
 use smasher_attractor::engine::{Engine, EngineConfig, EngineError};
+use smasher_attractor::events::{PipelineEvent, PipelineEventEmitter};
 use smasher_attractor::graph::{Graph, GraphEdge, GraphNode, NodeAttrValue, NodeType};
 use smasher_attractor::handler::{Handler, HandlerError, HandlerRegistry};
 use smasher_attractor::state::{Checkpoint, Context, Outcome};
@@ -1334,4 +1335,248 @@ async fn loop_restarts_with_non_loop_edges_have_zero_counter() {
 
     assert_eq!(result.loop_restarts.total(), 0);
     assert!(result.loop_restarts.counts().is_empty());
+}
+
+// ============================================================================
+// Parallel/FanIn concurrent dispatch tests
+// ============================================================================
+
+/// Handler that records every node id it's invoked for (in invocation order)
+/// and fails for any node id listed in `fail_ids`, succeeding for everything
+/// else. Used to prove both branches of a `Parallel` node are actually
+/// dispatched, not just the first one `select_edge` would otherwise pick.
+struct RecordingHandler {
+    calls: Arc<Mutex<Vec<String>>>,
+    fail_ids: HashSet<String>,
+}
+
+impl RecordingHandler {
+    fn new(calls: Arc<Mutex<Vec<String>>>) -> Self {
+        Self {
+            calls,
+            fail_ids: HashSet::new(),
+        }
+    }
+
+    fn with_failures(calls: Arc<Mutex<Vec<String>>>, fail_ids: HashSet<String>) -> Self {
+        Self { calls, fail_ids }
+    }
+}
+
+#[async_trait]
+impl Handler for RecordingHandler {
+    fn name(&self) -> &str {
+        "recording"
+    }
+
+    async fn execute(&self, node: &GraphNode, _context: &Context) -> Result<Outcome, HandlerError> {
+        self.calls.lock().unwrap().push(node.id.clone());
+        if self.fail_ids.contains(&node.id) {
+            Ok(Outcome::failure(format!("{} deliberately failed", node.id)))
+        } else {
+            Ok(Outcome::success_with(json!({"node": node.id})))
+        }
+    }
+
+    fn handles(&self, _node_type: &NodeType) -> bool {
+        true
+    }
+}
+
+/// `Start -> par(Parallel) -> {branch_a, branch_b} -> fanin(FanIn) -> exit`,
+/// the real shape `product_design_factory.dot`'s `CritiqueParallel` uses.
+fn parallel_fanin_graph() -> Graph {
+    make_graph(
+        vec![
+            make_node("start", NodeType::Start),
+            make_node("par", NodeType::Parallel),
+            make_node("branch_a", NodeType::Generic),
+            make_node("branch_b", NodeType::Generic),
+            make_node("fanin", NodeType::FanIn),
+            make_node("exit", NodeType::Exit),
+        ],
+        vec![
+            make_edge("start", "par"),
+            make_edge("par", "branch_a"),
+            make_edge("par", "branch_b"),
+            make_edge("branch_a", "fanin"),
+            make_edge("branch_b", "fanin"),
+            make_edge("fanin", "exit"),
+        ],
+    )
+}
+
+#[tokio::test]
+async fn parallel_node_dispatches_both_branches_with_events_and_outcomes() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let mut registry = HandlerRegistry::new();
+    registry.register(Arc::new(RecordingHandler::new(calls.clone())));
+
+    let emitter = Arc::new(PipelineEventEmitter::new(64));
+    let mut rx = emitter.subscribe();
+
+    let engine = Engine::new(parallel_fanin_graph(), registry).with_emitter(emitter);
+    let result = engine.run(Context::new()).await.unwrap();
+
+    // Both branches' handlers were actually invoked.
+    let recorded = calls.lock().unwrap().clone();
+    assert!(
+        recorded.contains(&"branch_a".to_string()),
+        "expected branch_a to be dispatched, got: {recorded:?}"
+    );
+    assert!(
+        recorded.contains(&"branch_b".to_string()),
+        "expected branch_b to be dispatched, got: {recorded:?}"
+    );
+
+    // Both branch outcomes landed in node_outcomes, keyed by their own node ids.
+    assert!(matches!(
+        result.node_outcomes.get("branch_a"),
+        Some(Outcome::Success { .. })
+    ));
+    assert!(matches!(
+        result.node_outcomes.get("branch_b"),
+        Some(Outcome::Success { .. })
+    ));
+
+    // Both branches were marked visited, in addition to the Parallel/FanIn nodes.
+    assert!(result.visited_nodes.contains(&"branch_a".to_string()));
+    assert!(result.visited_nodes.contains(&"branch_b".to_string()));
+    assert!(result.visited_nodes.contains(&"par".to_string()));
+    assert!(result.visited_nodes.contains(&"fanin".to_string()));
+
+    // FanIn's own recorded outcome is the all-succeeded aggregate.
+    assert!(matches!(
+        result.node_outcomes.get("fanin"),
+        Some(Outcome::Success { .. })
+    ));
+
+    // Both branches' NodeStarted/NodeCompleted events appear in the event
+    // stream, in addition to the Parallel and FanIn nodes' own events.
+    let mut events = Vec::new();
+    while let Ok(event) = rx.try_recv() {
+        events.push(event);
+    }
+    let started_ids: Vec<&str> = events
+        .iter()
+        .filter_map(|e| match e {
+            PipelineEvent::NodeStarted { node_id, .. } => Some(node_id.as_str()),
+            _ => None,
+        })
+        .collect();
+    let completed_ids: Vec<&str> = events
+        .iter()
+        .filter_map(|e| match e {
+            PipelineEvent::NodeCompleted { node_id, .. } => Some(node_id.as_str()),
+            _ => None,
+        })
+        .collect();
+    for id in ["branch_a", "branch_b", "par", "fanin"] {
+        assert!(
+            started_ids.contains(&id),
+            "expected NodeStarted for '{id}', got: {started_ids:?}"
+        );
+        assert!(
+            completed_ids.contains(&id),
+            "expected NodeCompleted for '{id}', got: {completed_ids:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn parallel_one_branch_failing_runs_other_to_completion_and_fanin_reports_failure() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let mut fail_ids = HashSet::new();
+    fail_ids.insert("branch_a".to_string());
+    let mut registry = HandlerRegistry::new();
+    registry.register(Arc::new(RecordingHandler::with_failures(
+        calls.clone(),
+        fail_ids,
+    )));
+
+    let mut attrs = HashMap::new();
+    attrs.insert("fail_fast".to_string(), NodeAttrValue::Bool(false));
+    let graph = make_graph(
+        vec![
+            make_node("start", NodeType::Start),
+            make_node_with_attrs("par", NodeType::Parallel, attrs),
+            make_node("branch_a", NodeType::Generic),
+            make_node("branch_b", NodeType::Generic),
+            make_node("fanin", NodeType::FanIn),
+            make_node("exit", NodeType::Exit),
+        ],
+        vec![
+            make_edge("start", "par"),
+            make_edge("par", "branch_a"),
+            make_edge("par", "branch_b"),
+            make_edge("branch_a", "fanin"),
+            make_edge("branch_b", "fanin"),
+            make_edge("fanin", "exit"),
+        ],
+    );
+
+    let engine = Engine::new(graph, registry);
+    let result = engine.run(Context::new()).await.unwrap();
+
+    // branch_b still ran to completion despite branch_a failing.
+    let recorded = calls.lock().unwrap().clone();
+    assert!(
+        recorded.contains(&"branch_b".to_string()),
+        "expected branch_b to still run, got: {recorded:?}"
+    );
+
+    assert!(matches!(
+        result.node_outcomes.get("branch_a"),
+        Some(Outcome::Failure { .. })
+    ));
+    assert!(matches!(
+        result.node_outcomes.get("branch_b"),
+        Some(Outcome::Success { .. })
+    ));
+
+    // FanIn's recorded outcome is a Failure naming the failed branch — the
+    // same shape any other node's Failure outcome takes, no new special-casing.
+    match result.node_outcomes.get("fanin") {
+        Some(Outcome::Failure { error, .. }) => {
+            assert!(
+                error.contains("branch_a"),
+                "expected fanin's failure to name branch_a, got: {error}"
+            );
+        }
+        other => panic!("expected fanin outcome to be a Failure, got: {other:?}"),
+    }
+
+    // Downstream routing from FanIn still reached exit via its normal
+    // (unconditional) edge, exactly as any other Failure outcome would.
+    assert!(result.visited_nodes.contains(&"exit".to_string()));
+}
+
+#[tokio::test]
+async fn parallel_invalid_shape_returns_clear_engine_error_not_panic() {
+    // "par" has only one outgoing edge — too few branches to be a real fan-out.
+    let graph = make_graph(
+        vec![
+            make_node("start", NodeType::Start),
+            make_node("par", NodeType::Parallel),
+            make_node("branch_a", NodeType::Generic),
+            make_node("fanin", NodeType::FanIn),
+            make_node("exit", NodeType::Exit),
+        ],
+        vec![
+            make_edge("start", "par"),
+            make_edge("par", "branch_a"),
+            make_edge("branch_a", "fanin"),
+            make_edge("fanin", "exit"),
+        ],
+    );
+
+    let engine = Engine::new(graph, passthrough_registry());
+    let err = engine.run(Context::new()).await.unwrap_err();
+
+    assert!(matches!(
+        err,
+        EngineError::ParallelBranchResolution(
+            smasher_attractor::parallel::BranchResolutionError::TooFewBranches { .. }
+        )
+    ));
 }
