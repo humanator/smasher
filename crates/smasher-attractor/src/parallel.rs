@@ -7,7 +7,7 @@ use std::sync::Arc;
 use futures::stream::{self, StreamExt};
 use serde_json::json;
 
-use crate::graph::{GraphNode, NodeAttrValue, NodeType};
+use crate::graph::{Graph, GraphNode, NodeAttrValue, NodeType};
 use crate::handler::{Handler, HandlerError, HandlerRegistry};
 use crate::state::{Context, Outcome};
 
@@ -260,6 +260,106 @@ pub async fn execute_parallel(
     })
 }
 
+/// A `Parallel` node's resolved branches and their shared convergence target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParallelBranches {
+    /// First-hop branch node IDs, in the `Parallel` node's own edge
+    /// declaration order.
+    pub branch_node_ids: Vec<String>,
+    /// The single `FanIn` node ID every branch converges on.
+    pub fan_in_id: String,
+}
+
+/// Errors produced when a `Parallel` node's branch/FanIn shape can't be resolved.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum BranchResolutionError {
+    #[error("parallel node '{parallel_id}' has too few branches ({count}); need at least 2")]
+    TooFewBranches { parallel_id: String, count: usize },
+    #[error(
+        "parallel node '{parallel_id}' branches resolve to ambiguous FanIn targets: {}",
+        targets.join(", ")
+    )]
+    AmbiguousFanIn {
+        parallel_id: String,
+        targets: Vec<String>,
+    },
+    #[error(
+        "parallel node '{parallel_id}' branch '{branch_id}' does not resolve to a \
+         FanIn node within one hop"
+    )]
+    NotSingleHop {
+        parallel_id: String,
+        branch_id: String,
+    },
+}
+
+/// Resolve a `Parallel` node's branches and the single `FanIn` node they
+/// converge on.
+///
+/// Mirrors the shape `graph::validation::check_parallel_fanin_shape` lints
+/// for, but validates independently rather than relying on validation having
+/// already run — safe to call standalone or in tests against an unvalidated
+/// graph.
+pub fn resolve_parallel_branches(
+    graph: &Graph,
+    parallel_id: &str,
+) -> Result<ParallelBranches, BranchResolutionError> {
+    let branches = graph.edges_from(parallel_id);
+
+    if branches.len() < 2 {
+        return Err(BranchResolutionError::TooFewBranches {
+            parallel_id: parallel_id.to_string(),
+            count: branches.len(),
+        });
+    }
+
+    let branch_node_ids: Vec<String> = branches.iter().map(|e| e.to.clone()).collect();
+
+    let mut fan_in_targets: Vec<String> = Vec::with_capacity(branch_node_ids.len());
+    for branch_id in &branch_node_ids {
+        let fan_in = match graph.node(branch_id) {
+            Some(n) if n.node_type == NodeType::FanIn => branch_id.clone(),
+            Some(_) => match graph.edges_from(branch_id).as_slice() {
+                [only]
+                    if graph
+                        .node(only.to.as_str())
+                        .is_some_and(|n| n.node_type == NodeType::FanIn) =>
+                {
+                    only.to.clone()
+                }
+                _ => {
+                    return Err(BranchResolutionError::NotSingleHop {
+                        parallel_id: parallel_id.to_string(),
+                        branch_id: branch_id.clone(),
+                    });
+                }
+            },
+            None => {
+                return Err(BranchResolutionError::NotSingleHop {
+                    parallel_id: parallel_id.to_string(),
+                    branch_id: branch_id.clone(),
+                });
+            }
+        };
+        fan_in_targets.push(fan_in);
+    }
+
+    let mut unique_targets = fan_in_targets.clone();
+    unique_targets.sort();
+    unique_targets.dedup();
+    if unique_targets.len() > 1 {
+        return Err(BranchResolutionError::AmbiguousFanIn {
+            parallel_id: parallel_id.to_string(),
+            targets: unique_targets,
+        });
+    }
+
+    Ok(ParallelBranches {
+        branch_node_ids,
+        fan_in_id: fan_in_targets[0].clone(),
+    })
+}
+
 /// Handler for Parallel-type graph nodes.
 ///
 /// Reads optional `max_concurrency` and `fail_fast` attributes from the node
@@ -362,6 +462,32 @@ mod tests {
             node_type,
             label: None,
             attrs: HashMap::new(),
+        }
+    }
+
+    /// Build a minimal GraphEdge with no label/condition/priority.
+    fn make_edge(from: &str, to: &str) -> crate::graph::GraphEdge {
+        crate::graph::GraphEdge {
+            from: from.to_string(),
+            to: to.to_string(),
+            label: None,
+            condition: None,
+            priority: None,
+            loop_restart: false,
+            attrs: HashMap::new(),
+        }
+    }
+
+    /// Build a Graph from nodes and edges, ignoring the fields resolve_parallel_branches
+    /// and validation don't inspect.
+    fn make_graph(nodes: Vec<GraphNode>, edges: Vec<crate::graph::GraphEdge>) -> Graph {
+        Graph {
+            name: Some("test".to_string()),
+            nodes,
+            edges,
+            default_node_attrs: HashMap::new(),
+            default_edge_attrs: HashMap::new(),
+            graph_attrs: HashMap::new(),
         }
     }
 
@@ -1358,5 +1484,156 @@ mod tests {
         };
         let parallel_err: ParallelError = merge_err.into();
         assert!(matches!(parallel_err, ParallelError::MergeFailed(_)));
+    }
+
+    // ---------------------------------------------------------------
+    // resolve_parallel_branches
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn resolve_parallel_branches_valid_two_branch_case() {
+        let graph = make_graph(
+            vec![
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("b", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+            ],
+            vec![
+                make_edge("par", "a"),
+                make_edge("par", "b"),
+                make_edge("a", "fanin"),
+                make_edge("b", "fanin"),
+            ],
+        );
+
+        let resolved = resolve_parallel_branches(&graph, "par").expect("should resolve");
+        assert_eq!(resolved.branch_node_ids, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(resolved.fan_in_id, "fanin");
+    }
+
+    #[test]
+    fn resolve_parallel_branches_preserves_edge_declaration_order() {
+        let graph = make_graph(
+            vec![
+                make_node("par", NodeType::Parallel),
+                make_node("z", NodeType::Generic),
+                make_node("a", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+            ],
+            vec![
+                // Declared "z" before "a" — order must be preserved, not resorted.
+                make_edge("par", "z"),
+                make_edge("par", "a"),
+                make_edge("z", "fanin"),
+                make_edge("a", "fanin"),
+            ],
+        );
+
+        let resolved = resolve_parallel_branches(&graph, "par").expect("should resolve");
+        assert_eq!(resolved.branch_node_ids, vec!["z".to_string(), "a".to_string()]);
+    }
+
+    #[test]
+    fn resolve_parallel_branches_direct_to_fanin_zero_work_branch() {
+        let graph = make_graph(
+            vec![
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+            ],
+            vec![
+                make_edge("par", "a"),
+                make_edge("par", "fanin"), // zero-work branch straight to FanIn
+                make_edge("a", "fanin"),
+            ],
+        );
+
+        let resolved = resolve_parallel_branches(&graph, "par").expect("should resolve");
+        assert_eq!(
+            resolved.branch_node_ids,
+            vec!["a".to_string(), "fanin".to_string()]
+        );
+        assert_eq!(resolved.fan_in_id, "fanin");
+    }
+
+    #[test]
+    fn resolve_parallel_branches_too_few_branches_error() {
+        let graph = make_graph(
+            vec![
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+            ],
+            vec![make_edge("par", "a"), make_edge("a", "fanin")],
+        );
+
+        let err = resolve_parallel_branches(&graph, "par").unwrap_err();
+        assert_eq!(
+            err,
+            BranchResolutionError::TooFewBranches {
+                parallel_id: "par".to_string(),
+                count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_parallel_branches_not_single_hop_error() {
+        let graph = make_graph(
+            vec![
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("b", NodeType::Generic),
+                make_node("c", NodeType::Generic),
+                make_node("fanin", NodeType::FanIn),
+            ],
+            vec![
+                make_edge("par", "a"),
+                make_edge("par", "b"),
+                make_edge("a", "fanin"),
+                // "b" has two outgoing edges, so it isn't a single-hop branch.
+                make_edge("b", "c"),
+                make_edge("b", "fanin"),
+                make_edge("c", "fanin"),
+            ],
+        );
+
+        let err = resolve_parallel_branches(&graph, "par").unwrap_err();
+        assert_eq!(
+            err,
+            BranchResolutionError::NotSingleHop {
+                parallel_id: "par".to_string(),
+                branch_id: "b".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn resolve_parallel_branches_ambiguous_fanin_error() {
+        let graph = make_graph(
+            vec![
+                make_node("par", NodeType::Parallel),
+                make_node("a", NodeType::Generic),
+                make_node("b", NodeType::Generic),
+                make_node("fanin1", NodeType::FanIn),
+                make_node("fanin2", NodeType::FanIn),
+            ],
+            vec![
+                make_edge("par", "a"),
+                make_edge("par", "b"),
+                make_edge("a", "fanin1"),
+                make_edge("b", "fanin2"),
+            ],
+        );
+
+        let err = resolve_parallel_branches(&graph, "par").unwrap_err();
+        assert_eq!(
+            err,
+            BranchResolutionError::AmbiguousFanIn {
+                parallel_id: "par".to_string(),
+                targets: vec!["fanin1".to_string(), "fanin2".to_string()],
+            }
+        );
     }
 }
