@@ -166,6 +166,136 @@ impl RunDirectory {
     }
 }
 
+/// Policy controlling how long `{data_dir}/artifacts/<run_id>/` trees are kept.
+///
+/// Mirrors `log_sink::RetentionPolicy`'s shape. All fields are optional; when set,
+/// runs exceeding the limits are pruned oldest-first (by `RunManifest.created_at`)
+/// by `prune_artifacts`.
+#[derive(Debug, Clone, Default)]
+pub struct ArtifactRetentionPolicy {
+    /// Remove runs older than this duration relative to now.
+    pub max_age: Option<chrono::Duration>,
+    /// Remove the oldest runs until the artifacts tree's total size is at or under
+    /// this cap.
+    pub max_total_bytes: Option<u64>,
+}
+
+/// Result of a `prune_artifacts` call: which runs were (or, for a dry run, would be)
+/// removed, and how many bytes that reclaims.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct PruneReport {
+    pub removed_run_ids: Vec<String>,
+    pub bytes_reclaimed: u64,
+}
+
+/// Recursively sums the byte size of every file under `path`.
+fn dir_size(path: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| match entry.file_type() {
+            Ok(file_type) if file_type.is_dir() => dir_size(&entry.path()),
+            Ok(_) => entry.metadata().map(|m| m.len()).unwrap_or(0),
+            Err(_) => 0,
+        })
+        .sum()
+}
+
+/// A run directory's identity, on-disk path, and stats needed to decide whether
+/// to prune it.
+struct PrunableRun {
+    run_id: String,
+    path: PathBuf,
+    created_at: DateTime<Utc>,
+    size: u64,
+}
+
+/// Scans `{data_dir}/artifacts/` for run directories with a parseable
+/// `manifest.json`, oldest-first. Missing directories, unreadable entries, and
+/// malformed manifests are skipped rather than erroring the whole scan — same
+/// convention as `smasher-web`'s `scan_candidates`.
+fn scan_runs(data_dir: &Path) -> Vec<PrunableRun> {
+    let artifacts_dir = data_dir.join("artifacts");
+    let Ok(entries) = std::fs::read_dir(&artifacts_dir) else {
+        return Vec::new();
+    };
+
+    let mut runs: Vec<PrunableRun> = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            if !entry.file_type().ok()?.is_dir() {
+                return None;
+            }
+            let path = entry.path();
+            let contents = std::fs::read_to_string(path.join("manifest.json")).ok()?;
+            let manifest: RunManifest = serde_json::from_str(&contents).ok()?;
+            let size = dir_size(&path);
+            Some(PrunableRun {
+                run_id: manifest.run_id,
+                path,
+                created_at: manifest.created_at,
+                size,
+            })
+        })
+        .collect();
+
+    runs.sort_by_key(|r| r.created_at);
+    runs
+}
+
+/// Removes whole `{data_dir}/artifacts/<run_id>/` trees, oldest-first, until the
+/// tree satisfies `policy`. Never deletes a partial run — a run's artifacts are
+/// kept or discarded as a unit. `dry_run: true` computes and returns the same
+/// report without touching disk.
+pub fn prune_artifacts(
+    data_dir: &Path,
+    policy: &ArtifactRetentionPolicy,
+    dry_run: bool,
+) -> Result<PruneReport, StateError> {
+    let runs = scan_runs(data_dir);
+
+    let mut to_remove: Vec<usize> = Vec::new();
+
+    if let Some(max_age) = policy.max_age {
+        let cutoff = Utc::now() - max_age;
+        for (i, run) in runs.iter().enumerate() {
+            if run.created_at < cutoff {
+                to_remove.push(i);
+            }
+        }
+    }
+
+    if let Some(max_total_bytes) = policy.max_total_bytes {
+        let mut total: u64 = runs.iter().map(|r| r.size).sum();
+        for (i, run) in runs.iter().enumerate() {
+            if total <= max_total_bytes {
+                break;
+            }
+            if !to_remove.contains(&i) {
+                to_remove.push(i);
+            }
+            total = total.saturating_sub(run.size);
+        }
+    }
+
+    to_remove.sort_unstable();
+    to_remove.dedup();
+
+    let mut report = PruneReport::default();
+    for i in to_remove {
+        let run = &runs[i];
+        report.removed_run_ids.push(run.run_id.clone());
+        report.bytes_reclaimed += run.size;
+        if !dry_run {
+            std::fs::remove_dir_all(&run.path)?;
+        }
+    }
+
+    Ok(report)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,5 +635,123 @@ mod tests {
         let result = sanitize_graph_name(&emoji);
         assert_eq!(result.chars().count(), MAX_GRAPH_NAME_LEN);
         assert!(std::str::from_utf8(result.as_bytes()).is_ok());
+    }
+
+    // ---------------------------------------------------------------
+    // prune_artifacts
+    // ---------------------------------------------------------------
+
+    /// Writes a fake `{data_dir}/artifacts/<run_id>/manifest.json` with the given
+    /// `created_at`, plus a `payload` file of `size_bytes` under the run dir, without
+    /// going through `RunDirectory::create` (which always stamps `Utc::now()` and
+    /// offers no way to backdate).
+    fn write_fake_run(data_dir: &Path, run_id: &str, created_at: DateTime<Utc>, size_bytes: usize) {
+        let root = data_dir.join("artifacts").join(run_id);
+        std::fs::create_dir_all(&root).unwrap();
+        let manifest = RunManifest {
+            run_id: run_id.to_string(),
+            graph_name: "g".to_string(),
+            graph_hash: "hash".to_string(),
+            created_at,
+            layout_version: 1,
+            directories: RunDirectories {
+                root: root.clone(),
+                checkpoints: root.join("checkpoints"),
+                node_logs: root.join("nodes"),
+                artifacts: root.join("artifacts"),
+                events: root.join("events"),
+            },
+        };
+        std::fs::write(
+            root.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(root.join("payload"), vec![0u8; size_bytes]).unwrap();
+    }
+
+    #[test]
+    fn prune_artifacts_max_age_removes_only_older_run_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let now = Utc::now();
+        write_fake_run(tmp.path(), "old-run", now - chrono::Duration::days(10), 10);
+        write_fake_run(tmp.path(), "new-run", now, 10);
+
+        let policy = ArtifactRetentionPolicy {
+            max_age: Some(chrono::Duration::days(1)),
+            max_total_bytes: None,
+        };
+        let report = prune_artifacts(tmp.path(), &policy, false).unwrap();
+
+        assert_eq!(report.removed_run_ids, vec!["old-run".to_string()]);
+        assert!(!tmp.path().join("artifacts/old-run").exists());
+        assert!(tmp.path().join("artifacts/new-run").exists());
+    }
+
+    #[test]
+    fn prune_artifacts_max_total_bytes_removes_oldest_first_until_under_cap() {
+        let tmp = tempfile::tempdir().unwrap();
+        let now = Utc::now();
+        write_fake_run(tmp.path(), "run-a", now - chrono::Duration::days(3), 10_000);
+        write_fake_run(tmp.path(), "run-b", now - chrono::Duration::days(2), 10_000);
+        write_fake_run(tmp.path(), "run-c", now - chrono::Duration::days(1), 10_000);
+
+        // Each run dir is the same size (same payload size, same-length manifest
+        // fields), so a cap of 1.5x one run's real on-disk size (manifest.json +
+        // payload) sits strictly between "keep 1" and "keep 2" — forcing exactly
+        // the two oldest runs out.
+        let one_run_size = dir_size(&tmp.path().join("artifacts/run-c"));
+        let cap = one_run_size + one_run_size / 2;
+
+        let policy = ArtifactRetentionPolicy {
+            max_age: None,
+            max_total_bytes: Some(cap),
+        };
+        let report = prune_artifacts(tmp.path(), &policy, false).unwrap();
+
+        assert_eq!(
+            report.removed_run_ids,
+            vec!["run-a".to_string(), "run-b".to_string()]
+        );
+        assert!(!tmp.path().join("artifacts/run-a").exists());
+        assert!(!tmp.path().join("artifacts/run-b").exists());
+        assert!(tmp.path().join("artifacts/run-c").exists());
+    }
+
+    #[test]
+    fn prune_artifacts_removes_nothing_when_within_limits() {
+        let tmp = tempfile::tempdir().unwrap();
+        let now = Utc::now();
+        write_fake_run(tmp.path(), "run-a", now, 10);
+
+        let policy = ArtifactRetentionPolicy {
+            max_age: Some(chrono::Duration::days(30)),
+            max_total_bytes: Some(1_000_000),
+        };
+        let report = prune_artifacts(tmp.path(), &policy, false).unwrap();
+
+        assert!(report.removed_run_ids.is_empty());
+        assert_eq!(report.bytes_reclaimed, 0);
+        assert!(tmp.path().join("artifacts/run-a").exists());
+    }
+
+    #[test]
+    fn prune_artifacts_dry_run_reports_without_touching_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let now = Utc::now();
+        write_fake_run(tmp.path(), "old-run", now - chrono::Duration::days(10), 10);
+
+        let policy = ArtifactRetentionPolicy {
+            max_age: Some(chrono::Duration::days(1)),
+            max_total_bytes: None,
+        };
+        let report = prune_artifacts(tmp.path(), &policy, true).unwrap();
+
+        assert_eq!(report.removed_run_ids, vec!["old-run".to_string()]);
+        // Nothing was actually deleted.
+        assert!(std::fs::metadata(tmp.path().join("artifacts/old-run")).is_ok());
+        assert!(
+            std::fs::metadata(tmp.path().join("artifacts/old-run/manifest.json")).is_ok()
+        );
     }
 }
