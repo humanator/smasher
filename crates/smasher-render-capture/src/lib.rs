@@ -48,6 +48,7 @@ pub async fn capture(
         viewport,
         candidate_dir: candidate_dir.to_path_buf(),
         exit_status: ExitStatus::Success,
+        artifacts: Vec::new(),
     };
 
     std::fs::create_dir_all(output_dir).map_err(|e| CaptureError::Capture(e.to_string()))?;

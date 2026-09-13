@@ -165,6 +165,7 @@ mod tests {
             },
             candidate_dir: PathBuf::from("/tmp/candidate"),
             exit_status,
+            artifacts: Vec::new(),
         };
         std::fs::write(
             candidate_dir.join("manifest.json"),

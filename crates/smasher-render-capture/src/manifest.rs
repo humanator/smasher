@@ -13,6 +13,26 @@ pub struct Manifest {
     pub viewport: Viewport,
     pub candidate_dir: PathBuf,
     pub exit_status: ExitStatus,
+    #[serde(default)]
+    pub artifacts: Vec<ArtifactRef>,
+}
+
+/// A single stored artifact for a candidate, beyond the historical bare
+/// `screenshot.png`. `path` is relative to the candidate's own artifact directory.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArtifactRef {
+    pub kind: ArtifactKind,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactKind {
+    Screenshot,
+    /// A persisted, standalone-servable copy of the candidate directory.
+    LiveBundle,
+    /// Reserved for a future interaction-recording producer; unused today.
+    Recording,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -53,6 +73,7 @@ mod tests {
             },
             candidate_dir: std::path::PathBuf::from("/tmp/candidate"),
             exit_status: ExitStatus::Success,
+            artifacts: Vec::new(),
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
@@ -73,12 +94,56 @@ mod tests {
             exit_status: ExitStatus::Failed {
                 reason: "boom".to_string(),
             },
+            artifacts: Vec::new(),
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
         let roundtripped: Manifest = serde_json::from_str(&json).unwrap();
 
         assert_eq!(manifest, roundtripped);
+    }
+
+    #[test]
+    fn manifest_serde_roundtrip_with_artifacts() {
+        let manifest = Manifest {
+            captured_at: chrono::Utc::now(),
+            viewport: Viewport {
+                width: 1280,
+                height: 800,
+            },
+            candidate_dir: std::path::PathBuf::from("/tmp/candidate"),
+            exit_status: ExitStatus::Success,
+            artifacts: vec![
+                ArtifactRef {
+                    kind: ArtifactKind::Screenshot,
+                    path: "screenshot.png".to_string(),
+                },
+                ArtifactRef {
+                    kind: ArtifactKind::LiveBundle,
+                    path: "bundle/index.html".to_string(),
+                },
+            ],
+        };
+
+        let json = serde_json::to_string(&manifest).unwrap();
+        let roundtripped: Manifest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(manifest, roundtripped);
+    }
+
+    #[test]
+    fn manifest_deserializes_without_artifacts_key_for_backward_compat() {
+        let legacy_json = serde_json::json!({
+            "captured_at": "2026-09-08T12:00:00Z",
+            "viewport": {"width": 1280, "height": 800},
+            "candidate_dir": "/tmp/candidate",
+            "exit_status": {"status": "success"}
+        })
+        .to_string();
+
+        let manifest: Manifest = serde_json::from_str(&legacy_json).unwrap();
+
+        assert_eq!(manifest.artifacts, Vec::new());
     }
 
     #[test]

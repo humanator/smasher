@@ -866,6 +866,7 @@ mod tests {
             },
             candidate_dir: "/tmp/candidate-fixture".into(),
             exit_status: ExitStatus::Success,
+            artifacts: Vec::new(),
         };
         std::fs::write(
             candidate_dir.join("manifest.json"),
@@ -911,6 +912,7 @@ mod tests {
                     viewport,
                     candidate_dir: "/tmp/candidate-a".into(),
                     exit_status: ExitStatus::Success,
+                    artifacts: Vec::new(),
                 },
             },
             CandidateSummary {
@@ -924,6 +926,7 @@ mod tests {
                     exit_status: ExitStatus::Failed {
                         reason: "chromium launch failed".into(),
                     },
+                    artifacts: Vec::new(),
                 },
             },
         ];
@@ -1053,6 +1056,7 @@ mod tests {
             } else {
                 ExitStatus::Success
             },
+            artifacts: Vec::new(),
         };
         std::fs::write(
             dir.join("manifest.json"),

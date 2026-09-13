@@ -236,6 +236,7 @@ mod tests {
                 } else {
                     ExitStatus::Success
                 },
+                artifacts: Vec::new(),
             },
         }
     }
@@ -334,6 +335,7 @@ mod tests {
             } else {
                 ExitStatus::Success
             },
+            artifacts: Vec::new(),
         };
         std::fs::write(
             dir.join("manifest.json"),
