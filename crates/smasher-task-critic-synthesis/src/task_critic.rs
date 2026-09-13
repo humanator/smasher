@@ -33,6 +33,56 @@ fn arg_str<'a>(args: &'a Value, field: &str) -> &'a str {
     args.get(field).and_then(Value::as_str).unwrap_or("")
 }
 
+/// Best-effort read of the candidate's `index.html` (the same file `system_lint`
+/// already reads, same directory), giving the model non-visual context (semantic
+/// markup, aria attributes) a screenshot alone can't carry. Missing or unreadable
+/// is not an error: the screenshot-only baseline must keep working for any
+/// candidate shape without static markup.
+fn read_optional_markup(candidate_dir: &Path) -> Option<String> {
+    std::fs::read_to_string(candidate_dir.join("index.html")).ok()
+}
+
+/// Builds the request sent to the model. `markup`, when present, becomes its own
+/// labeled `ContentPart::text`, distinct from the persona/task text and the
+/// screenshot, so the model doesn't confuse candidate markup with either.
+fn build_request(
+    model: &str,
+    provider: Option<&str>,
+    persona: &str,
+    task: &str,
+    screenshot: &[u8],
+    markup: Option<&str>,
+) -> Request {
+    let mut content = vec![ContentPart::text(format!("Persona: {persona}\nTask: {task}"))];
+    if let Some(markup) = markup {
+        content.push(ContentPart::text(format!(
+            "Candidate markup (index.html, for non-visual context only — judge the \
+             task against the screenshot, not this markup alone):\n{markup}"
+        )));
+    }
+    content.push(ContentPart::Image(ImageData {
+        source_type: ImageSourceType::Base64,
+        media_type: Some("image/png".to_string()),
+        data: BASE64.encode(screenshot),
+    }));
+
+    let mut request = Request::new(
+        model,
+        vec![Message {
+            role: Role::User,
+            content,
+            name: None,
+            tool_call_id: None,
+        }],
+    )
+    .system_prompt(CRITIC_SYSTEM_PROMPT)
+    .temperature(0.0);
+    if let Some(provider) = provider {
+        request = request.provider(provider);
+    }
+    request
+}
+
 fn parse_response(text: &str, persona: &str, task: &str) -> Result<CriticReport, CriticError> {
     let body: CriticResponseBody =
         serde_json::from_str(text).map_err(|_| CriticError::UnparseableResponse {
@@ -79,28 +129,9 @@ pub async fn run_task_critic(
         candidate_id: candidate_id.to_string(),
         path: screenshot_path.display().to_string(),
     })?;
+    let markup = read_optional_markup(candidate_dir);
 
-    let mut request = Request::new(
-        model,
-        vec![Message {
-            role: Role::User,
-            content: vec![
-                ContentPart::text(format!("Persona: {persona}\nTask: {task}")),
-                ContentPart::Image(ImageData {
-                    source_type: ImageSourceType::Base64,
-                    media_type: Some("image/png".to_string()),
-                    data: BASE64.encode(&screenshot),
-                }),
-            ],
-            name: None,
-            tool_call_id: None,
-        }],
-    )
-    .system_prompt(CRITIC_SYSTEM_PROMPT)
-    .temperature(0.0);
-    if let Some(provider) = provider {
-        request = request.provider(provider);
-    }
+    let request = build_request(model, provider, persona, task, &screenshot, markup.as_deref());
 
     let response =
         client
@@ -153,6 +184,85 @@ mod tests {
             }
             other => panic!("expected UnparseableResponse, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn build_request_includes_markup_as_its_own_labeled_text_part_when_present() {
+        let request = build_request(
+            "model",
+            None,
+            "new user",
+            "find settings",
+            b"fake-screenshot-bytes",
+            Some("<button>Submit</button>"),
+        );
+
+        let text_parts: Vec<&str> = request.messages[0]
+            .content
+            .iter()
+            .filter_map(|p| match p {
+                ContentPart::Text { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(text_parts.len(), 2, "persona/task text and markup text should be separate parts");
+        assert_eq!(text_parts[0], "Persona: new user\nTask: find settings");
+        assert!(
+            text_parts[1].contains("<button>Submit</button>"),
+            "markup part should contain the raw index.html text, got: {:?}",
+            text_parts[1]
+        );
+        assert!(
+            text_parts[1].to_lowercase().contains("markup"),
+            "markup part should label itself so the model doesn't confuse it with the \
+             screenshot description, got: {:?}",
+            text_parts[1]
+        );
+        assert_eq!(request.messages[0].content.len(), 3, "text + markup text + image");
+    }
+
+    #[test]
+    fn build_request_without_markup_matches_the_pre_task_5_shape() {
+        let with_markup = build_request(
+            "model",
+            None,
+            "new user",
+            "find settings",
+            b"fake-screenshot-bytes",
+            None,
+        );
+        let without_markup_call_shape = build_request(
+            "model",
+            None,
+            "new user",
+            "find settings",
+            b"fake-screenshot-bytes",
+            None,
+        );
+
+        // No new error path, no change to the shape: exactly persona/task text + image.
+        assert_eq!(with_markup.messages[0].content.len(), 2);
+        assert_eq!(
+            serde_json::to_value(&with_markup).unwrap(),
+            serde_json::to_value(&without_markup_call_shape).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_optional_markup_returns_none_when_index_html_absent() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(read_optional_markup(tmp.path()), None);
+    }
+
+    #[test]
+    fn read_optional_markup_returns_contents_when_index_html_present() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("index.html"), "<h1>Candidate</h1>").unwrap();
+        assert_eq!(
+            read_optional_markup(tmp.path()),
+            Some("<h1>Candidate</h1>".to_string())
+        );
     }
 
     #[tokio::test]
