@@ -512,13 +512,20 @@ async fn product_design_factory_critique_parallel_dispatches_both_branches() {
         .expect("pipeline should reach Exit via the proceed edge");
 
     let recorded = calls.lock().unwrap().clone();
-    assert!(
-        recorded.contains(&"SystemLint".to_string()),
-        "expected SystemLint to be dispatched as a CritiqueParallel branch, got: {recorded:?}"
+    let system_lint_calls = recorded.iter().filter(|id| *id == "SystemLint").count();
+    let task_critic_calls = recorded.iter().filter(|id| *id == "TaskCritic").count();
+    // Exactly once each, not merely "at least once": SPEC-task-critic-synthesis.md's
+    // Success Criteria requires "exactly one real LLM call made" per tool, and this is
+    // the concrete guard that the concurrent Parallel dispatch doesn't double-invoke a
+    // branch (e.g. via both the top-of-loop handler dispatch and the special-cased
+    // branch dispatch) or drop it.
+    assert_eq!(
+        system_lint_calls, 1,
+        "expected SystemLint dispatched exactly once, got {system_lint_calls} in {recorded:?}"
     );
-    assert!(
-        recorded.contains(&"TaskCritic".to_string()),
-        "expected TaskCritic to be dispatched as a CritiqueParallel branch, got: {recorded:?}"
+    assert_eq!(
+        task_critic_calls, 1,
+        "expected TaskCritic dispatched exactly once, got {task_critic_calls} in {recorded:?}"
     );
 
     assert!(matches!(
