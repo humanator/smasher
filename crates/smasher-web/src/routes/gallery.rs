@@ -222,6 +222,7 @@ mod tests {
         CandidateSummary {
             candidate_id: candidate_id.into(),
             screenshot_url: format!("/candidate-artifacts/run/artifacts/{candidate_id}/screenshot.png"),
+            bundle_url: None,
             manifest: Manifest {
                 captured_at: chrono::Utc::now(),
                 viewport: Viewport {

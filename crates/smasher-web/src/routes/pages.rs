@@ -907,6 +907,7 @@ mod tests {
                 candidate_id: "candidate-a".into(),
                 screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
                     .into(),
+                bundle_url: None,
                 manifest: Manifest {
                     captured_at: chrono::Utc::now(),
                     viewport,
@@ -919,6 +920,7 @@ mod tests {
                 candidate_id: "candidate-b".into(),
                 screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-b/screenshot.png"
                     .into(),
+                bundle_url: None,
                 manifest: Manifest {
                     captured_at: chrono::Utc::now(),
                     viewport,

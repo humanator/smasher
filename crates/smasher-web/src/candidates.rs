@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use smasher_render_capture::manifest::{ExitStatus, Manifest};
+use smasher_render_capture::manifest::{ArtifactKind, ExitStatus, Manifest};
 use smasher_system_lint::LintReport;
 use smasher_task_critic_synthesis::{CriticReport, Recommendation, SynthesisReport};
 
@@ -18,6 +18,7 @@ pub fn valid_id(s: &str) -> bool {
 pub struct CandidateSummary {
     pub candidate_id: String,
     pub screenshot_url: String,
+    pub bundle_url: Option<String>,
     pub manifest: Manifest,
 }
 
@@ -63,10 +64,22 @@ pub fn scan_candidates(artifacts_base: &Path, run_id: &str) -> Vec<CandidateSumm
             let contents = std::fs::read_to_string(entry.path().join("manifest.json")).ok()?;
             let manifest: Manifest = serde_json::from_str(&contents).ok()?;
 
+            let bundle_url = manifest
+                .artifacts
+                .iter()
+                .find(|a| a.kind == ArtifactKind::LiveBundle)
+                .map(|a| {
+                    format!(
+                        "/candidate-artifacts/{run_id}/artifacts/{candidate_id}/{}",
+                        a.path
+                    )
+                });
+
             Some(CandidateSummary {
                 screenshot_url: format!(
                     "/candidate-artifacts/{run_id}/artifacts/{candidate_id}/screenshot.png"
                 ),
+                bundle_url,
                 candidate_id,
                 manifest,
             })
@@ -155,6 +168,15 @@ mod tests {
     use std::path::PathBuf;
 
     fn write_manifest(dir: &Path, candidate_id: &str, exit_status: ExitStatus) {
+        write_manifest_with_artifacts(dir, candidate_id, exit_status, Vec::new());
+    }
+
+    fn write_manifest_with_artifacts(
+        dir: &Path,
+        candidate_id: &str,
+        exit_status: ExitStatus,
+        artifacts: Vec<smasher_render_capture::manifest::ArtifactRef>,
+    ) {
         let candidate_dir = dir.join("run-1/artifacts").join(candidate_id);
         std::fs::create_dir_all(&candidate_dir).unwrap();
         let manifest = Manifest {
@@ -165,7 +187,7 @@ mod tests {
             },
             candidate_dir: PathBuf::from("/tmp/candidate"),
             exit_status,
-            artifacts: Vec::new(),
+            artifacts,
         };
         std::fs::write(
             candidate_dir.join("manifest.json"),
@@ -226,6 +248,45 @@ mod tests {
         let b = candidates.iter().find(|c| c.candidate_id == "candidate-b").unwrap();
         assert!(b.failed());
         assert_eq!(b.failure_reason(), Some("boom"));
+    }
+
+    #[test]
+    fn scan_candidates_populates_bundle_url_when_live_bundle_artifact_present() {
+        use smasher_render_capture::manifest::{ArtifactKind, ArtifactRef};
+
+        let base = tempfile::tempdir().unwrap();
+        write_manifest_with_artifacts(
+            base.path(),
+            "candidate-a",
+            ExitStatus::Success,
+            vec![
+                ArtifactRef {
+                    kind: ArtifactKind::Screenshot,
+                    path: "screenshot.png".to_string(),
+                },
+                ArtifactRef {
+                    kind: ArtifactKind::LiveBundle,
+                    path: "bundle/index.html".to_string(),
+                },
+            ],
+        );
+
+        let candidates = scan_candidates(base.path(), "run-1");
+
+        assert_eq!(
+            candidates[0].bundle_url,
+            Some("/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html".to_string())
+        );
+    }
+
+    #[test]
+    fn scan_candidates_bundle_url_none_without_live_bundle_artifact() {
+        let base = tempfile::tempdir().unwrap();
+        write_manifest(base.path(), "candidate-a", ExitStatus::Success);
+
+        let candidates = scan_candidates(base.path(), "run-1");
+
+        assert_eq!(candidates[0].bundle_url, None);
     }
 
     #[test]
