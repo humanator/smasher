@@ -43,17 +43,29 @@ pub async fn capture(
     handle.shutdown().await;
     let screenshot = screenshot?;
 
+    std::fs::create_dir_all(output_dir).map_err(|e| CaptureError::Capture(e.to_string()))?;
+    std::fs::write(output_dir.join("screenshot.png"), &screenshot)
+        .map_err(|e| CaptureError::Capture(e.to_string()))?;
+    capture::copy_dir_recursive(candidate_dir, &output_dir.join("bundle"))
+        .map_err(|e| CaptureError::Capture(e.to_string()))?;
+
     let manifest = Manifest {
         captured_at: Utc::now(),
         viewport,
         candidate_dir: candidate_dir.to_path_buf(),
         exit_status: ExitStatus::Success,
-        artifacts: Vec::new(),
+        artifacts: vec![
+            manifest::ArtifactRef {
+                kind: manifest::ArtifactKind::Screenshot,
+                path: "screenshot.png".to_string(),
+            },
+            manifest::ArtifactRef {
+                kind: manifest::ArtifactKind::LiveBundle,
+                path: "bundle/index.html".to_string(),
+            },
+        ],
     };
 
-    std::fs::create_dir_all(output_dir).map_err(|e| CaptureError::Capture(e.to_string()))?;
-    std::fs::write(output_dir.join("screenshot.png"), &screenshot)
-        .map_err(|e| CaptureError::Capture(e.to_string()))?;
     let manifest_json =
         serde_json::to_string_pretty(&manifest).map_err(|e| CaptureError::Capture(e.to_string()))?;
     std::fs::write(output_dir.join("manifest.json"), manifest_json)
@@ -94,12 +106,57 @@ mod tests {
 
         let screenshot_path = output_dir.path().join("screenshot.png");
         let manifest_path = output_dir.path().join("manifest.json");
+        let bundle_index_path = output_dir.path().join("bundle/index.html");
         assert!(screenshot_path.is_file());
         assert!(manifest_path.is_file());
+        assert!(bundle_index_path.is_file());
+        assert_eq!(
+            std::fs::read_to_string(&bundle_index_path).unwrap(),
+            std::fs::read_to_string(fixture_candidate_dir().join("index.html")).unwrap()
+        );
+
+        assert_eq!(
+            manifest.artifacts,
+            vec![
+                manifest::ArtifactRef {
+                    kind: manifest::ArtifactKind::Screenshot,
+                    path: "screenshot.png".to_string(),
+                },
+                manifest::ArtifactRef {
+                    kind: manifest::ArtifactKind::LiveBundle,
+                    path: "bundle/index.html".to_string(),
+                },
+            ]
+        );
 
         let written_manifest: Manifest =
             serde_json::from_str(&std::fs::read_to_string(manifest_path).unwrap()).unwrap();
         assert_eq!(written_manifest, manifest);
+    }
+
+    #[tokio::test]
+    async fn capture_copies_nested_assets_into_the_bundle() {
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
+        let output_dir = tempfile::tempdir().unwrap();
+        let viewport = Viewport {
+            width: capture::VIEWPORT_WIDTH,
+            height: capture::VIEWPORT_HEIGHT,
+        };
+        let candidate_dir =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/candidate-with-assets");
+
+        capture(&candidate_dir, output_dir.path(), viewport)
+            .await
+            .expect("capture should succeed against the fixture candidate");
+
+        let bundled_asset = output_dir.path().join("bundle/assets/style.css");
+        assert!(bundled_asset.is_file());
+        assert_eq!(
+            std::fs::read_to_string(&bundled_asset).unwrap(),
+            std::fs::read_to_string(candidate_dir.join("assets/style.css")).unwrap()
+        );
     }
 
     #[tokio::test]

@@ -1,6 +1,8 @@
 // ABOUTME: Chromiumoxide-driven screenshot capture over CDP.
 // ABOUTME: Launches headless Chromium, navigates to a served URL, returns PNG bytes.
 
+use std::path::Path;
+
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::page::CaptureScreenshotFormat;
 use chromiumoxide::page::ScreenshotParams;
@@ -72,4 +74,21 @@ pub async fn capture_screenshot(url: &str, viewport: Viewport) -> Result<Vec<u8>
     handler_task.abort();
 
     png
+}
+
+/// Recursively copies every file and subdirectory under `src` into `dst`,
+/// creating `dst` (and any nested directories) as needed.
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let dst_path = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst_path)?;
+        } else {
+            std::fs::copy(entry.path(), dst_path)?;
+        }
+    }
+    Ok(())
 }
