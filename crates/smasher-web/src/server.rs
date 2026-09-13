@@ -25,6 +25,11 @@ pub fn build_router(state: AppState) -> Router {
     // `/candidate-artifacts/<run_id>/artifacts/<candidate_id>/...` URL scheme
     // resolves straight through with no rewriting.
     let candidate_artifacts_dir = std::path::Path::new(&state.data_dir).join("artifacts");
+    // A persisted candidate bundle's index.html references `/design-kit/...`
+    // absolute paths (same convention as smasher-render-capture's own two-mount
+    // server), so this mount has to exist for a bundle to render correctly here.
+    let design_kit_dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design-kit");
 
     Router::new()
         .merge(page_routes)
@@ -36,6 +41,7 @@ pub fn build_router(state: AppState) -> Router {
             "/candidate-artifacts",
             ServeDir::new(candidate_artifacts_dir),
         )
+        .nest_service("/design-kit", ServeDir::new(design_kit_dir))
         .with_state(state)
 }
 
@@ -204,5 +210,29 @@ mod tests {
         let resp = app.oneshot(req).await.unwrap();
 
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn design_kit_mount_serves_a_real_file() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/design-kit/tokens.css")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn design_kit_mount_does_not_escape_its_root() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/design-kit/..%2f..%2fCargo.toml")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_ne!(resp.status(), StatusCode::OK);
     }
 }
