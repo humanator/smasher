@@ -1,6 +1,6 @@
 digraph CritiqueLoopE2E {
   graph [
-    goal="Prove the critique loop end-to-end through smasher run: render_capture -> system_lint + task_critic -> synthesis, all producing real artifacts a gallery gate card would read (see smasher-web's candidates::read_scorecard)."
+    goal="Prove the critique loop end-to-end through smasher run: render_capture -> {system_lint, task_critic} in parallel -> synthesis, all producing real artifacts a gallery gate card would read (see smasher-web's candidates::read_scorecard)."
   ];
 
   Start [shape=Mdiamond, label="Start"];
@@ -11,6 +11,8 @@ digraph CritiqueLoopE2E {
     tool="render_capture",
     args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"e2e-critique-loop-fixture\", \"candidate_id\": \"candidate\"}"
   ];
+
+  CritiqueParallel [shape=component, label="Critique (Parallel)"];
 
   SystemLint [
     shape=parallelogram,
@@ -26,6 +28,8 @@ digraph CritiqueLoopE2E {
     args="{\"run_id\": \"e2e-critique-loop-fixture\", \"candidate_id\": \"candidate\", \"persona\": \"a new user unfamiliar with the product\", \"task\": \"find the primary call-to-action button\", \"provider\": \"ollama\", \"model\": \"gemma4:31b-cloud\"}"
   ];
 
+  CritiqueJoin [shape=tripleoctagon, label="Critique Join"];
+
   Synthesis [
     shape=parallelogram,
     label="Synthesise Critiques",
@@ -36,8 +40,8 @@ digraph CritiqueLoopE2E {
   Exit [shape=Msquare, label="Exit"];
 
   Start -> Render1;
-  Render1 -> SystemLint;
-  SystemLint -> TaskCritic;
-  TaskCritic -> Synthesis;
-  Synthesis -> Exit;
+  Render1 -> CritiqueParallel;
+  CritiqueParallel -> SystemLint -> CritiqueJoin;
+  CritiqueParallel -> TaskCritic -> CritiqueJoin;
+  CritiqueJoin -> Synthesis -> Exit;
 }

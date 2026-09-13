@@ -431,6 +431,108 @@ async fn product_design_factory_gate2_answers_route_to_the_named_edge() {
     }
 }
 
+/// Engine-level proof (no LLM, no browser, no HTTP) that `CritiqueParallel`'s
+/// real edges — `-> SystemLint`, `-> TaskCritic` — are both actually dispatched
+/// through a real `Engine`, against this exact fixture graph rather than the
+/// synthetic `parallel_fanin_graph()` `engine_integration.rs`'s own Task 3
+/// tests use. Resumes from a checkpoint planted right at `CritiqueParallel`
+/// (Discover/Implement already "visited") so the test doesn't need real
+/// `render_capture`/codergen handlers for the nodes upstream of it.
+#[tokio::test]
+async fn product_design_factory_critique_parallel_dispatches_both_branches() {
+    use async_trait::async_trait;
+    use smasher_attractor::engine::Engine;
+    use smasher_attractor::graph::{GraphNode, NodeType};
+    use smasher_attractor::handler::{Handler, HandlerError, HandlerRegistry};
+    use smasher_attractor::interviewer::{InterviewerHandler, QueueInterviewer};
+    use smasher_attractor::state::{Checkpoint, Context, Outcome};
+    use std::sync::{Arc, Mutex};
+
+    /// Records every node id it's invoked for; succeeds unconditionally.
+    /// Stands in for every non-`Interviewer` handler this fixture would
+    /// otherwise need (render_capture, system_lint, task_critic, synthesis,
+    /// codergen, the tool-command a11y stub) — none of which are under test
+    /// here, only whether the engine actually dispatches both `CritiqueParallel`
+    /// branches.
+    struct RecordingHandler {
+        calls: Arc<Mutex<Vec<String>>>,
+    }
+
+    #[async_trait]
+    impl Handler for RecordingHandler {
+        fn name(&self) -> &str {
+            "recording"
+        }
+
+        async fn execute(&self, node: &GraphNode, _context: &Context) -> Result<Outcome, HandlerError> {
+            self.calls.lock().unwrap().push(node.id.clone());
+            Ok(Outcome::success())
+        }
+
+        fn handles(&self, node_type: &NodeType) -> bool {
+            !matches!(node_type, NodeType::Interviewer)
+        }
+    }
+
+    let g = load_example("product_design_factory.dot");
+
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let queue = Arc::new(QueueInterviewer::new());
+    queue.push_response(r#"{"selected":["define"],"decision":"proceed"}"#);
+
+    let mut registry = HandlerRegistry::new();
+    registry.register(Arc::new(RecordingHandler {
+        calls: calls.clone(),
+    }));
+    registry.register(Arc::new(InterviewerHandler::new(queue)));
+
+    // Plant a checkpoint as if Discover and Implement already ran, resuming
+    // right at CritiqueParallel — the real Parallel node this fixture defines.
+    let cp_ctx = Context::new();
+    let mut checkpoint = Checkpoint::new("product_design_factory", "CritiqueParallel", &cp_ctx);
+    for id in [
+        "Start",
+        "IAOptions",
+        "RenderDiscoverA",
+        "RenderDiscoverB",
+        "RenderDiscoverC",
+        "RenderDiscoverD",
+        "GalleryGate1",
+        "Implement",
+        "RenderDefine",
+    ] {
+        checkpoint.mark_visited(id);
+        checkpoint.add_outcome(id, Outcome::success());
+    }
+
+    let engine = Engine::new(g, registry);
+    let result = engine
+        .run_from_checkpoint(checkpoint, Context::new())
+        .await
+        .expect("pipeline should reach Exit via the proceed edge");
+
+    let recorded = calls.lock().unwrap().clone();
+    assert!(
+        recorded.contains(&"SystemLint".to_string()),
+        "expected SystemLint to be dispatched as a CritiqueParallel branch, got: {recorded:?}"
+    );
+    assert!(
+        recorded.contains(&"TaskCritic".to_string()),
+        "expected TaskCritic to be dispatched as a CritiqueParallel branch, got: {recorded:?}"
+    );
+
+    assert!(matches!(
+        result.node_outcomes.get("SystemLint"),
+        Some(Outcome::Success { .. })
+    ));
+    assert!(matches!(
+        result.node_outcomes.get("TaskCritic"),
+        Some(Outcome::Success { .. })
+    ));
+    assert!(result.visited_nodes.contains(&"CritiqueParallel".to_string()));
+    assert!(result.visited_nodes.contains(&"CritiqueJoin".to_string()));
+}
+
 // ============================================================================
 // vulnerability_analyzer.dot
 // ============================================================================
