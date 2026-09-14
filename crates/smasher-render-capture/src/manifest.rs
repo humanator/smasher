@@ -1,6 +1,7 @@
 // ABOUTME: Manifest struct describing a completed capture run.
 // ABOUTME: Also holds the artifact path helper deriving run/candidate output paths.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -15,6 +16,8 @@ pub struct Manifest {
     pub exit_status: ExitStatus,
     #[serde(default)]
     pub artifacts: Vec<ArtifactRef>,
+    #[serde(default)]
+    pub generation_params: BTreeMap<String, String>,
 }
 
 /// A single stored artifact for a candidate, beyond the historical bare
@@ -74,6 +77,7 @@ mod tests {
             candidate_dir: std::path::PathBuf::from("/tmp/candidate"),
             exit_status: ExitStatus::Success,
             artifacts: Vec::new(),
+            generation_params: BTreeMap::new(),
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
@@ -95,6 +99,7 @@ mod tests {
                 reason: "boom".to_string(),
             },
             artifacts: Vec::new(),
+            generation_params: BTreeMap::new(),
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
@@ -123,6 +128,10 @@ mod tests {
                     path: "bundle/index.html".to_string(),
                 },
             ],
+            generation_params: BTreeMap::from([
+                ("prompt".to_string(), "a red button".to_string()),
+                ("persona".to_string(), "designer".to_string()),
+            ]),
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
@@ -132,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn manifest_deserializes_without_artifacts_key_for_backward_compat() {
+    fn manifest_deserializes_without_artifacts_or_generation_params_keys_for_backward_compat() {
         let legacy_json = serde_json::json!({
             "captured_at": "2026-09-08T12:00:00Z",
             "viewport": {"width": 1280, "height": 800},
@@ -144,6 +153,7 @@ mod tests {
         let manifest: Manifest = serde_json::from_str(&legacy_json).unwrap();
 
         assert_eq!(manifest.artifacts, Vec::new());
+        assert_eq!(manifest.generation_params, BTreeMap::new());
     }
 
     #[test]

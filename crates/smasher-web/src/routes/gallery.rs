@@ -238,6 +238,7 @@ mod tests {
                     ExitStatus::Success
                 },
                 artifacts: Vec::new(),
+                generation_params: std::collections::BTreeMap::new(),
             },
         }
     }
@@ -337,6 +338,7 @@ mod tests {
                 ExitStatus::Success
             },
             artifacts: Vec::new(),
+            generation_params: std::collections::BTreeMap::new(),
         };
         std::fs::write(
             dir.join("manifest.json"),

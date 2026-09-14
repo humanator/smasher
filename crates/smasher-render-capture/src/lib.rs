@@ -7,6 +7,7 @@ pub mod manifest;
 pub mod server;
 pub mod testing;
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
@@ -64,6 +65,7 @@ pub async fn capture(
                 path: "bundle/index.html".to_string(),
             },
         ],
+        generation_params: BTreeMap::new(),
     };
 
     let manifest_json =

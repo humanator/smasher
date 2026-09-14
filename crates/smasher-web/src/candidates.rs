@@ -194,6 +194,7 @@ mod tests {
             candidate_dir: PathBuf::from("/tmp/candidate"),
             exit_status,
             artifacts,
+            generation_params: std::collections::BTreeMap::new(),
         };
         std::fs::write(
             candidate_dir.join("manifest.json"),

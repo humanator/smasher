@@ -867,6 +867,7 @@ mod tests {
             candidate_dir: "/tmp/candidate-fixture".into(),
             exit_status: ExitStatus::Success,
             artifacts: Vec::new(),
+            generation_params: std::collections::BTreeMap::new(),
         };
         std::fs::write(
             candidate_dir.join("manifest.json"),
@@ -914,6 +915,7 @@ mod tests {
                     candidate_dir: "/tmp/candidate-a".into(),
                     exit_status: ExitStatus::Success,
                     artifacts: Vec::new(),
+                    generation_params: std::collections::BTreeMap::new(),
                 },
             },
             CandidateSummary {
@@ -929,6 +931,7 @@ mod tests {
                         reason: "chromium launch failed".into(),
                     },
                     artifacts: Vec::new(),
+                    generation_params: std::collections::BTreeMap::new(),
                 },
             },
         ];
@@ -966,6 +969,7 @@ mod tests {
                 candidate_dir: "/tmp/candidate-a".into(),
                 exit_status: ExitStatus::Success,
                 artifacts: Vec::new(),
+                generation_params: std::collections::BTreeMap::new(),
             },
         }];
 
@@ -1106,6 +1110,7 @@ mod tests {
                 ExitStatus::Success
             },
             artifacts,
+            generation_params: std::collections::BTreeMap::new(),
         };
         std::fs::write(
             dir.join("manifest.json"),
