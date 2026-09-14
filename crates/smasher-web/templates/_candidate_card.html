@@ -1,3 +1,13 @@
+{% macro live_card(c) %}
+<div class="candidate-embed">
+    {% if let Some(bundle) = c.bundle_url %}
+    <iframe src="{{ bundle }}" title="Candidate {{ c.candidate_id }}" sandbox="allow-scripts" class="candidate-thumbnail"></iframe>
+    {% else %}
+    <img src="{{ c.screenshot_url }}" alt="Candidate {{ c.candidate_id }}" class="candidate-thumbnail">
+    {% endif %}
+</div>
+{% endmacro %}
+
 {% macro failed_card(c, show_captured_at) %}
 <div class="candidate-card candidate-card-failed">
     <div class="candidate-id">{{ c.candidate_id }}</div>

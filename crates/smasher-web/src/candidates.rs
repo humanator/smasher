@@ -33,6 +33,12 @@ impl CandidateSummary {
             ExitStatus::Success => None,
         }
     }
+
+    /// The URL to embed/link as this candidate's primary view: the live bundle
+    /// when one was captured, falling back to the static screenshot otherwise.
+    pub fn primary_url(&self) -> &str {
+        self.bundle_url.as_deref().unwrap_or(&self.screenshot_url)
+    }
 }
 
 /// Scans `<artifacts_base>/<run_id>/artifacts/` for candidate subdirectories
@@ -276,6 +282,42 @@ mod tests {
         assert_eq!(
             candidates[0].bundle_url,
             Some("/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html".to_string())
+        );
+    }
+
+    #[test]
+    fn primary_url_returns_bundle_url_when_set() {
+        let candidates = {
+            let base = tempfile::tempdir().unwrap();
+            use smasher_render_capture::manifest::{ArtifactKind, ArtifactRef};
+            write_manifest_with_artifacts(
+                base.path(),
+                "candidate-a",
+                ExitStatus::Success,
+                vec![ArtifactRef {
+                    kind: ArtifactKind::LiveBundle,
+                    path: "bundle/index.html".to_string(),
+                }],
+            );
+            scan_candidates(base.path(), "run-1")
+        };
+
+        assert_eq!(
+            candidates[0].primary_url(),
+            "/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html"
+        );
+    }
+
+    #[test]
+    fn primary_url_falls_back_to_screenshot_url_when_bundle_url_is_none() {
+        let base = tempfile::tempdir().unwrap();
+        write_manifest(base.path(), "candidate-a", ExitStatus::Success);
+
+        let candidates = scan_candidates(base.path(), "run-1");
+
+        assert_eq!(
+            candidates[0].primary_url(),
+            "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
         );
     }
 

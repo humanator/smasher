@@ -1196,6 +1196,7 @@ textarea::placeholder {
   object-fit: cover;
   border-radius: var(--radius-sm);
   background: var(--bg-base);
+  border: 0;
 }
 
 .candidate-id {
