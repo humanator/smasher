@@ -100,7 +100,10 @@ impl CodergenBackend for AgentCodergenBackend {
         };
 
         // Create a fresh agent session with all shared tools.
-        let env = Arc::new(LocalExecutionEnvironment::new(self.working_dir.clone()));
+        let env = Arc::new(
+            LocalExecutionEnvironment::new(self.working_dir.clone())
+                .with_allowed_external_root(smasher_web::server::design_kit_dir()),
+        );
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
@@ -924,6 +927,9 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
             &graph_name,
             &dot_source,
         )?;
+        if let Err(e) = rd.symlink_into_root("design-kit", &smasher_web::server::design_kit_dir()) {
+            tracing::warn!(error = %e, "failed to link design-kit into run directory");
+        }
         // Write graph.dot to the run directory so `smasher resume` can find it.
         let graph_dot_path = rd.manifest().directories.root.join("graph.dot");
         std::fs::write(&graph_dot_path, &dot_source)?;

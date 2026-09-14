@@ -13,7 +13,7 @@ digraph ProductDesignFactory {
   IAOptions [
     shape=box,
     label="Build interaction approaches from kit",
-    prompt="Given this task and the shared component kit, build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/<id>/. Compose from kit components; do not reinvent them."
+    prompt="Given this task and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/<id>/. Compose from kit components; do not reinvent them."
   ];
 
   // Real render_capture is one-candidate-per-call, so Discover's 4 candidates

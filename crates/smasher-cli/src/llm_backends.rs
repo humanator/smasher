@@ -73,7 +73,10 @@ impl ManagerBackend for LlmManagerBackend {
             }
         );
 
-        let env = Arc::new(LocalExecutionEnvironment::new(self.working_dir.clone()));
+        let env = Arc::new(
+            LocalExecutionEnvironment::new(self.working_dir.clone())
+                .with_allowed_external_root(smasher_web::server::design_kit_dir()),
+        );
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
@@ -156,7 +159,10 @@ impl ToolBackend for LlmToolBackend {
             }
         );
 
-        let env = Arc::new(LocalExecutionEnvironment::new(self.working_dir.clone()));
+        let env = Arc::new(
+            LocalExecutionEnvironment::new(self.working_dir.clone())
+                .with_allowed_external_root(smasher_web::server::design_kit_dir()),
+        );
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 

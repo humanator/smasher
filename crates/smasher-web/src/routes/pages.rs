@@ -292,6 +292,10 @@ async fn submit_run(
         &form.dot_source,
     )
     .map_err(|e| WebError::Internal(format!("failed to create run directory: {e}")))?;
+    if let Err(e) = run_directory.symlink_into_root("design-kit", &crate::server::design_kit_dir())
+    {
+        tracing::warn!(error = %e, "failed to link design-kit into run directory");
+    }
     let run_working_dir = run_directory
         .manifest()
         .directories

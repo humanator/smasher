@@ -125,6 +125,12 @@ pub struct LocalExecutionEnvironment {
     working_directory: String,
     /// Environment variable key substrings to filter out (security-sensitive).
     env_filter: Vec<String>,
+    /// Additional canonicalized roots a path may resolve into without being
+    /// treated as a traversal, even though they lie outside `working_directory`.
+    /// Populated via `with_allowed_external_root`, e.g. for a symlink the
+    /// caller deliberately placed in the working directory pointing at a
+    /// shared resource (see `RunDirectory::symlink_into_root`).
+    allowed_external_roots: Vec<PathBuf>,
 }
 
 impl LocalExecutionEnvironment {
@@ -139,12 +145,26 @@ impl LocalExecutionEnvironment {
                 "PASSWORD".to_string(),
                 "SECRET".to_string(),
             ],
+            allowed_external_roots: Vec::new(),
         }
     }
 
     /// Override the default environment variable filter list.
     pub fn with_env_filter(mut self, filter: Vec<String>) -> Self {
         self.env_filter = filter;
+        self
+    }
+
+    /// Allow paths that resolve inside `root` even though it lies outside the
+    /// working directory — e.g. a symlink deliberately placed in the working
+    /// directory pointing at a shared, read-only resource.
+    ///
+    /// A no-op if `root` doesn't exist, so this is safe to call unconditionally
+    /// without checking for the resource's presence first.
+    pub fn with_allowed_external_root(mut self, root: impl AsRef<Path>) -> Self {
+        if let Ok(canonical) = root.as_ref().canonicalize() {
+            self.allowed_external_roots.push(canonical);
+        }
         self
     }
 
@@ -203,7 +223,12 @@ impl LocalExecutionEnvironment {
             base
         };
 
-        if !canonical.starts_with(&canonical_root) {
+        let within_root = canonical.starts_with(&canonical_root);
+        let within_allowed_external = self
+            .allowed_external_roots
+            .iter()
+            .any(|root| canonical.starts_with(root));
+        if !within_root && !within_allowed_external {
             return Err(EnvironmentError::PathTraversal {
                 path: path.to_string(),
             });
@@ -933,6 +958,62 @@ mod tests {
             matches!(err, EnvironmentError::PathTraversal { .. }),
             "expected PathTraversal, got: {err:?}"
         );
+
+        cleanup(&dir);
+    }
+
+    #[tokio::test]
+    async fn read_file_rejects_symlink_escape_by_default() {
+        let dir = make_temp_dir();
+        let external_dir = make_temp_dir();
+        std::fs::write(external_dir.join("secret.txt"), "shh").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&external_dir, dir.join("linked")).unwrap();
+
+        let env = LocalExecutionEnvironment::new(dir.display().to_string());
+        let result = env.read_file("linked/secret.txt").await;
+
+        assert!(result.is_err());
+        assert!(
+            matches!(result.unwrap_err(), EnvironmentError::PathTraversal { .. }),
+            "a symlink out of the working directory should still be denied by default"
+        );
+
+        cleanup(&dir);
+        cleanup(&external_dir);
+    }
+
+    #[tokio::test]
+    async fn read_file_allows_symlink_escape_into_an_allowed_external_root() {
+        let dir = make_temp_dir();
+        let external_dir = make_temp_dir();
+        std::fs::write(external_dir.join("readme.txt"), "shared kit").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&external_dir, dir.join("linked")).unwrap();
+
+        let env = LocalExecutionEnvironment::new(dir.display().to_string())
+            .with_allowed_external_root(&external_dir);
+        let result = env.read_file("linked/readme.txt").await;
+
+        assert_eq!(result.unwrap(), "shared kit");
+
+        cleanup(&dir);
+        cleanup(&external_dir);
+    }
+
+    #[tokio::test]
+    async fn with_allowed_external_root_is_a_noop_for_a_missing_path() {
+        let dir = make_temp_dir();
+
+        // Should not panic and should not grant any access.
+        let env = LocalExecutionEnvironment::new(dir.display().to_string())
+            .with_allowed_external_root(dir.join("does-not-exist"));
+        let result = env.read_file("/etc/passwd").await;
+
+        assert!(matches!(
+            result.unwrap_err(),
+            EnvironmentError::PathTraversal { .. }
+        ));
 
         cleanup(&dir);
     }

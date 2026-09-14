@@ -91,7 +91,10 @@ impl CodergenBackend for AgentCodergenBackend {
         };
 
         // Create a fresh agent session with all shared tools.
-        let env = Arc::new(LocalExecutionEnvironment::new(self.working_dir.clone()));
+        let env = Arc::new(
+            LocalExecutionEnvironment::new(self.working_dir.clone())
+                .with_allowed_external_root(crate::server::design_kit_dir()),
+        );
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
@@ -279,7 +282,10 @@ impl ManagerBackend for LlmManagerBackend {
 
         let system_prompt = "You are an AI coordination agent executing a manager task in a pipeline. Analyze the task, consider the configuration, and produce a clear result.";
 
-        let env = Arc::new(LocalExecutionEnvironment::new(self.working_dir.clone()));
+        let env = Arc::new(
+            LocalExecutionEnvironment::new(self.working_dir.clone())
+                .with_allowed_external_root(crate::server::design_kit_dir()),
+        );
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
@@ -370,7 +376,10 @@ impl ToolBackend for LlmToolBackend {
 
         let system_prompt = "You are an AI tool executor in a pipeline. Execute the specified tool operation and return the results.";
 
-        let env = Arc::new(LocalExecutionEnvironment::new(self.working_dir.clone()));
+        let env = Arc::new(
+            LocalExecutionEnvironment::new(self.working_dir.clone())
+                .with_allowed_external_root(crate::server::design_kit_dir()),
+        );
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 

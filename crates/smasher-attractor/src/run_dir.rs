@@ -164,6 +164,29 @@ impl RunDirectory {
     pub fn event_log_path(&self) -> PathBuf {
         self.manifest.directories.events.join("events.jsonl")
     }
+
+    /// Symlink `target` into the run's root directory as `{root}/{name}`.
+    ///
+    /// Each run gets a fresh, isolated working directory with nothing in it,
+    /// which leaves an agent with no way to find a shared, project-level
+    /// resource (e.g. a design system component kit) by a relative path — it
+    /// has to search for one, which is slow and unbounded. This exposes such
+    /// a resource under a stable, predictable name inside the run directory
+    /// instead.
+    ///
+    /// A no-op if `target` doesn't exist, so pipelines that don't need the
+    /// resource aren't affected by its absence.
+    pub fn symlink_into_root(&self, name: &str, target: &Path) -> Result<(), StateError> {
+        if !target.exists() {
+            return Ok(());
+        }
+        let link_path = self.manifest.directories.root.join(name);
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, &link_path)?;
+        #[cfg(not(unix))]
+        let _ = link_path;
+        Ok(())
+    }
 }
 
 /// Policy controlling how long `{data_dir}/artifacts/<run_id>/` trees are kept.
@@ -537,6 +560,44 @@ mod tests {
                 .join("events")
                 .join("events.jsonl")
         );
+    }
+
+    // ---------------------------------------------------------------
+    // symlink_into_root
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn symlink_into_root_links_an_existing_target() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target_dir = tmp.path().join("shared-kit");
+        std::fs::create_dir_all(&target_dir).unwrap();
+        std::fs::write(target_dir.join("marker.txt"), "hello").unwrap();
+
+        let run_dir =
+            RunDirectory::create(tmp.path(), "run-link", "g", "digraph { a -> b }").unwrap();
+        run_dir
+            .symlink_into_root("design-kit", &target_dir)
+            .unwrap();
+
+        let link_path = tmp.path().join("run-link").join("design-kit");
+        assert!(link_path.is_symlink());
+        // The link resolves through to the real file.
+        assert_eq!(
+            std::fs::read_to_string(link_path.join("marker.txt")).unwrap(),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn symlink_into_root_is_a_noop_when_target_is_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let run_dir =
+            RunDirectory::create(tmp.path(), "run-nolink", "g", "digraph { a -> b }").unwrap();
+
+        let result = run_dir.symlink_into_root("design-kit", &tmp.path().join("does-not-exist"));
+
+        assert!(result.is_ok());
+        assert!(!tmp.path().join("run-nolink").join("design-kit").exists());
     }
 
     // ---------------------------------------------------------------

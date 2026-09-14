@@ -11,6 +11,13 @@ use crate::state::AppState;
 /// Default port for the smasher-web dashboard (5MA5H in leet).
 pub const DEFAULT_PORT: u16 = 21541;
 
+/// Absolute path to the repo's shared `design-kit/` component library,
+/// resolved relative to this crate's manifest dir rather than the process's
+/// cwd (which varies depending on how `smasher` was invoked).
+pub fn design_kit_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design-kit")
+}
+
 /// Build the complete axum router with all routes and middleware.
 pub fn build_router(state: AppState) -> Router {
     let api_routes = crate::routes::api::router();
@@ -28,8 +35,7 @@ pub fn build_router(state: AppState) -> Router {
     // A persisted candidate bundle's index.html references `/design-kit/...`
     // absolute paths (same convention as smasher-render-capture's own two-mount
     // server), so this mount has to exist for a bundle to render correctly here.
-    let design_kit_dir =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design-kit");
+    let design_kit_dir = design_kit_dir();
 
     Router::new()
         .merge(page_routes)
