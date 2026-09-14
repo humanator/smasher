@@ -1076,6 +1076,15 @@ mod tests {
     }
 
     fn write_gate_manifest(run_id: &str, candidate_id: &str, failed: bool) {
+        write_gate_manifest_with_artifacts(run_id, candidate_id, failed, Vec::new());
+    }
+
+    fn write_gate_manifest_with_artifacts(
+        run_id: &str,
+        candidate_id: &str,
+        failed: bool,
+        artifacts: Vec<smasher_render_capture::manifest::ArtifactRef>,
+    ) {
         use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
 
         // Matches test_state()'s data_dir ("/tmp"): candidates live under
@@ -1096,7 +1105,7 @@ mod tests {
             } else {
                 ExitStatus::Success
             },
-            artifacts: Vec::new(),
+            artifacts,
         };
         std::fs::write(
             dir.join("manifest.json"),
@@ -1151,8 +1160,52 @@ mod tests {
         assert!(html.contains("lint-badge-slot"));
         assert!(html.contains("reject-all"));
         assert!(html.contains("target=\"_blank\""));
+        // No bundle artifact: falls back to the screenshot, both embedded and linked.
+        assert!(html.contains(
+            r#"<a href="/candidate-artifacts/gate-card-paused/artifacts/candidate-a/screenshot.png" target="_blank">"#
+        ));
+        assert!(html.contains("<img"));
+        assert!(!html.contains("<iframe"));
         // Plain cards still render alongside.
         assert!(html.contains("question-card"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_gate_card_shows_live_bundle_as_iframe_linked_to_the_bundle() {
+        use smasher_render_capture::manifest::{ArtifactKind, ArtifactRef};
+
+        let run_id = "gate-card-live-bundle";
+        write_gate_manifest_with_artifacts(
+            run_id,
+            "candidate-a",
+            false,
+            vec![ArtifactRef {
+                kind: ArtifactKind::LiveBundle,
+                path: "bundle/index.html".to_string(),
+            }],
+        );
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        let bundle_url = format!(
+            "/candidate-artifacts/{run_id}/artifacts/candidate-a/bundle/index.html"
+        );
+        assert!(
+            html.contains(&format!(r#"<a href="{bundle_url}" target="_blank">"#)),
+            "anchor should point at the bundle URL, not the screenshot:\n{html}"
+        );
+        assert!(html.contains(&format!(r#"<iframe src="{bundle_url}""#)));
+        assert!(html.contains(r#"sandbox="allow-scripts""#));
+        assert!(!html.contains("<img"));
+        // Checkbox selection structure survives.
+        assert!(html.contains(r#"value="candidate-a""#));
+        assert!(html.contains("<label class=\"candidate-card\">"));
     }
 
     /// Two gallery gates in one graph (e.g. a Discover gate feeding a
