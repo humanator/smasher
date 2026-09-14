@@ -290,6 +290,12 @@ impl AgentTool for EditFileTool {
 // ShellTool
 // ---------------------------------------------------------------------------
 
+/// Fallback timeout applied when the model's tool call omits `timeout_ms`.
+/// Matches the default advertised in the tool's own parameter schema below.
+/// Without this, a runaway command (e.g. an unbounded `find /`) has nothing
+/// to bound its execution and hangs the session indefinitely.
+const DEFAULT_SHELL_TIMEOUT_MS: u64 = 120_000;
+
 /// Executes a shell command and returns its output.
 pub struct ShellTool {
     env: Arc<dyn ExecutionEnvironment>,
@@ -337,10 +343,13 @@ impl AgentTool for ShellTool {
             Ok(c) => c,
             Err(e) => return e,
         };
-        let timeout_ms = args.get("timeout_ms").and_then(|v| v.as_u64());
+        let timeout_ms = args
+            .get("timeout_ms")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(DEFAULT_SHELL_TIMEOUT_MS);
 
         let options = ExecOptions {
-            timeout_ms,
+            timeout_ms: Some(timeout_ms),
             ..Default::default()
         };
 
@@ -571,6 +580,7 @@ mod tests {
     struct MockEnvironment {
         files: Arc<Mutex<HashMap<String, String>>>,
         working_dir: String,
+        last_exec_options: Arc<Mutex<Option<ExecOptions>>>,
     }
 
     impl MockEnvironment {
@@ -578,6 +588,7 @@ mod tests {
             Self {
                 files: Arc::new(Mutex::new(HashMap::new())),
                 working_dir: "/mock".to_string(),
+                last_exec_options: Arc::new(Mutex::new(None)),
             }
         }
 
@@ -656,8 +667,9 @@ mod tests {
         async fn exec_command(
             &self,
             command: &str,
-            _options: ExecOptions,
+            options: ExecOptions,
         ) -> Result<ExecResult, EnvironmentError> {
+            *self.last_exec_options.lock().unwrap() = Some(options);
             Ok(ExecResult {
                 stdout: format!("executed: {command}"),
                 stderr: String::new(),
@@ -941,6 +953,34 @@ mod tests {
 
         assert!(!result.is_error);
         assert!(result.content.contains("echo hello"));
+    }
+
+    #[tokio::test]
+    async fn shell_applies_default_timeout_when_llm_omits_timeout_ms() {
+        let mock = MockEnvironment::new();
+        let last_exec_options = Arc::clone(&mock.last_exec_options);
+        let env: Arc<dyn ExecutionEnvironment> = Arc::new(mock);
+        let tool = ShellTool::new(env);
+
+        tool.execute(r#"{"command": "find / -name never-finishes"}"#)
+            .await;
+
+        let options = last_exec_options.lock().unwrap().clone().unwrap();
+        assert_eq!(options.timeout_ms, Some(DEFAULT_SHELL_TIMEOUT_MS));
+    }
+
+    #[tokio::test]
+    async fn shell_honors_explicit_timeout_ms_from_the_llm() {
+        let mock = MockEnvironment::new();
+        let last_exec_options = Arc::clone(&mock.last_exec_options);
+        let env: Arc<dyn ExecutionEnvironment> = Arc::new(mock);
+        let tool = ShellTool::new(env);
+
+        tool.execute(r#"{"command": "echo hello", "timeout_ms": 5000}"#)
+            .await;
+
+        let options = last_exec_options.lock().unwrap().clone().unwrap();
+        assert_eq!(options.timeout_ms, Some(5000));
     }
 
     // -- GrepTool tests --
