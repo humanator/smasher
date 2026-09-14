@@ -46,7 +46,14 @@ impl HybridToolBackend {
             height: capture::VIEWPORT_HEIGHT,
         };
 
-        match crate::capture(Path::new(candidate_dir), &output_dir, viewport).await {
+        match crate::capture(
+            Path::new(candidate_dir),
+            &output_dir,
+            viewport,
+            std::collections::BTreeMap::new(),
+        )
+        .await
+        {
             Ok(manifest) => Ok(Outcome::success_with(json!({
                 "artifact_dir": output_dir,
                 "manifest": manifest,

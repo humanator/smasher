@@ -23,7 +23,14 @@ async fn main() {
         height: VIEWPORT_HEIGHT,
     };
 
-    match smasher_render_capture::capture(&candidate_dir, &output_dir, viewport).await {
+    match smasher_render_capture::capture(
+        &candidate_dir,
+        &output_dir,
+        viewport,
+        std::collections::BTreeMap::new(),
+    )
+    .await
+    {
         Ok(manifest) => {
             println!(
                 "captured {} -> {}",

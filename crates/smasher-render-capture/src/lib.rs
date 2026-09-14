@@ -30,6 +30,7 @@ pub async fn capture(
     candidate_dir: &Path,
     output_dir: &Path,
     viewport: Viewport,
+    generation_params: BTreeMap<String, String>,
 ) -> Result<Manifest, CaptureError> {
     let handle = server::start_server(candidate_dir, &design_kit_dir())
         .await
@@ -65,7 +66,7 @@ pub async fn capture(
                 path: "bundle/index.html".to_string(),
             },
         ],
-        generation_params: BTreeMap::new(),
+        generation_params,
     };
 
     let manifest_json =
@@ -98,9 +99,14 @@ mod tests {
             height: capture::VIEWPORT_HEIGHT,
         };
 
-        let manifest = capture(&fixture_candidate_dir(), output_dir.path(), viewport)
-            .await
-            .expect("capture should succeed against the fixture candidate");
+        let manifest = capture(
+            &fixture_candidate_dir(),
+            output_dir.path(),
+            viewport,
+            BTreeMap::new(),
+        )
+        .await
+        .expect("capture should succeed against the fixture candidate");
 
         assert_eq!(manifest.exit_status, ExitStatus::Success);
         assert_eq!(manifest.viewport, viewport);
@@ -149,9 +155,14 @@ mod tests {
         let candidate_dir =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/candidate-with-assets");
 
-        capture(&candidate_dir, output_dir.path(), viewport)
-            .await
-            .expect("capture should succeed against the fixture candidate");
+        capture(
+            &candidate_dir,
+            output_dir.path(),
+            viewport,
+            BTreeMap::new(),
+        )
+        .await
+        .expect("capture should succeed against the fixture candidate");
 
         let bundled_asset = output_dir.path().join("bundle/assets/style.css");
         assert!(bundled_asset.is_file());
@@ -170,8 +181,46 @@ mod tests {
             height: capture::VIEWPORT_HEIGHT,
         };
 
-        let result = capture(candidate_dir.path(), output_dir.path(), viewport).await;
+        let result = capture(
+            candidate_dir.path(),
+            output_dir.path(),
+            viewport,
+            BTreeMap::new(),
+        )
+        .await;
 
         assert!(matches!(result, Err(CaptureError::MissingEntryPoint(_))));
+    }
+
+    #[tokio::test]
+    async fn capture_writes_generation_params_into_manifest_unchanged() {
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
+        let output_dir = tempfile::tempdir().unwrap();
+        let viewport = Viewport {
+            width: capture::VIEWPORT_WIDTH,
+            height: capture::VIEWPORT_HEIGHT,
+        };
+        let generation_params = BTreeMap::from([
+            ("prompt".to_string(), "a red button".to_string()),
+            ("persona".to_string(), "designer".to_string()),
+        ]);
+
+        let manifest = capture(
+            &fixture_candidate_dir(),
+            output_dir.path(),
+            viewport,
+            generation_params.clone(),
+        )
+        .await
+        .expect("capture should succeed against the fixture candidate");
+
+        assert_eq!(manifest.generation_params, generation_params);
+
+        let manifest_path = output_dir.path().join("manifest.json");
+        let written_manifest: Manifest =
+            serde_json::from_str(&std::fs::read_to_string(manifest_path).unwrap()).unwrap();
+        assert_eq!(written_manifest.generation_params, generation_params);
     }
 }
