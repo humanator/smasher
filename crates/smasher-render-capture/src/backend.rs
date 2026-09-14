@@ -1,6 +1,7 @@
 // ABOUTME: HybridToolBackend: dispatches `render_capture` natively, falls back
 // ABOUTME: to a wrapped `ToolBackend` (e.g. `LlmToolBackend`) for every other tool.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -40,6 +41,15 @@ impl HybridToolBackend {
             .and_then(Value::as_str)
             .ok_or_else(|| HandlerError::Other("render_capture: missing candidate_id".into()))?;
 
+        let generation_params = match args.get("generation_params") {
+            Some(v) => {
+                serde_json::from_value::<BTreeMap<String, String>>(v.clone()).map_err(|e| {
+                    HandlerError::Other(format!("render_capture: invalid generation_params: {e}"))
+                })?
+            }
+            None => BTreeMap::new(),
+        };
+
         let output_dir = manifest::artifact_dir(&self.artifacts_base, candidate_id);
         let viewport = Viewport {
             width: capture::VIEWPORT_WIDTH,
@@ -50,7 +60,7 @@ impl HybridToolBackend {
             Path::new(candidate_dir),
             &output_dir,
             viewport,
-            std::collections::BTreeMap::new(),
+            generation_params,
         )
         .await
         {
@@ -177,5 +187,93 @@ mod tests {
         let artifact_dir = crate::manifest::artifact_dir(&artifacts_base, candidate_id);
         assert!(artifact_dir.join("screenshot.png").is_file());
         assert!(artifact_dir.join("manifest.json").is_file());
+    }
+
+    #[tokio::test]
+    async fn render_capture_writes_generation_params_into_manifest() {
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
+        let fallback = Arc::new(RecordingFallback::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = tmp.path().to_path_buf();
+        let backend = HybridToolBackend::new(fallback.clone(), artifacts_base.clone());
+
+        let candidate_id = "test-candidate-params";
+        let args = json!({
+            "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
+            "candidate_id": candidate_id,
+            "generation_params": {"prompt": "a red button", "persona": "designer"},
+        });
+
+        let outcome = backend
+            .execute_tool("render_capture", &args, &Context::default())
+            .await
+            .expect("render_capture should succeed against the fixture candidate");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+
+        let artifact_dir = crate::manifest::artifact_dir(&artifacts_base, candidate_id);
+        let manifest: crate::manifest::Manifest = serde_json::from_str(
+            &std::fs::read_to_string(artifact_dir.join("manifest.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            manifest.generation_params,
+            BTreeMap::from([
+                ("prompt".to_string(), "a red button".to_string()),
+                ("persona".to_string(), "designer".to_string()),
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn render_capture_omitting_generation_params_writes_empty_map() {
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
+        let fallback = Arc::new(RecordingFallback::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = tmp.path().to_path_buf();
+        let backend = HybridToolBackend::new(fallback.clone(), artifacts_base.clone());
+
+        let candidate_id = "test-candidate-no-params";
+        let args = json!({
+            "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
+            "candidate_id": candidate_id,
+        });
+
+        let outcome = backend
+            .execute_tool("render_capture", &args, &Context::default())
+            .await
+            .expect("render_capture should succeed against the fixture candidate");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+
+        let artifact_dir = crate::manifest::artifact_dir(&artifacts_base, candidate_id);
+        let manifest: crate::manifest::Manifest = serde_json::from_str(
+            &std::fs::read_to_string(artifact_dir.join("manifest.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(manifest.generation_params, BTreeMap::new());
+    }
+
+    #[tokio::test]
+    async fn render_capture_rejects_malformed_generation_params() {
+        let fallback = Arc::new(RecordingFallback::new());
+        let backend = HybridToolBackend::new(fallback.clone(), PathBuf::from("/tmp/unused"));
+
+        let args = json!({
+            "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
+            "candidate_id": "test-candidate-bad-params",
+            "generation_params": {"prompt": {"nested": "object"}},
+        });
+
+        let result = backend
+            .execute_tool("render_capture", &args, &Context::default())
+            .await;
+
+        assert!(result.is_err());
+        assert!(!fallback.called.load(Ordering::SeqCst));
     }
 }
