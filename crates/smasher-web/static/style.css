@@ -1225,6 +1225,28 @@ textarea::placeholder {
   color: var(--red);
 }
 
+.candidate-params {
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.candidate-params summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.candidate-param {
+  margin-top: 0.2rem;
+  overflow-wrap: break-word;
+}
+
+.candidate-param-key {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
 /* ============================================================
    Gallery Gate Card
    ============================================================ */

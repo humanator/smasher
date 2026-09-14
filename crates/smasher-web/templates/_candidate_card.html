@@ -6,6 +6,14 @@
     <img src="{{ c.screenshot_url }}" alt="Candidate {{ c.candidate_id }}" class="candidate-thumbnail">
     {% endif %}
 </div>
+{% if !c.manifest.generation_params.is_empty() %}
+<details class="candidate-params">
+    <summary>params</summary>
+    {% for (key, value) in c.manifest.generation_params %}
+    <div class="candidate-param"><span class="candidate-param-key">{{ key }}</span>: {{ value }}</div>
+    {% endfor %}
+</details>
+{% endif %}
 {% endmacro %}
 
 {% macro failed_card(c, show_captured_at) %}
