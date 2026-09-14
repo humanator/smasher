@@ -21,6 +21,10 @@ pub struct AppState {
     pub runs: Arc<RwLock<HashMap<String, RunRecord>>>,
     pub client: Arc<smasher_llm::client::Client>,
     pub default_model: String,
+    /// Provider override for `default_model`, bypassing model-name-based
+    /// inference — needed for providers whose model names (e.g. Ollama's
+    /// `gemma4:31b-cloud`) have no recognizable prefix to infer from.
+    pub default_provider: Option<String>,
     pub data_dir: String,
 }
 
@@ -28,12 +32,14 @@ impl AppState {
     pub fn new(
         client: smasher_llm::client::Client,
         default_model: String,
+        default_provider: Option<String>,
         data_dir: String,
     ) -> Self {
         Self {
             runs: Arc::new(RwLock::new(HashMap::new())),
             client: Arc::new(client),
             default_model,
+            default_provider,
             data_dir,
         }
     }
@@ -103,7 +109,7 @@ mod tests {
     #[test]
     fn app_state_new_creates_empty_runs() {
         let client = smasher_llm::client::Client::from_env();
-        let state = AppState::new(client, "test-model".into(), "/tmp".into());
+        let state = AppState::new(client, "test-model".into(), None, "/tmp".into());
         // runs map should be empty on creation
         let runs = state.runs.try_read().unwrap();
         assert!(runs.is_empty());

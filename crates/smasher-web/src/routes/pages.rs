@@ -261,6 +261,7 @@ async fn submit_run(
         .model
         .filter(|m| !m.is_empty())
         .unwrap_or_else(|| state.default_model.clone());
+    let provider = state.default_provider.clone();
     variables.insert("model".into(), model.clone());
 
     transforms::apply_transforms(&mut resolved, &variables, None);
@@ -377,6 +378,7 @@ async fn submit_run(
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             run_working_dir.clone(),
             input_tokens,
             output_tokens,
@@ -388,11 +390,13 @@ async fn submit_run(
         let manager_backend = Arc::new(LlmManagerBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             run_working_dir.clone(),
         ));
         let llm_tool_backend = Arc::new(LlmToolBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             run_working_dir.clone(),
         ));
         let render_capture_backend =
@@ -694,7 +698,7 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into())
     }
 
     /// A `test_state()` rooted at a fresh temp dir, for tests that need to write
@@ -706,6 +710,7 @@ mod tests {
         let state = AppState::new(
             client,
             "test-model".into(),
+            None,
             data_dir.path().display().to_string(),
         );
         (state, data_dir)

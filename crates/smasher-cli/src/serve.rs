@@ -19,6 +19,12 @@ pub struct ServeArgs {
     #[arg(long, short)]
     pub model: Option<String>,
 
+    /// Provider override for the default model, bypassing model-name-based
+    /// inference. Needed for providers whose model names (e.g. Ollama's
+    /// `gemma4:31b-cloud`) have no recognizable prefix to infer from.
+    #[arg(long)]
+    pub provider: Option<String>,
+
     /// Data directory for run artifacts. Defaults to ~/.smasher.
     #[arg(long)]
     pub data_dir: Option<PathBuf>,
@@ -28,6 +34,7 @@ pub async fn run(args: ServeArgs) -> Result<(), CliError> {
     let defaults = ServerConfig::default();
 
     let model = args.model.unwrap_or(defaults.model);
+    let provider = args.provider.or(defaults.provider);
 
     let data_dir = match args.data_dir {
         Some(dir) => {
@@ -44,6 +51,7 @@ pub async fn run(args: ServeArgs) -> Result<(), CliError> {
         port: args.port,
         host: defaults.host,
         model,
+        provider,
         data_dir,
     };
 

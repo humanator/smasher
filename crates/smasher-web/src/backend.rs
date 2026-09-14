@@ -25,6 +25,7 @@ use smasher_attractor::tool_handler::ToolBackend;
 pub struct AgentCodergenBackend {
     client: Arc<smasher_llm::client::Client>,
     default_model: String,
+    default_provider: Option<String>,
     working_dir: String,
     input_tokens: Arc<AtomicU64>,
     output_tokens: Arc<AtomicU64>,
@@ -35,6 +36,7 @@ impl AgentCodergenBackend {
     pub fn new(
         client: Arc<smasher_llm::client::Client>,
         default_model: String,
+        default_provider: Option<String>,
         working_dir: String,
         input_tokens: Arc<AtomicU64>,
         output_tokens: Arc<AtomicU64>,
@@ -43,6 +45,7 @@ impl AgentCodergenBackend {
         Self {
             client,
             default_model,
+            default_provider,
             working_dir,
             input_tokens,
             output_tokens,
@@ -194,7 +197,10 @@ impl CodergenBackend for AgentCodergenBackend {
             .with_max_turns(50)
             .with_system_prompt(&system_prompt)
             .with_working_directory(&self.working_dir);
-        if let Some(provider) = provider {
+        if let Some(provider) = provider
+            .map(str::to_string)
+            .or_else(|| self.default_provider.clone())
+        {
             config = config.with_provider(provider);
         }
 
@@ -237,6 +243,7 @@ impl CodergenBackend for AgentCodergenBackend {
 pub struct LlmManagerBackend {
     client: Arc<smasher_llm::client::Client>,
     default_model: String,
+    default_provider: Option<String>,
     working_dir: String,
 }
 
@@ -245,11 +252,13 @@ impl LlmManagerBackend {
     pub fn new(
         client: Arc<smasher_llm::client::Client>,
         default_model: String,
+        default_provider: Option<String>,
         working_dir: String,
     ) -> Self {
         Self {
             client,
             default_model,
+            default_provider,
             working_dir,
         }
     }
@@ -289,11 +298,14 @@ impl ManagerBackend for LlmManagerBackend {
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
-        let session_config = SessionConfig::default()
+        let mut session_config = SessionConfig::default()
             .with_model(&self.default_model)
             .with_max_turns(20)
             .with_system_prompt(system_prompt)
             .with_working_directory(&self.working_dir);
+        if let Some(ref provider) = self.default_provider {
+            session_config = session_config.with_provider(provider.clone());
+        }
 
         let session_emitter = EventEmitter::default();
         let mut session = Session::new(
@@ -331,6 +343,7 @@ impl ManagerBackend for LlmManagerBackend {
 pub struct LlmToolBackend {
     client: Arc<smasher_llm::client::Client>,
     default_model: String,
+    default_provider: Option<String>,
     working_dir: String,
 }
 
@@ -339,11 +352,13 @@ impl LlmToolBackend {
     pub fn new(
         client: Arc<smasher_llm::client::Client>,
         default_model: String,
+        default_provider: Option<String>,
         working_dir: String,
     ) -> Self {
         Self {
             client,
             default_model,
+            default_provider,
             working_dir,
         }
     }
@@ -383,11 +398,14 @@ impl ToolBackend for LlmToolBackend {
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
-        let session_config = SessionConfig::default()
+        let mut session_config = SessionConfig::default()
             .with_model(&self.default_model)
             .with_max_turns(20)
             .with_system_prompt(system_prompt)
             .with_working_directory(&self.working_dir);
+        if let Some(ref provider) = self.default_provider {
+            session_config = session_config.with_provider(provider.clone());
+        }
 
         let session_emitter = EventEmitter::default();
         let mut session = Session::new(
@@ -430,6 +448,7 @@ mod tests {
         let backend = AgentCodergenBackend::new(
             client,
             "claude-sonnet-4-20250514".into(),
+            None,
             "/tmp".into(),
             Arc::new(AtomicU64::new(0)),
             Arc::new(AtomicU64::new(0)),
@@ -462,8 +481,12 @@ mod tests {
     #[test]
     fn manager_backend_creation() {
         let client = Arc::new(smasher_llm::client::Client::from_env());
-        let backend =
-            LlmManagerBackend::new(client, "claude-sonnet-4-20250514".into(), "/tmp".into());
+        let backend = LlmManagerBackend::new(
+            client,
+            "claude-sonnet-4-20250514".into(),
+            None,
+            "/tmp".into(),
+        );
         assert_eq!(backend.default_model, "claude-sonnet-4-20250514");
         assert_eq!(backend.working_dir, "/tmp");
     }
@@ -471,7 +494,12 @@ mod tests {
     #[test]
     fn tool_backend_creation() {
         let client = Arc::new(smasher_llm::client::Client::from_env());
-        let backend = LlmToolBackend::new(client, "claude-sonnet-4-20250514".into(), "/tmp".into());
+        let backend = LlmToolBackend::new(
+            client,
+            "claude-sonnet-4-20250514".into(),
+            None,
+            "/tmp".into(),
+        );
         assert_eq!(backend.default_model, "claude-sonnet-4-20250514");
         assert_eq!(backend.working_dir, "/tmp");
     }
@@ -479,7 +507,7 @@ mod tests {
     #[test]
     fn tool_backend_available_tools_empty() {
         let client = Arc::new(smasher_llm::client::Client::from_env());
-        let backend = LlmToolBackend::new(client, "test".into(), "/tmp".into());
+        let backend = LlmToolBackend::new(client, "test".into(), None, "/tmp".into());
         assert!(backend.available_tools().is_empty());
     }
 }

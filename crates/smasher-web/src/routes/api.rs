@@ -125,6 +125,7 @@ async fn submit_pipeline(
 
     let mut variables = req.variables.clone();
     let model = req.model.unwrap_or_else(|| state.default_model.clone());
+    let provider = state.default_provider.clone();
     variables.insert("model".into(), model.clone());
 
     transforms::apply_transforms(&mut resolved, &variables, None);
@@ -242,6 +243,7 @@ async fn submit_pipeline(
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             spawn_working_dir.clone(),
             input_tokens,
             output_tokens,
@@ -253,11 +255,13 @@ async fn submit_pipeline(
         let manager_backend = Arc::new(LlmManagerBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             spawn_working_dir.clone(),
         ));
         let llm_tool_backend = Arc::new(LlmToolBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             spawn_working_dir.clone(),
         ));
         let render_capture_backend =
@@ -500,6 +504,7 @@ async fn resume_run(
         .get("model")
         .cloned()
         .unwrap_or_else(|| state.default_model.clone());
+    let provider = state.default_provider.clone();
 
     let record = RunRecord {
         id: run_id.clone(),
@@ -568,6 +573,7 @@ async fn resume_run(
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             spawn_working_dir.clone(),
             input_tokens,
             output_tokens,
@@ -579,11 +585,13 @@ async fn resume_run(
         let manager_backend = Arc::new(LlmManagerBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             spawn_working_dir.clone(),
         ));
         let llm_tool_backend = Arc::new(LlmToolBackend::new(
             Arc::clone(&client),
             model.clone(),
+            provider.clone(),
             spawn_working_dir.clone(),
         ));
         let render_capture_backend =
@@ -740,7 +748,7 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into())
     }
 
     #[tokio::test]
@@ -840,6 +848,7 @@ mod tests {
         let state = AppState::new(
             client,
             "test-model".into(),
+            None,
             tmp.path().display().to_string(),
         );
         let app = router().with_state(state.clone());

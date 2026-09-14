@@ -312,7 +312,7 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into())
     }
 
     fn write_fixture_manifest(run_id: &str, candidate_id: &str, failed: bool) {

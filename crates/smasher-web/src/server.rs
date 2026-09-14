@@ -56,6 +56,10 @@ pub struct ServerConfig {
     pub port: u16,
     pub host: [u8; 4],
     pub model: String,
+    /// Provider override for `model`, bypassing model-name-based inference —
+    /// needed for providers whose model names (e.g. Ollama's
+    /// `gemma4:31b-cloud`) have no recognizable prefix to infer from.
+    pub provider: Option<String>,
     pub data_dir: String,
 }
 
@@ -86,12 +90,15 @@ impl Default for ServerConfig {
         let model =
             std::env::var("SMASHER_MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".into());
 
+        let provider = std::env::var("SMASHER_PROVIDER").ok();
+
         let data_dir = default_data_dir();
 
         Self {
             port,
             host,
             model,
+            provider,
             data_dir,
         }
     }
@@ -107,13 +114,14 @@ pub async fn run_with_config(config: ServerConfig) -> Result<(), Box<dyn std::er
     let client = smasher_llm::client::Client::from_env();
     if client.registered_providers().is_empty() {
         return Err(
-            "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.".into(),
+            "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_API_KEY."
+                .into(),
         );
     }
 
-    tracing::info!(data_dir = %config.data_dir, model = %config.model, "agent configuration");
+    tracing::info!(data_dir = %config.data_dir, model = %config.model, provider = ?config.provider, "agent configuration");
 
-    let state = AppState::new(client, config.model, config.data_dir);
+    let state = AppState::new(client, config.model, config.provider, config.data_dir);
     let app = build_router(state);
 
     let addr = SocketAddr::from((config.host, config.port));
@@ -155,7 +163,7 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into())
     }
 
     #[tokio::test]
@@ -171,6 +179,7 @@ mod tests {
         let state = AppState::new(
             client,
             "test-model".into(),
+            None,
             data_dir.path().display().to_string(),
         );
         let app = build_router(state);
