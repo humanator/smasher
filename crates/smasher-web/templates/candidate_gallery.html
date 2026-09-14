@@ -9,7 +9,7 @@
         {% call candidate_card::failed_card(candidate, true) %}
         {% else %}
         <div class="candidate-card">
-            <img src="{{ candidate.screenshot_url }}" alt="{{ candidate.candidate_id }}" class="candidate-thumbnail">
+            {% call candidate_card::live_card(candidate) %}
             <div class="candidate-id">{{ candidate.candidate_id }}</div>
             <div class="candidate-captured-at">{{ candidate.manifest.captured_at }}</div>
         </div>

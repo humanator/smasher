@@ -943,6 +943,44 @@ mod tests {
         assert!(html.contains("/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"));
         assert!(html.contains("chromium launch failed"));
         assert!(html.contains("candidate-card-failed"));
+        assert!(!html.contains("<iframe"));
+    }
+
+    #[test]
+    fn candidate_gallery_template_renders_live_bundle_as_iframe() {
+        use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
+
+        let candidates = vec![CandidateSummary {
+            candidate_id: "candidate-a".into(),
+            screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
+                .into(),
+            bundle_url: Some(
+                "/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html".into(),
+            ),
+            manifest: Manifest {
+                captured_at: chrono::Utc::now(),
+                viewport: Viewport {
+                    width: 1280,
+                    height: 800,
+                },
+                candidate_dir: "/tmp/candidate-a".into(),
+                exit_status: ExitStatus::Success,
+                artifacts: Vec::new(),
+            },
+        }];
+
+        let html = CandidateGalleryTemplate {
+            run_id: "run-1".into(),
+            candidates,
+        }
+        .render()
+        .unwrap();
+
+        assert!(html.contains(
+            r#"<iframe src="/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html""#
+        ));
+        assert!(html.contains(r#"sandbox="allow-scripts""#));
+        assert!(!html.contains("<img"));
     }
 
     #[test]
