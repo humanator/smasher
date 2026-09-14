@@ -988,6 +988,78 @@ mod tests {
     }
 
     #[test]
+    fn candidate_gallery_template_renders_generation_params_panel_when_present() {
+        use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
+
+        let candidates = vec![CandidateSummary {
+            candidate_id: "candidate-a".into(),
+            screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
+                .into(),
+            bundle_url: None,
+            manifest: Manifest {
+                captured_at: chrono::Utc::now(),
+                viewport: Viewport {
+                    width: 1280,
+                    height: 800,
+                },
+                candidate_dir: "/tmp/candidate-a".into(),
+                exit_status: ExitStatus::Success,
+                artifacts: Vec::new(),
+                generation_params: std::collections::BTreeMap::from([
+                    ("prompt".to_string(), "a red button".to_string()),
+                    ("persona".to_string(), "designer".to_string()),
+                ]),
+            },
+        }];
+
+        let html = CandidateGalleryTemplate {
+            run_id: "run-1".into(),
+            candidates,
+        }
+        .render()
+        .unwrap();
+
+        assert!(html.contains(r#"<details class="candidate-params">"#));
+        assert!(html.contains("prompt"));
+        assert!(html.contains("a red button"));
+        assert!(html.contains("persona"));
+        assert!(html.contains("designer"));
+    }
+
+    #[test]
+    fn candidate_gallery_template_renders_no_params_panel_when_empty() {
+        use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
+
+        let candidates = vec![CandidateSummary {
+            candidate_id: "candidate-a".into(),
+            screenshot_url: "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
+                .into(),
+            bundle_url: None,
+            manifest: Manifest {
+                captured_at: chrono::Utc::now(),
+                viewport: Viewport {
+                    width: 1280,
+                    height: 800,
+                },
+                candidate_dir: "/tmp/candidate-a".into(),
+                exit_status: ExitStatus::Success,
+                artifacts: Vec::new(),
+                generation_params: std::collections::BTreeMap::new(),
+            },
+        }];
+
+        let html = CandidateGalleryTemplate {
+            run_id: "run-1".into(),
+            candidates,
+        }
+        .render()
+        .unwrap();
+
+        assert!(!html.contains("candidate-params"));
+        assert!(!html.contains("<details"));
+    }
+
+    #[test]
     fn candidate_gallery_template_renders_empty_state() {
         let html = CandidateGalleryTemplate {
             run_id: "run-1".into(),
@@ -1089,6 +1161,22 @@ mod tests {
         failed: bool,
         artifacts: Vec<smasher_render_capture::manifest::ArtifactRef>,
     ) {
+        write_gate_manifest_with_artifacts_and_params(
+            run_id,
+            candidate_id,
+            failed,
+            artifacts,
+            std::collections::BTreeMap::new(),
+        );
+    }
+
+    fn write_gate_manifest_with_artifacts_and_params(
+        run_id: &str,
+        candidate_id: &str,
+        failed: bool,
+        artifacts: Vec<smasher_render_capture::manifest::ArtifactRef>,
+        generation_params: std::collections::BTreeMap<String, String>,
+    ) {
         use smasher_render_capture::manifest::{ExitStatus, Manifest, Viewport};
 
         // Matches test_state()'s data_dir ("/tmp"): candidates live under
@@ -1110,7 +1198,7 @@ mod tests {
                 ExitStatus::Success
             },
             artifacts,
-            generation_params: std::collections::BTreeMap::new(),
+            generation_params,
         };
         std::fs::write(
             dir.join("manifest.json"),
@@ -1211,6 +1299,40 @@ mod tests {
         // Checkbox selection structure survives.
         assert!(html.contains(r#"value="candidate-a""#));
         assert!(html.contains("<label class=\"candidate-card\">"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_gate_card_shows_params_panel_only_where_generation_params_set() {
+        let run_id = "gate-card-params";
+        write_gate_manifest_with_artifacts_and_params(
+            run_id,
+            "candidate-a",
+            false,
+            Vec::new(),
+            std::collections::BTreeMap::from([
+                ("prompt".to_string(), "a red button".to_string()),
+                ("persona".to_string(), "designer".to_string()),
+            ]),
+        );
+        write_gate_manifest(run_id, "candidate-b", false);
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains(r#"<details class="candidate-params">"#));
+        assert!(html.contains("prompt"));
+        assert!(html.contains("a red button"));
+        // candidate-b has no generation_params: only one panel should render.
+        assert_eq!(
+            html.matches(r#"<details class="candidate-params">"#)
+                .count(),
+            1
+        );
     }
 
     /// Two gallery gates in one graph (e.g. a Discover gate feeding a
