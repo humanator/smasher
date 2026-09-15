@@ -16,7 +16,7 @@ digraph ProductDesignFactory {
   IAOptions [
     shape=box,
     label="Build interaction approaches from kit",
-    prompt="Product brief: {{brief}}\n\nGiven this brief and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/discover-a/, ./candidates/discover-b/, ./candidates/discover-c/, and ./candidates/discover-d/ (build up to 4 if the brief supports that many distinct directions; fewer is fine, but each one built must use its listed directory exactly). Compose from kit components; do not reinvent them."
+    prompt="Product brief: {{brief}}\n\nGiven this brief and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/discover-a/, ./candidates/discover-b/, ./candidates/discover-c/, and ./candidates/discover-d/ (build up to 4 if the brief supports that many distinct directions; fewer is fine, but each one built must use its listed directory exactly). Compose from kit components; do not reinvent them. Each candidate directory's entry point MUST be named index.html exactly — the render/critique tools that run next open that file by that name and nothing else."
   ];
 
   // Real render_capture is one-candidate-per-call, so Discover's 4 candidates
@@ -59,7 +59,7 @@ digraph ProductDesignFactory {
   Implement [
     shape=box,
     label="Implement chosen direction",
-    prompt="Product brief: {{brief}}\n\nBuild out the selected pattern under ./build/define/ using the kit, existing tokens, and components."
+    prompt="Product brief: {{brief}}\n\nBuild out the selected pattern under ./build/define/ using the kit, existing tokens, and components. The entry point MUST be ./build/define/index.html exactly — the render/critique tools that run next open that file by that name and nothing else."
   ];
 
   RenderDefine [
@@ -106,7 +106,7 @@ digraph ProductDesignFactory {
   Prune [
     shape=box,
     label="Cut non-value elements",
-    prompt="Remove anything not serving the product brief ({{brief}}) from ./build/define/. Prefer kit/native components over custom ones."
+    prompt="Remove anything not serving the product brief ({{brief}}) from ./build/define/. Prefer kit/native components over custom ones. Keep the entry point at ./build/define/index.html exactly — do not rename, move, or remove it."
   ];
 
   // No real axe-core integration exists yet (deliberately deferred — see
