@@ -2,6 +2,7 @@
 // ABOUTME: Provides the /api/* endpoints consumed by HTMX and external clients.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -268,11 +269,13 @@ async fn submit_pipeline(
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&spawn_working_dir),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&spawn_working_dir),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
@@ -598,11 +601,13 @@ async fn resume_run(
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&spawn_working_dir),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&spawn_working_dir),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(

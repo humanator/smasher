@@ -45,11 +45,34 @@ async fn render_capture_pipeline_makes_zero_llm_calls() {
 
     let repo_root = repo_root();
 
+    // `render_capture`'s candidate_dir now resolves relative paths against the
+    // run's own working directory, not the smasher process's CWD (see
+    // candidate-workdir-resolution). This fixture lives outside any run
+    // directory, so it needs an absolute candidate_dir — same pattern the unit
+    // tests in smasher-render-capture/smasher-system-lint already use for their
+    // own fixtures. Substitute the placeholder in the static .dot fixture with a
+    // real absolute path and run that copy instead of the static file.
+    let fixture_candidate_dir = repo_root
+        .join("crates/smasher-render-capture/fixtures/candidate")
+        .canonicalize()
+        .expect("fixture candidate dir should exist");
+    let dot_template = std::fs::read_to_string(
+        repo_root.join("crates/smasher-cli/tests/fixtures/render_capture.dot"),
+    )
+    .expect("failed to read render_capture.dot fixture");
+    let dot_contents = dot_template.replace(
+        "{{FIXTURE_CANDIDATE_DIR}}",
+        &fixture_candidate_dir.display().to_string(),
+    );
+    let dot_dir = tempfile::tempdir().expect("failed to create tempdir for rendered .dot");
+    let dot_path = dot_dir.path().join("render_capture.dot");
+    std::fs::write(&dot_path, dot_contents).expect("failed to write rendered .dot fixture");
+
     let output = Command::new(env!("CARGO_BIN_EXE_smasher"))
         .current_dir(&repo_root)
         .args([
             "run",
-            "crates/smasher-cli/tests/fixtures/render_capture.dot",
+            dot_path.to_str().unwrap(),
             "--skip-preflight",
             "--skip-lint",
             "--no-tui",

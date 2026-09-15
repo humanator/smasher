@@ -8,7 +8,7 @@ digraph SystemLintE2E {
     shape=parallelogram,
     label="System Lint",
     tool="system_lint",
-    args="{\"candidate_dir\": \"crates/smasher-system-lint/fixtures/clean-candidate\", \"run_id\": \"e2e-system-lint-fixture\", \"candidate_id\": \"fixture\"}"
+    args="{\"candidate_dir\": \"{{FIXTURE_CANDIDATE_DIR}}\", \"run_id\": \"e2e-system-lint-fixture\", \"candidate_id\": \"fixture\"}"
   ];
   Exit [shape=Msquare, label="Exit"];
 

@@ -2,6 +2,7 @@
 // ABOUTME: Provides the browser-facing pages: dashboard, run detail, and fragments.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use askama::Template;
@@ -407,11 +408,13 @@ async fn submit_run(
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&run_working_dir),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&run_working_dir),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(

@@ -2,6 +2,7 @@
 // ABOUTME: Supports variables, stylesheets, step limits, and outputs final context as JSON.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -1111,11 +1112,13 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
                 llm_tool_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&effective_working_dir),
             ));
         let system_lint_backend =
             Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
                 render_capture_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
+                PathBuf::from(&effective_working_dir),
             ));
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
