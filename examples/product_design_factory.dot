@@ -16,7 +16,7 @@ digraph ProductDesignFactory {
   IAOptions [
     shape=box,
     label="Build interaction approaches from kit",
-    prompt="Product brief: {{brief}}\n\nGiven this brief and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/<id>/. Compose from kit components; do not reinvent them."
+    prompt="Product brief: {{brief}}\n\nGiven this brief and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/discover-a/, ./candidates/discover-b/, ./candidates/discover-c/, and ./candidates/discover-d/ (build up to 4 if the brief supports that many distinct directions; fewer is fine, but each one built must use its listed directory exactly). Compose from kit components; do not reinvent them."
   ];
 
   // Real render_capture is one-candidate-per-call, so Discover's 4 candidates
@@ -26,25 +26,25 @@ digraph ProductDesignFactory {
     shape=parallelogram,
     label="Render candidate A",
     tool="render_capture",
-    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-a\"}"
+    args="{\"candidate_dir\": \"./candidates/discover-a\", \"candidate_id\": \"discover-a\"}"
   ];
   RenderDiscoverB [
     shape=parallelogram,
     label="Render candidate B",
     tool="render_capture",
-    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-b\"}"
+    args="{\"candidate_dir\": \"./candidates/discover-b\", \"candidate_id\": \"discover-b\"}"
   ];
   RenderDiscoverC [
     shape=parallelogram,
     label="Render candidate C",
     tool="render_capture",
-    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-c\"}"
+    args="{\"candidate_dir\": \"./candidates/discover-c\", \"candidate_id\": \"discover-c\"}"
   ];
   RenderDiscoverD [
     shape=parallelogram,
     label="Render candidate D",
     tool="render_capture",
-    args="{\"candidate_dir\": \"crates/smasher-render-capture/fixtures/candidate\", \"candidate_id\": \"discover-d\"}"
+    args="{\"candidate_dir\": \"./candidates/discover-d\", \"candidate_id\": \"discover-d\"}"
   ];
 
   GalleryGate1 [
@@ -66,7 +66,7 @@ digraph ProductDesignFactory {
     shape=parallelogram,
     label="Render + capture build",
     tool="render_capture",
-    args="{\"candidate_dir\": \"crates/smasher-system-lint/fixtures/clean-candidate\", \"candidate_id\": \"define\"}"
+    args="{\"candidate_dir\": \"./build/define\", \"candidate_id\": \"define\"}"
   ];
 
   CritiqueParallel [shape=component, label="Critique (Parallel)"];
@@ -75,7 +75,7 @@ digraph ProductDesignFactory {
     shape=parallelogram,
     label="Design-system check",
     tool="system_lint",
-    args="{\"candidate_dir\": \"crates/smasher-system-lint/fixtures/clean-candidate\", \"candidate_id\": \"define\"}"
+    args="{\"candidate_dir\": \"./build/define\", \"candidate_id\": \"define\"}"
   ];
 
   TaskCritic [
