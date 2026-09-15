@@ -1,3 +1,6 @@
+// Requires a {{brief}} variable describing what to build, e.g.:
+//   smasher run examples/product_design_factory.dot --var brief="A dashboard for tracking home energy usage, aimed at non-technical homeowners"
+// or, from the web dashboard, the "Product Brief" field on the submit form.
 digraph ProductDesignFactory {
   graph [
     goal="Discover a product design direction, define it against real usability and design-system critique, and deliver a pruned, accessible build.",
@@ -13,7 +16,7 @@ digraph ProductDesignFactory {
   IAOptions [
     shape=box,
     label="Build interaction approaches from kit",
-    prompt="Given this task and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/<id>/. Compose from kit components; do not reinvent them."
+    prompt="Product brief: {{brief}}\n\nGiven this brief and the shared component kit at ./design-kit/ (see ./design-kit/README.md and open ./design-kit/catalog.html), build 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/<id>/. Compose from kit components; do not reinvent them."
   ];
 
   // Real render_capture is one-candidate-per-call, so Discover's 4 candidates
@@ -56,7 +59,7 @@ digraph ProductDesignFactory {
   Implement [
     shape=box,
     label="Implement chosen direction",
-    prompt="Build out the selected pattern under ./build/define/ using the kit, existing tokens, and components."
+    prompt="Product brief: {{brief}}\n\nBuild out the selected pattern under ./build/define/ using the kit, existing tokens, and components."
   ];
 
   RenderDefine [
@@ -103,7 +106,7 @@ digraph ProductDesignFactory {
   Prune [
     shape=box,
     label="Cut non-value elements",
-    prompt="Remove anything not serving the task from ./build/define/. Prefer kit/native components over custom ones."
+    prompt="Remove anything not serving the product brief ({{brief}}) from ./build/define/. Prefer kit/native components over custom ones."
   ];
 
   // No real axe-core integration exists yet (deliberately deferred — see

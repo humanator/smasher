@@ -162,6 +162,7 @@ pub struct SubmitForm {
     pub dot_source: String,
     pub model: Option<String>,
     pub vars: Option<String>,
+    pub brief: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +256,9 @@ async fn submit_run(
                 variables.insert(key.trim().to_string(), value.trim().to_string());
             }
         }
+    }
+    if let Some(brief) = form.brief.as_deref().map(str::trim).filter(|b| !b.is_empty()) {
+        variables.insert("brief".into(), brief.to_string());
     }
 
     let model = form
@@ -780,6 +784,64 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn submit_run_with_brief_field_sets_brief_variable() {
+        let (state, _data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+        // URL-encoded: dot_source=digraph { start [shape=circle]; a [shape=box]; end [shape=doublecircle]; start -> a -> end }
+        // brief=Build+a+todo+app
+        let body = "dot_source=digraph+%7B+start+%5Bshape%3Dcircle%5D%3B+a+%5Bshape%3Dbox%5D%3B+end+%5Bshape%3Ddoublecircle%5D%3B+start+-%3E+a+-%3E+end+%7D&brief=Build+a+todo+app";
+        let req = Request::builder()
+            .method("POST")
+            .uri("/runs")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let run_id = resp
+            .headers()
+            .get("HX-Redirect")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .trim_start_matches("/runs/")
+            .to_string();
+
+        let runs = state.runs.read().await;
+        let record = runs.get(&run_id).expect("run should be recorded");
+        assert_eq!(record.variables.get("brief").map(String::as_str), Some("Build a todo app"));
+    }
+
+    #[tokio::test]
+    async fn submit_run_without_brief_field_leaves_brief_unset() {
+        let (state, _data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+        let body = "dot_source=digraph+%7B+start+%5Bshape%3Dcircle%5D%3B+a+%5Bshape%3Dbox%5D%3B+end+%5Bshape%3Ddoublecircle%5D%3B+start+-%3E+a+-%3E+end+%7D";
+        let req = Request::builder()
+            .method("POST")
+            .uri("/runs")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let run_id = resp
+            .headers()
+            .get("HX-Redirect")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .trim_start_matches("/runs/")
+            .to_string();
+
+        let runs = state.runs.read().await;
+        let record = runs.get(&run_id).expect("run should be recorded");
+        assert!(!record.variables.contains_key("brief"));
     }
 
     #[tokio::test]

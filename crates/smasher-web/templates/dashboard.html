@@ -33,6 +33,12 @@
                 reader.readAsText(file);
             });
         </script>
+        <div class="form-group">
+            <label for="brief">Product Brief (optional)</label>
+            <textarea id="brief" name="brief" rows="3" style="min-height: 60px"
+                placeholder="A dashboard for tracking home energy usage, aimed at non-technical homeowners"></textarea>
+            <span class="field-hint">Fills the <code>{% raw %}{{brief}}{% endraw %}</code> variable used by pipelines like product_design_factory.dot. Equivalent to <code>--var brief=...</code> on the CLI.</span>
+        </div>
         <div class="form-row">
             <div class="form-group">
                 <label for="model">Model (optional)</label>
