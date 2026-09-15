@@ -12,9 +12,12 @@
     {% call candidate_card::failed_card(gc.summary, false) %}
     {% else %}
     <label class="candidate-card">
-      <input type="checkbox" name="selected" value="{{ gc.summary.candidate_id }}">
+      <input type="checkbox" name="selected" value="{{ gc.summary.candidate_id }}"
+        id="gate-select-{{ question_id }}-{{ gc.summary.candidate_id }}" hx-preserve="true">
       <a href="{{ gc.summary.primary_url() }}" target="_blank">
-        {% call candidate_card::live_card(gc.summary) %}
+        <div id="gate-embed-{{ question_id }}-{{ gc.summary.candidate_id }}" hx-preserve="true">
+          {% call candidate_card::live_card(gc.summary) %}
+        </div>
       </a>
       <span class="candidate-id">{{ gc.summary.candidate_id }}</span>
       <div class="lint-badge-slot" data-candidate="{{ gc.summary.candidate_id }}">{% if let Some(passed) = gc.scorecard.lint_passed() -%}
