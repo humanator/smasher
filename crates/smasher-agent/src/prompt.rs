@@ -83,6 +83,25 @@ pub fn gather_system_info() -> SystemInfo {
     SystemInfo { os, date }
 }
 
+/// Conventions a Codergen node must follow when a `design-kit` (Semi-Dark
+/// Design Factory's shared component kit) is available in its working
+/// directory. Appended to the node's system prompt instead of being repeated
+/// in every `.dot` pipeline's `prompt` attribute — see
+/// `design_factory_conventions`.
+pub const DESIGN_FACTORY_CONVENTIONS: &str = "\n\nThis pipeline step has a shared component kit available at ./design-kit/. Read ./design-kit/README.md and open ./design-kit/catalog.html before writing any UI markup. Compose screens from its button/input/list-row/drawer/modal components and the tokens in ./design-kit/tokens.css (plus the color/font/radius/shadow tokens it documents from style.css) — never hand-roll a new component or a raw color, spacing, radius, or shadow value. If the task asks you to build or edit a candidate under a given directory, that directory's entry point must be named index.html exactly, and must stay at exactly that name — the render/lint/critique tools that run next open only that file, by that name.";
+
+/// Returns [`DESIGN_FACTORY_CONVENTIONS`] when `design-kit` exists directly
+/// under `working_dir` (the same signal `RunDirectory::symlink_into_root`
+/// uses to decide whether to link the kit into a run at all), or an empty
+/// string for pipelines that don't use the kit.
+pub fn design_factory_conventions(working_dir: &str) -> &'static str {
+    if Path::new(working_dir).join("design-kit").exists() {
+        DESIGN_FACTORY_CONVENTIONS
+    } else {
+        ""
+    }
+}
+
 /// Discover and read project documentation files from a working directory.
 ///
 /// Checks each file in [`PROJECT_DOC_FILES`] under the given directory. If any
@@ -841,5 +860,38 @@ mod tests {
         )
         .await;
         assert!(result.is_none());
+    }
+
+    // ── design_factory_conventions ───────────────────────────────────
+
+    #[test]
+    fn design_factory_conventions_present_when_design_kit_dir_exists() {
+        let tmp = TempDir::new().unwrap();
+        fs::create_dir(tmp.path().join("design-kit")).unwrap();
+
+        let result = design_factory_conventions(tmp.path().to_str().unwrap());
+        assert_eq!(result, DESIGN_FACTORY_CONVENTIONS);
+        assert!(result.contains("index.html"));
+    }
+
+    #[test]
+    fn design_factory_conventions_empty_when_design_kit_dir_missing() {
+        let tmp = TempDir::new().unwrap();
+
+        let result = design_factory_conventions(tmp.path().to_str().unwrap());
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn design_factory_conventions_empty_when_design_kit_is_a_file_not_a_dir() {
+        // A stray file named "design-kit" (not a symlinked directory) should
+        // still count as "present" by the same exists()-based check
+        // symlink_into_root uses — this documents that behavior rather than
+        // asserting a stricter is_dir() check that isn't implemented.
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("design-kit"), "not a directory").unwrap();
+
+        let result = design_factory_conventions(tmp.path().to_str().unwrap());
+        assert_eq!(result, DESIGN_FACTORY_CONVENTIONS);
     }
 }

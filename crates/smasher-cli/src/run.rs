@@ -86,11 +86,14 @@ impl CodergenBackend for AgentCodergenBackend {
             .map(|(k, v)| format!("{k}: {v}"))
             .collect();
 
+        let conventions = smasher_agent::prompt::design_factory_conventions(&self.working_dir);
         let system_prompt = if system_parts.is_empty() {
-            "You are an AI coding assistant executing a pipeline step. You have tools for reading files, writing files, editing files, running shell commands, grep, and glob. Use them to complete the task. Write all files in the current working directory.".to_string()
+            format!(
+                "You are an AI coding assistant executing a pipeline step. You have tools for reading files, writing files, editing files, running shell commands, grep, and glob. Use them to complete the task. Write all files in the current working directory.{conventions}"
+            )
         } else {
             format!(
-                "You are an AI coding assistant executing a pipeline step. Pipeline context:\n{}\n\nYou have tools for reading files, writing files, editing files, running shell commands, grep, and glob. Use them to complete the task. Write all files in the current working directory.",
+                "You are an AI coding assistant executing a pipeline step. Pipeline context:\n{}\n\nYou have tools for reading files, writing files, editing files, running shell commands, grep, and glob. Use them to complete the task. Write all files in the current working directory.{conventions}",
                 system_parts.join("\n")
             )
         };
