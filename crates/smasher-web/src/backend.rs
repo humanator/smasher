@@ -298,13 +298,25 @@ impl ManagerBackend for LlmManagerBackend {
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
+        // A node's `model`/`provider` attrs (folded into `config` by ManagerHandler)
+        // override this backend's pipeline-wide defaults.
+        let model = config
+            .get("model")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(&self.default_model);
+        let provider = config
+            .get("provider")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+            .or_else(|| self.default_provider.clone());
+
         let mut session_config = SessionConfig::default()
-            .with_model(&self.default_model)
+            .with_model(model)
             .with_max_turns(20)
             .with_system_prompt(system_prompt)
             .with_working_directory(&self.working_dir);
-        if let Some(ref provider) = self.default_provider {
-            session_config = session_config.with_provider(provider.clone());
+        if let Some(provider) = provider {
+            session_config = session_config.with_provider(provider);
         }
 
         let session_emitter = EventEmitter::default();
@@ -319,7 +331,7 @@ impl ManagerBackend for LlmManagerBackend {
             Ok(output) => {
                 let text = output.text.unwrap_or_default();
                 tracing::info!(
-                    model = %self.default_model,
+                    model = %model,
                     turns = output.turns_used,
                     "manager coordination completed"
                 );
@@ -398,13 +410,25 @@ impl ToolBackend for LlmToolBackend {
         let mut tool_registry = ToolRegistry::new();
         register_shared_tools(&mut tool_registry, env);
 
+        // A node's `model`/`provider` attrs (folded into `args` by ToolHandler)
+        // override this backend's pipeline-wide defaults.
+        let model = args
+            .get("model")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(&self.default_model);
+        let provider = args
+            .get("provider")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+            .or_else(|| self.default_provider.clone());
+
         let mut session_config = SessionConfig::default()
-            .with_model(&self.default_model)
+            .with_model(model)
             .with_max_turns(20)
             .with_system_prompt(system_prompt)
             .with_working_directory(&self.working_dir);
-        if let Some(ref provider) = self.default_provider {
-            session_config = session_config.with_provider(provider.clone());
+        if let Some(provider) = provider {
+            session_config = session_config.with_provider(provider);
         }
 
         let session_emitter = EventEmitter::default();
@@ -419,7 +443,7 @@ impl ToolBackend for LlmToolBackend {
             Ok(output) => {
                 let text = output.text.unwrap_or_default();
                 tracing::info!(
-                    model = %self.default_model,
+                    model = %model,
                     turns = output.turns_used,
                     "tool execution completed"
                 );

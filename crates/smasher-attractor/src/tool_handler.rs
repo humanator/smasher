@@ -63,7 +63,7 @@ impl Handler for ToolHandler {
         };
 
         // Parse optional args attribute as JSON.
-        let args = match node.attrs.get("args") {
+        let mut args = match node.attrs.get("args") {
             Some(NodeAttrValue::String(s)) => match serde_json::from_str::<Value>(s) {
                 Ok(parsed) => parsed,
                 Err(e) => {
@@ -74,6 +74,22 @@ impl Handler for ToolHandler {
             },
             _ => json!({}),
         };
+
+        // Fold `model=`/`provider=` node attrs into args as a fallback, same
+        // override surface CodergenHandler already gives Codergen nodes. An
+        // explicit "model"/"provider" key already inside the args JSON wins.
+        if let Value::Object(ref mut map) = args {
+            if !map.contains_key("model")
+                && let Some(NodeAttrValue::String(s)) = node.attrs.get("model")
+            {
+                map.insert("model".to_string(), json!(s));
+            }
+            if !map.contains_key("provider")
+                && let Some(NodeAttrValue::String(s)) = node.attrs.get("provider")
+            {
+                map.insert("provider".to_string(), json!(s));
+            }
+        }
 
         let outcome = self
             .backend
@@ -302,6 +318,71 @@ mod tests {
                 assert_eq!(data["tool"], "format");
                 assert_eq!(data["args"]["input"], "hello");
                 assert_eq!(data["args"]["style"], "bold");
+            }
+            other => panic!("expected success with data, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn tool_handler_folds_model_and_provider_attrs_into_args() {
+        let backend = Arc::new(EchoToolBackend);
+        let handler = ToolHandler::new(backend);
+
+        let mut node = make_node("t-model", NodeType::Tool);
+        node.attrs.insert(
+            "tool".to_string(),
+            NodeAttrValue::String("format".to_string()),
+        );
+        node.attrs.insert(
+            "model".to_string(),
+            NodeAttrValue::String("claude-opus-4".to_string()),
+        );
+        node.attrs.insert(
+            "provider".to_string(),
+            NodeAttrValue::String("anthropic".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert_eq!(data["args"]["model"], "claude-opus-4");
+                assert_eq!(data["args"]["provider"], "anthropic");
+            }
+            other => panic!("expected success with data, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn tool_handler_explicit_args_model_wins_over_node_attr() {
+        let backend = Arc::new(EchoToolBackend);
+        let handler = ToolHandler::new(backend);
+
+        let mut node = make_node("t-model-override", NodeType::Tool);
+        node.attrs.insert(
+            "tool".to_string(),
+            NodeAttrValue::String("format".to_string()),
+        );
+        node.attrs.insert(
+            "args".to_string(),
+            NodeAttrValue::String(r#"{"model": "gemma4:31b-cloud"}"#.to_string()),
+        );
+        node.attrs.insert(
+            "model".to_string(),
+            NodeAttrValue::String("claude-opus-4".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert_eq!(data["args"]["model"], "gemma4:31b-cloud");
             }
             other => panic!("expected success with data, got {other:?}"),
         }

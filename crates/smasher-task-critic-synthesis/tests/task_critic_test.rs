@@ -29,7 +29,7 @@ async fn missing_screenshot_fails_before_any_network_call() {
         "task": "find settings",
     });
 
-    let err = run_task_critic(&client, "claude-sonnet-4-20250514", tmp.path(), &args)
+    let err = run_task_critic(&client, "claude-sonnet-4-20250514", None, tmp.path(), &args)
         .await
         .expect_err("missing screenshot.png must fail");
 
@@ -50,7 +50,7 @@ async fn live_call_against_fixture_screenshot_produces_legible_report() {
         "task": "find the primary call-to-action button",
     });
 
-    let report = run_task_critic(&client, "claude-sonnet-4-20250514", candidate_dir, &args)
+    let report = run_task_critic(&client, "claude-sonnet-4-20250514", None, candidate_dir, &args)
         .await
         .expect("live task_critic call should succeed with a real API key");
 

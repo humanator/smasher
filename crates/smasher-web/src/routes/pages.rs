@@ -21,11 +21,6 @@ use crate::candidates::{self, CandidateScorecard, CandidateSummary};
 use crate::error::WebError;
 use crate::state::{AppState, RunSummary};
 
-/// Default vision-capable model for `task_critic` (overridable per node via `args["model"]`).
-const TASK_CRITIC_MODEL: &str = "claude-sonnet-4-20250514";
-/// Default cheap model for `synthesis` (overridable per node via `args["model"]`).
-const SYNTHESIS_MODEL: &str = "claude-3-5-haiku-20241022";
-
 // ---------------------------------------------------------------------------
 // Template structs
 // ---------------------------------------------------------------------------
@@ -164,6 +159,10 @@ pub struct SubmitForm {
     pub model: Option<String>,
     pub vars: Option<String>,
     pub brief: Option<String>,
+    /// JSON-encoded `{node_id: {model?, provider?}}`, built client-side from the
+    /// per-node override inputs. Each node defaults to the pipeline-wide `model`
+    /// above unless listed here. Absent or malformed JSON is treated as empty.
+    pub node_overrides: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -268,6 +267,17 @@ async fn submit_run(
         .unwrap_or_else(|| state.default_model.clone());
     let provider = state.default_provider.clone();
     variables.insert("model".into(), model.clone());
+
+    let node_overrides: HashMap<String, transforms::NodeOverride> = match form
+        .node_overrides
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+    {
+        Some(json) => serde_json::from_str(json)
+            .map_err(|e| WebError::BadRequest(format!("invalid node_overrides JSON: {e}")))?,
+        None => HashMap::new(),
+    };
+    transforms::apply_node_overrides(&mut resolved, &node_overrides);
 
     transforms::apply_transforms(&mut resolved, &variables, None);
 
@@ -419,8 +429,9 @@ async fn submit_run(
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
-                TASK_CRITIC_MODEL.to_string(),
-                SYNTHESIS_MODEL.to_string(),
+                model.clone(),
+                model.clone(),
+                provider.clone(),
                 candidate_artifacts_dir.clone(),
             ),
         );
@@ -817,6 +828,93 @@ mod tests {
         let runs = state.runs.read().await;
         let record = runs.get(&run_id).expect("run should be recorded");
         assert_eq!(record.variables.get("brief").map(String::as_str), Some("Build a todo app"));
+    }
+
+    /// Minimal `application/x-www-form-urlencoded` value encoder for building test
+    /// bodies — percent-encodes everything outside a small unreserved set, matching
+    /// what a browser's `FormData`/`URLSearchParams` would send.
+    fn urlencode(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        for b in s.bytes() {
+            match b {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    out.push(b as char)
+                }
+                b' ' => out.push('+'),
+                _ => out.push_str(&format!("%{b:02X}")),
+            }
+        }
+        out
+    }
+
+    #[tokio::test]
+    async fn submit_run_with_node_overrides_stamps_model_onto_the_named_node() {
+        let (state, _data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+
+        let dot_source =
+            "digraph { start [shape=circle]; a [shape=box]; end [shape=doublecircle]; start -> a -> end }";
+        let node_overrides = r#"{"a": {"model": "claude-opus-4", "provider": "anthropic"}}"#;
+        let body = format!(
+            "dot_source={}&node_overrides={}",
+            urlencode(dot_source),
+            urlencode(node_overrides)
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/runs")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let run_id = resp
+            .headers()
+            .get("HX-Redirect")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .trim_start_matches("/runs/")
+            .to_string();
+
+        let runs = state.runs.read().await;
+        let record = runs.get(&run_id).expect("run should be recorded");
+        let node_a = record
+            .graph
+            .nodes
+            .iter()
+            .find(|n| n.id == "a")
+            .expect("node 'a' should exist in the resolved graph");
+        assert_eq!(
+            node_a.attrs.get("model"),
+            Some(&smasher_attractor::graph::NodeAttrValue::String(
+                "claude-opus-4".to_string()
+            ))
+        );
+        let start_node = record.graph.nodes.iter().find(|n| n.id == "start").unwrap();
+        assert_eq!(start_node.attrs.get("model"), None);
+    }
+
+    #[tokio::test]
+    async fn submit_run_with_malformed_node_overrides_returns_bad_request() {
+        let (state, _data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+
+        let dot_source = "digraph { start [shape=circle]; end [shape=doublecircle]; start -> end }";
+        let body = format!(
+            "dot_source={}&node_overrides={}",
+            urlencode(dot_source),
+            urlencode("{not valid json")
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/runs")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

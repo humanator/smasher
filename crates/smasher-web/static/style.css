@@ -478,6 +478,50 @@ textarea::placeholder {
   font-weight: 600;
 }
 
+.node-overrides-empty {
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.node-overrides-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.node-overrides-table th {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border-bottom: 2px solid var(--border-subtle);
+}
+
+.node-overrides-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.node-overrides-table td:first-child {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.node-overrides-table input[type="text"] {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+}
+
 .empty-state {
   text-align: center;
   padding: 2.5rem 1rem;

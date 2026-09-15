@@ -3,8 +3,44 @@
 
 use std::collections::HashMap;
 
+use serde::Deserialize;
+
 use crate::graph::{Graph, NodeAttrValue};
 use crate::stylesheet::Stylesheet;
+
+/// A per-node model/provider override, keyed by node id in `apply_node_overrides`.
+/// Either field may be omitted to leave that node's existing attribute (or the
+/// pipeline-wide default a handler/backend falls back to) untouched.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct NodeOverride {
+    pub model: Option<String>,
+    pub provider: Option<String>,
+}
+
+/// Stamp `model=`/`provider=` attributes onto the graph nodes named in `overrides`,
+/// keyed by node id. Unknown node ids are silently ignored — the caller (typically
+/// a dashboard form) may reference a node id from a stale or hand-edited graph.
+///
+/// This is the mechanism `CodergenHandler`, `ToolHandler`, and `ManagerHandler` all
+/// already read `model`/`provider` node attrs through, so one override here reaches
+/// whichever of those three handler types the node actually is.
+pub fn apply_node_overrides(graph: &mut Graph, overrides: &HashMap<String, NodeOverride>) {
+    for node in &mut graph.nodes {
+        let Some(node_override) = overrides.get(&node.id) else {
+            continue;
+        };
+        if let Some(ref model) = node_override.model {
+            node.attrs
+                .insert("model".to_string(), NodeAttrValue::String(model.clone()));
+        }
+        if let Some(ref provider) = node_override.provider {
+            node.attrs.insert(
+                "provider".to_string(),
+                NodeAttrValue::String(provider.clone()),
+            );
+        }
+    }
+}
 
 /// Expand `{{variable}}` placeholders in all string attributes and labels of graph nodes.
 ///
@@ -489,6 +525,105 @@ mod tests {
         assert_eq!(
             graph.nodes[1].attrs.get("val"),
             Some(&NodeAttrValue::String("beta".to_string()))
+        );
+    }
+
+    // ---- apply_node_overrides tests ----
+
+    #[test]
+    fn apply_node_overrides_stamps_model_and_provider_onto_matching_node() {
+        let mut graph = make_graph(vec![
+            simple_node("n1", NodeType::Tool),
+            simple_node("n2", NodeType::Codergen),
+        ]);
+        let mut overrides = HashMap::new();
+        overrides.insert(
+            "n1".to_string(),
+            NodeOverride {
+                model: Some("claude-opus-4".to_string()),
+                provider: Some("anthropic".to_string()),
+            },
+        );
+
+        apply_node_overrides(&mut graph, &overrides);
+
+        assert_eq!(
+            graph.nodes[0].attrs.get("model"),
+            Some(&NodeAttrValue::String("claude-opus-4".to_string()))
+        );
+        assert_eq!(
+            graph.nodes[0].attrs.get("provider"),
+            Some(&NodeAttrValue::String("anthropic".to_string()))
+        );
+        assert_eq!(graph.nodes[1].attrs.get("model"), None);
+    }
+
+    #[test]
+    fn apply_node_overrides_ignores_unknown_node_ids() {
+        let mut graph = make_graph(vec![simple_node("n1", NodeType::Tool)]);
+        let mut overrides = HashMap::new();
+        overrides.insert(
+            "does-not-exist".to_string(),
+            NodeOverride {
+                model: Some("claude-opus-4".to_string()),
+                provider: None,
+            },
+        );
+
+        apply_node_overrides(&mut graph, &overrides);
+
+        assert_eq!(graph.nodes[0].attrs.get("model"), None);
+    }
+
+    #[test]
+    fn apply_node_overrides_model_only_leaves_provider_untouched() {
+        let mut graph = make_graph(vec![node_with_str_attrs(
+            "n1",
+            None,
+            vec![("provider", "ollama")],
+        )]);
+        let mut overrides = HashMap::new();
+        overrides.insert(
+            "n1".to_string(),
+            NodeOverride {
+                model: Some("gemma4:31b-cloud".to_string()),
+                provider: None,
+            },
+        );
+
+        apply_node_overrides(&mut graph, &overrides);
+
+        assert_eq!(
+            graph.nodes[0].attrs.get("model"),
+            Some(&NodeAttrValue::String("gemma4:31b-cloud".to_string()))
+        );
+        assert_eq!(
+            graph.nodes[0].attrs.get("provider"),
+            Some(&NodeAttrValue::String("ollama".to_string()))
+        );
+    }
+
+    #[test]
+    fn apply_node_overrides_overwrites_existing_model_attr() {
+        let mut graph = make_graph(vec![node_with_str_attrs(
+            "n1",
+            None,
+            vec![("model", "old-model")],
+        )]);
+        let mut overrides = HashMap::new();
+        overrides.insert(
+            "n1".to_string(),
+            NodeOverride {
+                model: Some("new-model".to_string()),
+                provider: None,
+            },
+        );
+
+        apply_node_overrides(&mut graph, &overrides);
+
+        assert_eq!(
+            graph.nodes[0].attrs.get("model"),
+            Some(&NodeAttrValue::String("new-model".to_string()))
         );
     }
 }

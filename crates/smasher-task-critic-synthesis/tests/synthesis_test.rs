@@ -30,7 +30,7 @@ async fn missing_critic_report_fails_before_any_network_call() {
         "candidate_id": "lint-only-candidate",
     });
 
-    let err = run_synthesis(&client, "claude-3-5-haiku-20241022", dir, &args)
+    let err = run_synthesis(&client, "claude-3-5-haiku-20241022", None, dir, &args)
         .await
         .expect_err("missing critic-report.json must fail");
 
@@ -48,7 +48,7 @@ async fn live_call_on_agreeing_fixtures_recommends_proceed() {
     let client = Client::from_env();
     let args = json!({ "candidate_id": "agreeing-candidate" });
 
-    let report = run_synthesis(&client, "claude-3-5-haiku-20241022", candidate_dir, &args)
+    let report = run_synthesis(&client, "claude-3-5-haiku-20241022", None, candidate_dir, &args)
         .await
         .expect("live synthesis call should succeed with a real API key");
 
@@ -66,7 +66,7 @@ async fn live_call_on_conflicting_fixtures_picks_a_side_citing_both_inputs() {
     let client = Client::from_env();
     let args = json!({ "candidate_id": "conflicting-candidate" });
 
-    let report = run_synthesis(&client, "claude-3-5-haiku-20241022", candidate_dir, &args)
+    let report = run_synthesis(&client, "claude-3-5-haiku-20241022", None, candidate_dir, &args)
         .await
         .expect("live synthesis call should succeed with a real API key");
 

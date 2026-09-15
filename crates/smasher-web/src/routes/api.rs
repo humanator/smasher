@@ -37,11 +37,6 @@ use crate::error::WebError;
 use crate::sse;
 use crate::state::{AppState, RunRecord, RunSummary};
 
-/// Default vision-capable model for `task_critic` (overridable per node via `args["model"]`).
-const TASK_CRITIC_MODEL: &str = "claude-sonnet-4-20250514";
-/// Default cheap model for `synthesis` (overridable per node via `args["model"]`).
-const SYNTHESIS_MODEL: &str = "claude-3-5-haiku-20241022";
-
 // ---------------------------------------------------------------------------
 // Request / Response types
 // ---------------------------------------------------------------------------
@@ -52,6 +47,10 @@ pub struct SubmitRequest {
     #[serde(default)]
     pub variables: HashMap<String, String>,
     pub model: Option<String>,
+    /// Per-node model/provider overrides, keyed by node id. Each node defaults
+    /// to the pipeline-wide `model`/`state.default_provider` unless listed here.
+    #[serde(default)]
+    pub node_overrides: HashMap<String, transforms::NodeOverride>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,6 +103,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/runs/{id}/resume", post(resume_run))
         .route("/api/runs/{id}/tokens", get(get_tokens))
         .route("/api/runs/{id}/graph", get(render_graph))
+        .route("/api/graph/nodes", post(list_graph_nodes))
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +114,47 @@ async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "ok".into(),
     })
+}
+
+#[derive(Debug, Deserialize)]
+struct GraphNodesRequest {
+    dot_source: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GraphNodeSummary {
+    id: String,
+    node_type: String,
+    label: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GraphNodesResponse {
+    nodes: Vec<GraphNodeSummary>,
+}
+
+/// Parses and resolves `dot_source` and returns its nodes (id, type, label) so the
+/// dashboard can render a per-node model/provider override row for each one before
+/// a run is submitted. Does not lint or execute the graph — a pipeline with lint
+/// errors still returns its node list here so the override UI stays usable while
+/// the DOT is being edited.
+async fn list_graph_nodes(
+    Json(req): Json<GraphNodesRequest>,
+) -> Result<Json<GraphNodesResponse>, WebError> {
+    let dot_graph = parser::parse(&req.dot_source)?;
+    let resolved = graph::resolve(&dot_graph)?;
+
+    let nodes = resolved
+        .nodes
+        .iter()
+        .map(|node| GraphNodeSummary {
+            id: node.id.clone(),
+            node_type: smasher_attractor::stylesheet::node_type_name(&node.node_type).to_string(),
+            label: node.label.clone(),
+        })
+        .collect();
+
+    Ok(Json(GraphNodesResponse { nodes }))
 }
 
 async fn submit_pipeline(
@@ -129,6 +170,7 @@ async fn submit_pipeline(
     let provider = state.default_provider.clone();
     variables.insert("model".into(), model.clone());
 
+    transforms::apply_node_overrides(&mut resolved, &req.node_overrides);
     transforms::apply_transforms(&mut resolved, &variables, None);
 
     // Lint the resolved graph and reject pipelines with errors.
@@ -280,8 +322,9 @@ async fn submit_pipeline(
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
-                TASK_CRITIC_MODEL.to_string(),
-                SYNTHESIS_MODEL.to_string(),
+                model.clone(),
+                model.clone(),
+                provider.clone(),
                 candidate_artifacts_dir.clone(),
             ),
         );
@@ -612,8 +655,9 @@ async fn resume_run(
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
-                TASK_CRITIC_MODEL.to_string(),
-                SYNTHESIS_MODEL.to_string(),
+                model.clone(),
+                model.clone(),
+                provider.clone(),
                 candidate_artifacts_dir.clone(),
             ),
         );
@@ -885,6 +929,103 @@ mod tests {
         // Verify the run exists in state.
         let runs = state.runs.read().await;
         assert!(runs.contains_key(&parsed.run_id));
+    }
+
+    #[tokio::test]
+    async fn submit_with_node_overrides_stamps_model_onto_the_named_node() {
+        let tmp = tempfile::tempdir().unwrap();
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            tmp.path().display().to_string(),
+        );
+        let app = router().with_state(state.clone());
+        let body = serde_json::json!({
+            "dot_source": "digraph { start [shape=circle]; a [shape=box]; end [shape=doublecircle]; start -> a -> end }",
+            "variables": {},
+            "node_overrides": {
+                "a": {"model": "claude-opus-4", "provider": "anthropic"}
+            }
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/runs")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: SubmitResponse = serde_json::from_slice(&body).unwrap();
+
+        let runs = state.runs.read().await;
+        let record = runs.get(&parsed.run_id).unwrap();
+        let node_a = record
+            .graph
+            .nodes
+            .iter()
+            .find(|n| n.id == "a")
+            .expect("node 'a' should exist in the resolved graph");
+        assert_eq!(
+            node_a.attrs.get("model"),
+            Some(&smasher_attractor::graph::NodeAttrValue::String(
+                "claude-opus-4".to_string()
+            ))
+        );
+        assert_eq!(
+            node_a.attrs.get("provider"),
+            Some(&smasher_attractor::graph::NodeAttrValue::String(
+                "anthropic".to_string()
+            ))
+        );
+
+        // Untouched nodes stay untouched.
+        let start_node = record.graph.nodes.iter().find(|n| n.id == "start").unwrap();
+        assert_eq!(start_node.attrs.get("model"), None);
+    }
+
+    #[tokio::test]
+    async fn list_graph_nodes_returns_id_type_and_label_for_each_node() {
+        let app = router().with_state(test_state());
+        let body = serde_json::json!({
+            "dot_source": "digraph { start [shape=circle]; a [label=\"Do a thing\"]; end [shape=doublecircle]; start -> a -> end }"
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/graph/nodes")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: GraphNodesResponse = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(parsed.nodes.len(), 3);
+        let node_a = parsed.nodes.iter().find(|n| n.id == "a").unwrap();
+        assert_eq!(node_a.label.as_deref(), Some("Do a thing"));
+    }
+
+    #[tokio::test]
+    async fn list_graph_nodes_rejects_invalid_dot() {
+        let app = router().with_state(test_state());
+        let body = serde_json::json!({ "dot_source": "not a valid dot graph" });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/graph/nodes")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     /// Insert a RunRecord directly into state for handler testing.

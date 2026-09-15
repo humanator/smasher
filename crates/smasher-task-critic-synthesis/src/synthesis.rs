@@ -58,11 +58,13 @@ fn parse_response(text: &str) -> Result<SynthesisReport, CriticError> {
 /// `args`: `{candidate_id, model?, provider?}`. A missing
 /// `lint-report.json` or `critic-report.json` fails with
 /// `CriticError::MissingArtifact` naming the exact missing file, before any
-/// network call is attempted. `provider` overrides model-name-based provider
-/// inference — see `task_critic::run_task_critic`'s doc comment for why.
+/// network call is attempted. `provider` (from `args["provider"]`, falling back
+/// to `default_provider`) overrides model-name-based provider inference — see
+/// `task_critic::run_task_critic`'s doc comment for why.
 pub async fn run_synthesis(
     client: &Client,
     default_model: &str,
+    default_provider: Option<&str>,
     candidate_dir: &Path,
     args: &Value,
 ) -> Result<SynthesisReport, CriticError> {
@@ -71,7 +73,10 @@ pub async fn run_synthesis(
         .get("model")
         .and_then(Value::as_str)
         .unwrap_or(default_model);
-    let provider = args.get("provider").and_then(Value::as_str);
+    let provider = args
+        .get("provider")
+        .and_then(Value::as_str)
+        .or(default_provider);
 
     let lint_report = read_report_artifact(candidate_dir, candidate_id, "lint-report.json")?;
     let critic_report = read_report_artifact(candidate_dir, candidate_id, "critic-report.json")?;
@@ -150,7 +155,7 @@ mod tests {
             "candidate_id": "no-critic-report-candidate",
         });
 
-        let err = run_synthesis(&client, "claude-3-5-haiku-20241022", dir, &args)
+        let err = run_synthesis(&client, "claude-3-5-haiku-20241022", None, dir, &args)
             .await
             .expect_err("missing critic-report.json must fail");
 
@@ -161,5 +166,35 @@ mod tests {
             other => panic!("expected MissingArtifact, got {other:?}"),
         }
         assert!(!dir.join("synthesis-report.json").exists());
+    }
+
+    #[tokio::test]
+    async fn default_provider_is_used_when_args_omit_provider() {
+        // Proves the backend-level default_provider fallback reaches the
+        // Request when args["provider"] is absent, by observing the routing
+        // error distinguish "no provider configured for ollama" from
+        // "couldn't infer a provider for this model name at all".
+        let client = Client::new();
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::write(dir.join("lint-report.json"), r#"{"checks": []}"#).unwrap();
+        std::fs::write(
+            dir.join("critic-report.json"),
+            r#"{"persona": "new user", "task": "find settings", "success": true, "friction": [], "notes": ""}"#,
+        )
+        .unwrap();
+
+        let args = serde_json::json!({ "candidate_id": "default-provider-candidate" });
+
+        let err = run_synthesis(&client, "gemma4:31b-cloud", Some("ollama"), dir, &args)
+            .await
+            .unwrap_err();
+        let CriticError::UnparseableResponse { response } = err else {
+            panic!("expected UnparseableResponse wrapping a client routing error");
+        };
+        assert!(
+            response.contains("ollama") && response.contains("not configured"),
+            "expected default_provider to route to ollama, got: {response}"
+        );
     }
 }

@@ -29,6 +29,7 @@
                 var reader = new FileReader();
                 reader.onload = function(ev) {
                     document.getElementById('dot_source').value = ev.target.result;
+                    document.getElementById('dot_source').dispatchEvent(new Event('input'));
                 };
                 reader.readAsText(file);
             });
@@ -52,9 +53,119 @@
 lang=rust"></textarea>
             </div>
         </div>
+        <div class="form-group">
+            <label>Per-node model overrides (optional)</label>
+            <span class="field-hint">Each node defaults to the Model field above unless given its own model/provider here. Refreshes automatically as you edit the DOT source.</span>
+            <div id="node-overrides-list" class="node-overrides-empty">Enter a DOT pipeline above to list its nodes.</div>
+        </div>
         <button type="submit" class="btn btn-primary">Execute Pipeline</button>
     </form>
 </section>
+
+<script>
+    (function () {
+        var nodeOverrideValues = {};
+        var refreshTimer = null;
+
+        function serializeOverrides() {
+            var out = {};
+            Object.keys(nodeOverrideValues).forEach(function (id) {
+                var v = nodeOverrideValues[id];
+                var entry = {};
+                if (v.model) entry.model = v.model;
+                if (v.provider) entry.provider = v.provider;
+                if (Object.keys(entry).length > 0) out[id] = entry;
+            });
+            return out;
+        }
+
+        function renderNodeList(nodes) {
+            var container = document.getElementById('node-overrides-list');
+            if (!nodes.length) {
+                container.className = 'node-overrides-empty';
+                container.textContent = 'No nodes found in this DOT source.';
+                return;
+            }
+            container.className = '';
+            var table = document.createElement('table');
+            table.className = 'node-overrides-table';
+            var thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th>Node</th><th>Type</th><th>Model</th><th>Provider</th></tr>';
+            table.appendChild(thead);
+            var tbody = document.createElement('tbody');
+            nodes.forEach(function (node) {
+                var existing = nodeOverrideValues[node.id] || {};
+                var tr = document.createElement('tr');
+
+                var nodeCell = document.createElement('td');
+                nodeCell.textContent = node.label ? node.id + ' — ' + node.label : node.id;
+                tr.appendChild(nodeCell);
+
+                var typeCell = document.createElement('td');
+                typeCell.textContent = node.node_type;
+                tr.appendChild(typeCell);
+
+                var modelCell = document.createElement('td');
+                var modelInput = document.createElement('input');
+                modelInput.type = 'text';
+                modelInput.placeholder = 'pipeline default';
+                modelInput.value = existing.model || '';
+                modelInput.addEventListener('input', function () {
+                    nodeOverrideValues[node.id] = nodeOverrideValues[node.id] || {};
+                    nodeOverrideValues[node.id].model = modelInput.value.trim();
+                });
+                modelCell.appendChild(modelInput);
+                tr.appendChild(modelCell);
+
+                var providerCell = document.createElement('td');
+                var providerInput = document.createElement('input');
+                providerInput.type = 'text';
+                providerInput.placeholder = 'pipeline default';
+                providerInput.value = existing.provider || '';
+                providerInput.addEventListener('input', function () {
+                    nodeOverrideValues[node.id] = nodeOverrideValues[node.id] || {};
+                    nodeOverrideValues[node.id].provider = providerInput.value.trim();
+                });
+                providerCell.appendChild(providerInput);
+                tr.appendChild(providerCell);
+
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+
+        function refreshNodeList() {
+            var dotSource = document.getElementById('dot_source').value;
+            if (!dotSource.trim()) {
+                var container = document.getElementById('node-overrides-list');
+                container.className = 'node-overrides-empty';
+                container.textContent = 'Enter a DOT pipeline above to list its nodes.';
+                return;
+            }
+            fetch('/api/graph/nodes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dot_source: dotSource })
+            })
+                .then(function (resp) { return resp.ok ? resp.json() : null; })
+                .then(function (data) {
+                    if (data) renderNodeList(data.nodes);
+                })
+                .catch(function () { /* leave the last-known list in place on network errors */ });
+        }
+
+        document.getElementById('dot_source').addEventListener('input', function () {
+            clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(refreshNodeList, 500);
+        });
+
+        document.querySelector('.submit-form').addEventListener('htmx:configRequest', function (evt) {
+            evt.detail.parameters['node_overrides'] = JSON.stringify(serializeOverrides());
+        });
+    })();
+</script>
 
 <section class="runs-section">
     <h2>Run History</h2>

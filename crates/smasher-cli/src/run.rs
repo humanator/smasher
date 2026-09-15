@@ -41,11 +41,6 @@ use crate::error::CliError;
 use crate::gitutil;
 use crate::tui::{Msg as TuiMsg, TuiFlags};
 
-/// Default vision-capable model for `task_critic` (overridable per node via `args["model"]`).
-const TASK_CRITIC_MODEL: &str = "claude-sonnet-4-20250514";
-/// Default cheap model for `synthesis` (overridable per node via `args["model"]`).
-const SYNTHESIS_MODEL: &str = "claude-3-5-haiku-20241022";
-
 /// CodergenBackend that runs a full agent session with file/shell tools.
 ///
 /// Each codergen node invocation creates a fresh agent Session with all six
@@ -1123,8 +1118,9 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
         let tool_backend = Arc::new(
             smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
                 system_lint_backend as Arc<dyn ToolBackend>,
-                TASK_CRITIC_MODEL.to_string(),
-                SYNTHESIS_MODEL.to_string(),
+                args.model.clone(),
+                args.model.clone(),
+                None,
                 candidate_artifacts_dir.clone(),
             ),
         );

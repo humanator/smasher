@@ -105,13 +105,14 @@ fn parse_response(text: &str, persona: &str, task: &str) -> Result<CriticReport,
 ///
 /// `args`: `{candidate_id, persona, task, model?, provider?}`. A missing
 /// `screenshot.png` fails with `CriticError::MissingArtifact` before any network
-/// call is attempted. `provider` overrides the model-name-based provider
-/// inference `Client::complete()` otherwise does — needed for providers like
-/// Ollama, whose model names (e.g. `"gemma4:31b-cloud"`) have no recognizable
-/// prefix to infer from.
+/// call is attempted. `provider` (from `args["provider"]`, falling back to
+/// `default_provider`) overrides the model-name-based provider inference
+/// `Client::complete()` otherwise does — needed for providers like Ollama, whose
+/// model names (e.g. `"gemma4:31b-cloud"`) have no recognizable prefix to infer from.
 pub async fn run_task_critic(
     client: &Client,
     default_model: &str,
+    default_provider: Option<&str>,
     candidate_dir: &Path,
     args: &Value,
 ) -> Result<CriticReport, CriticError> {
@@ -122,7 +123,10 @@ pub async fn run_task_critic(
         .get("model")
         .and_then(Value::as_str)
         .unwrap_or(default_model);
-    let provider = args.get("provider").and_then(Value::as_str);
+    let provider = args
+        .get("provider")
+        .and_then(Value::as_str)
+        .or(default_provider);
 
     let screenshot_path = candidate_dir.join("screenshot.png");
     let screenshot = std::fs::read(&screenshot_path).map_err(|_| CriticError::MissingArtifact {
@@ -279,7 +283,7 @@ mod tests {
             "task": "find settings",
         });
 
-        let err = run_task_critic(&client, "claude-sonnet-4-20250514", tmp.path(), &args)
+        let err = run_task_critic(&client, "claude-sonnet-4-20250514", None, tmp.path(), &args)
             .await
             .expect_err("missing screenshot.png must fail");
 
@@ -315,9 +319,10 @@ mod tests {
         // Ollama model names (e.g. "gemma4:31b-cloud") have no prefix
         // `infer_provider` recognizes, so without an override this fails with
         // "not found" (ModelNotFound), never reaching provider configuration.
-        let no_override_err = run_task_critic(&client, "gemma4:31b-cloud", candidate_dir, &base_args)
-            .await
-            .unwrap_err();
+        let no_override_err =
+            run_task_critic(&client, "gemma4:31b-cloud", None, candidate_dir, &base_args)
+                .await
+                .unwrap_err();
         let CriticError::UnparseableResponse { response } = no_override_err else {
             panic!("expected UnparseableResponse wrapping a client routing error");
         };
@@ -325,15 +330,64 @@ mod tests {
 
         let mut args_with_provider = base_args.clone();
         args_with_provider["provider"] = serde_json::json!("ollama");
-        let override_err = run_task_critic(&client, "gemma4:31b-cloud", candidate_dir, &args_with_provider)
-            .await
-            .unwrap_err();
+        let override_err = run_task_critic(
+            &client,
+            "gemma4:31b-cloud",
+            None,
+            candidate_dir,
+            &args_with_provider,
+        )
+        .await
+        .unwrap_err();
         let CriticError::UnparseableResponse { response } = override_err else {
             panic!("expected UnparseableResponse wrapping a client routing error");
         };
         assert!(
             response.contains("ollama") && response.contains("not configured"),
             "got: {response}"
+        );
+    }
+
+    #[tokio::test]
+    async fn default_provider_is_used_when_args_omit_provider() {
+        // Same routing-error trick as above, but proving the *backend-level*
+        // default_provider fallback reaches the Request when args["provider"]
+        // is absent entirely — this is the pipeline-wide provider a DOT
+        // author never has to repeat on every task_critic node.
+        let client = Client::new();
+        let tmp = tempfile::tempdir().unwrap();
+        let candidate_dir = tmp.path();
+        std::fs::write(
+            candidate_dir.join("screenshot.png"),
+            std::fs::read(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("fixtures/candidate/screenshot.png"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let args = serde_json::json!({
+            "candidate_id": "default-provider-candidate",
+            "persona": "new user",
+            "task": "find settings",
+        });
+
+        let err = run_task_critic(
+            &client,
+            "gemma4:31b-cloud",
+            Some("ollama"),
+            candidate_dir,
+            &args,
+        )
+        .await
+        .unwrap_err();
+        let CriticError::UnparseableResponse { response } = err else {
+            panic!("expected UnparseableResponse wrapping a client routing error");
+        };
+        assert!(
+            response.contains("ollama") && response.contains("not configured"),
+            "expected default_provider to route to ollama, got: {response}"
         );
     }
 }

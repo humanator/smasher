@@ -59,7 +59,7 @@ impl Handler for ManagerHandler {
         };
 
         // Parse optional config attribute as JSON.
-        let config = match node.attrs.get("config") {
+        let mut config = match node.attrs.get("config") {
             Some(NodeAttrValue::String(s)) => match serde_json::from_str::<Value>(s) {
                 Ok(parsed) => parsed,
                 Err(e) => {
@@ -70,6 +70,22 @@ impl Handler for ManagerHandler {
             },
             _ => json!({}),
         };
+
+        // Fold `model=`/`provider=` node attrs into config as a fallback, same
+        // override surface CodergenHandler already gives Codergen nodes. An
+        // explicit "model"/"provider" key already inside the config JSON wins.
+        if let Value::Object(ref mut map) = config {
+            if !map.contains_key("model")
+                && let Some(NodeAttrValue::String(s)) = node.attrs.get("model")
+            {
+                map.insert("model".to_string(), json!(s));
+            }
+            if !map.contains_key("provider")
+                && let Some(NodeAttrValue::String(s)) = node.attrs.get("provider")
+            {
+                map.insert("provider".to_string(), json!(s));
+            }
+        }
 
         let outcome = self.backend.coordinate(&task, &config, context).await?;
 
@@ -598,6 +614,79 @@ mod tests {
                 data: Some(data), ..
             } => {
                 assert_eq!(data["config"], json!({}));
+            }
+            other => panic!("expected success, got {other:?}"),
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Test 15: ManagerHandler folds model/provider attrs into config
+    // ---------------------------------------------------------------
+
+    #[tokio::test]
+    async fn manager_handler_folds_model_and_provider_attrs_into_config() {
+        let backend = Arc::new(EchoManagerBackend);
+        let handler = ManagerHandler::new(backend);
+
+        let mut node = make_node("m13", NodeType::Manager);
+        node.attrs.insert(
+            "task".to_string(),
+            NodeAttrValue::String("deploy".to_string()),
+        );
+        node.attrs.insert(
+            "model".to_string(),
+            NodeAttrValue::String("claude-opus-4".to_string()),
+        );
+        node.attrs.insert(
+            "provider".to_string(),
+            NodeAttrValue::String("anthropic".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert_eq!(data["config"]["model"], "claude-opus-4");
+                assert_eq!(data["config"]["provider"], "anthropic");
+            }
+            other => panic!("expected success, got {other:?}"),
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // Test 16: explicit config model wins over node attr
+    // ---------------------------------------------------------------
+
+    #[tokio::test]
+    async fn manager_handler_explicit_config_model_wins_over_node_attr() {
+        let backend = Arc::new(EchoManagerBackend);
+        let handler = ManagerHandler::new(backend);
+
+        let mut node = make_node("m14", NodeType::Manager);
+        node.attrs.insert(
+            "task".to_string(),
+            NodeAttrValue::String("deploy".to_string()),
+        );
+        node.attrs.insert(
+            "config".to_string(),
+            NodeAttrValue::String(r#"{"model": "gemma4:31b-cloud"}"#.to_string()),
+        );
+        node.attrs.insert(
+            "model".to_string(),
+            NodeAttrValue::String("claude-opus-4".to_string()),
+        );
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert_eq!(data["config"]["model"], "gemma4:31b-cloud");
             }
             other => panic!("expected success, got {other:?}"),
         }

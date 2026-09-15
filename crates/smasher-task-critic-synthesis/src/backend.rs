@@ -46,16 +46,21 @@ pub struct TaskCriticSynthesisToolBackend {
     client: Client,
     task_critic_model: String,
     synthesis_model: String,
+    default_provider: Option<String>,
     artifacts_base: std::path::PathBuf,
 }
 
 impl TaskCriticSynthesisToolBackend {
     /// `artifacts_base` is the current run's own artifact directory — see
-    /// `smasher_render_capture::backend::HybridToolBackend::new`.
+    /// `smasher_render_capture::backend::HybridToolBackend::new`. `default_provider`
+    /// is the pipeline-wide provider override (e.g. `"ollama"`, needed when
+    /// `task_critic_model`/`synthesis_model` aren't inferable by name); a node's own
+    /// `args["provider"]` still takes precedence over it.
     pub fn new(
         fallback: Arc<dyn ToolBackend>,
         task_critic_model: String,
         synthesis_model: String,
+        default_provider: Option<String>,
         artifacts_base: std::path::PathBuf,
     ) -> Self {
         Self {
@@ -63,6 +68,7 @@ impl TaskCriticSynthesisToolBackend {
             client: Client::from_env(),
             task_critic_model,
             synthesis_model,
+            default_provider,
             artifacts_base,
         }
     }
@@ -77,6 +83,7 @@ impl TaskCriticSynthesisToolBackend {
         let report = match task_critic::run_task_critic(
             &self.client,
             &self.task_critic_model,
+            self.default_provider.as_deref(),
             &output_dir,
             args,
         )
@@ -106,6 +113,7 @@ impl TaskCriticSynthesisToolBackend {
         let report = match synthesis::run_synthesis(
             &self.client,
             &self.synthesis_model,
+            self.default_provider.as_deref(),
             &output_dir,
             args,
         )
@@ -197,6 +205,7 @@ mod tests {
             fallback.clone(),
             "claude-sonnet-4-20250514".to_string(),
             "claude-3-5-haiku-20241022".to_string(),
+            None,
             artifacts_base,
         );
         (backend, fallback)
