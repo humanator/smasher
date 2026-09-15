@@ -18,16 +18,31 @@ use crate::manifest::{self, Viewport};
 pub struct HybridToolBackend {
     fallback: Arc<dyn ToolBackend>,
     artifacts_base: PathBuf,
+    working_dir: PathBuf,
 }
 
 impl HybridToolBackend {
     /// `artifacts_base` is the current run's own artifact directory (e.g.
     /// `RunDirectory::manifest().directories.artifacts`) — every candidate this
     /// backend captures is written under `artifacts_base/<candidate_id>/`.
-    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf) -> Self {
+    ///
+    /// `working_dir` is the run's own working directory (e.g. `run.rs`'s
+    /// `effective_working_dir`) — a relative `candidate_dir` resolves against this,
+    /// not the `smasher` process's own CWD.
+    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf, working_dir: PathBuf) -> Self {
         Self {
             fallback,
             artifacts_base,
+            working_dir,
+        }
+    }
+
+    fn resolve_candidate_dir(&self, candidate_dir: &str) -> PathBuf {
+        let path = Path::new(candidate_dir);
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.working_dir.join(path)
         }
     }
 
@@ -56,8 +71,10 @@ impl HybridToolBackend {
             height: capture::VIEWPORT_HEIGHT,
         };
 
+        let resolved_candidate_dir = self.resolve_candidate_dir(candidate_dir);
+
         match crate::capture(
-            Path::new(candidate_dir),
+            &resolved_candidate_dir,
             &output_dir,
             viewport,
             generation_params,
@@ -141,7 +158,11 @@ mod tests {
     #[test]
     fn available_tools_returns_exactly_render_capture() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = HybridToolBackend::new(fallback, PathBuf::from("/tmp/unused"));
+        let backend = HybridToolBackend::new(
+            fallback,
+            PathBuf::from("/tmp/unused"),
+            PathBuf::from("/tmp/unused"),
+        );
 
         assert_eq!(backend.available_tools(), vec!["render_capture".to_string()]);
     }
@@ -149,7 +170,11 @@ mod tests {
     #[tokio::test]
     async fn unknown_tool_name_reaches_the_fallback() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = HybridToolBackend::new(fallback.clone(), PathBuf::from("/tmp/unused"));
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            PathBuf::from("/tmp/unused"),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let outcome = backend
             .execute_tool("some_other_tool", &json!({}), &Context::default())
@@ -168,7 +193,11 @@ mod tests {
         let fallback = Arc::new(RecordingFallback::new());
         let tmp = tempfile::tempdir().unwrap();
         let artifacts_base = tmp.path().to_path_buf();
-        let backend = HybridToolBackend::new(fallback.clone(), artifacts_base.clone());
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let candidate_id = "test-candidate";
         let args = json!({
@@ -197,7 +226,11 @@ mod tests {
         let fallback = Arc::new(RecordingFallback::new());
         let tmp = tempfile::tempdir().unwrap();
         let artifacts_base = tmp.path().to_path_buf();
-        let backend = HybridToolBackend::new(fallback.clone(), artifacts_base.clone());
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let candidate_id = "test-candidate-params";
         let args = json!({
@@ -235,7 +268,11 @@ mod tests {
         let fallback = Arc::new(RecordingFallback::new());
         let tmp = tempfile::tempdir().unwrap();
         let artifacts_base = tmp.path().to_path_buf();
-        let backend = HybridToolBackend::new(fallback.clone(), artifacts_base.clone());
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let candidate_id = "test-candidate-no-params";
         let args = json!({
@@ -261,7 +298,11 @@ mod tests {
     #[tokio::test]
     async fn render_capture_rejects_malformed_generation_params() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = HybridToolBackend::new(fallback.clone(), PathBuf::from("/tmp/unused"));
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            PathBuf::from("/tmp/unused"),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let args = json!({
             "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
@@ -275,5 +316,77 @@ mod tests {
 
         assert!(result.is_err());
         assert!(!fallback.called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn relative_candidate_dir_resolves_against_working_dir() {
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
+        let fallback = Arc::new(RecordingFallback::new());
+        let artifacts_tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = artifacts_tmp.path().to_path_buf();
+        let working_tmp = tempfile::tempdir().unwrap();
+        let working_dir = working_tmp.path().to_path_buf();
+
+        let candidate_subdir = "nested/candidate";
+        let full_candidate_dir = working_dir.join(candidate_subdir);
+        std::fs::create_dir_all(&full_candidate_dir).unwrap();
+        std::fs::copy(
+            fixture_candidate_dir().join("index.html"),
+            full_candidate_dir.join("index.html"),
+        )
+        .unwrap();
+
+        let backend =
+            HybridToolBackend::new(fallback.clone(), artifacts_base.clone(), working_dir.clone());
+
+        let candidate_id = "test-candidate-relative";
+        let args = json!({
+            "candidate_dir": candidate_subdir,
+            "candidate_id": candidate_id,
+        });
+
+        let outcome = backend
+            .execute_tool("render_capture", &args, &Context::default())
+            .await
+            .expect("render_capture should succeed against the working_dir-joined path");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+        assert!(!fallback.called.load(Ordering::SeqCst));
+
+        let artifact_dir = crate::manifest::artifact_dir(&artifacts_base, candidate_id);
+        assert!(artifact_dir.join("screenshot.png").is_file());
+    }
+
+    #[tokio::test]
+    async fn absolute_candidate_dir_is_used_as_is_regardless_of_working_dir() {
+        let _guard = tokio::task::spawn_blocking(crate::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
+        let fallback = Arc::new(RecordingFallback::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = tmp.path().to_path_buf();
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            PathBuf::from("/does/not/exist"),
+        );
+
+        let candidate_id = "test-candidate-absolute";
+        let args = json!({
+            "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
+            "candidate_id": candidate_id,
+        });
+
+        let outcome = backend
+            .execute_tool("render_capture", &args, &Context::default())
+            .await
+            .expect("absolute candidate_dir should succeed even with a bogus working_dir");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+
+        let artifact_dir = crate::manifest::artifact_dir(&artifacts_base, candidate_id);
+        assert!(artifact_dir.join("screenshot.png").is_file());
     }
 }
