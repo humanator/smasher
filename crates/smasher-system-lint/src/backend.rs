@@ -16,15 +16,30 @@ use crate::report;
 pub struct SystemLintToolBackend {
     fallback: Arc<dyn ToolBackend>,
     artifacts_base: PathBuf,
+    working_dir: PathBuf,
 }
 
 impl SystemLintToolBackend {
     /// `artifacts_base` is the current run's own artifact directory — see
     /// `smasher_render_capture::backend::HybridToolBackend::new`.
-    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf) -> Self {
+    ///
+    /// `working_dir` is the run's own working directory — a relative `candidate_dir`
+    /// resolves against this, not the `smasher` process's own CWD. See
+    /// `smasher_render_capture::backend::HybridToolBackend::new`.
+    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf, working_dir: PathBuf) -> Self {
         Self {
             fallback,
             artifacts_base,
+            working_dir,
+        }
+    }
+
+    fn resolve_candidate_dir(&self, candidate_dir: &str) -> PathBuf {
+        let path = Path::new(candidate_dir);
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            self.working_dir.join(path)
         }
     }
 
@@ -38,7 +53,9 @@ impl SystemLintToolBackend {
             .and_then(Value::as_str)
             .ok_or_else(|| HandlerError::Other("system_lint: missing candidate_id".into()))?;
 
-        let report = match crate::lint(Path::new(candidate_dir)) {
+        let resolved_candidate_dir = self.resolve_candidate_dir(candidate_dir);
+
+        let report = match crate::lint(&resolved_candidate_dir) {
             Ok(report) => report,
             Err(e) => return Ok(Outcome::failure(e.to_string())),
         };
@@ -138,7 +155,11 @@ mod tests {
     #[test]
     fn available_tools_returns_exactly_system_lint() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = SystemLintToolBackend::new(fallback, PathBuf::from("/tmp/unused"));
+        let backend = SystemLintToolBackend::new(
+            fallback,
+            PathBuf::from("/tmp/unused"),
+            PathBuf::from("/tmp/unused"),
+        );
 
         assert_eq!(backend.available_tools(), vec!["system_lint".to_string()]);
     }
@@ -146,7 +167,11 @@ mod tests {
     #[tokio::test]
     async fn unknown_tool_name_reaches_the_fallback() {
         let fallback = Arc::new(RecordingFallback::new());
-        let backend = SystemLintToolBackend::new(fallback.clone(), PathBuf::from("/tmp/unused"));
+        let backend = SystemLintToolBackend::new(
+            fallback.clone(),
+            PathBuf::from("/tmp/unused"),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let outcome = backend
             .execute_tool("some_other_tool", &json!({}), &Context::default())
@@ -162,7 +187,11 @@ mod tests {
         let fallback = Arc::new(RecordingFallback::new());
         let tmp = tempfile::tempdir().unwrap();
         let artifacts_base = tmp.path().to_path_buf();
-        let backend = SystemLintToolBackend::new(fallback.clone(), artifacts_base.clone());
+        let backend = SystemLintToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            PathBuf::from("/tmp/unused"),
+        );
 
         let candidate_id = "test-candidate";
         let args = json!({
@@ -185,5 +214,74 @@ mod tests {
         let contents = std::fs::read_to_string(&report_path).unwrap();
         let report: crate::LintReport = serde_json::from_str(&contents).unwrap();
         assert!(report.passed());
+    }
+
+    #[tokio::test]
+    async fn relative_candidate_dir_resolves_against_working_dir() {
+        let fallback = Arc::new(RecordingFallback::new());
+        let artifacts_tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = artifacts_tmp.path().to_path_buf();
+        let working_tmp = tempfile::tempdir().unwrap();
+        let working_dir = working_tmp.path().to_path_buf();
+
+        let candidate_subdir = "nested/candidate";
+        let full_candidate_dir = working_dir.join(candidate_subdir);
+        std::fs::create_dir_all(&full_candidate_dir).unwrap();
+        std::fs::copy(
+            fixture_candidate_dir().join("index.html"),
+            full_candidate_dir.join("index.html"),
+        )
+        .unwrap();
+
+        let backend = SystemLintToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            working_dir.clone(),
+        );
+
+        let candidate_id = "test-candidate-relative";
+        let args = json!({
+            "candidate_dir": candidate_subdir,
+            "candidate_id": candidate_id,
+        });
+
+        let outcome = backend
+            .execute_tool("system_lint", &args, &Context::default())
+            .await
+            .expect("system_lint should succeed against the working_dir-joined path");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+        assert!(!fallback.called.load(Ordering::SeqCst));
+
+        let artifact_dir = crate::report::artifact_dir(&artifacts_base, candidate_id);
+        assert!(artifact_dir.join("lint-report.json").is_file());
+    }
+
+    #[tokio::test]
+    async fn absolute_candidate_dir_is_used_as_is_regardless_of_working_dir() {
+        let fallback = Arc::new(RecordingFallback::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = tmp.path().to_path_buf();
+        let backend = SystemLintToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            PathBuf::from("/does/not/exist"),
+        );
+
+        let candidate_id = "test-candidate-absolute";
+        let args = json!({
+            "candidate_dir": fixture_candidate_dir().to_str().unwrap(),
+            "candidate_id": candidate_id,
+        });
+
+        let outcome = backend
+            .execute_tool("system_lint", &args, &Context::default())
+            .await
+            .expect("absolute candidate_dir should succeed even with a bogus working_dir");
+
+        assert!(matches!(outcome, Outcome::Success { .. }));
+
+        let artifact_dir = crate::report::artifact_dir(&artifacts_base, candidate_id);
+        assert!(artifact_dir.join("lint-report.json").is_file());
     }
 }
