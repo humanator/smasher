@@ -17,6 +17,10 @@ fn design_kit_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../design-kit")
 }
 
+fn static_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../smasher-web/static")
+}
+
 #[tokio::test]
 async fn captures_a_real_png_of_the_fixture_candidate() {
     let _ = tracing_subscriber::fmt::try_init();
@@ -25,7 +29,7 @@ async fn captures_a_real_png_of_the_fixture_candidate() {
     )
     .await
     .unwrap();
-    let handle = start_server(&fixture_candidate_dir(), &design_kit_dir())
+    let handle = start_server(&fixture_candidate_dir(), &design_kit_dir(), &static_dir())
         .await
         .expect("server should start against the fixture candidate");
 

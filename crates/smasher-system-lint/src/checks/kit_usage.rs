@@ -21,17 +21,29 @@ fn has_bare_attr(tag: &str, attr: &str) -> bool {
     re.is_match(tag)
 }
 
-/// Runs all four kit-component-usage rules against raw candidate HTML text, returning
+/// Runs all six kit-component-usage rules against raw candidate HTML text, returning
 /// one violation per offending element, naming the tag.
 ///
 /// - `<button>` must carry `.btn`
 /// - a text `<input>` (no `type` or `type="text"`) must carry `.input`
 /// - `role="button"` must carry `.list-row-action`
 /// - `role="dialog"` must carry `aria-modal="true"` and `hidden`
+/// - a `<link>`/`<script>` referencing `design-kit/` must use the absolute
+///   `/design-kit/...` path, not a relative one — a candidate is served from a
+///   different directory depth at render time than in the dashboard later, so a
+///   relative reference (`../../design-kit/...`, `./design-kit/...`) 404s in one
+///   of the two places even though it looks fine in the other.
+/// - a document that references `/design-kit/` must also link `/static/style.css`
+///   — `design-kit/tokens.css`/`components.css` only define spacing/overlay/focus
+///   tokens, not the color/font/radius/shadow tokens every kit class's `var(...)`
+///   resolves against; those live in `style.css`, and without it every such
+///   reference silently resolves to nothing.
 pub fn check_kit_usage(html: &str) -> Vec<String> {
     let mut violations = Vec::new();
     let tag_re = Regex::new(r"<[a-zA-Z][^>]*>").unwrap();
     let tag_name_re = Regex::new(r"^<([a-zA-Z][a-zA-Z0-9-]*)").unwrap();
+    let mut references_design_kit = false;
+    let mut links_static_style = false;
 
     for tag_match in tag_re.find_iter(html) {
         let tag = tag_match.as_str();
@@ -53,6 +65,28 @@ pub fn check_kit_usage(html: &str) -> Vec<String> {
             }
         }
 
+        let path_attr = match tag_name.as_str() {
+            "link" => Some("href"),
+            "script" => Some("src"),
+            _ => None,
+        };
+        if let Some(attr) = path_attr
+            && let Some(value) = attr_value(tag, attr)
+            && value.contains("design-kit/")
+        {
+            if value.starts_with("/design-kit/") {
+                references_design_kit = true;
+            } else {
+                violations.push(format!(
+                    "{tag} — design-kit reference must use an absolute path (/design-kit/...), not a relative one"
+                ));
+            }
+        }
+
+        if tag_name == "link" && attr_value(tag, "href") == Some("/static/style.css") {
+            links_static_style = true;
+        }
+
         match attr_value(tag, "role") {
             Some("button") if !has_class(tag, "list-row-action") => {
                 violations.push(format!(
@@ -70,6 +104,12 @@ pub fn check_kit_usage(html: &str) -> Vec<String> {
             }
             _ => {}
         }
+    }
+
+    if references_design_kit && !links_static_style {
+        violations.push(
+            "document references /design-kit/ but is missing <link rel=\"stylesheet\" href=\"/static/style.css\"> — every color/font/radius/shadow token the kit uses is defined there".to_string(),
+        );
     }
 
     violations
@@ -161,5 +201,74 @@ mod tests {
             <div role="dialog" aria-modal="true" hidden>Dialog</div>
         "#;
         assert!(check_kit_usage(html).is_empty());
+    }
+
+    #[test]
+    fn absolute_design_kit_link_href_passes() {
+        let violations = check_kit_usage(
+            r#"<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/design-kit/tokens.css">"#,
+        );
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn relative_design_kit_link_href_fails() {
+        let violations =
+            check_kit_usage(r#"<link rel="stylesheet" href="../../design-kit/tokens.css">"#);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].contains("absolute path"));
+    }
+
+    #[test]
+    fn dot_relative_design_kit_link_href_fails() {
+        let violations =
+            check_kit_usage(r#"<link rel="stylesheet" href="./design-kit/tokens.css">"#);
+        assert_eq!(violations.len(), 1);
+    }
+
+    #[test]
+    fn relative_design_kit_script_src_fails() {
+        let violations = check_kit_usage(r#"<script src="../../design-kit/components.js"></script>"#);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].contains("absolute path"));
+    }
+
+    #[test]
+    fn absolute_design_kit_script_src_passes() {
+        let violations = check_kit_usage(
+            r#"<link rel="stylesheet" href="/static/style.css"><script src="/design-kit/components.js"></script>"#,
+        );
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn non_design_kit_relative_link_is_unaffected() {
+        let violations = check_kit_usage(r#"<link rel="stylesheet" href="assets/style.css">"#);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn design_kit_reference_without_static_style_link_fails() {
+        let violations =
+            check_kit_usage(r#"<link rel="stylesheet" href="/design-kit/tokens.css">"#);
+        assert_eq!(violations.len(), 1);
+        assert!(violations[0].contains("/static/style.css"));
+    }
+
+    #[test]
+    fn design_kit_reference_with_static_style_link_passes() {
+        let violations = check_kit_usage(
+            r#"<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/design-kit/components.css">"#,
+        );
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn relative_design_kit_reference_does_not_also_require_static_style_link() {
+        // A relative reference already fails on its own; it shouldn't count as
+        // "references design-kit" and pile on a second, redundant violation.
+        let violations =
+            check_kit_usage(r#"<link rel="stylesheet" href="../../design-kit/tokens.css">"#);
+        assert_eq!(violations.len(), 1);
     }
 }

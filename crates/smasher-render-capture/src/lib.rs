@@ -24,6 +24,14 @@ fn design_kit_dir() -> PathBuf {
     PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../design-kit"))
 }
 
+/// This crate's fixed location relative to `smasher-web`'s static assets — same
+/// repo-convention reasoning as `design_kit_dir`. Candidates need this mount because
+/// `design-kit/components.css` references color/font/radius/shadow tokens defined in
+/// `style.css` here, not duplicated into `design-kit/tokens.css`.
+fn static_dir() -> PathBuf {
+    PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../smasher-web/static"))
+}
+
 /// Serves `candidate_dir`, captures a screenshot at `viewport`, and writes
 /// `screenshot.png` plus `manifest.json` to `output_dir`.
 pub async fn capture(
@@ -32,7 +40,7 @@ pub async fn capture(
     viewport: Viewport,
     generation_params: BTreeMap<String, String>,
 ) -> Result<Manifest, CaptureError> {
-    let handle = server::start_server(candidate_dir, &design_kit_dir())
+    let handle = server::start_server(candidate_dir, &design_kit_dir(), &static_dir())
         .await
         .map_err(|e| match e {
             server::ServerError::MissingEntryPoint(dir) => CaptureError::MissingEntryPoint(dir),

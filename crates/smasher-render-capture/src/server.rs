@@ -1,5 +1,6 @@
-// ABOUTME: Ephemeral two-mount static server (axum + tower-http) for candidates.
-// ABOUTME: Mounts a candidate directory at `/` and `design-kit/` at `/design-kit`.
+// ABOUTME: Ephemeral three-mount static server (axum + tower-http) for candidates.
+// ABOUTME: Mounts a candidate directory at `/`, `design-kit/` at `/design-kit`, and
+// ABOUTME: smasher-web's static assets at `/static`.
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -34,12 +35,20 @@ impl ServerHandle {
     }
 }
 
-/// Starts the ephemeral two-mount server on an OS-assigned port: `candidate_dir` at
-/// `/`, `design_kit_dir` at `/design-kit`. Returns once the server is bound and
-/// accepting connections.
+/// Starts the ephemeral three-mount server on an OS-assigned port: `candidate_dir` at
+/// `/`, `design_kit_dir` at `/design-kit`, `static_dir` at `/static`. Returns once the
+/// server is bound and accepting connections.
+///
+/// The `/static` mount matters even though nothing under `candidate_dir` lives there:
+/// `design-kit/components.css` (and any candidate HTML) references color/font/radius/
+/// shadow tokens defined in `crates/smasher-web/static/style.css`, not duplicated into
+/// `design-kit/tokens.css` (see `design-kit/README.md`'s "Reused from style.css"
+/// section) — so a candidate's `<link href="/static/style.css">` has to resolve here
+/// the same way it resolves once smasher-web serves the persisted bundle later.
 pub async fn start_server(
     candidate_dir: &Path,
     design_kit_dir: &Path,
+    static_dir: &Path,
 ) -> Result<ServerHandle, ServerError> {
     if !candidate_dir.join("index.html").is_file() {
         return Err(ServerError::MissingEntryPoint(
@@ -49,6 +58,7 @@ pub async fn start_server(
 
     let app = axum::Router::new()
         .nest_service("/design-kit", ServeDir::new(design_kit_dir))
+        .nest_service("/static", ServeDir::new(static_dir))
         .fallback_service(ServeDir::new(candidate_dir));
 
     let listener = TcpListener::bind("127.0.0.1:0").await?;
