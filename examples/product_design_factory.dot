@@ -123,7 +123,13 @@ digraph ProductDesignFactory {
 
   GalleryGate1 -> Implement [label="proceed"];
 
-  Implement -> RenderDefine -> CritiqueParallel;
+  Implement -> RenderDefine;
+  RenderDefine -> CritiqueParallel [label="ok", condition="outcome=success"];
+  // Render can fail after exhausting its own retries (e.g. a headless-Chromium
+  // crash). Without this edge the engine falls back to the unconditional path
+  // into CritiqueParallel anyway, and TaskCritic/Synthesis then fail on a
+  // missing screenshot/critic-report instead of the real problem being visible.
+  RenderDefine -> Exit [label="failure", condition="outcome=fail"];
   CritiqueParallel -> SystemLint -> CritiqueJoin;
   CritiqueParallel -> TaskCritic -> CritiqueJoin;
   CritiqueJoin -> Synthesis -> GalleryGate2;

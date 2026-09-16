@@ -355,6 +355,25 @@ fn product_design_factory_has_critique_parallel_fanout_and_join() {
 }
 
 #[test]
+fn product_design_factory_render_define_routes_failure_to_exit_instead_of_cascading() {
+    let g = load_example("product_design_factory.dot");
+
+    let success_edge = g
+        .edges
+        .iter()
+        .find(|e| e.from == "RenderDefine" && e.to == "CritiqueParallel")
+        .expect("missing RenderDefine -> CritiqueParallel edge");
+    assert_eq!(success_edge.condition.as_deref(), Some("outcome=success"));
+
+    let failure_edge = g
+        .edges
+        .iter()
+        .find(|e| e.from == "RenderDefine" && e.to == "Exit")
+        .expect("missing RenderDefine -> Exit failure edge");
+    assert_eq!(failure_edge.condition.as_deref(), Some("outcome=fail"));
+}
+
+#[test]
 fn product_design_factory_has_native_tool_dispatch_for_every_pipeline_tool() {
     let g = load_example("product_design_factory.dot");
     for (id, tool) in [

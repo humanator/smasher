@@ -85,8 +85,19 @@ impl HybridToolBackend {
                 "artifact_dir": output_dir,
                 "manifest": manifest,
             }))),
-            Err(e) => Ok(Outcome::failure(e.to_string())),
+            Err(e) => Ok(outcome_for_capture_error(e)),
         }
+    }
+}
+
+/// Maps a capture failure to a retryable or non-retryable `Outcome::Failure`
+/// per `CaptureError::is_retryable` — see that method for the reasoning.
+fn outcome_for_capture_error(error: capture::CaptureError) -> Outcome {
+    let message = error.to_string();
+    if error.is_retryable() {
+        Outcome::retryable_failure(message)
+    } else {
+        Outcome::failure(message)
     }
 }
 
@@ -293,6 +304,66 @@ mod tests {
         )
         .unwrap();
         assert_eq!(manifest.generation_params, BTreeMap::new());
+    }
+
+    #[test]
+    fn outcome_for_capture_error_marks_missing_entry_point_non_retryable() {
+        let outcome =
+            outcome_for_capture_error(crate::capture::CaptureError::MissingEntryPoint("dir".into()));
+        match outcome {
+            Outcome::Failure { retryable, .. } => assert!(!retryable),
+            other => panic!("expected Outcome::Failure, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn outcome_for_capture_error_marks_browser_launch_failure_retryable() {
+        let outcome =
+            outcome_for_capture_error(crate::capture::CaptureError::BrowserLaunch("boom".into()));
+        match outcome {
+            Outcome::Failure { retryable, .. } => assert!(retryable),
+            other => panic!("expected Outcome::Failure, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn outcome_for_capture_error_marks_capture_failure_retryable() {
+        let outcome = outcome_for_capture_error(crate::capture::CaptureError::Capture(
+            "oneshot canceled".into(),
+        ));
+        match outcome {
+            Outcome::Failure { retryable, .. } => assert!(retryable),
+            other => panic!("expected Outcome::Failure, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn render_capture_of_missing_entry_point_surfaces_as_non_retryable_failure() {
+        let fallback = Arc::new(RecordingFallback::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let artifacts_base = tmp.path().to_path_buf();
+        let empty_candidate_dir = tempfile::tempdir().unwrap();
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            artifacts_base,
+            PathBuf::from("/tmp/unused"),
+        );
+
+        let args = json!({
+            "candidate_dir": empty_candidate_dir.path().to_str().unwrap(),
+            "candidate_id": "test-candidate-missing-entry",
+        });
+
+        let outcome = backend
+            .execute_tool("render_capture", &args, &Context::default())
+            .await
+            .expect("missing entry point should surface as a failure outcome, not a handler error");
+
+        match outcome {
+            Outcome::Failure { retryable, .. } => assert!(!retryable),
+            other => panic!("expected Outcome::Failure, got {other:?}"),
+        }
+        assert!(!fallback.called.load(Ordering::SeqCst));
     }
 
     #[tokio::test]

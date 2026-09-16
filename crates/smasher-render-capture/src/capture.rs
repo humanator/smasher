@@ -25,6 +25,21 @@ pub enum CaptureError {
     Capture(String),
 }
 
+impl CaptureError {
+    /// Whether re-running the same capture might succeed. `MissingEntryPoint`
+    /// is a permanent problem with the candidate's own contents — retrying
+    /// won't produce an index.html that isn't there. `BrowserLaunch` and
+    /// `Capture` cover headless-Chromium/CDP flakiness (a crashed browser
+    /// process, a dropped CDP connection mid-capture — see the "oneshot
+    /// canceled" case this was added for) that a fresh attempt often clears.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            CaptureError::MissingEntryPoint(_) => false,
+            CaptureError::BrowserLaunch(_) | CaptureError::Capture(_) => true,
+        }
+    }
+}
+
 /// Launches headless Chromium, navigates to `url`, and returns PNG bytes captured
 /// at `viewport`. Shuts the browser down before returning.
 pub async fn capture_screenshot(url: &str, viewport: Viewport) -> Result<Vec<u8>, CaptureError> {
@@ -91,4 +106,24 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CaptureError;
+
+    #[test]
+    fn missing_entry_point_is_not_retryable() {
+        assert!(!CaptureError::MissingEntryPoint("dir".into()).is_retryable());
+    }
+
+    #[test]
+    fn browser_launch_failure_is_retryable() {
+        assert!(CaptureError::BrowserLaunch("launch failed".into()).is_retryable());
+    }
+
+    #[test]
+    fn capture_failure_is_retryable() {
+        assert!(CaptureError::Capture("oneshot canceled".into()).is_retryable());
+    }
 }
