@@ -38,6 +38,17 @@
             var version = evt.detail.xhr.getResponseHeader('X-Fragment-Version');
             if (version) elt.dataset.version = version;
         });
+        // htmx adds .htmx-swapping (a CSS opacity fade, see style.css) to the
+        // target on every successful response *before* it looks at whether
+        // the swap style is "none" — so an HX-Reswap: none response alone
+        // still produces a visible flash on each poll. Cancelling the swap
+        // outright here (shouldSwap = false) skips that entirely for a tick
+        // the server told us has nothing new.
+        document.body.addEventListener('htmx:beforeSwap', function (evt) {
+            if (evt.detail.elt.hasAttribute('data-poll') && evt.detail.swapOverride === 'none') {
+                evt.detail.shouldSwap = false;
+            }
+        });
     </script>
 </body>
 </html>
