@@ -593,50 +593,29 @@ impl Interviewer for ChannelInterviewer {
 /// falls back to the node label. Supports `approve` (yes/no) and `options`
 /// (predefined choices) modes; otherwise asks a free-form question.
 ///
-/// The free-form path additionally supports an optional timeout and
-/// default_choice — when a timeout is configured and the interviewer times
-/// out, the default_choice is used if available. Timeout and default_choice
-/// can also be read from node attributes `human.timeout_secs` and
-/// `human.default_choice`, which take precedence over the handler-level
-/// configuration. A free-form response on a node authored as a gallery gate
-/// (`gallery="true"`) is parsed as a structured `{"selected": [...],
-/// "decision": "..."}` decision rather than stored as a plain string.
+/// The free-form path always awaits the interviewer directly, with no
+/// timeout or default-choice substitution. A free-form response on a node
+/// authored as a gallery gate (`gallery="true"`) is parsed as a structured
+/// `{"selected": [...], "decision": "..."}` decision rather than stored as a
+/// plain string.
 ///
 /// This is the single handler registered for `NodeType::Interviewer` in
 /// production — one handler per node type keeps dispatch unambiguous
 /// (`HandlerRegistry` uses the first handler whose `handles()` matches).
 pub struct InterviewerHandler {
     interviewer: Arc<dyn Interviewer>,
-    timeout: Option<Duration>,
-    default_choice: Option<String>,
 }
 
-/// Builder for constructing an `InterviewerHandler` with optional timeout and default choice.
+/// Builder for constructing an `InterviewerHandler`.
 pub struct InterviewerHandlerBuilder {
     interviewer: Arc<dyn Interviewer>,
-    timeout: Option<Duration>,
-    default_choice: Option<String>,
 }
 
 impl InterviewerHandlerBuilder {
-    /// Set the timeout duration for the free-form/human-gate path.
-    pub fn timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
-        self
-    }
-
-    /// Set the default choice to use when the interviewer times out.
-    pub fn default_choice(mut self, choice: impl Into<String>) -> Self {
-        self.default_choice = Some(choice.into());
-        self
-    }
-
     /// Build the `InterviewerHandler`.
     pub fn build(self) -> InterviewerHandler {
         InterviewerHandler {
             interviewer: self.interviewer,
-            timeout: self.timeout,
-            default_choice: self.default_choice,
         }
     }
 }
@@ -644,39 +623,12 @@ impl InterviewerHandlerBuilder {
 impl InterviewerHandler {
     /// Create a new InterviewerHandler wrapping the given Interviewer.
     pub fn new(interviewer: Arc<dyn Interviewer>) -> Self {
-        Self {
-            interviewer,
-            timeout: None,
-            default_choice: None,
-        }
+        Self { interviewer }
     }
 
     /// Return a builder for constructing an InterviewerHandler with optional configuration.
     pub fn builder(interviewer: Arc<dyn Interviewer>) -> InterviewerHandlerBuilder {
-        InterviewerHandlerBuilder {
-            interviewer,
-            timeout: None,
-            default_choice: None,
-        }
-    }
-
-    /// Resolve the effective timeout, preferring the node attribute over the handler-level setting.
-    fn resolve_timeout(&self, node: &GraphNode) -> Option<Duration> {
-        if let Some(NodeAttrValue::Number(secs)) = node.attrs.get("human.timeout_secs") {
-            let secs = *secs as u64;
-            if secs > 0 {
-                return Some(Duration::from_secs(secs));
-            }
-        }
-        self.timeout
-    }
-
-    /// Resolve the effective default choice, preferring the node attribute over the handler-level setting.
-    fn resolve_default_choice<'a>(&'a self, node: &'a GraphNode) -> Option<&'a str> {
-        if let Some(NodeAttrValue::String(s)) = node.attrs.get("human.default_choice") {
-            return Some(s.as_str());
-        }
-        self.default_choice.as_deref()
+        InterviewerHandlerBuilder { interviewer }
     }
 }
 
@@ -740,23 +692,9 @@ impl Handler for InterviewerHandler {
                 Err(e) => Ok(Outcome::failure(e.to_string())),
             }
         } else {
-            // Free-form question mode, with optional timeout/default_choice and
-            // gallery-gate structured-answer reinterpretation.
-            let effective_timeout = self.resolve_timeout(node);
-            let effective_default = self.resolve_default_choice(node);
-
-            let ask_result = match effective_timeout {
-                Some(duration) => match tokio::time::timeout(
-                    duration,
-                    self.interviewer.ask(&question, &scoped_context),
-                )
-                .await
-                {
-                    Ok(result) => result,
-                    Err(_elapsed) => Err(InterviewerError::Timeout),
-                },
-                None => self.interviewer.ask(&question, &scoped_context).await,
-            };
+            // Free-form question mode, with gallery-gate structured-answer
+            // reinterpretation.
+            let ask_result = self.interviewer.ask(&question, &scoped_context).await;
 
             match ask_result {
                 Ok(response) => {
@@ -782,18 +720,6 @@ impl Handler for InterviewerHandler {
                         .with_preferred_label(&response))
                 }
                 Err(InterviewerError::Cancelled) => Ok(Outcome::skip("interview cancelled")),
-                Err(InterviewerError::Timeout) => {
-                    if let Some(default) = effective_default {
-                        let response = default.to_string();
-                        context.set(&node.id, json!(&response));
-                        Ok(Outcome::success_with(
-                            json!({"response": &response, "defaulted": true}),
-                        )
-                        .with_preferred_label(&response))
-                    } else {
-                        Ok(Outcome::failure("interview timed out"))
-                    }
-                }
                 Err(e) => Ok(Outcome::failure(e.to_string())),
             }
         }
@@ -2035,243 +1961,30 @@ mod tests {
     }
 
     // ---------------------------------------------------------------
-    // InterviewerHandler timeout and default_choice tests
+    // InterviewerHandler tests
     // ---------------------------------------------------------------
 
     #[tokio::test]
-    async fn human_gate_builder_creates_handler_with_timeout() {
+    async fn human_gate_builder_creates_basic_handler() {
         let interviewer = Arc::new(AutoApproveInterviewer::new());
-        let handler = InterviewerHandler::builder(interviewer)
-            .timeout(Duration::from_secs(30))
-            .build();
-
-        assert_eq!(handler.timeout, Some(Duration::from_secs(30)));
-        assert!(handler.default_choice.is_none());
+        let handler = InterviewerHandler::builder(interviewer).build();
         assert_eq!(handler.name(), "interviewer");
-    }
 
-    #[tokio::test]
-    async fn human_gate_builder_creates_handler_with_default_choice() {
-        let interviewer = Arc::new(AutoApproveInterviewer::new());
-        let handler = InterviewerHandler::builder(interviewer)
-            .default_choice("yes")
-            .build();
-
-        assert!(handler.timeout.is_none());
-        assert_eq!(handler.default_choice, Some("yes".to_string()));
-    }
-
-    #[tokio::test]
-    async fn human_gate_builder_creates_handler_with_both() {
-        let interviewer = Arc::new(AutoApproveInterviewer::new());
-        let handler = InterviewerHandler::builder(interviewer)
-            .timeout(Duration::from_secs(10))
-            .default_choice("proceed")
-            .build();
-
-        assert_eq!(handler.timeout, Some(Duration::from_secs(10)));
-        assert_eq!(handler.default_choice, Some("proceed".to_string()));
-    }
-
-    #[tokio::test]
-    async fn human_gate_uses_default_choice_on_timeout() {
-        let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(100)));
-        let handler = InterviewerHandler::builder(slow)
-            .timeout(Duration::from_millis(5))
-            .default_choice("auto-approved")
-            .build();
-
-        let mut node = make_node("gate_default", NodeType::Interviewer);
+        // Should behave identically to InterviewerHandler::new()
+        let mut node = make_node("gate_basic", NodeType::Interviewer);
         node.attrs.insert(
             "question".to_string(),
-            NodeAttrValue::String("Approve deployment?".to_string()),
+            NodeAttrValue::String("Q?".to_string()),
         );
 
         let ctx = Context::new();
         let result = handler.execute(&node, &ctx).await.unwrap();
         assert!(result.is_success());
-        match result {
-            Outcome::Success {
-                data: Some(data), ..
-            } => {
-                assert_eq!(data["response"], "auto-approved");
-                assert_eq!(data["defaulted"], true);
-            }
-            other => panic!("expected success with defaulted data, got {other:?}"),
-        }
-
-        // Verify the default response was stored in context
-        let stored = ctx.get_string("gate_default");
-        assert_eq!(stored, Some("auto-approved".to_string()));
-    }
-
-    #[tokio::test]
-    async fn human_gate_timeout_without_default_choice_returns_failure() {
-        let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(100)));
-        let handler = InterviewerHandler::builder(slow)
-            .timeout(Duration::from_millis(5))
-            .build();
-
-        let mut node = make_node("gate_no_default", NodeType::Interviewer);
-        node.attrs.insert(
-            "question".to_string(),
-            NodeAttrValue::String("Waiting...".to_string()),
-        );
-
-        let ctx = Context::new();
-        let result = handler.execute(&node, &ctx).await.unwrap();
-        assert!(result.is_failure());
-        match result {
-            Outcome::Failure { error, .. } => {
-                assert!(error.contains("timed out"));
-            }
-            other => panic!("expected failure, got {other:?}"),
-        }
-
-        // Nothing stored in context on timeout failure
-        assert!(ctx.get("gate_no_default").is_none());
-    }
-
-    #[tokio::test]
-    async fn human_gate_reads_timeout_secs_from_node_attrs() {
-        let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(100)));
-        // No handler-level timeout set
-        let handler = InterviewerHandler::builder(slow)
-            .default_choice("node-level-default")
-            .build();
-
-        let mut node = make_node("gate_node_timeout", NodeType::Interviewer);
-        node.attrs.insert(
-            "question".to_string(),
-            NodeAttrValue::String("Please confirm".to_string()),
-        );
-        // Set a very short timeout via node attribute (in seconds, using a small fraction)
-        // Since timeout_secs is u64, we use 0 which won't set a timeout,
-        // so let's use a handler-level timeout instead for this test.
-        // Actually, since Duration::from_secs(0) would be zero, we need at least 1 sec.
-        // Let's restructure: use handler-level timeout of 5ms, node attr overrides don't help here.
-        // We'll test that node attribute IS read by using a node attr that's long enough.
-
-        // For this test: handler has NO timeout, but node has human.timeout_secs = 1 (1 second).
-        // SlowInterviewer sleeps 100ms. The node timeout (1s) > 100ms, so we should get the response.
-        node.attrs
-            .insert("human.timeout_secs".to_string(), NodeAttrValue::Number(1.0));
-
-        let ctx = Context::new();
-        let result = handler.execute(&node, &ctx).await.unwrap();
-        assert!(result.is_success());
-        match result {
-            Outcome::Success {
-                data: Some(data), ..
-            } => {
-                assert_eq!(data["response"], "slow response");
-            }
-            other => panic!("expected success, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn human_gate_node_timeout_secs_overrides_handler_timeout() {
-        // Handler has a very short timeout (5ms), but node attr sets 1 second.
-        // SlowInterviewer sleeps 100ms. Node timeout (1s) > 100ms, so response comes through.
-        let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(100)));
-        let handler = InterviewerHandler::builder(slow)
-            .timeout(Duration::from_millis(5))
-            .default_choice("should-not-be-used")
-            .build();
-
-        let mut node = make_node("gate_node_override_to", NodeType::Interviewer);
-        node.attrs.insert(
-            "question".to_string(),
-            NodeAttrValue::String("Confirm?".to_string()),
-        );
-        // Node attr timeout of 1 second overrides handler's 5ms timeout
-        node.attrs
-            .insert("human.timeout_secs".to_string(), NodeAttrValue::Number(1.0));
-
-        let ctx = Context::new();
-        let result = handler.execute(&node, &ctx).await.unwrap();
-        assert!(result.is_success());
-        match result {
-            Outcome::Success {
-                data: Some(data), ..
-            } => {
-                // Got the real response, not the default
-                assert_eq!(data["response"], "slow response");
-                assert!(data.get("defaulted").is_none());
-            }
-            other => panic!("expected success with real response, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn human_gate_reads_default_choice_from_node_attrs() {
-        let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(100)));
-        let handler = InterviewerHandler::builder(slow)
-            .timeout(Duration::from_millis(5))
-            .build();
-
-        let mut node = make_node("gate_node_default", NodeType::Interviewer);
-        node.attrs.insert(
-            "question".to_string(),
-            NodeAttrValue::String("Continue?".to_string()),
-        );
-        node.attrs.insert(
-            "human.default_choice".to_string(),
-            NodeAttrValue::String("node-level-default".to_string()),
-        );
-
-        let ctx = Context::new();
-        let result = handler.execute(&node, &ctx).await.unwrap();
-        assert!(result.is_success());
-        match result {
-            Outcome::Success {
-                data: Some(data), ..
-            } => {
-                assert_eq!(data["response"], "node-level-default");
-                assert_eq!(data["defaulted"], true);
-            }
-            other => panic!("expected success with node-level default, got {other:?}"),
-        }
-
-        let stored = ctx.get_string("gate_node_default");
-        assert_eq!(stored, Some("node-level-default".to_string()));
-    }
-
-    #[tokio::test]
-    async fn human_gate_node_default_choice_overrides_handler_default() {
-        let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(100)));
-        let handler = InterviewerHandler::builder(slow)
-            .timeout(Duration::from_millis(5))
-            .default_choice("handler-level-default")
-            .build();
-
-        let mut node = make_node("gate_override", NodeType::Interviewer);
-        node.attrs.insert(
-            "question".to_string(),
-            NodeAttrValue::String("Continue?".to_string()),
-        );
-        node.attrs.insert(
-            "human.default_choice".to_string(),
-            NodeAttrValue::String("node-wins".to_string()),
-        );
-
-        let ctx = Context::new();
-        let result = handler.execute(&node, &ctx).await.unwrap();
-        assert!(result.is_success());
-        match result {
-            Outcome::Success {
-                data: Some(data), ..
-            } => {
-                assert_eq!(data["response"], "node-wins");
-            }
-            other => panic!("expected success with node override, got {other:?}"),
-        }
     }
 
     #[tokio::test]
     async fn human_gate_no_timeout_does_not_time_out() {
-        // Handler with no timeout, even with a slow interviewer, should wait for the response
+        // No timeout mechanism exists at all: even a slow interviewer is awaited to completion.
         let slow = Arc::new(SlowInterviewer::new(Duration::from_millis(10)));
         let handler = InterviewerHandler::new(slow);
 
@@ -2295,23 +2008,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn human_gate_builder_no_options_creates_basic_handler() {
-        let interviewer = Arc::new(AutoApproveInterviewer::new());
-        let handler = InterviewerHandler::builder(interviewer).build();
+    async fn human_gate_ignores_legacy_timeout_and_default_choice_attrs() {
+        // human.timeout_secs / human.default_choice are no longer read at all —
+        // a node carrying them behaves identically to one without them.
+        let interviewer = Arc::new(QueueInterviewer::new());
+        interviewer.push_response("real answer");
+        let handler = InterviewerHandler::new(interviewer);
 
-        assert!(handler.timeout.is_none());
-        assert!(handler.default_choice.is_none());
-
-        // Should behave identically to InterviewerHandler::new()
-        let mut node = make_node("gate_basic", NodeType::Interviewer);
+        let mut node = make_node("gate_legacy_attrs", NodeType::Interviewer);
         node.attrs.insert(
             "question".to_string(),
-            NodeAttrValue::String("Q?".to_string()),
+            NodeAttrValue::String("Continue?".to_string()),
+        );
+        node.attrs
+            .insert("human.timeout_secs".to_string(), NodeAttrValue::Number(1.0));
+        node.attrs.insert(
+            "human.default_choice".to_string(),
+            NodeAttrValue::String("should-be-ignored".to_string()),
         );
 
         let ctx = Context::new();
         let result = handler.execute(&node, &ctx).await.unwrap();
         assert!(result.is_success());
+        match result {
+            Outcome::Success {
+                data: Some(data), ..
+            } => {
+                assert_eq!(data["response"], "real answer");
+                assert!(data.get("defaulted").is_none());
+            }
+            other => panic!("expected success with real response, got {other:?}"),
+        }
+
+        let stored = ctx.get_string("gate_legacy_attrs");
+        assert_eq!(stored, Some("real answer".to_string()));
     }
 
     // ---------------------------------------------------------------

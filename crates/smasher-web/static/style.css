@@ -1375,6 +1375,40 @@ textarea::placeholder {
   background: var(--red-dim);
 }
 
+/* Lint badge: a dot by default (native <details>/<summary>, no JS), click
+   expands to the full violation list. Reuses the existing scorecard color
+   tokens, not new ones. */
+.lint-badge summary {
+  list-style: none;
+}
+
+.lint-badge summary::-webkit-details-marker {
+  display: none;
+}
+
+.lint-dot {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.lint-dot-pass {
+  background: var(--green);
+}
+
+.lint-dot-fail {
+  background: var(--red);
+}
+
+/* Unverified "also expand on hover" enhancement (Vision.md's "click/hover"
+   wording) — click-to-expand alone already satisfies the decision. */
+.lint-badge:not([open]):hover > :not(summary),
+.lint-badge:not([open]):focus-within > :not(summary) {
+  display: block;
+}
+
 .scorecard-violation,
 .scorecard-reason {
   font-size: 0.65rem;

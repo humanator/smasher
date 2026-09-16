@@ -21,14 +21,15 @@
       </a>
       <span class="candidate-id">{{ gc.summary.candidate_id }}</span>
       <div class="lint-badge-slot" data-candidate="{{ gc.summary.candidate_id }}">{% if let Some(passed) = gc.scorecard.lint_passed() -%}
-          {%- if passed -%}
-          <span class="scorecard-badge scorecard-badge-pass">lint: pass</span>
-          {%- else -%}
-          <span class="scorecard-badge scorecard-badge-fail">lint: fail</span>
-          {%- for v in gc.scorecard.lint_violations() %}
-          <span class="scorecard-violation">{{ v }}</span>
-          {%- endfor -%}
-          {%- endif -%}
+          <details class="lint-badge">
+            <summary class="lint-dot{% if passed %} lint-dot-pass{% else %} lint-dot-fail{% endif %}"
+                title="{% if passed %}lint: pass{% else %}lint: fail{% endif %}"></summary>
+            {%- if !passed -%}
+            {%- for v in gc.scorecard.lint_violations() %}
+            <span class="scorecard-violation">{{ v }}</span>
+            {%- endfor -%}
+            {%- endif -%}
+          </details>
         {%- endif -%}
         {%- if let Some(success) = gc.scorecard.critic_success() -%}
           {%- if success -%}
