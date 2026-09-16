@@ -6,10 +6,11 @@
 <div class="run-detail">
     <div class="run-header">
         <h2>Run {{ run.id }}</h2>
-        <div id="run-status" hx-get="/runs/{{ run.id }}/status" hx-trigger="every 5s">
+        <div id="run-status" data-poll hx-get="/runs/{{ run.id }}/status" hx-trigger="every 5s">
             {% include "run_status.html" %}
         </div>
         <div class="token-counter" id="token-counter"
+            data-poll
             hx-get="/runs/{{ run.id }}/tokens"
             hx-trigger="every 3s"
             hx-swap="innerHTML">
@@ -49,6 +50,7 @@
         <section class="graph-section">
             <h3>Pipeline Graph</h3>
             <div id="graph-container"
+                data-poll
                 hx-get="/runs/{{ run.id }}/graph"
                 hx-trigger="load, every 3s"
                 hx-swap="innerHTML">
@@ -58,6 +60,7 @@
         <section class="questions-section">
             <h3>Human Input</h3>
             <div id="question-list"
+                data-poll
                 hx-get="/runs/{{ run.id }}/questions"
                 hx-trigger="every 2s">
             </div>
@@ -66,6 +69,7 @@
         <section class="candidates-section">
             <h3>Candidates</h3>
             <div id="candidate-list"
+                data-poll
                 hx-get="/runs/{{ run.id }}/candidates"
                 hx-trigger="load, every 5s"
                 hx-swap="innerHTML">
@@ -75,6 +79,7 @@
         <section class="decision-history-section">
             <h3>Decision History</h3>
             <div id="decision-history-list"
+                data-poll
                 hx-get="/runs/{{ run.id }}/decisions"
                 hx-trigger="load, every 5s"
                 hx-swap="innerHTML">

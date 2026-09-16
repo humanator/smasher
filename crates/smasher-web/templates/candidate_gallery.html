@@ -9,7 +9,9 @@
         {% call candidate_card::failed_card(candidate, true) %}
         {% else %}
         <div class="candidate-card">
-            {% call candidate_card::live_card(candidate) %}
+            <div id="candidate-embed-{{ run_id }}-{{ candidate.candidate_id }}" hx-preserve="true">
+                {% call candidate_card::live_card(candidate) %}
+            </div>
             <div class="candidate-id">{{ candidate.candidate_id }}</div>
             <div class="candidate-captured-at">{{ candidate.manifest.captured_at }}</div>
         </div>

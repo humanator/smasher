@@ -14,7 +14,8 @@
     <div class="question-choices">
         {% for choice in q.choices %}
         <label class="choice-label">
-            <input type="radio" name="answer" value="{{ choice }}">
+            <input type="radio" name="answer" value="{{ choice }}"
+                id="answer-choice-{{ q.id }}-{{ choice }}" hx-preserve="true">
             {{ choice }}
         </label>
         {% endfor %}
@@ -25,7 +26,8 @@
         hx-swap="outerHTML"
         class="answer-form">
         {% if q.choices.is_empty() %}
-        <input type="text" name="answer" placeholder="Type your answer..." class="answer-input">
+        <input type="text" name="answer" placeholder="Type your answer..." class="answer-input"
+            id="answer-input-{{ q.id }}" hx-preserve="true">
         {% endif %}
         <button type="submit" class="btn btn-primary btn-small">Submit</button>
     </form>

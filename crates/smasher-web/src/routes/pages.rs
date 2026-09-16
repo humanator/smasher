@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use askama::Template;
 use axum::Router;
 use axum::extract::{Form, Path, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 
@@ -185,6 +185,69 @@ impl<T: Template> IntoResponse for HtmlTemplate<T> {
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Poll response helper
+// ---------------------------------------------------------------------------
+//
+// The dashboard's polled sections (run status, token counter, questions,
+// candidates, decisions, graph) used to re-render and swap their whole
+// container on every tick regardless of whether anything had changed. That
+// wiped out in-progress typing in the question form and tore down/reloaded
+// any embedded candidate `<iframe>` every few seconds. `poll_response`
+// fixes that at the response level: it fingerprints the rendered fragment
+// and, when the requesting client's `X-If-Version` header already matches,
+// tells htmx to skip the swap entirely via `HX-Reswap: none` instead of
+// sending a body that would just replace the DOM with itself. See
+// base.html's `data-poll` script for the client half that tracks and
+// echoes the version.
+
+const IF_VERSION_HEADER: &str = "x-if-version";
+const FRAGMENT_VERSION_HEADER: &str = "x-fragment-version";
+
+/// Cheap content fingerprint for a rendered fragment. Only ever compared
+/// within a single running server process (the client echoes it back, it's
+/// never persisted), so `DefaultHasher`'s lack of cross-process stability
+/// doesn't matter here.
+fn fragment_version(html: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    html.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
+}
+
+/// Renders a polled template and skips the DOM swap (`HX-Reswap: none`)
+/// when the request's `X-If-Version` header already matches this render.
+fn poll_response<T: Template>(headers: &HeaderMap, template: T) -> Response {
+    let html = match template.render() {
+        Ok(html) => html,
+        Err(e) => {
+            tracing::error!(error = %e, "template render failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("template error: {e}"),
+            )
+                .into_response();
+        }
+    };
+
+    let version = fragment_version(&html);
+    let unchanged = headers
+        .get(IF_VERSION_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|seen| seen == version);
+
+    let mut response = if unchanged {
+        (StatusCode::OK, [(HeaderName::from_static("hx-reswap"), "none")]).into_response()
+    } else {
+        Html(html).into_response()
+    };
+    response.headers_mut().insert(
+        HeaderName::from_static(FRAGMENT_VERSION_HEADER),
+        HeaderValue::from_str(&version).unwrap_or_else(|_| HeaderValue::from_static("0")),
+    );
+    response
 }
 
 // ---------------------------------------------------------------------------
@@ -533,6 +596,7 @@ async fn run_detail(
 async fn run_graph(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
     let runs = state.runs.read().await;
     let record = runs
@@ -565,24 +629,26 @@ async fn run_graph(
         .map_err(|e| WebError::Internal(format!("graph render failed: {e}")))?;
 
     let svg_content = String::from_utf8_lossy(&output.content).to_string();
-    Ok(HtmlTemplate(GraphTemplate { svg_content }))
+    Ok(poll_response(&headers, GraphTemplate { svg_content }))
 }
 
 async fn run_status(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
     let runs = state.runs.read().await;
     let record = runs
         .get(&id)
         .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
     let summary = record.to_summary();
-    Ok(HtmlTemplate(RunStatusTemplate { run: summary }))
+    Ok(poll_response(&headers, RunStatusTemplate { run: summary }))
 }
 
 async fn run_tokens(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
     let runs = state.runs.read().await;
     let record = runs
@@ -590,15 +656,19 @@ async fn run_tokens(
         .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
     let input = record.input_tokens.load(Ordering::Relaxed);
     let output = record.output_tokens.load(Ordering::Relaxed);
-    Ok(HtmlTemplate(TokenTemplate {
-        input_tokens: input,
-        output_tokens: output,
-    }))
+    Ok(poll_response(
+        &headers,
+        TokenTemplate {
+            input_tokens: input,
+            output_tokens: output,
+        },
+    ))
 }
 
 async fn run_questions(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
     use crate::routes::gallery::{find_gallery_gate_for_node, resolve_candidate_count};
 
@@ -664,16 +734,20 @@ async fn run_questions(
         .ok()
     });
 
-    Ok(HtmlTemplate(QuestionCardTemplate {
-        run_id: id,
-        questions,
-        gallery_gate_html,
-    }))
+    Ok(poll_response(
+        &headers,
+        QuestionCardTemplate {
+            run_id: id,
+            questions,
+            gallery_gate_html,
+        },
+    ))
 }
 
 async fn run_candidates(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
     {
         let runs = state.runs.read().await;
@@ -683,15 +757,19 @@ async fn run_candidates(
 
     let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
     let candidates = candidates::scan_candidates(&artifacts_base, &id);
-    Ok(HtmlTemplate(CandidateGalleryTemplate {
-        run_id: id,
-        candidates,
-    }))
+    Ok(poll_response(
+        &headers,
+        CandidateGalleryTemplate {
+            run_id: id,
+            candidates,
+        },
+    ))
 }
 
 async fn run_decisions(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
     let runs = state.runs.read().await;
     let record = runs
@@ -704,7 +782,7 @@ async fn run_decisions(
         .map(TemplateDecision::from)
         .collect();
 
-    Ok(HtmlTemplate(DecisionHistoryTemplate { decisions }))
+    Ok(poll_response(&headers, DecisionHistoryTemplate { decisions }))
 }
 
 #[cfg(test)]

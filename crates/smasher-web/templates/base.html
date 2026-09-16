@@ -19,5 +19,25 @@
     <main class="container" id="main">
         {% block content %}{% endblock %}
     </main>
+    <script>
+        // Polled sections (marked `data-poll`) echo back the version of the
+        // fragment they last rendered so the server can skip the swap
+        // (`HX-Reswap: none`) when nothing changed — otherwise every tick
+        // would blindly replace the DOM, clearing in-progress typing and
+        // reloading any embedded candidate iframe even when there's nothing
+        // new. See routes/pages.rs's `poll_response` for the server half.
+        document.body.addEventListener('htmx:configRequest', function (evt) {
+            var elt = evt.detail.elt;
+            if (elt.hasAttribute('data-poll') && elt.dataset.version) {
+                evt.detail.headers['X-If-Version'] = elt.dataset.version;
+            }
+        });
+        document.body.addEventListener('htmx:afterRequest', function (evt) {
+            var elt = evt.detail.elt;
+            if (!elt.hasAttribute('data-poll') || !evt.detail.xhr) return;
+            var version = evt.detail.xhr.getResponseHeader('X-Fragment-Version');
+            if (version) elt.dataset.version = version;
+        });
+    </script>
 </body>
 </html>
