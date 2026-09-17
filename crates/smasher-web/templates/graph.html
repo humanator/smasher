@@ -1,3 +1,8 @@
+{% match error %}
+{% when Some with (message) %}
+<p class="error-text graph-error">{{ message }}</p>
+{% when None %}
 <div class="graph-svg">
-{{ svg_content|safe }}
+{{ svg_content.as_deref().unwrap_or_default()|safe }}
 </div>
+{% endmatch %}

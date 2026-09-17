@@ -14,7 +14,8 @@ use axum::routing::{get, post};
 
 use smasher_attractor::events::PipelineEvent;
 use smasher_attractor::rendering::{
-    CachedRenderer, GraphRenderer, NodeExecutionStatus, RenderFormat, StatusGraphvizRenderer,
+    CachedRenderer, GraphRenderer, NodeExecutionStatus, RenderError, RenderFormat,
+    StatusGraphvizRenderer,
 };
 
 use crate::candidates::{self, CandidateScorecard, CandidateSummary};
@@ -56,7 +57,8 @@ struct RunStatusTemplate {
 #[derive(Template)]
 #[template(path = "graph.html")]
 struct GraphTemplate {
-    svg_content: String,
+    svg_content: Option<String>,
+    error: Option<String>,
 }
 
 /// Template-friendly question summary with Display-compatible kind.
@@ -623,13 +625,40 @@ async fn run_graph(
 
     let renderer = StatusGraphvizRenderer::new(statuses);
     let cached = CachedRenderer::new(renderer);
-    let output = cached
-        .render(&record.graph, RenderFormat::Svg)
-        .await
-        .map_err(|e| WebError::Internal(format!("graph render failed: {e}")))?;
-
-    let svg_content = String::from_utf8_lossy(&output.content).to_string();
-    Ok(poll_response(&headers, GraphTemplate { svg_content }))
+    match cached.render(&record.graph, RenderFormat::Svg).await {
+        Ok(output) => {
+            let svg_content = String::from_utf8_lossy(&output.content).to_string();
+            Ok(poll_response(
+                &headers,
+                GraphTemplate {
+                    svg_content: Some(svg_content),
+                    error: None,
+                },
+            ))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "graph render failed");
+            let error = match &e {
+                RenderError::GraphvizUnavailable { .. } => {
+                    "Graphviz's `dot` command isn't installed, or isn't on PATH. \
+                     Install it (e.g. `brew install graphviz` on macOS, \
+                     `apt install graphviz` on Debian/Ubuntu) and reload this page."
+                        .to_string()
+                }
+                RenderError::GraphvizFailed { message } => {
+                    format!("Graphviz failed to render this graph: {message}")
+                }
+                RenderError::UnsupportedFormat { .. } => e.to_string(),
+            };
+            Ok(poll_response(
+                &headers,
+                GraphTemplate {
+                    svg_content: None,
+                    error: Some(error),
+                },
+            ))
+        }
+    }
 }
 
 async fn run_status(
