@@ -699,7 +699,9 @@ async fn run_questions(
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, WebError> {
-    use crate::routes::gallery::{find_gallery_gate_for_node, resolve_candidate_count};
+    use crate::routes::gallery::{
+        candidate_ids_for_gate, find_gallery_gate_for_node, resolve_candidate_count,
+    };
 
     let runs = state.runs.read().await;
     let record = runs
@@ -730,10 +732,25 @@ async fn run_questions(
     let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
     let gallery_gate_html = gate.and_then(|gate| {
         let question_id = gallery_question_id?;
-        let found = candidates::scan_candidates(&artifacts_base, &id);
-        if found.is_empty() {
+        let all = candidates::scan_candidates(&artifacts_base, &id);
+        if all.is_empty() {
             return None;
         }
+        // Scope the card to this gate's own step, not the run's whole
+        // artifact history — a later gate shouldn't drag an earlier gate's
+        // already-decided candidates back into the picture. Falls back to
+        // showing everything found when the graph can't tell candidates
+        // apart by step (e.g. no render_capture-style Tool nodes on record).
+        let relevant_ids = candidate_ids_for_gate(&record.graph, &gate.id);
+        let filtered: Vec<CandidateSummary> = if relevant_ids.is_empty() {
+            Vec::new()
+        } else {
+            all.iter()
+                .filter(|c| relevant_ids.contains(&c.candidate_id))
+                .cloned()
+                .collect()
+        };
+        let found = if filtered.is_empty() { all } else { filtered };
         let candidates: Vec<GateCandidate> = found
             .into_iter()
             .map(|summary| {
@@ -1652,6 +1669,50 @@ mod tests {
         );
         assert!(html.contains(r#"data-question-id="q1""#));
         assert!(html.contains(&format!("/api/runs/{run_id}/gallery/q1/decision")));
+    }
+
+    /// A graph where each phase's Tool nodes carry `candidate_id` in their
+    /// `args`, the same authoring convention `examples/product_design_factory.dot`
+    /// uses. Gate2's card must only show `define` — not `discover-a`, which
+    /// belongs to Gate1's already-decided step but is still sitting on disk
+    /// from earlier in the run.
+    const TWO_GALLERY_GATES_WITH_RENDER_DOT: &str = r#"digraph {
+        Start [shape=Mdiamond];
+        RenderA [shape=parallelogram, tool="render_capture", args="{\"candidate_dir\": \"./a\", \"candidate_id\": \"discover-a\"}"];
+        Gate1 [shape=hexagon, label="Discover gate", gallery="true"];
+        RenderDefine [shape=parallelogram, tool="render_capture", args="{\"candidate_dir\": \"./define\", \"candidate_id\": \"define\"}"];
+        Gate2 [shape=hexagon, label="Define gate", gallery="true"];
+        Next [shape=box];
+        Start -> RenderA -> Gate1;
+        Gate1 -> RenderDefine [label="proceed"];
+        RenderDefine -> Gate2;
+        Gate2 -> Next [label="proceed"];
+    }"#;
+
+    #[tokio::test]
+    async fn run_questions_gate_card_scopes_candidates_to_the_pending_gates_own_step() {
+        let run_id = "gate-card-scoped-to-step";
+        write_gate_manifest(run_id, "discover-a", false);
+        write_gate_manifest(run_id, "define", false);
+
+        let state = test_state();
+        let interviewer =
+            insert_graph_record(&state, run_id, TWO_GALLERY_GATES_WITH_RENDER_DOT).await;
+        // Gate1's question is long done; only Gate2's is pending.
+        push_pending_qid(&interviewer, "q1", Some("Gate2"));
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            html.contains(r#"<span class="candidate-id">define</span>"#),
+            "missing this gate's own candidate:\n{html}"
+        );
+        assert!(
+            !html.contains(r#"<span class="candidate-id">discover-a</span>"#),
+            "an earlier gate's already-decided candidate leaked into this gate's card:\n{html}"
+        );
     }
 
     #[tokio::test]

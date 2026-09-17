@@ -134,6 +134,59 @@ pub fn resolve_candidate_count(
     }
 }
 
+/// Candidate ids belonging to this gate's own step, derived from the graph
+/// rather than the run's full artifact history.
+///
+/// Walks backward from the gate through `predecessors`, reading the
+/// `candidate_id` out of each Tool node's `args` JSON (the same field
+/// `render_capture`/`system_lint`/`task_critic`/`synthesis` nodes are
+/// authored with). Traversal stops behind an earlier gallery gate — those
+/// candidates already had their own human decision and belong to a prior
+/// step, not this one. A cycle (e.g. an "iterate" edge looping back through
+/// this same gate) is safe: the visited set stops it from recursing forever.
+///
+/// Returns an empty set when the graph has no Tool nodes carrying a
+/// `candidate_id` on the path behind this gate (e.g. hand-built test graphs,
+/// or an authoring style this convention doesn't cover) — callers should
+/// treat that as "unknown" and fall back to showing every candidate on disk
+/// rather than an empty gallery.
+pub fn candidate_ids_for_gate(graph: &Graph, gate_id: &str) -> std::collections::HashSet<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut ids = std::collections::HashSet::new();
+    let mut stack: Vec<String> = graph
+        .predecessors(gate_id)
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+    while let Some(node_id) = stack.pop() {
+        if !seen.insert(node_id.clone()) {
+            continue;
+        }
+        let Some(node) = graph.node(&node_id) else {
+            continue;
+        };
+        if let Some(id) = tool_candidate_id(node) {
+            ids.insert(id);
+        }
+        if is_gallery_gate(node) {
+            continue;
+        }
+        stack.extend(graph.predecessors(&node_id).into_iter().map(String::from));
+    }
+
+    ids
+}
+
+/// Reads the `candidate_id` a Tool node's `args` JSON names, if any.
+fn tool_candidate_id(node: &GraphNode) -> Option<String> {
+    let NodeAttrValue::String(args) = node.attrs.get("args")? else {
+        return None;
+    };
+    let parsed: serde_json::Value = serde_json::from_str(args).ok()?;
+    parsed.get("candidate_id")?.as_str().map(String::from)
+}
+
 /// Map `phase_default(<phase>)` to its gallery size: discover=4, define=2,
 /// deliver=1. Returns `None` for anything else.
 fn phase_default(s: &str) -> Option<usize> {
