@@ -29,10 +29,14 @@ pub fn router() -> Router<AppState> {
 // Decision types
 // ---------------------------------------------------------------------------
 
+/// Maximum length, in characters, of a trimmed per-candidate comment.
+const MAX_COMMENT_CHARS: usize = 4000;
+
 /// A validated gallery decision: chosen candidate ids plus the outgoing edge.
 pub struct GateDecision {
     pub selected: Vec<String>,
     pub decision: String,
+    pub comments: HashMap<String, String>,
 }
 
 /// Request body for the decision endpoint. Defaults keep a `{}` body
@@ -43,6 +47,22 @@ pub struct GateDecisionRequest {
     pub selected: Vec<String>,
     #[serde(default)]
     pub decision: String,
+    #[serde(default)]
+    pub comments: HashMap<String, String>,
+}
+
+/// Validate a candidate id against the same rules used for `selected`:
+/// well-formed (no path traversal) and present among this gate's non-failed
+/// candidates. Shared by both `selected` and `comments` validation so the
+/// two never drift.
+fn validate_candidate_id(id: &str, candidates: &[CandidateSummary]) -> Result<(), String> {
+    if !crate::candidates::valid_id(id) {
+        return Err(format!("invalid candidate id: {id}"));
+    }
+    match candidates.iter().find(|c| c.candidate_id == id) {
+        Some(c) if !c.failed() => Ok(()),
+        _ => Err(format!("unknown or failed candidate: {id}")),
+    }
 }
 
 /// Pure validation: no AppState, no queue — unit-testable against fixture vecs.
@@ -58,17 +78,30 @@ pub fn validate_decision(
         return Err("decision must name an outgoing edge".into());
     }
     for id in &decision.selected {
-        if !crate::candidates::valid_id(id) {
-            return Err(format!("invalid candidate id: {id}"));
-        }
-        match candidates.iter().find(|c| &c.candidate_id == id) {
-            Some(c) if !c.failed() => {}
-            _ => return Err(format!("unknown or failed candidate: {id}")),
-        }
+        validate_candidate_id(id, candidates)?;
     }
+
+    // Comments are not restricted to selected candidates — critiquing a
+    // candidate the human didn't check is the real use case.
+    let mut comments = std::collections::BTreeMap::new();
+    for (id, text) in &decision.comments {
+        validate_candidate_id(id, candidates)?;
+        let trimmed_text = text.trim();
+        if trimmed_text.is_empty() {
+            continue;
+        }
+        if trimmed_text.chars().count() > MAX_COMMENT_CHARS {
+            return Err(format!(
+                "comment on candidate {id} exceeds {MAX_COMMENT_CHARS} characters"
+            ));
+        }
+        comments.insert(id.clone(), trimmed_text.to_string());
+    }
+
     serde_json::to_string(&serde_json::json!({
         "selected": decision.selected,
         "decision": trimmed,
+        "comments": comments,
     }))
     .map_err(|e| e.to_string())
 }
@@ -249,6 +282,7 @@ async fn submit_gallery_decision(
     let decision = GateDecision {
         selected: req.selected,
         decision: req.decision,
+        comments: req.comments,
     };
     let run_id = id.clone();
     let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
@@ -300,6 +334,22 @@ mod tests {
         GateDecision {
             selected: selected.iter().map(|s| s.to_string()).collect(),
             decision: decision.into(),
+            comments: HashMap::new(),
+        }
+    }
+
+    fn decision_with_comments(
+        selected: &[&str],
+        decision: &str,
+        comments: &[(&str, &str)],
+    ) -> GateDecision {
+        GateDecision {
+            selected: selected.iter().map(|s| s.to_string()).collect(),
+            decision: decision.into(),
+            comments: comments
+                .iter()
+                .map(|(id, text)| (id.to_string(), text.to_string()))
+                .collect(),
         }
     }
 
@@ -312,7 +362,75 @@ mod tests {
         let candidates = vec![summary("a", false), summary("b", false)];
         let canonical = validate_decision(&candidates, &decision(&["a"], "proceed")).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
-        assert_eq!(parsed, serde_json::json!({"selected": ["a"], "decision": "proceed"}));
+        assert_eq!(
+            parsed,
+            serde_json::json!({"selected": ["a"], "decision": "proceed", "comments": {}})
+        );
+    }
+
+    #[test]
+    fn validate_decision_accepts_comment_on_unselected_candidate() {
+        let candidates = vec![summary("a", false), summary("b", false)];
+        let canonical = validate_decision(
+            &candidates,
+            &decision_with_comments(&["a"], "proceed", &[("b", "tweak spacing")]),
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
+        assert_eq!(parsed["comments"], serde_json::json!({"b": "tweak spacing"}));
+    }
+
+    #[test]
+    fn validate_decision_rejects_comment_on_forged_id() {
+        let candidates = vec![summary("a", false)];
+        let err = validate_decision(
+            &candidates,
+            &decision_with_comments(&["a"], "proceed", &[("../x", "hi")]),
+        )
+        .unwrap_err();
+        assert!(err.contains("../x"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn validate_decision_rejects_comment_on_unknown_or_failed_id() {
+        let candidates = vec![summary("good", false), summary("bad", true)];
+        let err = validate_decision(
+            &candidates,
+            &decision_with_comments(&[], "proceed", &[("bad", "hi")]),
+        )
+        .unwrap_err();
+        assert!(err.contains("bad"), "unexpected error: {err}");
+
+        let err = validate_decision(
+            &candidates,
+            &decision_with_comments(&[], "proceed", &[("unknown", "hi")]),
+        )
+        .unwrap_err();
+        assert!(err.contains("unknown"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn validate_decision_rejects_overlong_comment() {
+        let candidates = vec![summary("a", false)];
+        let too_long = "x".repeat(4001);
+        let err = validate_decision(
+            &candidates,
+            &decision_with_comments(&["a"], "proceed", &[("a", &too_long)]),
+        )
+        .unwrap_err();
+        assert!(err.contains("a"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn validate_decision_drops_whitespace_only_comment() {
+        let candidates = vec![summary("a", false)];
+        let canonical = validate_decision(
+            &candidates,
+            &decision_with_comments(&["a"], "proceed", &[("a", "   ")]),
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
+        assert_eq!(parsed["comments"], serde_json::json!({}));
     }
 
     #[test]
@@ -356,7 +474,10 @@ mod tests {
         let candidates = vec![summary("a", false)];
         let canonical = validate_decision(&candidates, &decision(&[], "iterate")).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
-        assert_eq!(parsed, serde_json::json!({"selected": [], "decision": "iterate"}));
+        assert_eq!(
+            parsed,
+            serde_json::json!({"selected": [], "decision": "iterate", "comments": {}})
+        );
     }
 
     // ---------------------------------------------------------------
@@ -520,7 +641,7 @@ mod tests {
         let answer_json: serde_json::Value = serde_json::from_str(&answer).unwrap();
         assert_eq!(
             answer_json,
-            serde_json::json!({"selected": ["candidate-a"], "decision": "proceed"})
+            serde_json::json!({"selected": ["candidate-a"], "decision": "proceed", "comments": {}})
         );
 
         std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
