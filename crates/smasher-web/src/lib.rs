@@ -5,6 +5,7 @@ pub mod backend;
 pub mod candidates;
 pub mod decision_history;
 pub mod error;
+pub mod rehydrate;
 pub mod routes;
 pub mod server;
 pub mod sse;

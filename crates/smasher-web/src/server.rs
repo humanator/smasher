@@ -162,6 +162,8 @@ pub async fn run_with_config(config: ServerConfig) -> Result<(), Box<dyn std::er
         config.data_dir,
         workflow_dirs,
     );
+    let rehydrated = crate::rehydrate::rehydrate_runs(&state.data_dir).await;
+    state.runs.write().await.extend(rehydrated);
     let app = build_router(state);
 
     let addr = SocketAddr::from((config.host, config.port));
