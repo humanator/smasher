@@ -10,7 +10,7 @@ use axum::Router;
 use axum::extract::{Form, Path, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 
 use smasher_attractor::events::PipelineEvent;
 use smasher_attractor::rendering::{
@@ -36,6 +36,12 @@ struct WorkflowCatalogTemplate {
 #[template(path = "runs_page.html")]
 struct RunsPageTemplate {
     runs: Vec<RunSummary>,
+}
+
+#[derive(Template)]
+#[template(path = "workflow_new.html")]
+struct WorkflowNewTemplate {
+    target_dirs: Vec<String>,
 }
 
 #[derive(Template)]
@@ -177,6 +183,13 @@ pub struct SubmitForm {
     pub node_overrides: Option<String>,
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateWorkflowForm {
+    pub name: String,
+    pub target_dir: String,
+    pub dot_source: String,
+}
+
 // ---------------------------------------------------------------------------
 // Template response helper
 // ---------------------------------------------------------------------------
@@ -269,6 +282,8 @@ fn poll_response<T: Template>(headers: &HeaderMap, template: T) -> Response {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(workflow_catalog))
+        .route("/workflows/new", get(workflow_new))
+        .route("/workflows", post(create_workflow))
         .route("/runs", get(runs_page).post(submit_run))
         .route("/runs/{id}", get(run_detail))
         .route("/runs/{id}/graph", get(run_graph))
@@ -293,6 +308,58 @@ async fn runs_page(State(state): State<AppState>) -> impl IntoResponse {
     let mut runs: Vec<RunSummary> = runs_map.values().map(|r| r.to_summary()).collect();
     runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
     HtmlTemplate(RunsPageTemplate { runs })
+}
+
+async fn workflow_new(State(state): State<AppState>) -> impl IntoResponse {
+    HtmlTemplate(WorkflowNewTemplate {
+        target_dirs: state.workflow_dirs.clone(),
+    })
+}
+
+/// Writes the submitted DOT text to `{target_dir}/{name}.dot` and redirects
+/// to the new workflow's detail page. `name` gets the same traversal-
+/// rejection discipline `candidates::valid_id` already applies to candidate
+/// ids: empty/whitespace-only and any `..`/`/`/`\` component are rejected
+/// before anything touches disk.
+async fn create_workflow(
+    State(state): State<AppState>,
+    Form(form): Form<CreateWorkflowForm>,
+) -> Result<Response, WebError> {
+    use smasher_attractor::dot::parser;
+
+    let name = form.name.trim();
+    if name.is_empty() {
+        return Err(WebError::BadRequest(
+            "workflow name must not be blank".into(),
+        ));
+    }
+    if !crate::candidates::valid_id(name) {
+        return Err(WebError::BadRequest(format!(
+            "invalid workflow name: {name}"
+        )));
+    }
+    // `target_dir` comes from a client-submitted form field (a <select>, but
+    // nothing stops a forged request from sending any string) -- restrict
+    // writes to directories the operator actually configured, not wherever
+    // the request asks for.
+    if !state.workflow_dirs.contains(&form.target_dir) {
+        return Err(WebError::BadRequest(format!(
+            "unknown target directory: {}",
+            form.target_dir
+        )));
+    }
+
+    parser::parse(&form.dot_source)?;
+
+    let target_dir = std::path::Path::new(&form.target_dir);
+    std::fs::create_dir_all(target_dir)?;
+    let file_path = target_dir.join(format!("{name}.dot"));
+    std::fs::write(&file_path, &form.dot_source)?;
+
+    let root_name = crate::workflows::root_name_for(&form.target_dir);
+    let id = crate::workflows::slug_for(&root_name, std::path::Path::new(&format!("{name}.dot")));
+
+    Ok(axum::response::Redirect::to(&format!("/workflows/{id}")).into_response())
 }
 
 async fn submit_run(
@@ -1153,6 +1220,155 @@ mod tests {
         let runs = state.runs.read().await;
         let record = runs.get(&run_id).expect("run should be recorded");
         assert!(!record.variables.contains_key("brief"));
+    }
+
+    fn state_with_workflow_dir(dir: &std::path::Path) -> AppState {
+        let client = smasher_llm::client::Client::from_env();
+        AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            "/tmp".into(),
+            vec![dir.display().to_string()],
+        )
+    }
+
+    #[tokio::test]
+    async fn new_workflow_form_renders() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri("/workflows/new")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("Add Workflow"));
+        assert!(html.contains(&tmp.path().display().to_string()));
+    }
+
+    #[tokio::test]
+    async fn create_workflow_writes_file_and_redirects() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target_dir = tmp.path().display().to_string();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let body = format!(
+            "name=hello&target_dir={}&dot_source={}",
+            urlencode(&target_dir),
+            urlencode("digraph { a -> b }")
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::SEE_OTHER);
+        let location = resp
+            .headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        assert!(location.starts_with("/workflows/"));
+
+        let written = std::fs::read_to_string(tmp.path().join("hello.dot")).unwrap();
+        assert_eq!(written, "digraph { a -> b }");
+    }
+
+    #[tokio::test]
+    async fn create_workflow_rejects_invalid_dot() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target_dir = tmp.path().display().to_string();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let body = format!(
+            "name=hello&target_dir={}&dot_source={}",
+            urlencode(&target_dir),
+            urlencode("not a valid dot graph")
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert!(!tmp.path().join("hello.dot").exists());
+    }
+
+    #[tokio::test]
+    async fn create_workflow_rejects_blank_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target_dir = tmp.path().display().to_string();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let body = format!(
+            "name={}&target_dir={}&dot_source={}",
+            urlencode("   "),
+            urlencode(&target_dir),
+            urlencode("digraph { a -> b }")
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn create_workflow_rejects_path_traversal_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target_dir = tmp.path().display().to_string();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let body = format!(
+            "name={}&target_dir={}&dot_source={}",
+            urlencode("../../etc/passwd"),
+            urlencode(&target_dir),
+            urlencode("digraph { a -> b }")
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn create_workflow_rejects_unknown_target_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let body = format!(
+            "name=hello&target_dir={}&dot_source={}",
+            urlencode("/etc"),
+            urlencode("digraph { a -> b }")
+        );
+        let req = Request::builder()
+            .method("POST")
+            .uri("/workflows")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

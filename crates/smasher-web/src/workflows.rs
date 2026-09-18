@@ -38,11 +38,7 @@ pub fn scan_workflows(dirs: &[String]) -> Vec<WorkflowSummary> {
 
     for dir in dirs {
         let root = Path::new(dir);
-        let root_name = root
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(dir)
-            .to_string();
+        let root_name = root_name_for(dir);
         walk(root, root, &root_name, dir, &mut seen, &mut results);
     }
 
@@ -101,7 +97,19 @@ fn walk(
     }
 }
 
-fn slug_for(root_name: &str, relative: &Path) -> String {
+/// The root-name component of a workflow id slug: a configured root
+/// directory's last path component, falling back to the whole configured
+/// string if it has none. Shared by `scan_workflows` and callers that need
+/// to compute the id a not-yet-scanned file will get (e.g. after writing it).
+pub(crate) fn root_name_for(dir: &str) -> String {
+    Path::new(dir)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(dir)
+        .to_string()
+}
+
+pub(crate) fn slug_for(root_name: &str, relative: &Path) -> String {
     let stem = relative.with_extension("");
     let stem_str = stem
         .to_string_lossy()
@@ -188,6 +196,24 @@ mod tests {
 
         let resolved = resolve_workflow(&dirs, &summary.id).unwrap();
         assert_eq!(resolved.path, summary.path);
+    }
+
+    #[test]
+    fn root_name_for_takes_the_last_path_component() {
+        assert_eq!(root_name_for("foo/bar/examples"), "examples");
+        assert_eq!(root_name_for("examples"), "examples");
+    }
+
+    #[test]
+    fn slug_for_matches_scan_workflows_for_a_freshly_written_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_file(tmp.path(), "hello.dot", "digraph { a -> b }");
+        let dirs = vec![tmp.path().display().to_string()];
+
+        let scanned_id = scan_workflows(&dirs).first().unwrap().id.clone();
+        let computed_id = slug_for(&root_name_for(&dirs[0]), Path::new("hello.dot"));
+
+        assert_eq!(scanned_id, computed_id);
     }
 
     #[test]
