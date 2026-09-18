@@ -45,6 +45,13 @@ struct WorkflowNewTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "workflow_detail_stub.html")]
+struct WorkflowDetailStubTemplate {
+    workflow: crate::workflows::WorkflowSummary,
+    dot_source: String,
+}
+
+#[derive(Template)]
 #[template(path = "run_detail.html")]
 struct RunDetailTemplate {
     run: RunSummary,
@@ -284,6 +291,7 @@ pub fn router() -> Router<AppState> {
         .route("/", get(workflow_catalog))
         .route("/workflows/new", get(workflow_new))
         .route("/workflows", post(create_workflow))
+        .route("/workflows/{id}", get(workflow_detail))
         .route("/runs", get(runs_page).post(submit_run))
         .route("/runs/{id}", get(run_detail))
         .route("/runs/{id}/graph", get(run_graph))
@@ -360,6 +368,22 @@ async fn create_workflow(
     let id = crate::workflows::slug_for(&root_name, std::path::Path::new(&format!("{name}.dot")));
 
     Ok(axum::response::Redirect::to(&format!("/workflows/{id}")).into_response())
+}
+
+/// Read-only placeholder for a workflow's detail page. Run/monitor/edit/Q&A
+/// land with `workflow-run-shell` -- `workflow-catalog` ships independently
+/// of it, per the spec's Resolved Questions.
+async fn workflow_detail(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, WebError> {
+    let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
+        .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let dot_source = std::fs::read_to_string(&workflow.path)?;
+    Ok(HtmlTemplate(WorkflowDetailStubTemplate {
+        workflow,
+        dot_source,
+    }))
 }
 
 async fn submit_run(
@@ -1369,6 +1393,50 @@ mod tests {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_known_id_shows_name_source_dir_and_dot_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+
+        // The id encodes the configured root's *last path component*, which
+        // is a random tempdir name here, not a fixed string -- compute it
+        // the same way scan_workflows would rather than hardcoding it.
+        let dirs = vec![tmp.path().display().to_string()];
+        let real_id = crate::workflows::scan_workflows(&dirs)
+            .first()
+            .unwrap()
+            .id
+            .clone();
+
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri(format!("/workflows/{real_id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("hello.dot"));
+        // askama HTML-escapes the raw DOT source (`>` -> `&gt;`), correctly.
+        assert!(html.contains("digraph { a -&gt; b }"));
+        assert!(html.contains("All workflows"));
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_unknown_id_returns_404() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri("/workflows/no-such-id")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

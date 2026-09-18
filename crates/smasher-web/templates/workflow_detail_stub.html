@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}SMASHER — {{ workflow.name }}{% endblock %}
+
+{% block content %}
+<div class="workflow-detail">
+    <a href="/" class="btn btn-small">&larr; All workflows</a>
+    <h2>{{ workflow.name }}</h2>
+    <p class="field-hint">Source: {{ workflow.source_dir }}</p>
+    <p class="field-hint">Run, monitor, edit, and Q&amp;A land with workflow-run-shell — this is a read-only placeholder.</p>
+    <pre class="dot-source-preview">{{ dot_source }}</pre>
+</div>
+{% endblock %}
