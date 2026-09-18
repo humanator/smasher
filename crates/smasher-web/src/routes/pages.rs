@@ -735,8 +735,12 @@ async fn run_questions(
         Some((q.id.clone(), gate))
     });
     let gallery_question_id = pending_gallery.as_ref().map(|(qid, _)| qid.clone());
+    // `gallery_question_id` is moved into the `gallery_gate_html` closure
+    // below (it's consumed there via `?`), so keep a second clone to compare
+    // against after the card is rendered.
+    let dedupe_question_id = gallery_question_id.clone();
     let gate = pending_gallery.map(|(_, gate)| gate);
-    let questions: Vec<TemplateQuestion> = pending
+    let mut questions: Vec<TemplateQuestion> = pending
         .questions
         .into_iter()
         .map(TemplateQuestion::from)
@@ -794,6 +798,17 @@ async fn run_questions(
         })
         .ok()
     });
+
+    // Suppress the redundant plain question card for the gate's own pending
+    // question — but only once a gate card actually rendered. Keyed off the
+    // rendered `Option`, not "is this node gallery-shaped": if the card
+    // fails to render for any reason, the plain card must still be the
+    // paused run's only way to answer.
+    if gallery_gate_html.is_some()
+        && let Some(qid) = &dedupe_question_id
+    {
+        questions.retain(|q| &q.id != qid);
+    }
 
     Ok(poll_response(
         &headers,
@@ -1570,8 +1585,9 @@ mod tests {
         ));
         assert!(html.contains("<img"));
         assert!(!html.contains("<iframe"));
-        // Plain cards still render alongside.
-        assert!(html.contains("question-card"));
+        // The gate's own question no longer gets a redundant plain card now
+        // that its gate card rendered (Task 5 dedupe).
+        assert!(!html.contains("answer-input-q1"));
         // Non-failed candidates get an optional comment textarea (one each,
         // none for the failed candidate rendered via the failed_card macro).
         assert_eq!(html.matches("<textarea class=\"candidate-comment\"").count(), 2);
@@ -1798,6 +1814,27 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(!html.contains("data-question-id="));
         assert!(html.contains("question-card"));
+    }
+
+    #[tokio::test]
+    async fn run_questions_dedupe_keeps_a_second_genuinely_plain_question() {
+        let run_id = "gate-card-dedupe-keeps-plain";
+        write_gate_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        let interviewer = insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        // q1 belongs to the gallery gate (deduped away); q2 is a genuinely
+        // separate, non-gallery pending question on the same run.
+        push_pending_qid(&interviewer, "q1", Some("Gate1"));
+        push_pending_qid(&interviewer, "q2", None);
+
+        let (status, html) = get_questions_html(state, run_id).await;
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains(r#"<div class="gate-card""#), "gate card missing:\n{html}");
+        assert!(!html.contains("answer-input-q1"), "gate's own question must be deduped");
+        assert!(html.contains("answer-input-q2"), "unrelated plain question must still render");
     }
 
     #[tokio::test]
