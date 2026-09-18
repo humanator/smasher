@@ -990,7 +990,7 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
         max_steps: args.max_steps,
         enable_checkpointing: true,
         checkpoint_dir: Some(run_directory.manifest().directories.checkpoints.clone()),
-        artifact_store: Some(artifact_store),
+        artifact_store: Some(artifact_store.clone()),
         ..EngineConfig::default()
     };
 
@@ -1089,7 +1089,11 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
     // plus timeout/default_choice and gallery-gate structured answers) —
     // HandlerRegistry dispatches to the first handler whose `handles()`
     // matches, so only one handler may ever claim this node type.
-    registry.register(Arc::new(InterviewerHandler::new(interviewer)));
+    registry.register(Arc::new(
+        InterviewerHandler::builder(interviewer)
+            .with_artifact_store(artifact_store)
+            .build(),
+    ));
 
     // Register manager and tool handlers with LLM backends (skipped for shell backend).
     if let Some(ref client) = client {

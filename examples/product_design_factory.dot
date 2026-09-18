@@ -11,12 +11,42 @@ digraph ProductDesignFactory {
   Start [shape=Mdiamond, label="Start"];
   Exit  [shape=Msquare, label="Exit"];
 
+  // --- Intake: clarify the raw brief with the user before any design work ---
+
+  // Codergen (box) node output isn't propagated into the pipeline context —
+  // only a hexagon gate's own human answer is (stored under the gate's node
+  // id). ComposeBrief needs the questions on disk (Codergen-to-Codergen still
+  // only shares state via the filesystem), but the dashboard's question card
+  // needs them too, and that's a separate channel: question_source below
+  // tells InterviewerHandler to pull ClarifyQuestions' final reply straight
+  // out of the engine's ArtifactStore (every node's Outcome is recorded
+  // there regardless of context propagation) and show it on the card instead
+  // of just this node's static label.
+  ClarifyQuestions [
+    shape=box,
+    label="Analyse brief, draft clarifying questions",
+    prompt="Product brief: {{brief}}\n\nAnalyse this brief for ambiguity, missing constraints, or unstated assumptions that would materially change the design direction (target users, platform, must-have features, tone/brand, technical constraints, existing design system to match, etc.) and to identify the goal. Write at most 5 numbered clarifying questions to ./intake/questions.md (create the directory if needed), and reply with that exact numbered list as your final message so it can be shown to the user directly. If the brief is already clear and unambiguous, write a single line to that file saying no clarification is needed, and give that same line as your final reply."
+  ];
+
+  ClarifyGate [
+    shape=hexagon,
+    label="Answer the clarifying questions below (or type 'skip' if the brief is already clear):",
+    mode="freeform",
+    question_source="ClarifyQuestions"
+  ];
+
+  ComposeBrief [
+    shape=box,
+    label="Combine answers into a refined brief",
+    prompt="Original product brief: {{brief}}\n\nRead ./intake/questions.md, and combine the original brief with the user's answers (given above in the pipeline context) into a single, self-contained, unambiguous product brief. Write the result to ./intake/brief.md. This refined brief is what all subsequent design work must follow."
+  ];
+
   // --- Discover: wide exploration, cheap kit-based candidates ---
 
   IAOptions [
     shape=box,
     label="Build interaction approaches from kit",
-    prompt="Product brief: {{brief}}\n\nBuild 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/discover-a/, ./candidates/discover-b/, ./candidates/discover-c/, and ./candidates/discover-d/ (build up to 4 if the brief supports that many distinct directions; fewer is fine, but each one built must use its listed directory exactly)."
+    prompt="Refined product brief: read ./intake/brief.md (original brief plus clarifying Q&A: {{brief}}).\n\nBuild 3-4 distinct, working interaction patterns (not visual skins) under ./candidates/discover-a/, ./candidates/discover-b/, ./candidates/discover-c/, and ./candidates/discover-d/ (build up to 4 if the brief supports that many distinct directions; fewer is fine, but each one built must use its listed directory exactly)."
   ];
 
   // Real render_capture is one-candidate-per-call, so Discover's 4 candidates
@@ -59,7 +89,7 @@ digraph ProductDesignFactory {
   Implement [
     shape=box,
     label="Implement chosen direction",
-    prompt="Product brief: {{brief}}\n\nBuild out the selected pattern under ./build/define/."
+    prompt="Refined product brief: read ./intake/brief.md (original brief plus clarifying Q&A: {{brief}}).\n\nBuild out the selected pattern under ./build/define/."
   ];
 
   RenderDefine [
@@ -106,7 +136,7 @@ digraph ProductDesignFactory {
   Prune [
     shape=box,
     label="Cut non-value elements",
-    prompt="Remove anything not serving the product brief ({{brief}}) from ./build/define/. Prefer kit/native components over custom ones."
+    prompt="Remove anything not serving the refined product brief (./intake/brief.md, or the original brief {{brief}} if that file is absent) from ./build/define/. Prefer kit/native components over custom ones."
   ];
 
   // No real axe-core integration exists yet (deliberately deferred — see
@@ -118,7 +148,7 @@ digraph ProductDesignFactory {
     tool_command="echo 'axe-core stub: no violations (placeholder, not a real audit)'"
   ];
 
-  Start -> IAOptions;
+  Start -> ClarifyQuestions -> ClarifyGate -> ComposeBrief -> IAOptions;
   IAOptions -> RenderDiscoverA -> RenderDiscoverB -> RenderDiscoverC -> RenderDiscoverD -> GalleryGate1;
 
   GalleryGate1 -> Implement [label="proceed"];

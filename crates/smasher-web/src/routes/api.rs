@@ -336,17 +336,28 @@ async fn submit_pipeline(
             manager_backend.clone();
         let child_tool: Arc<dyn smasher_attractor::tool_handler::ToolBackend> =
             tool_backend.clone();
+        // Shared with InterviewerHandler below so a hexagon gate's
+        // `question_source` attribute can pull a prior Codergen node's
+        // response text out of the same store the engine records into.
+        let artifact_store = ArtifactStore::new();
+
         let mut child_registry = HandlerRegistry::new();
         child_registry.register(Arc::new(CodergenHandler::new(child_codergen)));
-        child_registry.register(Arc::new(InterviewerHandler::new(Arc::clone(
-            &interviewer_arc,
-        ))));
+        child_registry.register(Arc::new(
+            InterviewerHandler::builder(Arc::clone(&interviewer_arc))
+                .with_artifact_store(artifact_store.clone())
+                .build(),
+        ));
         child_registry.register(Arc::new(ManagerHandler::new(child_manager)));
         child_registry.register(Arc::new(ToolHandler::new(child_tool)));
 
         let mut registry = default_registry();
         registry.register(Arc::new(CodergenHandler::new(backend)));
-        registry.register(Arc::new(InterviewerHandler::new(interviewer_arc)));
+        registry.register(Arc::new(
+            InterviewerHandler::builder(interviewer_arc)
+                .with_artifact_store(artifact_store.clone())
+                .build(),
+        ));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
         registry.register(Arc::new(ParallelHandler::new(Arc::new(child_registry))));
@@ -356,7 +367,7 @@ async fn submit_pipeline(
             enable_checkpointing: true,
             checkpoint_dir: Some(checkpoint_dir),
             cancellation_token: Some(cancellation),
-            artifact_store: Some(ArtifactStore::new()),
+            artifact_store: Some(artifact_store),
             ..EngineConfig::default()
         };
 
@@ -669,17 +680,28 @@ async fn resume_run(
             manager_backend.clone();
         let child_tool: Arc<dyn smasher_attractor::tool_handler::ToolBackend> =
             tool_backend.clone();
+        // Shared with InterviewerHandler below so a hexagon gate's
+        // `question_source` attribute can pull a prior Codergen node's
+        // response text out of the same store the engine records into.
+        let artifact_store = ArtifactStore::new();
+
         let mut child_registry = HandlerRegistry::new();
         child_registry.register(Arc::new(CodergenHandler::new(child_codergen)));
-        child_registry.register(Arc::new(InterviewerHandler::new(Arc::clone(
-            &interviewer_arc,
-        ))));
+        child_registry.register(Arc::new(
+            InterviewerHandler::builder(Arc::clone(&interviewer_arc))
+                .with_artifact_store(artifact_store.clone())
+                .build(),
+        ));
         child_registry.register(Arc::new(ManagerHandler::new(child_manager)));
         child_registry.register(Arc::new(ToolHandler::new(child_tool)));
 
         let mut registry = default_registry();
         registry.register(Arc::new(CodergenHandler::new(backend)));
-        registry.register(Arc::new(InterviewerHandler::new(interviewer_arc)));
+        registry.register(Arc::new(
+            InterviewerHandler::builder(interviewer_arc)
+                .with_artifact_store(artifact_store.clone())
+                .build(),
+        ));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
         registry.register(Arc::new(ToolHandler::new(tool_backend)));
         registry.register(Arc::new(ParallelHandler::new(Arc::new(child_registry))));
@@ -688,7 +710,7 @@ async fn resume_run(
             max_steps: 1000,
             enable_checkpointing: false,
             cancellation_token: Some(cancellation),
-            artifact_store: Some(ArtifactStore::new()),
+            artifact_store: Some(artifact_store),
             ..EngineConfig::default()
         };
 

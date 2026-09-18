@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
+use crate::artifact::ArtifactStore;
 use crate::graph::{GraphNode, NodeAttrValue, NodeType};
 use crate::handler::{Handler, HandlerError};
 use crate::state::{Context, Outcome};
@@ -604,31 +605,79 @@ impl Interviewer for ChannelInterviewer {
 /// (`HandlerRegistry` uses the first handler whose `handles()` matches).
 pub struct InterviewerHandler {
     interviewer: Arc<dyn Interviewer>,
+    artifact_store: Option<ArtifactStore>,
 }
 
 /// Builder for constructing an `InterviewerHandler`.
 pub struct InterviewerHandlerBuilder {
     interviewer: Arc<dyn Interviewer>,
+    artifact_store: Option<ArtifactStore>,
 }
 
 impl InterviewerHandlerBuilder {
+    /// Attach an `ArtifactStore` so `question_source` node attributes can be
+    /// resolved to a prior Codergen node's response text at ask-time.
+    pub fn with_artifact_store(mut self, store: ArtifactStore) -> Self {
+        self.artifact_store = Some(store);
+        self
+    }
+
     /// Build the `InterviewerHandler`.
     pub fn build(self) -> InterviewerHandler {
         InterviewerHandler {
             interviewer: self.interviewer,
+            artifact_store: self.artifact_store,
         }
     }
 }
 
 impl InterviewerHandler {
     /// Create a new InterviewerHandler wrapping the given Interviewer.
+    ///
+    /// Has no `ArtifactStore`, so `question_source` node attributes are
+    /// ignored and the question falls back to `question`/`prompt`/`label`.
+    /// Use `builder` to attach a store.
     pub fn new(interviewer: Arc<dyn Interviewer>) -> Self {
-        Self { interviewer }
+        Self {
+            interviewer,
+            artifact_store: None,
+        }
     }
 
     /// Return a builder for constructing an InterviewerHandler with optional configuration.
     pub fn builder(interviewer: Arc<dyn Interviewer>) -> InterviewerHandlerBuilder {
-        InterviewerHandlerBuilder { interviewer }
+        InterviewerHandlerBuilder {
+            interviewer,
+            artifact_store: None,
+        }
+    }
+
+    /// Resolve the `question_source` node attribute (if present) to the
+    /// referenced node's latest stored response text.
+    ///
+    /// Codergen node output isn't propagated into the pipeline `Context` (see
+    /// module docs), so a hexagon gate that wants to show a prior LLM step's
+    /// dynamically generated text (e.g. clarifying questions) has no other
+    /// way to reach it — every node's `Outcome` is unconditionally recorded
+    /// in the `ArtifactStore` under its own node id as an "outcome" artifact,
+    /// so that's the channel this reads from.
+    fn resolve_question_source(&self, node: &GraphNode) -> Option<String> {
+        let Some(NodeAttrValue::String(source_id)) = node.attrs.get("question_source") else {
+            return None;
+        };
+        let store = self.artifact_store.as_ref()?;
+        let artifact = store
+            .get_by_node(source_id)
+            .into_iter()
+            .filter(|a| a.metadata.name == "outcome")
+            .max_by_key(|a| a.metadata.created_at)?;
+        let outcome: Outcome = serde_json::from_value(artifact.data).ok()?;
+        let text = outcome.data()?.get("response")?.as_str()?.trim();
+        if text.is_empty() {
+            None
+        } else {
+            Some(text.to_string())
+        }
     }
 }
 
@@ -640,19 +689,28 @@ impl Handler for InterviewerHandler {
 
     async fn execute(&self, node: &GraphNode, context: &Context) -> Result<Outcome, HandlerError> {
         // Determine the question: `question` attr, then `prompt` attr, then label.
-        let question = match node.attrs.get("question") {
-            Some(NodeAttrValue::String(s)) => s.clone(),
+        let static_question = match node.attrs.get("question") {
+            Some(NodeAttrValue::String(s)) => Some(s.clone()),
             _ => match node.attrs.get("prompt") {
-                Some(NodeAttrValue::String(s)) => s.clone(),
-                _ => match &node.label {
-                    Some(label) => label.clone(),
-                    None => {
-                        return Ok(Outcome::failure(
-                            "no question or prompt specified for interviewer node",
-                        ));
-                    }
-                },
+                Some(NodeAttrValue::String(s)) => Some(s.clone()),
+                _ => node.label.clone(),
             },
+        };
+
+        // If `question_source` names a node whose response text is available
+        // in the ArtifactStore, append it below the static question/label so
+        // the gate card shows the dynamically generated content (e.g. an
+        // LLM's clarifying questions) rather than just the static instruction.
+        let dynamic_question = self.resolve_question_source(node);
+        let question = match (static_question, dynamic_question) {
+            (Some(s), Some(d)) => format!("{s}\n\n{d}"),
+            (Some(s), None) => s,
+            (None, Some(d)) => d,
+            (None, None) => {
+                return Ok(Outcome::failure(
+                    "no question or prompt specified for interviewer node",
+                ));
+            }
         };
 
         // Scoped copy of the context carrying this node's id, so an
@@ -1735,6 +1793,118 @@ mod tests {
             }
             other => panic!("expected success with data, got {other:?}"),
         }
+    }
+
+    // ---------------------------------------------------------------
+    // InterviewerHandler: question_source (dynamic question from a prior
+    // Codergen node's recorded ArtifactStore outcome)
+    // ---------------------------------------------------------------
+
+    #[tokio::test]
+    async fn interviewer_handler_appends_question_source_artifact_text() {
+        let store = ArtifactStore::new();
+        store.store(
+            "analyze",
+            "outcome",
+            "application/json",
+            serde_json::to_value(Outcome::success_with(
+                json!({"response": "1. Who are the target users?"}),
+            ))
+            .unwrap(),
+        );
+
+        let captured = Arc::new(Mutex::new(None));
+        let captured_clone = Arc::clone(&captured);
+        let callback = Arc::new(CallbackInterviewer::new(
+            move |q| {
+                *captured_clone.lock().unwrap() = Some(q.to_string());
+                "answered".to_string()
+            },
+            |_| true,
+        ));
+        let handler = InterviewerHandler::builder(callback)
+            .with_artifact_store(store)
+            .build();
+
+        let mut node = make_node_with_label(
+            "clarify_gate",
+            NodeType::Interviewer,
+            "Answer the clarifying questions below",
+        );
+        node.attrs.insert(
+            "question_source".to_string(),
+            NodeAttrValue::String("analyze".to_string()),
+        );
+
+        let ctx = Context::new();
+        handler.execute(&node, &ctx).await.unwrap();
+
+        let question = captured.lock().unwrap().clone().unwrap();
+        assert_eq!(
+            question,
+            "Answer the clarifying questions below\n\n1. Who are the target users?"
+        );
+    }
+
+    #[tokio::test]
+    async fn interviewer_handler_question_source_missing_artifact_falls_back_to_label() {
+        let store = ArtifactStore::new();
+
+        let captured = Arc::new(Mutex::new(None));
+        let captured_clone = Arc::clone(&captured);
+        let callback = Arc::new(CallbackInterviewer::new(
+            move |q| {
+                *captured_clone.lock().unwrap() = Some(q.to_string());
+                "answered".to_string()
+            },
+            |_| true,
+        ));
+        let handler = InterviewerHandler::builder(callback)
+            .with_artifact_store(store)
+            .build();
+
+        let mut node = make_node_with_label(
+            "clarify_gate2",
+            NodeType::Interviewer,
+            "Answer the clarifying questions below",
+        );
+        node.attrs.insert(
+            "question_source".to_string(),
+            NodeAttrValue::String("never_ran".to_string()),
+        );
+
+        let ctx = Context::new();
+        handler.execute(&node, &ctx).await.unwrap();
+
+        let question = captured.lock().unwrap().clone().unwrap();
+        assert_eq!(question, "Answer the clarifying questions below");
+    }
+
+    #[tokio::test]
+    async fn interviewer_handler_without_artifact_store_ignores_question_source() {
+        // No .with_artifact_store(..) — question_source must be a silent no-op.
+        let captured = Arc::new(Mutex::new(None));
+        let captured_clone = Arc::clone(&captured);
+        let callback = Arc::new(CallbackInterviewer::new(
+            move |q| {
+                *captured_clone.lock().unwrap() = Some(q.to_string());
+                "answered".to_string()
+            },
+            |_| true,
+        ));
+        let handler = InterviewerHandler::new(callback);
+
+        let mut node = make_node_with_label("clarify_gate3", NodeType::Interviewer, "static only");
+        node.attrs.insert(
+            "question_source".to_string(),
+            NodeAttrValue::String("analyze".to_string()),
+        );
+
+        let ctx = Context::new();
+        handler.execute(&node, &ctx).await.unwrap();
+
+        let question = captured.lock().unwrap().clone().unwrap();
+        assert_eq!(question, "static only");
     }
 
     #[tokio::test]
