@@ -191,6 +191,14 @@ pub struct SubmitForm {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct WorkflowRunForm {
+    pub model: Option<String>,
+    pub vars: Option<String>,
+    pub brief: Option<String>,
+    pub node_overrides: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct CreateWorkflowForm {
     pub name: String,
     pub target_dir: String,
@@ -292,6 +300,7 @@ pub fn router() -> Router<AppState> {
         .route("/workflows/new", get(workflow_new))
         .route("/workflows", post(create_workflow))
         .route("/workflows/{id}", get(workflow_detail))
+        .route("/workflows/{id}/run", post(workflow_run))
         .route("/runs", get(runs_page).post(submit_run))
         .route("/runs/{id}", get(run_detail))
         .route("/runs/{id}/graph", get(run_graph))
@@ -384,6 +393,38 @@ async fn workflow_detail(
         workflow,
         dot_source,
     }))
+}
+
+/// Launches a run of a workflow's current on-disk `.dot` file (read fresh,
+/// not any page-load snapshot) and redirects back to the workflow's own
+/// detail page rather than `/runs/{id}`, per the spec's redirect-target
+/// decision.
+async fn workflow_run(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Form(form): Form<WorkflowRunForm>,
+) -> Result<Response, WebError> {
+    let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
+        .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let dot_source = std::fs::read_to_string(&workflow.path)?;
+
+    create_run(
+        &state,
+        dot_source,
+        form.model,
+        form.vars,
+        form.brief,
+        form.node_overrides,
+        Some(id.clone()),
+    )
+    .await?;
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("HX-Redirect", format!("/workflows/{id}"))
+        .body(axum::body::Body::empty())
+        .unwrap();
+    Ok(response)
 }
 
 async fn submit_run(
@@ -1583,6 +1624,101 @@ mod tests {
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    fn state_with_workflow_dir_and_data_dir(
+        workflow_dir: &std::path::Path,
+        data_dir: &std::path::Path,
+    ) -> AppState {
+        let client = smasher_llm::client::Client::from_env();
+        AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            data_dir.display().to_string(),
+            vec![workflow_dir.display().to_string()],
+        )
+    }
+
+    async fn post_workflow_run(app: axum::Router, id: &str) -> Response {
+        let req = Request::builder()
+            .method("POST")
+            .uri(format!("/workflows/{id}/run"))
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(""))
+            .unwrap();
+        app.oneshot(req).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn workflow_run_launches_run_with_workflow_id_and_redirects_to_workflow() {
+        let workflow_dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            workflow_dir.path().join("hello.dot"),
+            "digraph { start [shape=circle]; end [shape=doublecircle]; start -> end }",
+        )
+        .unwrap();
+        let dirs = vec![workflow_dir.path().display().to_string()];
+        let id = crate::workflows::scan_workflows(&dirs).first().unwrap().id.clone();
+
+        let data_dir = tempfile::tempdir().unwrap();
+        let state = state_with_workflow_dir_and_data_dir(workflow_dir.path(), data_dir.path());
+        let app = router().with_state(state.clone());
+
+        let resp = post_workflow_run(app, &id).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get("HX-Redirect").unwrap().to_str().unwrap(),
+            format!("/workflows/{id}")
+        );
+
+        let runs = state.runs.read().await;
+        let record = runs.values().next().expect("a run should have been recorded");
+        assert_eq!(record.workflow_id, Some(id));
+    }
+
+    #[tokio::test]
+    async fn workflow_run_reads_dot_source_fresh_not_a_stale_snapshot() {
+        let workflow_dir = tempfile::tempdir().unwrap();
+        let file_path = workflow_dir.path().join("hello.dot");
+        std::fs::write(
+            &file_path,
+            "digraph { start [shape=circle]; end [shape=doublecircle]; start -> end }",
+        )
+        .unwrap();
+        let dirs = vec![workflow_dir.path().display().to_string()];
+        let id = crate::workflows::scan_workflows(&dirs).first().unwrap().id.clone();
+
+        let data_dir = tempfile::tempdir().unwrap();
+        let state = state_with_workflow_dir_and_data_dir(workflow_dir.path(), data_dir.path());
+        let app = router().with_state(state.clone());
+
+        let resp1 = post_workflow_run(app.clone(), &id).await;
+        assert_eq!(resp1.status(), StatusCode::OK);
+
+        std::fs::write(
+            &file_path,
+            "digraph { start [shape=circle]; middle; end [shape=doublecircle]; start -> middle -> end }",
+        )
+        .unwrap();
+
+        let resp2 = post_workflow_run(app, &id).await;
+        assert_eq!(resp2.status(), StatusCode::OK);
+
+        let runs = state.runs.read().await;
+        let mut records: Vec<_> = runs.values().collect();
+        records.sort_by_key(|r| r.started_at);
+        assert_eq!(records.len(), 2);
+        assert!(!records[0].dot_source.contains("middle"));
+        assert!(records[1].dot_source.contains("middle"));
+    }
+
+    #[tokio::test]
+    async fn workflow_run_unknown_id_returns_404() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let resp = post_workflow_run(app, "no-such-id").await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
