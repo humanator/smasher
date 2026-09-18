@@ -234,6 +234,7 @@ async fn submit_pipeline(
         input_tokens: Arc::clone(&input_tokens),
         output_tokens: Arc::clone(&output_tokens),
         run_working_dir: Some(run_working_dir.clone()),
+        workflow_id: None,
     };
 
     {
@@ -579,6 +580,7 @@ async fn resume_run(
         input_tokens: Arc::clone(&input_tokens),
         output_tokens: Arc::clone(&output_tokens),
         run_working_dir: Some(run_working_dir.clone()),
+        workflow_id: None,
     };
 
     {
@@ -1077,6 +1079,7 @@ mod tests {
             input_tokens: Arc::new(AtomicU64::new(0)),
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: Some("/srv/project/artifacts/test-run-1".into()),
+            workflow_id: None,
         };
         state.runs.write().await.insert(id.into(), record);
         token

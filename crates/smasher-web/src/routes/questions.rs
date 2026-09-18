@@ -135,6 +135,7 @@ mod tests {
             input_tokens: Arc::new(AtomicU64::new(0)),
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: None,
+            workflow_id: None,
         };
         state.runs.write().await.insert("run1".into(), record);
 

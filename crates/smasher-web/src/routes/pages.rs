@@ -390,6 +390,39 @@ async fn submit_run(
     State(state): State<AppState>,
     Form(form): Form<SubmitForm>,
 ) -> Result<Response, WebError> {
+    let run_id = create_run(
+        &state,
+        form.dot_source,
+        form.model,
+        form.vars,
+        form.brief,
+        form.node_overrides,
+        None,
+    )
+    .await?;
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("HX-Redirect", format!("/runs/{run_id}"))
+        .body(axum::body::Body::empty())
+        .unwrap();
+    Ok(response)
+}
+
+/// Validates, lints, and launches a pipeline run: parses `dot_source`,
+/// applies variables/overrides/transforms, creates the run's artifact
+/// directory, registers the `RunRecord`, and spawns the engine task.
+/// Returns the new run's id. `workflow_id` is `Some(id)` when launched from
+/// a workflow's detail page, `None` for the paste-a-DOT-file `/runs` form.
+async fn create_run(
+    state: &AppState,
+    dot_source: String,
+    model: Option<String>,
+    vars: Option<String>,
+    brief: Option<String>,
+    node_overrides: Option<String>,
+    workflow_id: Option<String>,
+) -> Result<String, WebError> {
     use chrono::Utc;
     use std::sync::Arc;
     use tokio_util::sync::CancellationToken;
@@ -413,11 +446,11 @@ async fn submit_run(
     use crate::backend::{AgentCodergenBackend, LlmManagerBackend, LlmToolBackend};
     use crate::state::RunRecord;
 
-    let dot_graph = parser::parse(&form.dot_source)?;
+    let dot_graph = parser::parse(&dot_source)?;
     let mut resolved = graph::resolve(&dot_graph)?;
 
     let mut variables: HashMap<String, String> = HashMap::new();
-    if let Some(ref vars_text) = form.vars {
+    if let Some(ref vars_text) = vars {
         for line in vars_text.lines() {
             let line = line.trim();
             if line.is_empty() {
@@ -428,19 +461,17 @@ async fn submit_run(
             }
         }
     }
-    if let Some(brief) = form.brief.as_deref().map(str::trim).filter(|b| !b.is_empty()) {
+    if let Some(brief) = brief.as_deref().map(str::trim).filter(|b| !b.is_empty()) {
         variables.insert("brief".into(), brief.to_string());
     }
 
-    let model = form
-        .model
+    let model = model
         .filter(|m| !m.is_empty())
         .unwrap_or_else(|| state.default_model.clone());
     let provider = state.default_provider.clone();
     variables.insert("model".into(), model.clone());
 
-    let node_overrides: HashMap<String, transforms::NodeOverride> = match form
-        .node_overrides
+    let node_overrides: HashMap<String, transforms::NodeOverride> = match node_overrides
         .as_deref()
         .filter(|s| !s.trim().is_empty())
     {
@@ -472,17 +503,24 @@ async fn submit_run(
     let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
     let graph_name =
         smasher_attractor::run_dir::sanitize_graph_name(&resolved.name.clone().unwrap_or_default());
-    let run_directory = smasher_attractor::run_dir::RunDirectory::create(
+    let mut run_directory = smasher_attractor::run_dir::RunDirectory::create(
         &artifacts_base,
         &run_id,
         &graph_name,
-        &form.dot_source,
+        &dot_source,
     )
     .map_err(|e| WebError::Internal(format!("failed to create run directory: {e}")))?;
     if let Err(e) = run_directory.symlink_into_root("design-kit", &crate::server::design_kit_dir())
     {
         tracing::warn!(error = %e, "failed to link design-kit into run directory");
     }
+    std::fs::write(
+        run_directory.manifest().directories.root.join("graph.dot"),
+        &dot_source,
+    )?;
+    run_directory
+        .persist_run_metadata(workflow_id.clone(), Some("Running".to_string()), 0, 0, None)
+        .map_err(|e| WebError::Internal(format!("failed to persist run metadata: {e}")))?;
     let run_working_dir = run_directory
         .manifest()
         .directories
@@ -499,7 +537,7 @@ async fn submit_run(
 
     let record = RunRecord {
         id: run_id.clone(),
-        dot_source: form.dot_source.clone(),
+        dot_source: dot_source.clone(),
         graph: resolved.clone(),
         status: RunStatus::Running,
         started_at: Utc::now(),
@@ -513,6 +551,7 @@ async fn submit_run(
         input_tokens: Arc::clone(&input_tokens),
         output_tokens: Arc::clone(&output_tokens),
         run_working_dir: Some(run_working_dir.clone()),
+        workflow_id: workflow_id.clone(),
     };
 
     {
@@ -560,6 +599,7 @@ async fn submit_run(
     let client = Arc::clone(&state.client);
     let checkpoint_dir = run_directory.manifest().directories.checkpoints.clone();
     let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
+    let mut run_directory_clone = run_directory.clone();
     tokio::spawn(async move {
         let backend = Arc::new(AgentCodergenBackend::new(
             Arc::clone(&client),
@@ -675,15 +715,19 @@ async fn submit_run(
                     }
                 }
             }
+            if let Err(e) = run_directory_clone.persist_run_metadata(
+                workflow_id.clone(),
+                Some(format!("{:?}", record.status)),
+                record.input_tokens.load(Ordering::Relaxed),
+                record.output_tokens.load(Ordering::Relaxed),
+                record.completed_at,
+            ) {
+                tracing::warn!(error = %e, "failed to persist run metadata after run completion");
+            }
         }
     });
 
-    let response = Response::builder()
-        .status(StatusCode::OK)
-        .header("HX-Redirect", format!("/runs/{run_id}"))
-        .body(axum::body::Body::empty())
-        .unwrap();
-    Ok(response)
+    Ok(run_id)
 }
 
 async fn run_detail(
@@ -1246,6 +1290,109 @@ mod tests {
         assert!(!record.variables.contains_key("brief"));
     }
 
+    /// Sends a `POST /runs` request with the given raw (already
+    /// urlencoded-if-needed) `dot_source` and returns the run id from the
+    /// `HX-Redirect` response header.
+    async fn submit_dot_source(app: axum::Router, dot_source: &str) -> String {
+        let body = format!("dot_source={}", urlencode(dot_source));
+        let req = Request::builder()
+            .method("POST")
+            .uri("/runs")
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        resp.headers()
+            .get("HX-Redirect")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .trim_start_matches("/runs/")
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn post_runs_writes_graph_dot_to_run_directory() {
+        let (state, data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+        let dot_source = "digraph { start [shape=circle]; end [shape=doublecircle]; start -> end }";
+
+        let run_id = submit_dot_source(app, dot_source).await;
+
+        let graph_dot = std::fs::read_to_string(
+            data_dir.path().join("artifacts").join(&run_id).join("graph.dot"),
+        )
+        .expect("graph.dot should be written alongside manifest.json");
+        assert_eq!(graph_dot, dot_source);
+    }
+
+    #[tokio::test]
+    async fn post_runs_manifest_has_null_workflow_id_and_running_status() {
+        let (state, data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+        let dot_source = "digraph { start [shape=circle]; end [shape=doublecircle]; start -> end }";
+
+        let run_id = submit_dot_source(app, dot_source).await;
+
+        let manifest_json = std::fs::read_to_string(
+            data_dir
+                .path()
+                .join("artifacts")
+                .join(&run_id)
+                .join("manifest.json"),
+        )
+        .unwrap();
+        let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap();
+        assert!(manifest["workflow_id"].is_null());
+        assert_eq!(manifest["status"], "Running");
+    }
+
+    #[tokio::test]
+    async fn run_reaching_terminal_state_persists_final_status_and_tokens_to_manifest() {
+        use smasher_attractor::state::RunStatus;
+
+        let (state, data_dir) = test_state_with_data_dir();
+        let app = router().with_state(state.clone());
+        // No `box`-shaped (Codergen) node -- a trivial pipeline that completes
+        // without any real LLM calls, so the test can wait for a genuine
+        // terminal transition instead of hitting the network.
+        let dot_source = "digraph { start [shape=circle]; end [shape=doublecircle]; start -> end }";
+
+        let run_id = submit_dot_source(app, dot_source).await;
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let final_status = loop {
+            let runs = state.runs.read().await;
+            let record = runs.get(&run_id).expect("run should be recorded");
+            if !matches!(record.status, RunStatus::Running) {
+                break format!("{:?}", record.status);
+            }
+            drop(runs);
+            if std::time::Instant::now() > deadline {
+                panic!("run did not reach a terminal state in time");
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        };
+
+        let manifest_json = std::fs::read_to_string(
+            data_dir
+                .path()
+                .join("artifacts")
+                .join(&run_id)
+                .join("manifest.json"),
+        )
+        .unwrap();
+        let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap();
+        assert_eq!(manifest["status"], final_status);
+        assert!(manifest["input_tokens"].is_u64());
+        assert!(manifest["output_tokens"].is_u64());
+        assert!(
+            !manifest["completed_at"].is_null(),
+            "completed_at should be stamped once the run reaches a terminal state"
+        );
+    }
+
     fn state_with_workflow_dir(dir: &std::path::Path) -> AppState {
         let client = smasher_llm::client::Client::from_env();
         AppState::new(
@@ -1481,6 +1628,7 @@ mod tests {
             input_tokens: Arc::new(AtomicU64::new(0)),
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: None,
+            workflow_id: None,
         };
         state.runs.write().await.insert(id.into(), record);
     }
@@ -1795,6 +1943,7 @@ mod tests {
             input_tokens: Arc::new(AtomicU64::new(0)),
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: None,
+            workflow_id: None,
         };
         state.runs.write().await.insert(id.into(), record);
         interviewer
@@ -2421,6 +2570,7 @@ mod tests {
             input_tokens: Arc::new(AtomicU64::new(0)),
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: None,
+            workflow_id: None,
         };
         state.runs.write().await.insert(run_id.into(), record);
         push_pending_qid(&interviewer, "q1", Some("Gate1"));

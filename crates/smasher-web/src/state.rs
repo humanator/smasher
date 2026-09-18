@@ -65,6 +65,9 @@ pub struct RunRecord {
     pub input_tokens: Arc<AtomicU64>,
     pub output_tokens: Arc<AtomicU64>,
     pub run_working_dir: Option<String>,
+    /// The workflow catalog entry this run was launched from, if any —
+    /// `None` for runs submitted via the paste-a-DOT-file `/runs` form.
+    pub workflow_id: Option<String>,
 }
 
 /// Serializable summary of a run for API responses.
@@ -79,6 +82,7 @@ pub struct RunSummary {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub run_working_dir: Option<String>,
+    pub workflow_id: Option<String>,
 }
 
 impl RunRecord {
@@ -101,6 +105,7 @@ impl RunRecord {
                     .map(|name| format!("artifacts/{name}"))
                     .unwrap_or_else(|| dir.clone())
             }),
+            workflow_id: self.workflow_id.clone(),
         }
     }
 }
@@ -146,6 +151,7 @@ mod tests {
             input_tokens: 0,
             output_tokens: 0,
             run_working_dir: None,
+            workflow_id: None,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["id"], "test-123");
@@ -165,6 +171,7 @@ mod tests {
             input_tokens: 100,
             output_tokens: 50,
             run_working_dir: None,
+            workflow_id: None,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["error"], "node X failed");
@@ -172,7 +179,11 @@ mod tests {
     }
 
     /// Helper to create a minimal RunRecord for testing to_summary().
-    fn make_test_record(status: RunStatus, working_dir: Option<String>) -> RunRecord {
+    fn make_test_record(
+        status: RunStatus,
+        working_dir: Option<String>,
+        workflow_id: Option<String>,
+    ) -> RunRecord {
         use smasher_attractor::dot::parser;
         use smasher_attractor::graph;
         let dot_graph = parser::parse("digraph { a -> b }").unwrap();
@@ -193,6 +204,7 @@ mod tests {
             input_tokens: Arc::new(AtomicU64::new(0)),
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: working_dir,
+            workflow_id,
         }
     }
 
@@ -201,6 +213,7 @@ mod tests {
         let record = make_test_record(
             RunStatus::Running,
             Some("/home/user/project/artifacts/abc-123".into()),
+            None,
         );
         let summary = record.to_summary();
         assert_eq!(summary.run_working_dir, Some("artifacts/abc-123".into()));
@@ -208,22 +221,36 @@ mod tests {
 
     #[test]
     fn to_summary_handles_none_working_dir() {
-        let record = make_test_record(RunStatus::Running, None);
+        let record = make_test_record(RunStatus::Running, None, None);
         let summary = record.to_summary();
         assert!(summary.run_working_dir.is_none());
     }
 
     #[test]
     fn to_summary_aborted_status() {
-        let record = make_test_record(RunStatus::Aborted, None);
+        let record = make_test_record(RunStatus::Aborted, None, None);
         let summary = record.to_summary();
         assert_eq!(summary.status, "Aborted");
     }
 
     #[test]
     fn to_summary_completed_status() {
-        let record = make_test_record(RunStatus::Completed, None);
+        let record = make_test_record(RunStatus::Completed, None, None);
         let summary = record.to_summary();
         assert_eq!(summary.status, "Completed");
+    }
+
+    #[test]
+    fn to_summary_carries_workflow_id_when_some() {
+        let record = make_test_record(RunStatus::Running, None, Some("wf-42".to_string()));
+        let summary = record.to_summary();
+        assert_eq!(summary.workflow_id, Some("wf-42".to_string()));
+    }
+
+    #[test]
+    fn to_summary_carries_workflow_id_when_none() {
+        let record = make_test_record(RunStatus::Running, None, None);
+        let summary = record.to_summary();
+        assert_eq!(summary.workflow_id, None);
     }
 }
