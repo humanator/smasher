@@ -708,10 +708,10 @@ impl Handler for InterviewerHandler {
                         let decision = gallery.decision.trim().to_string();
                         context.set(
                             &node.id,
-                            json!({"selected": gallery.selected, "decision": decision}),
+                            json!({"selected": gallery.selected, "decision": decision, "comments": gallery.comments}),
                         );
                         return Ok(Outcome::success_with(
-                            json!({"selected": gallery.selected, "decision": decision}),
+                            json!({"selected": gallery.selected, "decision": decision, "comments": gallery.comments}),
                         )
                         .with_preferred_label(&decision));
                     }
@@ -742,6 +742,8 @@ impl Handler for InterviewerHandler {
 pub struct GalleryAnswer {
     pub selected: Vec<String>,
     pub decision: String,
+    #[serde(default)]
+    pub comments: std::collections::HashMap<String, String>,
 }
 
 /// Parse a raw gate answer as a structured gallery decision.
@@ -2179,6 +2181,26 @@ mod tests {
     }
 
     #[test]
+    fn parse_gallery_answer_accepts_comments() {
+        let parsed = super::parse_gallery_answer(
+            r#"{"selected":["a"],"decision":"proceed","comments":{"a":"tweak spacing"}}"#,
+        );
+        assert!(parsed.is_some());
+        let answer = parsed.unwrap();
+        assert_eq!(
+            answer.comments.get("a"),
+            Some(&"tweak spacing".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_gallery_answer_defaults_comments_to_empty_when_absent() {
+        let parsed = super::parse_gallery_answer(r#"{"selected":["a"],"decision":"proceed"}"#);
+        assert!(parsed.is_some());
+        assert!(parsed.unwrap().comments.is_empty());
+    }
+
+    #[test]
     fn parse_gallery_answer_rejects_empty_object() {
         assert!(super::parse_gallery_answer("{}").is_none());
     }
@@ -2210,6 +2232,32 @@ mod tests {
         let stored = ctx.get("gallery1").expect("context holds gallery decision");
         assert_eq!(stored["selected"], json!(["a", "b"]));
         assert_eq!(stored["decision"], json!("proceed"));
+    }
+
+    #[tokio::test]
+    async fn human_gate_stores_gallery_comments_in_three_key_object() {
+        let queue = Arc::new(QueueInterviewer::new());
+        queue.push_response(
+            r#"{"selected":["a"],"decision":"proceed","comments":{"b":"tweak spacing"}}"#,
+        );
+        let handler = InterviewerHandler::new(queue);
+
+        let mut node = make_node("gallery2", NodeType::Interviewer);
+        node.attrs.insert(
+            "question".to_string(),
+            NodeAttrValue::String("Pick direction(s)".to_string()),
+        );
+        node.attrs
+            .insert("gallery".to_string(), NodeAttrValue::Bool(true));
+
+        let ctx = Context::new();
+        let result = handler.execute(&node, &ctx).await.unwrap();
+        assert!(result.is_success());
+
+        let stored = ctx.get("gallery2").expect("context holds gallery decision");
+        assert_eq!(stored["selected"], json!(["a"]));
+        assert_eq!(stored["decision"], json!("proceed"));
+        assert_eq!(stored["comments"], json!({"b": "tweak spacing"}));
     }
 
     #[tokio::test]
