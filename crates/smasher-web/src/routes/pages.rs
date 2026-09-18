@@ -45,10 +45,18 @@ struct WorkflowNewTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "workflow_detail_stub.html")]
-struct WorkflowDetailStubTemplate {
+#[template(path = "workflow_detail.html")]
+struct WorkflowDetailTemplate {
     workflow: crate::workflows::WorkflowSummary,
     dot_source: String,
+    active_run: Option<RunSummary>,
+    // Duplicated from `RunDetailTemplate` -- Askama template structs are
+    // flat data, not composable, so `run_detail_body.html`'s `{% include %}`
+    // needs these fields present here too when `active_run` is `Some`.
+    historical_events: String,
+    initial_input_tokens: u64,
+    initial_output_tokens: u64,
+    runs: Vec<RunSummary>,
 }
 
 #[derive(Template)]
@@ -322,8 +330,7 @@ async fn workflow_catalog(State(state): State<AppState>) -> impl IntoResponse {
 
 async fn runs_page(State(state): State<AppState>) -> impl IntoResponse {
     let runs_map = state.runs.read().await;
-    let mut runs: Vec<RunSummary> = runs_map.values().map(|r| r.to_summary()).collect();
-    runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    let runs = runs_for_workflow(&runs_map, None);
     HtmlTemplate(RunsPageTemplate { runs })
 }
 
@@ -379,9 +386,25 @@ async fn create_workflow(
     Ok(axum::response::Redirect::to(&format!("/workflows/{id}")).into_response())
 }
 
-/// Read-only placeholder for a workflow's detail page. Run/monitor/edit/Q&A
-/// land with `workflow-run-shell` -- `workflow-catalog` ships independently
-/// of it, per the spec's Resolved Questions.
+/// Runs scoped to a single workflow (`Some(id)`) or every run (`None`),
+/// newest-first by `started_at` -- the shared row source behind both
+/// `/runs` and a workflow's own Run History section.
+fn runs_for_workflow(
+    runs_map: &HashMap<String, crate::state::RunRecord>,
+    workflow_id: Option<&str>,
+) -> Vec<RunSummary> {
+    let mut runs: Vec<RunSummary> = runs_map
+        .values()
+        .filter(|r| workflow_id.is_none() || r.workflow_id.as_deref() == workflow_id)
+        .map(|r| r.to_summary())
+        .collect();
+    runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+    runs
+}
+
+/// A workflow's detail page: header, read-only DOT source, a Run form when
+/// idle, or the same live sections `/runs/{id}` shows once a run exists --
+/// plus a Run History table scoped to this workflow.
 async fn workflow_detail(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -389,9 +412,39 @@ async fn workflow_detail(
     let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
         .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
     let dot_source = std::fs::read_to_string(&workflow.path)?;
-    Ok(HtmlTemplate(WorkflowDetailStubTemplate {
+
+    let runs_map = state.runs.read().await;
+    let runs = runs_for_workflow(&runs_map, Some(&id));
+    // `runs_for_workflow` sorts newest-first, so the first entry is the
+    // most-recently-started run for this workflow -- the "active" one.
+    let active_run = runs.first().cloned();
+
+    let (historical_events, initial_input_tokens, initial_output_tokens) = match &active_run {
+        Some(active) => match runs_map.get(&active.id) {
+            Some(record) => {
+                let mut events = record.event_log.events();
+                events.reverse();
+                let historical_events: String =
+                    events.iter().map(crate::sse::render_event_html).collect();
+                (
+                    historical_events,
+                    record.input_tokens.load(Ordering::Relaxed),
+                    record.output_tokens.load(Ordering::Relaxed),
+                )
+            }
+            None => (String::new(), 0, 0),
+        },
+        None => (String::new(), 0, 0),
+    };
+
+    Ok(HtmlTemplate(WorkflowDetailTemplate {
         workflow,
         dot_source,
+        active_run,
+        historical_events,
+        initial_input_tokens,
+        initial_output_tokens,
+        runs,
     }))
 }
 
@@ -1159,6 +1212,35 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
+    /// Regression coverage for the `run_detail_body.html` extraction --
+    /// `/runs/{id}` must still render the same live sections (status,
+    /// tokens, questions, candidates, graph, telemetry) it did before the
+    /// markup moved into an `{% include %}`.
+    #[tokio::test]
+    async fn run_detail_renders_live_sections_for_a_real_run() {
+        let state = test_state();
+        insert_test_record(&state, "run-detail-render").await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri("/runs/run-detail-render")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("Run run-detail-render"));
+        assert!(html.contains("hx-get=\"/runs/run-detail-render/status\""));
+        assert!(html.contains("hx-get=\"/runs/run-detail-render/tokens\""));
+        assert!(html.contains("id=\"question-list\""));
+        assert!(html.contains("id=\"candidate-list\""));
+        assert!(html.contains("id=\"graph-container\""));
+        assert!(html.contains("id=\"telemetry-drawer\""));
+    }
+
     #[tokio::test]
     async fn run_status_not_found() {
         let app = router().with_state(test_state());
@@ -1627,6 +1709,182 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
+    /// Resolves the single workflow `scan_workflows` finds under `dir` --
+    /// used by tests that need a real workflow id to address by URL.
+    fn only_workflow_id(dir: &std::path::Path) -> String {
+        let dirs = vec![dir.display().to_string()];
+        crate::workflows::scan_workflows(&dirs).first().unwrap().id.clone()
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_with_no_runs_shows_run_form_not_live_sections() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        assert!(html.contains(&format!("hx-post=\"/workflows/{id}/run\"")));
+        assert!(!html.contains("id=\"run-status\""));
+        assert!(!html.contains("id=\"token-counter\""));
+        assert!(!html.contains("id=\"question-list\""));
+        assert!(!html.contains("id=\"candidate-list\""));
+        assert!(!html.contains("id=\"graph-container\""));
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_with_a_run_shows_the_same_live_sections_as_run_detail() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let state = state_with_workflow_dir(tmp.path());
+        insert_test_record_for_workflow(&state, "run-1", Some(&id), chrono::Utc::now()).await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        assert!(!html.contains(&format!("hx-post=\"/workflows/{id}/run\"")));
+        assert!(html.contains("hx-get=\"/runs/run-1/status\""));
+        assert!(html.contains("hx-get=\"/runs/run-1/tokens\""));
+        assert!(html.contains("hx-get=\"/runs/run-1/questions\""));
+        assert!(html.contains("hx-get=\"/runs/run-1/candidates\""));
+        assert!(html.contains("hx-get=\"/runs/run-1/graph\""));
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_shows_dot_source_read_only_with_no_edit_form() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        assert!(html.contains("<pre class=\"dot-source-preview\">digraph { a -&gt; b }</pre>"));
+        // The DOT source itself is never editable -- no textarea named
+        // `dot_source` and no form that could write it back to disk (the
+        // spec's "Never do: DOT editing"). Other run-parameter textareas
+        // (vars/brief/node_overrides) are fine.
+        assert!(!html.contains("name=\"dot_source\""));
+        assert!(!html.contains("action=\"/workflows"));
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_run_history_is_scoped_to_the_workflow() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let workflow_a = only_workflow_id(tmp.path());
+
+        let state = state_with_workflow_dir(tmp.path());
+        let base = chrono::Utc::now();
+        insert_test_record_for_workflow(&state, "run-a1", Some(&workflow_a), base).await;
+        insert_test_record_for_workflow(
+            &state,
+            "run-a2",
+            Some(&workflow_a),
+            base + chrono::Duration::seconds(1),
+        )
+        .await;
+        insert_test_record_for_workflow(
+            &state,
+            "run-b1",
+            Some("some-other-workflow"),
+            base + chrono::Duration::seconds(2),
+        )
+        .await;
+        let app = router().with_state(state.clone());
+
+        let req = Request::builder()
+            .uri(format!("/workflows/{workflow_a}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("run-a1"));
+        assert!(html.contains("run-a2"));
+        assert!(!html.contains("run-b1"));
+
+        let req = Request::builder()
+            .uri("/runs")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("run-a1"));
+        assert!(html.contains("run-a2"));
+        assert!(html.contains("run-b1"));
+    }
+
+    #[tokio::test]
+    async fn workflow_detail_active_run_is_the_most_recently_started_one() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let state = state_with_workflow_dir(tmp.path());
+        let base = chrono::Utc::now();
+        insert_test_record_for_workflow(&state, "run-older", Some(&id), base).await;
+        insert_test_record_for_workflow(
+            &state,
+            "run-newer",
+            Some(&id),
+            base + chrono::Duration::seconds(5),
+        )
+        .await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        // The live section addresses the newer run...
+        assert!(html.contains("hx-get=\"/runs/run-newer/status\""));
+        assert!(!html.contains("hx-get=\"/runs/run-older/status\""));
+        // ...but the history table still lists both.
+        assert!(html.contains("run-older"));
+        assert!(html.contains("run-newer"));
+    }
+
     fn state_with_workflow_dir_and_data_dir(
         workflow_dir: &std::path::Path,
         data_dir: &std::path::Path,
@@ -1765,6 +2023,47 @@ mod tests {
             output_tokens: Arc::new(AtomicU64::new(0)),
             run_working_dir: None,
             workflow_id: None,
+        };
+        state.runs.write().await.insert(id.into(), record);
+    }
+
+    /// Like `insert_test_record`, but with an explicit `workflow_id` and
+    /// `started_at` -- needed to test the workflow-scoped history filter and
+    /// the "most-recently-started run is the active one" rule.
+    async fn insert_test_record_for_workflow(
+        state: &AppState,
+        id: &str,
+        workflow_id: Option<&str>,
+        started_at: chrono::DateTime<chrono::Utc>,
+    ) {
+        use crate::state::RunRecord;
+        use smasher_attractor::dot::parser;
+        use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
+        use smasher_attractor::graph;
+        use smasher_attractor::http_interviewer::HttpInterviewer;
+        use smasher_attractor::state::RunStatus;
+        use std::sync::Arc;
+        use tokio_util::sync::CancellationToken;
+
+        let dot_graph = parser::parse("digraph { a -> b }").unwrap();
+        let resolved = graph::resolve(&dot_graph).unwrap();
+        let record = RunRecord {
+            id: id.into(),
+            dot_source: "digraph { a -> b }".into(),
+            graph: resolved,
+            status: RunStatus::Running,
+            started_at,
+            completed_at: None,
+            emitter: Arc::new(PipelineEventEmitter::default()),
+            event_log: Arc::new(PipelineEventLog::new()),
+            cancellation: CancellationToken::new(),
+            interviewer: HttpInterviewer::new(),
+            variables: HashMap::new(),
+            error: None,
+            input_tokens: Arc::new(AtomicU64::new(0)),
+            output_tokens: Arc::new(AtomicU64::new(0)),
+            run_working_dir: None,
+            workflow_id: workflow_id.map(String::from),
         };
         state.runs.write().await.insert(id.into(), record);
     }
