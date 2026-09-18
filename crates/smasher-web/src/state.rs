@@ -26,6 +26,7 @@ pub struct AppState {
     /// `gemma4:31b-cloud`) have no recognizable prefix to infer from.
     pub default_provider: Option<String>,
     pub data_dir: String,
+    pub workflow_dirs: Vec<String>,
 }
 
 impl AppState {
@@ -34,6 +35,7 @@ impl AppState {
         default_model: String,
         default_provider: Option<String>,
         data_dir: String,
+        workflow_dirs: Vec<String>,
     ) -> Self {
         Self {
             runs: Arc::new(RwLock::new(HashMap::new())),
@@ -41,6 +43,7 @@ impl AppState {
             default_model,
             default_provider,
             data_dir,
+            workflow_dirs,
         }
     }
 }
@@ -109,10 +112,26 @@ mod tests {
     #[test]
     fn app_state_new_creates_empty_runs() {
         let client = smasher_llm::client::Client::from_env();
-        let state = AppState::new(client, "test-model".into(), None, "/tmp".into());
+        let state = AppState::new(client, "test-model".into(), None, "/tmp".into(), vec![]);
         // runs map should be empty on creation
         let runs = state.runs.try_read().unwrap();
         assert!(runs.is_empty());
+    }
+
+    #[test]
+    fn app_state_new_stores_workflow_dirs() {
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            "/tmp".into(),
+            vec!["examples".into(), "/tmp/workflows".into()],
+        );
+        assert_eq!(
+            state.workflow_dirs,
+            vec!["examples".to_string(), "/tmp/workflows".to_string()]
+        );
     }
 
     #[test]

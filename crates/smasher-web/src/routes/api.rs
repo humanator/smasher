@@ -819,7 +819,7 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), None, "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into(), vec![])
     }
 
     #[tokio::test]
@@ -921,6 +921,7 @@ mod tests {
             "test-model".into(),
             None,
             tmp.path().display().to_string(),
+            vec![],
         );
         let app = router().with_state(state.clone());
         let body = serde_json::json!({
@@ -962,6 +963,7 @@ mod tests {
             "test-model".into(),
             None,
             tmp.path().display().to_string(),
+            vec![],
         );
         let app = router().with_state(state.clone());
         let body = serde_json::json!({

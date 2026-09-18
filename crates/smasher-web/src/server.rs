@@ -61,6 +61,7 @@ pub struct ServerConfig {
     /// `gemma4:31b-cloud`) have no recognizable prefix to infer from.
     pub provider: Option<String>,
     pub data_dir: String,
+    pub workflow_dirs: Vec<String>,
 }
 
 /// Return the default data directory for smasher (~/.smasher).
@@ -73,6 +74,36 @@ pub fn default_data_dir() -> String {
     dirs::home_dir()
         .map(|h| h.join(".smasher").display().to_string())
         .unwrap_or_else(|| ".smasher".into())
+}
+
+/// Parse the comma-separated `SMASHER_WORKFLOWS_DIR` env var value into a
+/// list of configured workflow directories, falling back to `["examples"]`
+/// when unset. Pure (takes the already-read env value) so it's testable
+/// without touching global process state.
+fn parse_workflow_dirs_env(env_val: Option<&str>) -> Vec<String> {
+    match env_val {
+        Some(val) => val.split(',').map(|s| s.trim().to_string()).collect(),
+        None => vec!["examples".to_string()],
+    }
+}
+
+/// Return the default configured workflow directories, from
+/// `SMASHER_WORKFLOWS_DIR` (comma-separated) or `["examples"]` if unset.
+pub fn default_workflow_dirs() -> Vec<String> {
+    parse_workflow_dirs_env(std::env::var("SMASHER_WORKFLOWS_DIR").ok().as_deref())
+}
+
+/// Merge the configured workflow directories with the always-scanned
+/// `{data_dir}/workflows` root, enforcing that invariant exactly once at
+/// the `ServerConfig` -> `AppState` boundary. Deduplicates so passing
+/// `{data_dir}/workflows` explicitly doesn't produce two scans of it.
+pub fn effective_workflow_dirs(data_dir: &str, configured: &[String]) -> Vec<String> {
+    let required = format!("{data_dir}/workflows");
+    let mut dirs: Vec<String> = configured.to_vec();
+    if !dirs.contains(&required) {
+        dirs.push(required);
+    }
+    dirs
 }
 
 impl Default for ServerConfig {
@@ -93,6 +124,7 @@ impl Default for ServerConfig {
         let provider = std::env::var("SMASHER_PROVIDER").ok();
 
         let data_dir = default_data_dir();
+        let workflow_dirs = default_workflow_dirs();
 
         Self {
             port,
@@ -100,6 +132,7 @@ impl Default for ServerConfig {
             model,
             provider,
             data_dir,
+            workflow_dirs,
         }
     }
 }
@@ -121,7 +154,14 @@ pub async fn run_with_config(config: ServerConfig) -> Result<(), Box<dyn std::er
 
     tracing::info!(data_dir = %config.data_dir, model = %config.model, provider = ?config.provider, "agent configuration");
 
-    let state = AppState::new(client, config.model, config.provider, config.data_dir);
+    let workflow_dirs = effective_workflow_dirs(&config.data_dir, &config.workflow_dirs);
+    let state = AppState::new(
+        client,
+        config.model,
+        config.provider,
+        config.data_dir,
+        workflow_dirs,
+    );
     let app = build_router(state);
 
     let addr = SocketAddr::from((config.host, config.port));
@@ -163,7 +203,39 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), None, "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into(), vec![])
+    }
+
+    #[test]
+    fn parse_workflow_dirs_env_defaults_to_examples_when_unset() {
+        assert_eq!(parse_workflow_dirs_env(None), vec!["examples".to_string()]);
+    }
+
+    #[test]
+    fn parse_workflow_dirs_env_splits_comma_separated_value() {
+        assert_eq!(
+            parse_workflow_dirs_env(Some("a, b ,c")),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
+    }
+
+    #[test]
+    fn effective_workflow_dirs_appends_data_dir_workflows_when_absent() {
+        assert_eq!(
+            effective_workflow_dirs("/tmp/data", &["examples".to_string()]),
+            vec!["examples".to_string(), "/tmp/data/workflows".to_string()]
+        );
+    }
+
+    #[test]
+    fn effective_workflow_dirs_does_not_duplicate_data_dir_workflows() {
+        assert_eq!(
+            effective_workflow_dirs(
+                "/tmp/data",
+                &["examples".to_string(), "/tmp/data/workflows".to_string()]
+            ),
+            vec!["examples".to_string(), "/tmp/data/workflows".to_string()]
+        );
     }
 
     #[tokio::test]
@@ -181,6 +253,7 @@ mod tests {
             "test-model".into(),
             None,
             data_dir.path().display().to_string(),
+            vec![],
         );
         let app = build_router(state);
         let req = Request::builder()

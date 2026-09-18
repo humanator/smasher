@@ -405,7 +405,7 @@ mod tests {
 
         let stdout = String::from_utf8_lossy(&output.stdout);
 
-        let expected_flags = ["--port", "--model", "--data-dir"];
+        let expected_flags = ["--port", "--model", "--data-dir", "--workflows-dir"];
         for flag in &expected_flags {
             assert!(
                 stdout.contains(flag),

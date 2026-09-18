@@ -28,6 +28,23 @@ pub struct ServeArgs {
     /// Data directory for run artifacts. Defaults to ~/.smasher.
     #[arg(long)]
     pub data_dir: Option<PathBuf>,
+
+    /// Additional directory to scan for `.dot`/`.gv` workflow files,
+    /// repeatable. Replaces the default additional-roots list (not
+    /// `{data_dir}/workflows`, which is always scanned regardless).
+    #[arg(long = "workflows-dir", value_name = "PATH")]
+    pub workflows_dir: Vec<PathBuf>,
+}
+
+/// Resolve the configured workflow directories: CLI-provided paths replace
+/// the defaults entirely when any are given, otherwise fall back to
+/// `defaults`. Pure so it's unit-testable without spawning the server.
+fn resolve_workflow_dirs(cli_dirs: &[PathBuf], defaults: Vec<String>) -> Vec<String> {
+    if cli_dirs.is_empty() {
+        defaults
+    } else {
+        cli_dirs.iter().map(|p| p.display().to_string()).collect()
+    }
 }
 
 pub async fn run(args: ServeArgs) -> Result<(), CliError> {
@@ -47,15 +64,40 @@ pub async fn run(args: ServeArgs) -> Result<(), CliError> {
         None => defaults.data_dir,
     };
 
+    let workflow_dirs = resolve_workflow_dirs(&args.workflows_dir, defaults.workflow_dirs);
+
     let config = ServerConfig {
         port: args.port,
         host: defaults.host,
         model,
         provider,
         data_dir,
+        workflow_dirs,
     };
 
     smasher_web::server::run_with_config(config)
         .await
         .map_err(|e| CliError::Web(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_workflow_dirs_falls_back_to_defaults_when_cli_empty() {
+        assert_eq!(
+            resolve_workflow_dirs(&[], vec!["examples".to_string()]),
+            vec!["examples".to_string()]
+        );
+    }
+
+    #[test]
+    fn resolve_workflow_dirs_replaces_defaults_when_cli_provided() {
+        let cli_dirs = vec![PathBuf::from("examples"), PathBuf::from("other")];
+        assert_eq!(
+            resolve_workflow_dirs(&cli_dirs, vec!["default-only".to_string()]),
+            vec!["examples".to_string(), "other".to_string()]
+        );
+    }
 }

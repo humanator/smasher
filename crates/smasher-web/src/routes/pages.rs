@@ -870,7 +870,7 @@ mod tests {
 
     fn test_state() -> AppState {
         let client = smasher_llm::client::Client::from_env();
-        AppState::new(client, "test-model".into(), None, "/tmp".into())
+        AppState::new(client, "test-model".into(), None, "/tmp".into(), vec![])
     }
 
     /// A `test_state()` rooted at a fresh temp dir, for tests that need to write
@@ -884,6 +884,7 @@ mod tests {
             "test-model".into(),
             None,
             data_dir.path().display().to_string(),
+            vec![],
         );
         (state, data_dir)
     }
