@@ -58,6 +58,12 @@
         document.body.addEventListener('click', function (evt) {
             var btn = evt.target.closest('.candidate-reload-btn');
             if (!btn) return;
+            // gallery_gate.html wraps live_card in an <a target="_blank">
+            // (click-to-expand the candidate); without this the click bubbles
+            // to that anchor and opens the candidate in a new tab instead of
+            // reloading the iframe in place.
+            evt.preventDefault();
+            evt.stopPropagation();
             var iframe = btn.parentElement.querySelector('iframe');
             if (!iframe) return;
             iframe.removeAttribute('src');
