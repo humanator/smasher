@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}SMASHER — Workflows{% endblock %}
+
+{% block content %}
+<section class="workflow-catalog-section">
+    <h2>Workflows</h2>
+    {% if workflows.is_empty() %}
+    <p class="empty-state">No workflows found. Add one to get started.</p>
+    {% else %}
+    <table class="workflow-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for workflow in workflows %}
+            <tr>
+                <td><a href="/workflows/{{ workflow.id }}">{{ workflow.name }}</a></td>
+                <td>{{ workflow.source_dir }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</section>
+{% endblock %}

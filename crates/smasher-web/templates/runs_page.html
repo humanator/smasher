@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}SMASHER — Runs{% endblock %}
+
+{% block content %}
+<section class="runs-section">
+    <h2>Run History</h2>
+    <div id="run-list-container">
+        {% include "run_list.html" %}
+    </div>
+</section>
+{% endblock %}

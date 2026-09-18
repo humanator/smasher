@@ -10,7 +10,7 @@ use axum::Router;
 use axum::extract::{Form, Path, State};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::get;
 
 use smasher_attractor::events::PipelineEvent;
 use smasher_attractor::rendering::{
@@ -27,8 +27,14 @@ use crate::state::{AppState, RunSummary};
 // ---------------------------------------------------------------------------
 
 #[derive(Template)]
-#[template(path = "dashboard.html")]
-struct DashboardTemplate {
+#[template(path = "workflow_catalog.html")]
+struct WorkflowCatalogTemplate {
+    workflows: Vec<crate::workflows::WorkflowSummary>,
+}
+
+#[derive(Template)]
+#[template(path = "runs_page.html")]
+struct RunsPageTemplate {
     runs: Vec<RunSummary>,
 }
 
@@ -262,8 +268,8 @@ fn poll_response<T: Template>(headers: &HeaderMap, template: T) -> Response {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", get(dashboard))
-        .route("/runs", post(submit_run))
+        .route("/", get(workflow_catalog))
+        .route("/runs", get(runs_page).post(submit_run))
         .route("/runs/{id}", get(run_detail))
         .route("/runs/{id}/graph", get(run_graph))
         .route("/runs/{id}/status", get(run_status))
@@ -277,11 +283,16 @@ pub fn router() -> Router<AppState> {
 // Handlers
 // ---------------------------------------------------------------------------
 
-async fn dashboard(State(state): State<AppState>) -> impl IntoResponse {
+async fn workflow_catalog(State(state): State<AppState>) -> impl IntoResponse {
+    let workflows = crate::workflows::scan_workflows(&state.workflow_dirs);
+    HtmlTemplate(WorkflowCatalogTemplate { workflows })
+}
+
+async fn runs_page(State(state): State<AppState>) -> impl IntoResponse {
     let runs_map = state.runs.read().await;
     let mut runs: Vec<RunSummary> = runs_map.values().map(|r| r.to_summary()).collect();
     runs.sort_by(|a, b| b.started_at.cmp(&a.started_at));
-    HtmlTemplate(DashboardTemplate { runs })
+    HtmlTemplate(RunsPageTemplate { runs })
 }
 
 async fn submit_run(
@@ -904,7 +915,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dashboard_returns_html() {
+    async fn root_shows_empty_state_with_no_workflows() {
         let app = router().with_state(test_state());
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
         let resp = app.oneshot(req).await.unwrap();
@@ -914,7 +925,51 @@ mod tests {
             .unwrap();
         let html = String::from_utf8_lossy(&body);
         assert!(html.contains("SMASHER"));
-        assert!(html.contains("Submit Pipeline"));
+        assert!(html.contains("No workflows found"));
+    }
+
+    #[tokio::test]
+    async fn root_lists_workflows_found_under_configured_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            "/tmp".into(),
+            vec![tmp.path().display().to_string()],
+        );
+        let app = router().with_state(state);
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("hello.dot"));
+        assert!(html.contains("/workflows/"));
+    }
+
+    #[tokio::test]
+    async fn runs_page_lists_run_history() {
+        let state = test_state();
+        insert_test_record(&state, "run-for-runs-page").await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri("/runs")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("run-for-runs-page"));
     }
 
     #[tokio::test]
