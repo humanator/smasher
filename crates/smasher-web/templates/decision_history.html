@@ -8,6 +8,13 @@
             <span class="decision-node">{{ d.node_id }}</span>
             <span class="decision-edge">{{ d.decision }}</span>
             <span class="decision-candidates">{{ d.selected.join(", ") }}</span>
+            {% if !d.comments.is_empty() %}
+            <ul class="decision-comments">
+                {% for (candidate_id, text) in d.comments %}
+                <li class="decision-comment"><span class="decision-comment-candidate">{{ candidate_id }}</span>: {{ text }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
             <span class="decision-timestamp">{{ d.timestamp }}</span>
         </li>
         {% endfor %}

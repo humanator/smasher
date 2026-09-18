@@ -1,6 +1,8 @@
 // ABOUTME: Gate decision history: extracts every gallery-gate decision recorded in a
 // ABOUTME: run's event log into a display-ready, chronological record for the dashboard.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 
 use smasher_attractor::events::PipelineEvent;
@@ -13,6 +15,7 @@ pub struct GalleryDecision {
     pub node_id: String,
     pub selected: Vec<String>,
     pub decision: String,
+    pub comments: HashMap<String, String>,
     pub timestamp: DateTime<Utc>,
 }
 
@@ -43,10 +46,22 @@ pub fn gallery_decisions(events: &[PipelineEvent], graph: &Graph) -> Vec<Gallery
                 .iter()
                 .filter_map(|v| v.as_str().map(str::to_string))
                 .collect();
+            // Absent on pre-amendment event-log entries (only selected/decision
+            // were recorded); defaulted empty so those still parse.
+            let comments = data
+                .get("comments")
+                .and_then(|v| v.as_object())
+                .map(|map| {
+                    map.iter()
+                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                        .collect()
+                })
+                .unwrap_or_default();
             Some(GalleryDecision {
                 node_id: node_id.clone(),
                 selected,
                 decision,
+                comments,
                 timestamp: *timestamp,
             })
         })
@@ -103,6 +118,46 @@ mod tests {
         assert_eq!(decisions[0].selected, vec!["candidate-a".to_string()]);
         assert_eq!(decisions[0].decision, "proceed");
         assert_eq!(decisions[0].timestamp, ts);
+        assert!(decisions[0].comments.is_empty());
+    }
+
+    #[test]
+    fn extracts_comments_when_present() {
+        let graph = gallery_graph();
+        let events = vec![completed(
+            "Gate1",
+            Outcome::success_with(json!({
+                "selected": ["candidate-a"],
+                "decision": "proceed",
+                "comments": {"candidate-b": "tweak spacing"}
+            })),
+            Utc::now(),
+        )];
+
+        let decisions = gallery_decisions(&events, &graph);
+
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(
+            decisions[0].comments.get("candidate-b"),
+            Some(&"tweak spacing".to_string())
+        );
+    }
+
+    #[test]
+    fn pre_amendment_event_without_comments_key_still_parses() {
+        // Regression: an event logged before this amendment has only
+        // selected/decision in its data — must not panic or fail to parse.
+        let graph = gallery_graph();
+        let events = vec![completed(
+            "Gate1",
+            Outcome::success_with(json!({"selected": ["candidate-a"], "decision": "proceed"})),
+            Utc::now(),
+        )];
+
+        let decisions = gallery_decisions(&events, &graph);
+
+        assert_eq!(decisions.len(), 1);
+        assert!(decisions[0].comments.is_empty());
     }
 
     #[test]

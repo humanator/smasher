@@ -114,15 +114,19 @@ struct TemplateDecision {
     node_id: String,
     selected: Vec<String>,
     decision: String,
+    comments: Vec<(String, String)>,
     timestamp: String,
 }
 
 impl From<crate::decision_history::GalleryDecision> for TemplateDecision {
     fn from(d: crate::decision_history::GalleryDecision) -> Self {
+        let mut comments: Vec<(String, String)> = d.comments.into_iter().collect();
+        comments.sort_by(|a, b| a.0.cmp(&b.0));
         Self {
             node_id: d.node_id,
             selected: d.selected,
             decision: d.decision,
+            comments,
             timestamp: d.timestamp.to_rfc3339(),
         }
     }
@@ -1865,6 +1869,60 @@ mod tests {
         });
     }
 
+    fn push_gate_completed_with_comments(
+        state: &AppState,
+        run_id: &str,
+        node_id: &str,
+        selected: &[&str],
+        decision: &str,
+        comments: &[(&str, &str)],
+    ) {
+        use smasher_attractor::events::PipelineEvent;
+        use smasher_attractor::state::Outcome;
+
+        let comments_obj: serde_json::Map<String, serde_json::Value> = comments
+            .iter()
+            .map(|(id, text)| ((*id).to_string(), serde_json::json!(text)))
+            .collect();
+
+        let runs = state.runs.try_read().unwrap();
+        let record = runs.get(run_id).unwrap();
+        record.event_log.push(PipelineEvent::NodeCompleted {
+            node_id: node_id.into(),
+            outcome: Outcome::success_with(serde_json::json!({
+                "selected": selected,
+                "decision": decision,
+                "comments": comments_obj,
+            }))
+            .with_preferred_label(decision),
+            duration_ms: 0,
+            timestamp: chrono::Utc::now(),
+        });
+    }
+
+    #[tokio::test]
+    async fn run_decisions_shows_comments_sorted_by_candidate_id() {
+        let run_id = "decisions-with-comments";
+        let state = test_state();
+        insert_graph_record(&state, run_id, GALLERY_DOT).await;
+        push_gate_completed_with_comments(
+            &state,
+            run_id,
+            "Gate1",
+            &["candidate-a"],
+            "proceed",
+            &[("candidate-b", "tweak spacing"), ("candidate-a", "nice")],
+        );
+
+        let (status, html) = get_html(state, &format!("/runs/{run_id}/decisions")).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("decision-comments"));
+        let a_pos = html.find("nice").expect("candidate-a comment present");
+        let b_pos = html.find("tweak spacing").expect("candidate-b comment present");
+        assert!(a_pos < b_pos, "comments must render sorted by candidate id");
+    }
+
     #[tokio::test]
     async fn run_decisions_empty_state_for_run_with_no_gate_decisions() {
         let run_id = "decisions-empty";
@@ -1893,6 +1951,8 @@ mod tests {
         assert!(html.contains("proceed"));
         assert!(html.contains("candidate-b"));
         assert!(html.contains("iterate"));
+        // Pre-amendment fixture (no comments key): unchanged, no comments block.
+        assert!(!html.contains("decision-comments"));
     }
 
     #[tokio::test]
