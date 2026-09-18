@@ -19,6 +19,34 @@
     <main class="container" id="main">
         {% block content %}{% endblock %}
     </main>
+    <div id="error-toast" class="error-toast" hidden role="alert"></div>
+    <script>
+        // Any hx-post/hx-get that 4xx/5xxs fires this instead of swapping
+        // (htmx's default: error responses aren't swapped into a target),
+        // so without this, a failed submission -- e.g. malformed
+        // node_overrides JSON on the workflow Run form -- would fail
+        // silently with no visible feedback at all.
+        document.body.addEventListener('htmx:responseError', function (evt) {
+            var xhr = evt.detail.xhr;
+            var message = 'Request failed (' + xhr.status + ')';
+            try {
+                var body = JSON.parse(xhr.responseText);
+                if (body && body.error) message = body.error;
+            } catch (e) {
+                // Non-JSON error body -- fall back to the generic message above.
+            }
+            var toast = document.getElementById('error-toast');
+            toast.textContent = message;
+            toast.hidden = false;
+            clearTimeout(toast._hideTimer);
+            toast._hideTimer = setTimeout(function () {
+                toast.hidden = true;
+            }, 6000);
+        });
+        document.getElementById('error-toast').addEventListener('click', function () {
+            this.hidden = true;
+        });
+    </script>
     <script>
         // Polled sections (marked `data-poll`) echo back the version of the
         // fragment they last rendered so the server can skip the swap
