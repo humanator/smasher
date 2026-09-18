@@ -214,7 +214,7 @@ async fn submit_pipeline(
     let emitter = Arc::new(PipelineEventEmitter::default());
     let event_log = Arc::new(PipelineEventLog::new());
     let cancellation = CancellationToken::new();
-    let interviewer = HttpInterviewer::new();
+    let interviewer = HttpInterviewer::new().with_cancellation(cancellation.clone());
     let input_tokens = Arc::new(AtomicU64::new(0));
     let output_tokens = Arc::new(AtomicU64::new(0));
 
@@ -554,7 +554,7 @@ async fn resume_run(
     let emitter = Arc::new(PipelineEventEmitter::default());
     let event_log = Arc::new(PipelineEventLog::new());
     let cancellation = CancellationToken::new();
-    let interviewer = HttpInterviewer::new();
+    let interviewer = HttpInterviewer::new().with_cancellation(cancellation.clone());
     let input_tokens = Arc::new(AtomicU64::new(0));
     let output_tokens = Arc::new(AtomicU64::new(0));
 

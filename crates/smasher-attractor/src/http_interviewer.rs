@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 use crate::interviewer::{Interviewer, InterviewerError, NODE_ID_CONTEXT_KEY};
 use crate::server::{HttpMethod, Route};
@@ -201,6 +202,7 @@ pub struct AnswerQuestionResponse {
 #[derive(Debug, Clone)]
 pub struct HttpInterviewer {
     queue: QuestionQueue,
+    cancellation: Option<CancellationToken>,
 }
 
 impl HttpInterviewer {
@@ -208,12 +210,26 @@ impl HttpInterviewer {
     pub fn new() -> Self {
         Self {
             queue: QuestionQueue::new(),
+            cancellation: None,
         }
     }
 
     /// Create a new HttpInterviewer backed by the given shared queue.
     pub fn with_queue(queue: QuestionQueue) -> Self {
-        Self { queue }
+        Self {
+            queue,
+            cancellation: None,
+        }
+    }
+
+    /// Race `ask`/`ask_with_options`/`approve` against this token, so
+    /// cancelling a run can interrupt it while it's blocked waiting on a
+    /// human answer -- not just take effect the next time the engine checks
+    /// between node steps, which never happens for a node that's still
+    /// blocked.
+    pub fn with_cancellation(mut self, token: CancellationToken) -> Self {
+        self.cancellation = Some(token);
+        self
     }
 
     /// Return a reference to the underlying question queue.
@@ -279,18 +295,18 @@ impl HttpInterviewer {
         ]
     }
 
-    /// Internal helper: enqueue a question and return a receiver for the answer.
+    /// Internal helper: enqueue a question and return its id plus a receiver
+    /// for the answer.
     fn enqueue(
         &self,
         question: &str,
         choices: Vec<String>,
         kind: QuestionKind,
         node_id: Option<String>,
-    ) -> oneshot::Receiver<String> {
+    ) -> (String, oneshot::Receiver<String>) {
         let (tx, rx) = oneshot::channel();
-        let id = uuid::Uuid::new_v4().to_string();
         let pending = PendingQuestion {
-            id,
+            id: uuid::Uuid::new_v4().to_string(),
             question: question.to_string(),
             choices,
             kind,
@@ -298,8 +314,30 @@ impl HttpInterviewer {
             node_id,
             answer_tx: Some(tx),
         };
-        self.queue.push(pending);
-        rx
+        let id = self.queue.push(pending);
+        (id, rx)
+    }
+
+    /// Awaits `rx`, racing it against `self.cancellation` when set. On
+    /// cancellation, removes the now-orphaned question from the queue (so a
+    /// dashboard polling `list_questions` doesn't keep showing a gate card
+    /// for a run that's no longer running) and returns `Cancelled`.
+    async fn await_answer(
+        &self,
+        question_id: &str,
+        rx: oneshot::Receiver<String>,
+    ) -> Result<String, InterviewerError> {
+        let closed = || InterviewerError::Other("answer channel closed".to_string());
+        let Some(token) = &self.cancellation else {
+            return rx.await.map_err(|_| closed());
+        };
+        tokio::select! {
+            result = rx => result.map_err(|_| closed()),
+            _ = token.cancelled() => {
+                self.queue.take(question_id);
+                Err(InterviewerError::Cancelled)
+            }
+        }
     }
 }
 
@@ -313,9 +351,8 @@ impl Default for HttpInterviewer {
 impl Interviewer for HttpInterviewer {
     async fn ask(&self, question: &str, context: &Context) -> Result<String, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let rx = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id);
-        rx.await
-            .map_err(|_| InterviewerError::Other("answer channel closed".to_string()))
+        let (id, rx) = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id);
+        self.await_answer(&id, rx).await
     }
 
     async fn ask_with_options(
@@ -325,22 +362,19 @@ impl Interviewer for HttpInterviewer {
         context: &Context,
     ) -> Result<String, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let rx = self.enqueue(
+        let (id, rx) = self.enqueue(
             question,
             options.to_vec(),
             QuestionKind::MultipleChoice,
             node_id,
         );
-        rx.await
-            .map_err(|_| InterviewerError::Other("answer channel closed".to_string()))
+        self.await_answer(&id, rx).await
     }
 
     async fn approve(&self, message: &str, context: &Context) -> Result<bool, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let rx = self.enqueue(message, vec![], QuestionKind::Approval, node_id);
-        let answer = rx
-            .await
-            .map_err(|_| InterviewerError::Other("answer channel closed".to_string()))?;
+        let (id, rx) = self.enqueue(message, vec![], QuestionKind::Approval, node_id);
+        let answer = self.await_answer(&id, rx).await?;
         let normalized = answer.trim().to_lowercase();
         Ok(normalized == "yes" || normalized == "y" || normalized == "true")
     }
@@ -776,6 +810,140 @@ mod tests {
         let answer = iv.ask("What is your name?", &ctx).await.unwrap();
         assert_eq!(answer, "Turbosaurus Rex");
 
+        handle.await.unwrap();
+    }
+
+    // ---------------------------------------------------------------
+    // Cancellation interrupts a blocked ask()/ask_with_options()/approve(),
+    // rather than only taking effect between node steps (the engine's
+    // between-step check never runs for a node that never finishes on its
+    // own -- e.g. a human gate nobody has answered).
+    // ---------------------------------------------------------------
+
+    #[tokio::test]
+    async fn ask_is_interrupted_by_cancellation_without_an_answer() {
+        let token = CancellationToken::new();
+        let iv = HttpInterviewer::new().with_cancellation(token.clone());
+        let ctx = Context::new();
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move { iv_clone.ask("Never answered", &ctx).await });
+
+        // Wait for the question to actually be enqueued before cancelling,
+        // so this isn't just racing the spawn.
+        loop {
+            if !iv.queue().is_empty() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+
+        token.cancel();
+
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), handle)
+            .await
+            .expect("ask() should return promptly once cancelled, not hang forever")
+            .unwrap();
+        assert!(matches!(result, Err(InterviewerError::Cancelled)));
+    }
+
+    #[tokio::test]
+    async fn cancellation_removes_the_orphaned_question_from_the_queue() {
+        let token = CancellationToken::new();
+        let iv = HttpInterviewer::new().with_cancellation(token.clone());
+        let ctx = Context::new();
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move { iv_clone.ask("Never answered", &ctx).await });
+
+        loop {
+            if !iv.queue().is_empty() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        token.cancel();
+        handle.await.unwrap().ok();
+
+        assert!(
+            iv.queue().is_empty(),
+            "a cancelled question must not linger in the queue for a dashboard to keep showing"
+        );
+    }
+
+    #[tokio::test]
+    async fn ask_with_options_is_interrupted_by_cancellation() {
+        let token = CancellationToken::new();
+        let iv = HttpInterviewer::new().with_cancellation(token.clone());
+        let ctx = Context::new();
+
+        let iv_clone = iv.clone();
+        let options = vec!["yes".to_string(), "no".to_string()];
+        let handle = tokio::spawn(async move {
+            iv_clone
+                .ask_with_options("Never answered", &options, &ctx)
+                .await
+        });
+
+        loop {
+            if !iv.queue().is_empty() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        token.cancel();
+
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), handle)
+            .await
+            .expect("ask_with_options() should return promptly once cancelled")
+            .unwrap();
+        assert!(matches!(result, Err(InterviewerError::Cancelled)));
+    }
+
+    #[tokio::test]
+    async fn approve_is_interrupted_by_cancellation() {
+        let token = CancellationToken::new();
+        let iv = HttpInterviewer::new().with_cancellation(token.clone());
+        let ctx = Context::new();
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move { iv_clone.approve("Never answered", &ctx).await });
+
+        loop {
+            if !iv.queue().is_empty() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        token.cancel();
+
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), handle)
+            .await
+            .expect("approve() should return promptly once cancelled")
+            .unwrap();
+        assert!(matches!(result, Err(InterviewerError::Cancelled)));
+    }
+
+    #[tokio::test]
+    async fn ask_without_a_cancellation_token_behaves_exactly_as_before() {
+        // No with_cancellation() call -- the default, pre-existing path.
+        let iv = HttpInterviewer::new();
+        let iv_clone = iv.clone();
+        let ctx = Context::new();
+
+        let handle = tokio::spawn(async move {
+            loop {
+                if !iv_clone.queue().is_empty() {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            let id = iv_clone.list_questions().questions[0].id.clone();
+            iv_clone.answer_question(&id, "still works");
+        });
+
+        let answer = iv.ask("Anything", &ctx).await.unwrap();
+        assert_eq!(answer, "still works");
         handle.await.unwrap();
     }
 

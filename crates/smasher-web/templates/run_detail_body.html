@@ -1,7 +1,7 @@
 <div class="run-detail">
     <div class="run-header">
         <h2>Run {{ run.id }}</h2>
-        <div id="run-status" data-poll hx-get="/runs/{{ run.id }}/status" hx-trigger="every 5s">
+        <div id="run-status" data-poll hx-get="/runs/{{ run.id }}/status" hx-trigger="every 5s, run-aborted from:body">
             {% include "run_status.html" %}
         </div>
         <div class="token-counter" id="token-counter"
@@ -29,7 +29,8 @@
         {% if run.status == "Running" %}
         <button class="btn btn-danger"
             hx-post="/api/runs/{{ run.id }}/cancel"
-            hx-target="#run-status">
+            hx-swap="none"
+            hx-on::after-request="htmx.trigger(document.body, 'run-aborted')">
             Abort
         </button>
         {% endif %}
