@@ -28,6 +28,16 @@ pub struct RunManifest {
     pub created_at: DateTime<Utc>,
     pub layout_version: u32,
     pub directories: RunDirectories,
+    #[serde(default)]
+    pub workflow_id: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub input_tokens: u64,
+    #[serde(default)]
+    pub output_tokens: u64,
+    #[serde(default)]
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
 /// Builder and manager for run directory layout on disk.
@@ -105,6 +115,11 @@ impl RunDirectory {
             created_at: Utc::now(),
             layout_version: 1,
             directories,
+            workflow_id: None,
+            status: None,
+            input_tokens: 0,
+            output_tokens: 0,
+            completed_at: None,
         };
 
         // Write manifest.json
@@ -132,6 +147,40 @@ impl RunDirectory {
     /// Return a reference to the run manifest.
     pub fn manifest(&self) -> &RunManifest {
         &self.manifest
+    }
+
+    /// Stamp rehydration metadata onto the manifest and rewrite `manifest.json`
+    /// on disk, leaving every other field untouched.
+    ///
+    /// Called once at creation time (status `"Running"`) and again at the
+    /// run's terminal transition (final status, token counts, completion
+    /// time), so a server restart can reconstruct a run's state from disk
+    /// alone.
+    pub fn persist_run_metadata(
+        &mut self,
+        workflow_id: Option<String>,
+        status: Option<String>,
+        input_tokens: u64,
+        output_tokens: u64,
+        completed_at: Option<DateTime<Utc>>,
+    ) -> Result<(), StateError> {
+        self.manifest.workflow_id = workflow_id;
+        self.manifest.status = status;
+        self.manifest.input_tokens = input_tokens;
+        self.manifest.output_tokens = output_tokens;
+        self.manifest.completed_at = completed_at;
+
+        let manifest_json = serde_json::to_string_pretty(&self.manifest).map_err(|e| {
+            StateError::SerializationError {
+                message: e.to_string(),
+            }
+        })?;
+        std::fs::write(
+            self.manifest.directories.root.join("manifest.json"),
+            manifest_json,
+        )?;
+
+        Ok(())
     }
 
     /// Return the log directory path for a specific node.
@@ -342,12 +391,193 @@ mod tests {
                 artifacts: PathBuf::from("/tmp/runs/run-42/artifacts"),
                 events: PathBuf::from("/tmp/runs/run-42/events"),
             },
+            workflow_id: None,
+            status: None,
+            input_tokens: 0,
+            output_tokens: 0,
+            completed_at: None,
         };
 
         let json_str = serde_json::to_string_pretty(&manifest).unwrap();
         let restored: RunManifest = serde_json::from_str(&json_str).unwrap();
 
         assert_eq!(manifest, restored);
+    }
+
+    // ---------------------------------------------------------------
+    // RunManifest defaults the 5 rehydration fields on an old-shape manifest
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn run_manifest_defaults_rehydration_fields_from_old_shape_json() {
+        let old_shape_json = r#"{
+            "run_id": "run-old",
+            "graph_name": "legacy_pipeline",
+            "graph_hash": "deadbeef",
+            "created_at": "2024-01-01T00:00:00Z",
+            "layout_version": 1,
+            "directories": {
+                "root": "/tmp/runs/run-old",
+                "checkpoints": "/tmp/runs/run-old/checkpoints",
+                "node_logs": "/tmp/runs/run-old/nodes",
+                "artifacts": "/tmp/runs/run-old/artifacts",
+                "events": "/tmp/runs/run-old/events"
+            }
+        }"#;
+
+        let manifest: RunManifest = serde_json::from_str(old_shape_json).unwrap();
+
+        assert_eq!(manifest.workflow_id, None);
+        assert_eq!(manifest.status, None);
+        assert_eq!(manifest.input_tokens, 0);
+        assert_eq!(manifest.output_tokens, 0);
+        assert_eq!(manifest.completed_at, None);
+    }
+
+    // ---------------------------------------------------------------
+    // RunManifest with all 5 new fields populated round-trips unchanged
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn run_manifest_populated_rehydration_fields_roundtrip() {
+        let manifest = RunManifest {
+            run_id: "run-99".to_string(),
+            graph_name: "my_pipeline".to_string(),
+            graph_hash: "abc123def456".to_string(),
+            created_at: Utc::now(),
+            layout_version: 1,
+            directories: RunDirectories {
+                root: PathBuf::from("/tmp/runs/run-99"),
+                checkpoints: PathBuf::from("/tmp/runs/run-99/checkpoints"),
+                node_logs: PathBuf::from("/tmp/runs/run-99/nodes"),
+                artifacts: PathBuf::from("/tmp/runs/run-99/artifacts"),
+                events: PathBuf::from("/tmp/runs/run-99/events"),
+            },
+            workflow_id: Some("wf-1".to_string()),
+            status: Some("Completed".to_string()),
+            input_tokens: 123,
+            output_tokens: 456,
+            completed_at: Some(Utc::now()),
+        };
+
+        let json_str = serde_json::to_string_pretty(&manifest).unwrap();
+        let restored: RunManifest = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(manifest, restored);
+    }
+
+    // ---------------------------------------------------------------
+    // persist_run_metadata mutates in-memory manifest and rewrites manifest.json
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn persist_run_metadata_mutates_memory_and_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut run_dir =
+            RunDirectory::create(tmp.path(), "run-persist", "g", "digraph { a -> b }").unwrap();
+
+        let completed_at = Utc::now();
+        run_dir
+            .persist_run_metadata(
+                Some("wf-42".to_string()),
+                Some("Completed".to_string()),
+                10,
+                20,
+                Some(completed_at),
+            )
+            .unwrap();
+
+        assert_eq!(run_dir.manifest().workflow_id, Some("wf-42".to_string()));
+        assert_eq!(run_dir.manifest().status, Some("Completed".to_string()));
+        assert_eq!(run_dir.manifest().input_tokens, 10);
+        assert_eq!(run_dir.manifest().output_tokens, 20);
+        assert_eq!(run_dir.manifest().completed_at, Some(completed_at));
+
+        let contents =
+            std::fs::read_to_string(tmp.path().join("run-persist").join("manifest.json")).unwrap();
+        let on_disk: RunManifest = serde_json::from_str(&contents).unwrap();
+
+        assert_eq!(on_disk.workflow_id, Some("wf-42".to_string()));
+        assert_eq!(on_disk.status, Some("Completed".to_string()));
+        assert_eq!(on_disk.input_tokens, 10);
+        assert_eq!(on_disk.output_tokens, 20);
+        assert_eq!(on_disk.completed_at, Some(completed_at));
+    }
+
+    // ---------------------------------------------------------------
+    // persist_run_metadata leaves the original fields untouched
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn persist_run_metadata_leaves_original_fields_unchanged() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut run_dir =
+            RunDirectory::create(tmp.path(), "run-stable", "g", "digraph { a -> b }").unwrap();
+
+        let run_id_before = run_dir.manifest().run_id.clone();
+        let graph_name_before = run_dir.manifest().graph_name.clone();
+        let graph_hash_before = run_dir.manifest().graph_hash.clone();
+        let created_at_before = run_dir.manifest().created_at;
+        let layout_version_before = run_dir.manifest().layout_version;
+        let directories_before = run_dir.manifest().directories.clone();
+
+        run_dir
+            .persist_run_metadata(
+                Some("wf-1".to_string()),
+                Some("Running".to_string()),
+                0,
+                0,
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(run_dir.manifest().run_id, run_id_before);
+        assert_eq!(run_dir.manifest().graph_name, graph_name_before);
+        assert_eq!(run_dir.manifest().graph_hash, graph_hash_before);
+        assert_eq!(run_dir.manifest().created_at, created_at_before);
+        assert_eq!(run_dir.manifest().layout_version, layout_version_before);
+        assert_eq!(run_dir.manifest().directories, directories_before);
+    }
+
+    // ---------------------------------------------------------------
+    // persist_run_metadata called twice leaves only the second call's values
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn persist_run_metadata_second_call_overwrites_first() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut run_dir =
+            RunDirectory::create(tmp.path(), "run-twice", "g", "digraph { a -> b }").unwrap();
+
+        run_dir
+            .persist_run_metadata(
+                Some("wf-1".to_string()),
+                Some("Running".to_string()),
+                0,
+                0,
+                None,
+            )
+            .unwrap();
+
+        let completed_at = Utc::now();
+        run_dir
+            .persist_run_metadata(
+                Some("wf-1".to_string()),
+                Some("Completed".to_string()),
+                50,
+                75,
+                Some(completed_at),
+            )
+            .unwrap();
+
+        let contents =
+            std::fs::read_to_string(tmp.path().join("run-twice").join("manifest.json")).unwrap();
+        let on_disk: RunManifest = serde_json::from_str(&contents).unwrap();
+
+        assert_eq!(on_disk.status, Some("Completed".to_string()));
+        assert_eq!(on_disk.input_tokens, 50);
+        assert_eq!(on_disk.output_tokens, 75);
+        assert_eq!(on_disk.completed_at, Some(completed_at));
     }
 
     // ---------------------------------------------------------------
@@ -722,6 +952,11 @@ mod tests {
                 artifacts: root.join("artifacts"),
                 events: root.join("events"),
             },
+            workflow_id: None,
+            status: None,
+            input_tokens: 0,
+            output_tokens: 0,
+            completed_at: None,
         };
         std::fs::write(
             root.join("manifest.json"),
@@ -811,8 +1046,6 @@ mod tests {
         assert_eq!(report.removed_run_ids, vec!["old-run".to_string()]);
         // Nothing was actually deleted.
         assert!(std::fs::metadata(tmp.path().join("artifacts/old-run")).is_ok());
-        assert!(
-            std::fs::metadata(tmp.path().join("artifacts/old-run/manifest.json")).is_ok()
-        );
+        assert!(std::fs::metadata(tmp.path().join("artifacts/old-run/manifest.json")).is_ok());
     }
 }
