@@ -47,6 +47,8 @@
           <span class="scorecard-reason">{{ reason }}</span>
           {%- endfor -%}
         {%- endif %}</div>
+      <textarea class="candidate-comment" data-candidate="{{ gc.summary.candidate_id }}"
+        placeholder="Notes to drive the next iteration (optional)"></textarea>
     </label>
     {% endif %}
     {% endfor %}
@@ -68,10 +70,15 @@
       var selected = Array.prototype.map.call(
         card.querySelectorAll("input[name='selected']:checked"),
         function(el) { return el.value; });
+      var comments = {};
+      card.querySelectorAll(".candidate-comment").forEach(function(el) {
+        var text = el.value.trim();
+        if (text) { comments[el.dataset.candidate] = text; }
+      });
       fetch("/api/runs/{{ run_id }}/gallery/{{ question_id }}/decision", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({selected: selected, decision: btn.dataset.decision})
+        body: JSON.stringify({selected: selected, decision: btn.dataset.decision, comments: comments})
       }).then(function(resp) {
         if (!resp.ok) {
           return resp.json().then(function(j) { throw new Error(j.error || resp.statusText); });

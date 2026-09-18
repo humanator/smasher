@@ -1568,6 +1568,12 @@ mod tests {
         assert!(!html.contains("<iframe"));
         // Plain cards still render alongside.
         assert!(html.contains("question-card"));
+        // Non-failed candidates get an optional comment textarea (one each,
+        // none for the failed candidate rendered via the failed_card macro).
+        assert_eq!(html.matches("<textarea class=\"candidate-comment\"").count(), 2);
+        assert!(html.contains(r#"<textarea class="candidate-comment" data-candidate="candidate-a""#));
+        assert!(html.contains(r#"<textarea class="candidate-comment" data-candidate="candidate-b""#));
+        assert!(!html.contains(r#"data-candidate="candidate-c""#));
     }
 
     #[tokio::test]
