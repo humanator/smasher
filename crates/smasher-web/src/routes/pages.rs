@@ -1885,6 +1885,73 @@ mod tests {
         assert!(html.contains("run-newer"));
     }
 
+    /// Found via manual QA: once a workflow has ever had a run, the Run form
+    /// disappeared for good, even after that run finished (Completed,
+    /// Failed, or -- as observed after a restart-survival check --
+    /// Aborted). A workflow must stay re-runnable once its active run is no
+    /// longer in flight.
+    #[tokio::test]
+    async fn workflow_detail_shows_run_form_again_once_active_run_is_terminal() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let state = state_with_workflow_dir(tmp.path());
+        insert_test_record_for_workflow_with_status(
+            &state,
+            "run-done",
+            Some(&id),
+            chrono::Utc::now(),
+            smasher_attractor::state::RunStatus::Completed,
+        )
+        .await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        assert!(
+            html.contains(&format!("hx-post=\"/workflows/{id}/run\"")),
+            "Run form should reappear once the active run is terminal:\n{html}"
+        );
+        // The finished run's own view should still be visible too.
+        assert!(html.contains("hx-get=\"/runs/run-done/status\""));
+    }
+
+    /// While a run is genuinely still in flight (including paused at a
+    /// human gate, which stays "Running" until answered), the Run form
+    /// should stay hidden -- launching a second run isn't the right escape
+    /// hatch for "waiting on my input."
+    #[tokio::test]
+    async fn workflow_detail_hides_run_form_while_active_run_is_running() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let state = state_with_workflow_dir(tmp.path());
+        insert_test_record_for_workflow(&state, "run-live", Some(&id), chrono::Utc::now()).await;
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        assert!(!html.contains(&format!("hx-post=\"/workflows/{id}/run\"")));
+    }
+
     fn state_with_workflow_dir_and_data_dir(
         workflow_dir: &std::path::Path,
         data_dir: &std::path::Path,
@@ -2054,6 +2121,47 @@ mod tests {
             status: RunStatus::Running,
             started_at,
             completed_at: None,
+            emitter: Arc::new(PipelineEventEmitter::default()),
+            event_log: Arc::new(PipelineEventLog::new()),
+            cancellation: CancellationToken::new(),
+            interviewer: HttpInterviewer::new(),
+            variables: HashMap::new(),
+            error: None,
+            input_tokens: Arc::new(AtomicU64::new(0)),
+            output_tokens: Arc::new(AtomicU64::new(0)),
+            run_working_dir: None,
+            workflow_id: workflow_id.map(String::from),
+        };
+        state.runs.write().await.insert(id.into(), record);
+    }
+
+    /// Like `insert_test_record_for_workflow`, but with an explicit
+    /// terminal/non-terminal `status` -- needed to test that the Run form
+    /// reappears once a workflow's active run has finished.
+    async fn insert_test_record_for_workflow_with_status(
+        state: &AppState,
+        id: &str,
+        workflow_id: Option<&str>,
+        started_at: chrono::DateTime<chrono::Utc>,
+        status: smasher_attractor::state::RunStatus,
+    ) {
+        use crate::state::RunRecord;
+        use smasher_attractor::dot::parser;
+        use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
+        use smasher_attractor::graph;
+        use smasher_attractor::http_interviewer::HttpInterviewer;
+        use std::sync::Arc;
+        use tokio_util::sync::CancellationToken;
+
+        let dot_graph = parser::parse("digraph { a -> b }").unwrap();
+        let resolved = graph::resolve(&dot_graph).unwrap();
+        let record = RunRecord {
+            id: id.into(),
+            dot_source: "digraph { a -> b }".into(),
+            graph: resolved,
+            status,
+            started_at,
+            completed_at: Some(started_at),
             emitter: Arc::new(PipelineEventEmitter::default()),
             event_log: Arc::new(PipelineEventLog::new()),
             cancellation: CancellationToken::new(),
