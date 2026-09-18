@@ -1273,6 +1273,8 @@ mod tests {
         assert!(html.contains("chromium launch failed"));
         assert!(html.contains("candidate-card-failed"));
         assert!(!html.contains("<iframe"));
+        // Static-<img>-fallback cards get no reload button — nothing to reset.
+        assert!(!html.contains("candidate-reload-btn"));
     }
 
     #[test]
@@ -1309,7 +1311,11 @@ mod tests {
         assert!(html.contains(
             r#"<iframe src="/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html""#
         ));
+        assert!(html.contains(
+            r#"data-src="/candidate-artifacts/run-1/artifacts/candidate-a/bundle/index.html""#
+        ));
         assert!(html.contains(r#"sandbox="allow-scripts""#));
+        assert!(html.contains("candidate-reload-btn"));
         assert!(!html.contains("<img"));
     }
 

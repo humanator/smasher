@@ -1,7 +1,8 @@
 {% macro live_card(c) %}
 <div class="candidate-embed">
     {% if let Some(bundle) = c.bundle_url %}
-    <iframe src="{{ bundle }}" title="Candidate {{ c.candidate_id }}" sandbox="allow-scripts" class="candidate-thumbnail"></iframe>
+    <iframe src="{{ bundle }}" data-src="{{ bundle }}" title="Candidate {{ c.candidate_id }}" sandbox="allow-scripts" class="candidate-thumbnail"></iframe>
+    <button type="button" class="candidate-reload-btn" aria-label="Reset preview to start">⟲</button>
     {% else %}
     <img src="{{ c.screenshot_url }}" alt="Candidate {{ c.candidate_id }}" class="candidate-thumbnail">
     {% endif %}

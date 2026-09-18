@@ -49,6 +49,20 @@
                 evt.detail.shouldSwap = false;
             }
         });
+        // Delegated from the document (not attached per-card) because
+        // live_card's markup renders inside HTMX-polled fragments that get
+        // swapped out and back in; a per-card listener would need
+        // re-attaching on every swap. A parent-frame `src` reassignment,
+        // never `contentWindow` — the iframe's `sandbox` lacks
+        // `allow-same-origin`, so reaching into it would throw.
+        document.body.addEventListener('click', function (evt) {
+            var btn = evt.target.closest('.candidate-reload-btn');
+            if (!btn) return;
+            var iframe = btn.parentElement.querySelector('iframe');
+            if (!iframe) return;
+            iframe.removeAttribute('src');
+            iframe.src = iframe.dataset.src;
+        });
     </script>
 </body>
 </html>
