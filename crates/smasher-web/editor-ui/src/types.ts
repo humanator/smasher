@@ -77,3 +77,29 @@ export interface NodeFormProps {
   attrs: Record<string, AttrValue>;
   onChange: (patch: NodeFormChange) => void;
 }
+
+// Task 8 (edge polish + edge attrs form): the `onChange` contract EdgeForm.svelte
+// uses. Unlike NodeFormChange/NodeAttrsPatch, these 3 attrs aren't folded into a
+// generic attrs bag on the wire -- graph/mod.rs's resolve() (and this editor's
+// convert.ts toFlowEdges/toEditorGraph) already model condition/priority/
+// loop_restart as their own typed `EditorEdge` fields (see types.ts's EditorEdge
+// above), not entries in `attrs`. So the patch shape mirrors that directly
+// instead of reusing NodeAttrsPatch's "undefined deletes" convention: `condition`/
+// `priority` are `| null` (matching EditorEdge's own Option<String>/Option<i32>
+// nullability -- "clear the field" is expressed as an explicit `null`, not
+// `undefined`, since these keys are never *missing* from the patch, only ever
+// present with a value or null) and `loopRestart` is a plain boolean (loop_restart
+// itself defaults to `false` server-side per graph/mod.rs's extract_loop_restart,
+// never "absent").
+export interface EdgeFormChange {
+  condition?: string | null;
+  priority?: number | null;
+  loopRestart?: boolean;
+}
+
+export interface EdgeFormProps {
+  condition: string | null;
+  priority: number | null;
+  loopRestart: boolean;
+  onChange: (patch: EdgeFormChange) => void;
+}

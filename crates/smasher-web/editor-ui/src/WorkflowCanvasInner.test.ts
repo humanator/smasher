@@ -548,3 +548,179 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
     expect(new Set(toolIds).size).toBe(2);
   });
 });
+
+// Task 8: connection handle / edge hover polish, edge-selection side panel,
+// default position assignment. jsdom never renders a `.svelte-flow__edge`
+// DOM element at all (confirmed while writing this task -- edges depend on
+// the same getBoundingClientRect-based measurement this file's very first
+// test already documented jsdom lacking for edge *path* geometry; here it
+// means edges are absent from `store.visible.edges` entirely, not just
+// drawn with bad coordinates), so edge selection/hover/delete are driven
+// through `component.selectEdge(id)`/`component.edgeActions` -- the same
+// "call the real handler directly instead of a synthetic DOM gesture jsdom
+// can't produce" precedent `addNodeAtPosition` already set for Task 4's
+// drag-and-drop.
+describe('connection handle polish (Task 8)', () => {
+  it('marks a node with at least one edge as wf-node-connected', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    const nodeA = document.querySelector('.svelte-flow__node[data-id="a"]');
+    const nodeB = document.querySelector('.svelte-flow__node[data-id="b"]');
+    expect(nodeA?.className).toContain('wf-node-connected');
+    expect(nodeB?.className).toContain('wf-node-connected');
+  });
+
+  it('does not mark an unconnected node as wf-node-connected', async () => {
+    render(WorkflowCanvasInner, {
+      props: {
+        graph: {
+          name: null,
+          graph_attrs: {},
+          nodes: [{ id: 'lonely', node_type: 'Start', label: 'Lonely', attrs: {} }],
+          edges: [],
+        },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Lonely')).toBeInTheDocument());
+
+    const node = document.querySelector('.svelte-flow__node[data-id="lonely"]');
+    expect(node?.className).not.toContain('wf-node-connected');
+  });
+
+  it('removes the wf-node-connected class once its only edge is deleted', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    // The id convert.ts's toFlowEdges assigns (`${from}->${to}#${i}`).
+    component.edgeActions.onDeleteEdge('a->b#0');
+
+    await waitFor(() => {
+      expect(component.currentGraph().edges).toHaveLength(0);
+    });
+    const nodeA = document.querySelector('.svelte-flow__node[data-id="a"]');
+    expect(nodeA?.className).not.toContain('wf-node-connected');
+  });
+});
+
+describe('edge inspector (Task 8 side panel)', () => {
+  it('is absent until an edge is selected', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+  });
+
+  it('shows EdgeForm pre-populated from the edge\'s condition/priority/loop_restart when selected', async () => {
+    const graph: EditorGraph = {
+      ...sampleGraph,
+      edges: [
+        { from: 'a', to: 'b', label: null, condition: 'ready', priority: 2, loop_restart: true, attrs: {} },
+      ],
+    };
+    const { component } = render(WorkflowCanvasInner, { props: { graph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    component.selectEdge('a->b#0');
+
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+    expect(screen.getByTestId('edge-form')).toBeInTheDocument();
+    expect(screen.getByTestId('edge-condition')).toHaveValue('ready');
+    expect(screen.getByTestId('edge-priority')).toHaveValue('2');
+    expect(screen.getByTestId('edge-loop-restart')).toBeChecked();
+  });
+
+  it('editing a field updates the edge\'s attrs in live graph state immediately', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-form')).toBeInTheDocument());
+    await fireEvent.input(screen.getByTestId('edge-condition'), { target: { value: 'x > 5' } });
+    await fireEvent.input(screen.getByTestId('edge-priority'), { target: { value: '3' } });
+    await fireEvent.click(screen.getByTestId('edge-loop-restart'));
+
+    const updated = component.currentGraph().edges.find((e) => e.from === 'a' && e.to === 'b');
+    expect(updated?.condition).toBe('x > 5');
+    expect(updated?.priority).toBe(3);
+    expect(updated?.loop_restart).toBe(true);
+  });
+
+  it('selecting a node closes an open edge inspector, and vice versa', async () => {
+    const graph: EditorGraph = { ...sampleGraph };
+    const { component } = render(WorkflowCanvasInner, { props: { graph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    const nodeA = screen.getByText('A').closest('.svelte-flow__node') as HTMLElement;
+    await fireEvent.click(nodeA);
+
+    expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('closes when the pane is clicked', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    const pane = document.querySelector('.svelte-flow__pane') as HTMLElement;
+    await fireEvent.click(pane);
+
+    expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+  });
+
+  it('closes via the inspector\'s own close button', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByLabelText('Close edge inspector'));
+
+    expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+  });
+});
+
+describe('edge deletion via edgeActions (Task 8 hover-revealed delete)', () => {
+  it('removes the edge from graph state when onDeleteEdge is invoked', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    expect(component.currentGraph().edges).toHaveLength(1);
+
+    component.edgeActions.onDeleteEdge('a->b#0');
+
+    await waitFor(() => {
+      expect(component.currentGraph().edges).toHaveLength(0);
+    });
+  });
+
+  it('closes the edge inspector when the currently-selected edge is deleted', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    component.edgeActions.onDeleteEdge('a->b#0');
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+    });
+  });
+
+  it('tracks hover state via edgeActions.hoveredEdgeId', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    expect(component.edgeActions.hoveredEdgeId).toBeNull();
+    component.edgeActions.hoveredEdgeId = 'a->b#0';
+    expect(component.edgeActions.hoveredEdgeId).toBe('a->b#0');
+  });
+});

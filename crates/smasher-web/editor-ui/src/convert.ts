@@ -59,6 +59,10 @@ export function toFlowEdges(editorEdges: EditorEdge[]): FlowEdge<WorkflowEdgeDat
     source: e.from,
     target: e.to,
     label: e.label ?? undefined,
+    // Task 8: WorkflowEdge.svelte, registered as the "workflow" edgeTypes
+    // entry in WorkflowCanvasInner.svelte -- same bezier path the built-in
+    // "default" edge draws, plus a hover/selection-revealed delete button.
+    type: 'workflow',
     data: {
       condition: e.condition,
       priority: e.priority,

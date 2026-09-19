@@ -1,17 +1,26 @@
 <script lang="ts">
   import { Background, Controls, MiniMap, SvelteFlow, type Edge as FlowEdge, type Node as FlowNode } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import type { Component } from 'svelte';
+  import { setContext, untrack, type Component } from 'svelte';
   import Palette from './Palette.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import { toEditorGraph, toFlowEdges, toFlowNodes, type WorkflowEdgeData, type WorkflowNodeData } from './convert';
-  import type { AttrValue, EditorGraph, NodeFormChange, NodeFormProps } from './types';
+  import type { AttrValue, EdgeFormChange, EditorGraph, NodeFormChange, NodeFormProps } from './types';
+  import { EDGE_ACTIONS_CONTEXT_KEY, type WorkflowEdgeActions } from './edgeContext';
+  import WorkflowEdge from './WorkflowEdge.svelte';
+  import EdgeForm from './EdgeForm.svelte';
   import CodergenForm from './nodeForms/CodergenForm.svelte';
   import InterviewerForm from './nodeForms/InterviewerForm.svelte';
   import ToolForm from './nodeForms/ToolForm.svelte';
   import ManagerForm from './nodeForms/ManagerForm.svelte';
   import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
   import StructuralForm from './nodeForms/StructuralForm.svelte';
+
+  // Task 8: WorkflowEdge.svelte is the only edge type this canvas renders
+  // (loaded edges via convert.ts's toFlowEdges, freshly hand-drawn ones via
+  // defaultEdgeOptions below) -- registered once here rather than inline in
+  // the template so the object identity is stable across re-renders.
+  const edgeTypes = { workflow: WorkflowEdge };
 
   // Task 7: one form component per NodeType, rendered in a selected-node
   // side panel. Start/Exit/Parallel/FanIn/Conditional (no kind-specific
@@ -136,12 +145,113 @@
   let selectedNodeId = $state<string | null>(null);
   const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
 
+  // Task 8: the same pattern, for edges -- one inspector panel slot shared
+  // between a selected node and a selected edge (never both at once:
+  // selecting either clears the other, matching this canvas having a single
+  // side panel, not two independent ones).
+  let selectedEdgeId = $state<string | null>(null);
+  const selectedEdge = $derived(edges.find((e) => e.id === selectedEdgeId) ?? null);
+
   function handleNodeClick({ node }: { node: FlowNode<WorkflowNodeData> }) {
     selectedNodeId = node.id;
+    selectedEdgeId = null;
+  }
+
+  function handleEdgeClick({ edge }: { edge: FlowEdge<WorkflowEdgeData> }) {
+    selectedEdgeId = edge.id;
+    selectedNodeId = null;
+  }
+
+  // jsdom never renders a `.svelte-flow__edge` DOM element at all (it
+  // relies on the same getBoundingClientRect-based node measurement this
+  // file's own test suite already documented jsdom lacking for edge *path*
+  // rendering -- here it means edges are entirely absent from
+  // `store.visible.edges`, not just drawn with NaN coordinates), so no real
+  // click/hover DOM event can reach an edge in a jsdom test. Exported so
+  // tests can drive the real selection handler directly by id, the same
+  // "call the underlying handler, not a synthetic gesture jsdom can't
+  // produce" precedent `addNodeAtPosition` already set for Task 4's
+  // drag-and-drop.
+  export function selectEdge(edgeId: string) {
+    const edge = edges.find((e) => e.id === edgeId);
+    if (edge) handleEdgeClick({ edge });
   }
 
   function handlePaneClick() {
     selectedNodeId = null;
+    selectedEdgeId = null;
+  }
+
+  // Task 8: hover state + the delete callback WorkflowEdge.svelte reads via
+  // Svelte context (see edgeContext.ts's own comment on why context, not a
+  // prop, is needed here). A single reactive ($state) object set once via
+  // setContext -- every WorkflowEdge instance reads the same live object.
+  // Exported for the same jsdom-can't-render-edges reason as selectEdge
+  // above: WorkflowEdge.svelte (the real consumer, via Svelte context --
+  // see edgeContext.ts) can't be driven by a real pointer-hover/click DOM
+  // event in a test, so tests call `.onDeleteEdge(...)`/set
+  // `.hoveredEdgeId` on this same live object directly instead of
+  // duplicating its logic in a separate test-only helper.
+  export const edgeActions: WorkflowEdgeActions = $state({
+    hoveredEdgeId: null,
+    onDeleteEdge: (edgeId: string) => {
+      edges = edges.filter((e) => e.id !== edgeId);
+      if (selectedEdgeId === edgeId) selectedEdgeId = null;
+    },
+  });
+  setContext(EDGE_ACTIONS_CONTEXT_KEY, edgeActions);
+
+  function handleEdgePointerEnter({ edge }: { edge: FlowEdge<WorkflowEdgeData> }) {
+    edgeActions.hoveredEdgeId = edge.id;
+  }
+
+  function handleEdgePointerLeave() {
+    edgeActions.hoveredEdgeId = null;
+  }
+
+  // Task 8 (connection handle polish): handles are hidden by default and
+  // revealed on node hover via CSS alone (see the :global rules below), but
+  // "turn an accent color once connected" needs to know *which* nodes have
+  // at least one edge -- not expressible in CSS since a node's handle
+  // elements and the edges attached to it aren't DOM siblings/ancestors of
+  // each other. Recomputed only from `edges` (untracked read of `nodes`, so
+  // this doesn't re-run -- and fight the drag/selection updates `bind:nodes`
+  // applies -- every time `nodes` itself changes for unrelated reasons, e.g.
+  // a drag repositioning a node).
+  const connectedNodeIds = $derived(new Set(edges.flatMap((e) => [e.source, e.target])));
+
+  $effect(() => {
+    const connected = connectedNodeIds;
+    const current = untrack(() => nodes);
+    const next = current.map((n) => {
+      const base = typeof n.class === 'string' ? n.class.replace(/\bwf-node-connected\b/g, '').trim() : '';
+      const withFlag = connected.has(n.id) ? (base ? `${base} wf-node-connected` : 'wf-node-connected') : base;
+      if ((n.class ?? '') === withFlag) return n;
+      return { ...n, class: withFlag || undefined };
+    });
+    if (next.some((n, i) => n !== current[i])) {
+      nodes = next;
+    }
+  });
+
+  // Applies an EdgeForm.svelte onChange patch to the selected edge's live
+  // graph state -- the edge-form analogue of applyNodeFormChange above.
+  // condition/priority/loop_restart are their own typed WorkflowEdgeData
+  // fields (not a generic attrs bag -- see types.ts's EdgeFormChange
+  // comment), so each is applied only when the patch actually mentions it.
+  function applyEdgeFormChange(edgeId: string, patch: EdgeFormChange) {
+    edges = edges.map((e) => {
+      if (e.id !== edgeId) return e;
+      return {
+        ...e,
+        data: {
+          condition: patch.condition !== undefined ? patch.condition : (e.data?.condition ?? null),
+          priority: patch.priority !== undefined ? patch.priority : (e.data?.priority ?? null),
+          loopRestart: patch.loopRestart !== undefined ? patch.loopRestart : (e.data?.loopRestart ?? false),
+          attrs: e.data?.attrs ?? {},
+        },
+      };
+    });
   }
 
   // Applies a nodeForms/*.svelte onChange patch to the selected node's live
@@ -258,7 +368,18 @@
       ondragover={handleDragOver}
       ondrop={handleDrop}
     >
-      <SvelteFlow bind:nodes bind:edges fitView onnodeclick={handleNodeClick} onpaneclick={handlePaneClick}>
+      <SvelteFlow
+        bind:nodes
+        bind:edges
+        fitView
+        {edgeTypes}
+        defaultEdgeOptions={{ type: 'workflow' }}
+        onnodeclick={handleNodeClick}
+        onpaneclick={handlePaneClick}
+        onedgeclick={handleEdgeClick}
+        onedgepointerenter={handleEdgePointerEnter}
+        onedgepointerleave={handleEdgePointerLeave}
+      >
         <Background />
         <Controls />
         <MiniMap />
@@ -307,10 +428,66 @@
         <FormComponent attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
       {/key}
     </aside>
+  {:else if selectedEdge}
+    {@const edge = selectedEdge}
+    <aside class="node-inspector" data-testid="edge-inspector">
+      <div class="node-inspector-header">
+        <span class="node-inspector-title" data-testid="edge-inspector-title">Edge</span>
+        <button
+          type="button"
+          class="node-inspector-close"
+          onclick={() => (selectedEdgeId = null)}
+          aria-label="Close edge inspector"
+        >
+          ×
+        </button>
+      </div>
+      <!-- Remount on selection change, same reasoning as the node
+           inspector's own {#key} above -- EdgeForm.svelte seeds its local
+           field state from condition/priority/loopRestart only once per
+           mount. -->
+      {#key edge.id}
+        <EdgeForm
+          condition={edge.data?.condition ?? null}
+          priority={edge.data?.priority ?? null}
+          loopRestart={edge.data?.loopRestart ?? false}
+          onChange={(patch) => applyEdgeFormChange(edge.id, patch)}
+        />
+      {/key}
+    </aside>
   {/if}
 </div>
 
 <style>
+  /* Task 8: connection handles hidden until the owning node is hovered
+     (spec Assumption 2 / Agent Flow reference), revealed with a plain
+     opacity transition; a node that has at least one edge (wf-node-connected,
+     computed in this file's `connectedNodeIds` $effect above) keeps its
+     handles visibly accent-colored even without hovering, so a "wired up"
+     node reads as such at a glance instead of needing a hover to confirm.
+     :global() is required here -- these elements are rendered by @xyflow/
+     svelte's own child components (DefaultNode/Handle.svelte), not by this
+     component's own template, so Svelte's default per-component style
+     scoping never reaches them. */
+  :global(.svelte-flow__handle) {
+    opacity: 0;
+    transition:
+      opacity 0.15s ease,
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  :global(.svelte-flow__node:hover .svelte-flow__handle),
+  :global(.svelte-flow__node.selected .svelte-flow__handle) {
+    opacity: 1;
+  }
+
+  :global(.svelte-flow__node.wf-node-connected .svelte-flow__handle) {
+    opacity: 1;
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+  }
+
   .node-inspector {
     width: 260px;
     flex: 0 0 260px;

@@ -21,6 +21,32 @@ describe('toFlowNodes', () => {
     expect(flow[0].position).toEqual({ x: 0, y: 0 });
   });
 
+  // Task 8 acceptance criterion: "Loading a graph where some nodes have pos
+  // and others don't leaves the positioned ones alone and only assigns
+  // defaults to the rest" -- this logic already existed from Task 4 (see
+  // this file's own two tests above), but wasn't exercised by a *mixed*
+  // fixture. Confirmed it already satisfies the criterion as written rather
+  // than needing a code change: `parsePos` always wins when present
+  // (regardless of array position), and `defaultPosition(index)` is keyed
+  // off each node's own array index, so a node without `pos` sitting next to
+  // one that has it still gets its own distinct default rather than
+  // colliding with position 0.
+  it('leaves an explicit pos alone and assigns a default only to nodes missing it', () => {
+    const nodes: EditorNode[] = [
+      { id: 'has-pos', node_type: 'Start', label: 'Has', attrs: { pos: '500,500' } },
+      { id: 'no-pos-1', node_type: 'Codergen', label: 'One', attrs: {} },
+      { id: 'no-pos-2', node_type: 'Exit', label: 'Two', attrs: {} },
+    ];
+    const flow = toFlowNodes(nodes);
+
+    expect(flow[0].position).toEqual({ x: 500, y: 500 });
+    // Neither defaulted node collides with the explicit position or with
+    // each other.
+    expect(flow[1].position).not.toEqual(flow[0].position);
+    expect(flow[2].position).not.toEqual(flow[0].position);
+    expect(flow[1].position).not.toEqual(flow[2].position);
+  });
+
   it('does not crash on an unknown/future node_type, falling back to a generic label', () => {
     const nodes: EditorNode[] = [
       { id: 'weird', node_type: 'FromTheFuture', label: null, attrs: {} },
