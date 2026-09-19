@@ -2019,6 +2019,31 @@ digraph {
         assert!(!html.contains("action=\"/workflows"));
     }
 
+    /// Task 9 cutover: the read-only DOT preview gains a link to the real
+    /// visual editor (Task 5's `/workflows/{id}/edit`) rather than any
+    /// raw-DOT-editing affordance -- this is additive to, not in tension
+    /// with, the "no edit form" test directly above (an `<a href>` isn't a
+    /// form that could write `dot_source` back to disk).
+    #[tokio::test]
+    async fn workflow_detail_links_to_the_edit_route() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+
+        assert!(html.contains(&format!("href=\"/workflows/{id}/edit\"")));
+    }
+
     #[tokio::test]
     async fn workflow_detail_run_history_is_scoped_to_the_workflow() {
         let tmp = tempfile::tempdir().unwrap();

@@ -7,6 +7,7 @@
     <a href="/" class="btn btn-small">&larr; All workflows</a>
     <h2>{{ workflow.name }}</h2>
     <p class="field-hint">Source: {{ workflow.source_dir }}</p>
+    <a href="/workflows/{{ workflow.id }}/edit" class="btn btn-small">Edit</a>
     <pre class="dot-source-preview">{{ dot_source }}</pre>
 
     {% match active_run %}
