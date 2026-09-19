@@ -58,6 +58,13 @@ struct WorkflowEditorTemplate {
     /// (see `escape_for_inline_script`).
     graph_json: String,
     is_edit: bool,
+    /// JSON-serialized `Vec<String>` of `state.workflow_dirs` (same source
+    /// `WorkflowNewTemplate::target_dirs` already exposes for the old
+    /// raw-paste form's `<select>`), escaped the same way `graph_json` is.
+    /// Only consumed by the frontend's inline create-mode name/target-dir
+    /// form when there's no `workflowId` yet, but bootstrapped unconditionally
+    /// for both routes to keep this one template/one bootstrap script simple.
+    target_dirs_json: String,
 }
 
 #[derive(Template)]
@@ -380,12 +387,14 @@ fn to_inline_script_json<T: serde::Serialize>(value: &T) -> Result<String, WebEr
 /// mount, bootstrapped with an empty graph and no `workflowId` (per spec
 /// Assumption 8) -- replaces the old `workflow_new` handler's route
 /// binding, which moved to `/workflows/new/raw` (kept as a fallback).
-async fn workflow_editor_new() -> Result<impl IntoResponse, WebError> {
+async fn workflow_editor_new(State(state): State<AppState>) -> Result<impl IntoResponse, WebError> {
     let graph_json = to_inline_script_json(&crate::routes::editor_api::EditorGraph::default())?;
+    let target_dirs_json = to_inline_script_json(&state.workflow_dirs)?;
     Ok(HtmlTemplate(WorkflowEditorTemplate {
         workflow_id_js: None,
         graph_json,
         is_edit: false,
+        target_dirs_json,
     }))
 }
 
@@ -410,11 +419,13 @@ async fn workflow_editor_edit(
 
     let graph_json = to_inline_script_json(&editor_graph)?;
     let workflow_id_js = Some(to_inline_script_json(&id)?);
+    let target_dirs_json = to_inline_script_json(&state.workflow_dirs)?;
 
     Ok(HtmlTemplate(WorkflowEditorTemplate {
         workflow_id_js,
         graph_json,
         is_edit: true,
+        target_dirs_json,
     }))
 }
 
@@ -1651,6 +1662,30 @@ mod tests {
         assert!(html.contains(r#""nodes":[]"#));
         assert!(html.contains(r#""edges":[]"#));
         assert!(!html.contains("canvas.workflowId"));
+    }
+
+    /// Follow-up to Task 5: `/workflows/new` has no `workflowId` yet, so the
+    /// frontend's inline create-mode name/target-dir form (approved by
+    /// Jobsworth as the fix for the gap Task 5 flagged) needs the list of
+    /// configured target directories bootstrapped the same way the old
+    /// `WorkflowNewTemplate::target_dirs` already fed the raw-paste form's
+    /// `<select>`.
+    #[tokio::test]
+    async fn new_workflow_editor_bootstraps_available_target_dirs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri("/workflows/new")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("canvas.availableTargetDirs = ["));
+        assert!(html.contains(&tmp.path().display().to_string()));
     }
 
     const EDITOR_FIXTURE_DOT: &str = r#"

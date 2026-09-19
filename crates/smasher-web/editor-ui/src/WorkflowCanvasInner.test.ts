@@ -102,10 +102,10 @@ describe('unknown node_type', () => {
   });
 });
 
-describe('save action', () => {
-  it('invokes onSave with the current graph shape when clicked', async () => {
+describe('save action (edit mode -- workflowId set)', () => {
+  it('invokes onSave with the current graph shape and no meta when clicked', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave } });
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave } });
 
     await waitFor(() => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
@@ -118,11 +118,12 @@ describe('save action', () => {
     });
     const submitted = onSave.mock.calls[0][0] as EditorGraph;
     expect(submitted.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(onSave.mock.calls[0][1]).toBeUndefined();
   });
 
   it('surfaces a save error from a rejected onSave without crashing', async () => {
     const onSave = vi.fn().mockRejectedValue(new Error('workflow not found'));
-    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave } });
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave } });
 
     await waitFor(() => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
@@ -133,5 +134,84 @@ describe('save action', () => {
     await waitFor(() => {
       expect(screen.getByTestId('save-error')).toHaveTextContent('workflow not found');
     });
+  });
+
+  it('does not render the create-mode name/target-dir fields', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave: vi.fn() } });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+    expect(screen.queryByTestId('create-name-input')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('create-target-dir-select')).not.toBeInTheDocument();
+  });
+});
+
+// Follow-up to Task 5, approved by Jobsworth: when there's no `workflowId`
+// (the /workflows/new case), Save has nowhere to PUT to -- a small inline
+// name/target-dir form is shown instead, and Save calls onSave with a
+// second `meta` argument so the host shell can call createGraph instead of
+// saveGraph.
+describe('create mode (no workflowId)', () => {
+  const emptyGraph: EditorGraph = { name: null, graph_attrs: {}, nodes: [], edges: [] };
+
+  it('renders name and target-dir fields, defaulting the dir to the first available one', async () => {
+    render(WorkflowCanvasInner, {
+      props: { graph: emptyGraph, availableTargetDirs: ['examples', 'other'], onSave: vi.fn() },
+    });
+
+    const nameInput = await screen.findByTestId('create-name-input');
+    const dirSelect = screen.getByTestId('create-target-dir-select') as HTMLSelectElement;
+    expect(nameInput).toBeInTheDocument();
+    expect(dirSelect.value).toBe('examples');
+  });
+
+  it('disables Save until a non-blank name is entered', async () => {
+    render(WorkflowCanvasInner, {
+      props: { graph: emptyGraph, availableTargetDirs: ['examples'], onSave: vi.fn() },
+    });
+
+    const saveButton = await screen.findByTestId('save-button');
+    expect(saveButton).toBeDisabled();
+
+    await fireEvent.input(screen.getByTestId('create-name-input'), { target: { value: 'my-pipeline' } });
+
+    await waitFor(() => {
+      expect(saveButton).not.toBeDisabled();
+    });
+  });
+
+  it('calls onSave with the graph and {name, targetDir} meta when Save is clicked', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(WorkflowCanvasInner, {
+      props: { graph: emptyGraph, availableTargetDirs: ['examples', 'other'], onSave },
+    });
+
+    await fireEvent.input(await screen.findByTestId('create-name-input'), {
+      target: { value: 'my-pipeline' },
+    });
+    await fireEvent.change(screen.getByTestId('create-target-dir-select'), { target: { value: 'other' } });
+    await fireEvent.click(screen.getByTestId('save-button'));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledTimes(1);
+    });
+    expect(onSave.mock.calls[0][1]).toEqual({ name: 'my-pipeline', targetDir: 'other' });
+  });
+
+  it('does not call onSave and shows a validation error if Save is somehow triggered with a blank name', async () => {
+    const onSave = vi.fn();
+    render(WorkflowCanvasInner, {
+      props: { graph: emptyGraph, availableTargetDirs: ['examples'], onSave },
+    });
+
+    // Whitespace-only counts as blank, same discipline create_workflow/
+    // create_graph apply server-side.
+    await fireEvent.input(await screen.findByTestId('create-name-input'), {
+      target: { value: '   ' },
+    });
+
+    expect(screen.getByTestId('save-button')).toBeDisabled();
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

@@ -41,6 +41,7 @@
                 // entire script block before the real assignments below
                 // ever ran).
                 canvas.graph = {{ graph_json|safe }};
+                canvas.availableTargetDirs = {{ target_dirs_json|safe }};
                 {% match workflow_id_js %}
                 {% when Some with (id_js) %}
                 canvas.workflowId = {{ id_js|safe }};

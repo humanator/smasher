@@ -41,4 +41,20 @@ describe('workflow-canvas custom element (jsdom-reliable subset)', () => {
       el.workflowId = 'some-id';
     }).not.toThrow();
   });
+
+  // Follow-up to Task 5, approved by Jobsworth: /workflows/new's bootstrap
+  // script also sets `availableTargetDirs` so the create-mode name/dir form
+  // (WorkflowCanvasInner) knows which directories are configured.
+  it('accepts availableTargetDirs property assignment without throwing', () => {
+    const el = document.createElement('workflow-canvas') as HTMLElement & {
+      graph?: unknown;
+      availableTargetDirs?: string[];
+    };
+    document.body.appendChild(el);
+
+    expect(() => {
+      el.graph = { name: null, graph_attrs: {}, nodes: [], edges: [] };
+      el.availableTargetDirs = ['examples', 'other'];
+    }).not.toThrow();
+  });
 });
