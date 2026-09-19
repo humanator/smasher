@@ -37,6 +37,15 @@ pub fn build_router(state: AppState) -> Router {
     // absolute paths (same convention as smasher-render-capture's own two-mount
     // server), so this mount has to exist for a bundle to render correctly here.
     let design_kit_dir = design_kit_dir();
+    // Task 4's compiled `<workflow-canvas>` custom-element bundle
+    // (`workflow-canvas.js` + `editor-ui.css`), checked into git rather than
+    // built at Cargo build time (plan's Architecture Decisions -- no CI Node
+    // setup exists to build it otherwise). Served straight out of
+    // `editor-ui/dist/` rather than copied into `static/`, matching the
+    // `design_kit_dir` mount's own pattern of pointing `ServeDir` at a
+    // source-tree directory instead of duplicating files.
+    let editor_ui_dist_dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("editor-ui/dist");
 
     Router::new()
         .merge(page_routes)
@@ -50,6 +59,7 @@ pub fn build_router(state: AppState) -> Router {
             ServeDir::new(candidate_artifacts_dir),
         )
         .nest_service("/design-kit", ServeDir::new(design_kit_dir))
+        .nest_service("/editor-ui", ServeDir::new(editor_ui_dist_dir))
         .with_state(state)
 }
 
@@ -321,6 +331,57 @@ mod tests {
         let app = build_router(test_state());
         let req = Request::builder()
             .uri("/design-kit/..%2f..%2fCargo.toml")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_ne!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn editor_ui_mount_serves_the_compiled_workflow_canvas_bundle() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/editor-ui/workflow-canvas.js")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let content_type = resp
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        assert!(content_type.contains("javascript"));
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(!body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn editor_ui_mount_serves_the_compiled_css() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/editor-ui/editor-ui.css")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(!body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn editor_ui_mount_does_not_escape_its_root() {
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/editor-ui/..%2f..%2fCargo.toml")
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();

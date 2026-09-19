@@ -19,6 +19,22 @@ export default defineConfig({
       },
     }),
   ],
+  // `@xyflow/svelte` (bundled into this lib build) branches on
+  // `process.env.NODE_ENV` internally (dev-only warnings/attribution
+  // logic). Vite's `build.lib` mode -- unlike its regular app build --
+  // does not automatically strip/replace that reference, so the compiled
+  // `dist/workflow-canvas.js` throws `ReferenceError: process is not
+  // defined` the moment a real browser (no Node global) loads it as a
+  // plain `<script type="module">` -- confirmed via a real-Chromium check
+  // while wiring this bundle into smasher-web's pages (Task 5); `npm run
+  // dev`'s Vite dev server never hits this because it serves unbundled
+  // ESM with its own runtime shims, which is why Task 4's own dev-server
+  // Playwright check didn't catch it. This `define` statically replaces
+  // every `process.env.NODE_ENV` reference at build time, same as Vite's
+  // app-mode build already does for you.
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   build: {
     lib: {
       entry: resolve(import.meta.dirname, 'src/WorkflowCanvas.svelte'),

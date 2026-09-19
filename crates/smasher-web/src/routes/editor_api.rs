@@ -25,8 +25,14 @@ pub fn router() -> Router<AppState> {
 // JSON graph shape (thin serde wrappers around Graph/GraphNode/GraphEdge)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct EditorGraph {
+// `pub(crate)` on these three so `routes::pages`'s `/workflows/{id}/edit`
+// handler can reuse the exact same JSON shape (and the `From<&Graph>`
+// conversions below) for its server-side graph bootstrap, per the plan's
+// "call the underlying functions directly, don't loop back through HTTP"
+// instruction — a second hand-rolled DTO here would risk silently
+// diverging from what the real `GET /api/workflows/{id}/graph` returns.
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+pub(crate) struct EditorGraph {
     name: Option<String>,
     nodes: Vec<EditorNode>,
     edges: Vec<EditorEdge>,
@@ -39,7 +45,7 @@ struct EditorGraph {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct EditorNode {
+pub(crate) struct EditorNode {
     id: String,
     node_type: String,
     label: Option<String>,
@@ -48,7 +54,7 @@ struct EditorNode {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-struct EditorEdge {
+pub(crate) struct EditorEdge {
     from: String,
     to: String,
     label: Option<String>,

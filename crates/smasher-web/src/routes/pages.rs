@@ -45,6 +45,22 @@ struct WorkflowNewTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "workflow_editor.html")]
+struct WorkflowEditorTemplate {
+    /// `None` for `/workflows/new` (no file exists yet to save against --
+    /// the custom element's Save action has no target); `Some(id)` for
+    /// `/workflows/{id}/edit`, bootstrapped into the element's `workflowId`
+    /// property so its built-in Save button can PUT back to that file.
+    workflow_id_js: Option<String>,
+    /// JSON-serialized `EditorGraph` (empty for `/workflows/new`, populated
+    /// from the real parsed+resolved file for `/workflows/{id}/edit`),
+    /// already escaped for safe embedding inside an inline `<script>` block
+    /// (see `escape_for_inline_script`).
+    graph_json: String,
+    is_edit: bool,
+}
+
+#[derive(Template)]
 #[template(path = "workflow_detail.html")]
 struct WorkflowDetailTemplate {
     workflow: crate::workflows::WorkflowSummary,
@@ -305,8 +321,10 @@ fn poll_response<T: Template>(headers: &HeaderMap, template: T) -> Response {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(workflow_catalog))
-        .route("/workflows/new", get(workflow_new))
+        .route("/workflows/new", get(workflow_editor_new))
+        .route("/workflows/new/raw", get(workflow_new))
         .route("/workflows", post(create_workflow))
+        .route("/workflows/{id}/edit", get(workflow_editor_edit))
         .route("/workflows/{id}", get(workflow_detail))
         .route("/workflows/{id}/run", post(workflow_run))
         .route("/runs", get(runs_page).post(submit_run))
@@ -338,6 +356,66 @@ async fn workflow_new(State(state): State<AppState>) -> impl IntoResponse {
     HtmlTemplate(WorkflowNewTemplate {
         target_dirs: state.workflow_dirs.clone(),
     })
+}
+
+/// Serializes `value` to JSON and neutralizes `<`, `>`, and `&` (as their
+/// `\uXXXX` escapes) so the result is safe to embed verbatim (`|safe`,
+/// bypassing askama's HTML escaping, which would otherwise mangle the
+/// JSON's own quotes) inside an inline `<script>` block. Without this, a
+/// `.dot` file with a label/prompt containing a literal `</script>` could
+/// break out of the bootstrap script tag and inject arbitrary markup/script
+/// into the page -- these three characters only ever appear inside JSON
+/// string values here, so escaping them can't corrupt the JSON's own
+/// structural syntax. Same technique as Django's `json_script`/Rails'
+/// `json_escape`.
+fn to_inline_script_json<T: serde::Serialize>(value: &T) -> Result<String, WebError> {
+    let json = serde_json::to_string(value)?;
+    Ok(json
+        .replace('<', "\\u003c")
+        .replace('>', "\\u003e")
+        .replace('&', "\\u0026"))
+}
+
+/// `GET /workflows/new`: the new Svelte Flow `<workflow-canvas>` editor
+/// mount, bootstrapped with an empty graph and no `workflowId` (per spec
+/// Assumption 8) -- replaces the old `workflow_new` handler's route
+/// binding, which moved to `/workflows/new/raw` (kept as a fallback).
+async fn workflow_editor_new() -> Result<impl IntoResponse, WebError> {
+    let graph_json = to_inline_script_json(&crate::routes::editor_api::EditorGraph::default())?;
+    Ok(HtmlTemplate(WorkflowEditorTemplate {
+        workflow_id_js: None,
+        graph_json,
+        is_edit: false,
+    }))
+}
+
+/// `GET /workflows/{id}/edit`: the same editor mount, bootstrapped from the
+/// real file's parsed+resolved `Graph` -- calls `dot::parser::parse` and
+/// `graph::resolve` directly (the same functions Task 3's
+/// `editor_api::get_graph` uses) rather than looping back through HTTP, per
+/// the plan.
+async fn workflow_editor_edit(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, WebError> {
+    use smasher_attractor::dot::parser;
+    use smasher_attractor::graph;
+
+    let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
+        .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let dot_source = std::fs::read_to_string(&workflow.path)?;
+    let ast = parser::parse(&dot_source)?;
+    let resolved = graph::resolve(&ast)?;
+    let editor_graph = crate::routes::editor_api::EditorGraph::from(&resolved);
+
+    let graph_json = to_inline_script_json(&editor_graph)?;
+    let workflow_id_js = Some(to_inline_script_json(&id)?);
+
+    Ok(HtmlTemplate(WorkflowEditorTemplate {
+        workflow_id_js,
+        graph_json,
+        is_edit: true,
+    }))
 }
 
 /// Writes the submitted DOT text to `{target_dir}/{name}.dot` and redirects
@@ -1527,8 +1605,34 @@ mod tests {
         )
     }
 
+    /// The raw-paste form relocated from `/workflows/new` to `/workflows/new/raw`
+    /// (Task 5) -- same handler, same template, only the route path moved, kept
+    /// reachable as a fallback per the spec's Boundaries recommendation.
     #[tokio::test]
-    async fn new_workflow_form_renders() {
+    async fn new_workflow_raw_form_renders() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri("/workflows/new/raw")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("Add Workflow"));
+        assert!(html.contains(&tmp.path().display().to_string()));
+    }
+
+    /// `/workflows/new` now mounts the Svelte Flow `<workflow-canvas>` custom
+    /// element (Task 5) with an empty graph bootstrap instead of the raw-paste
+    /// form -- the JS bundle it depends on must load from the new `/editor-ui`
+    /// static mount (server.rs), and no `workflowId` is set (there's no file
+    /// yet to save against).
+    #[tokio::test]
+    async fn new_workflow_editor_renders_canvas_with_empty_graph_and_no_workflow_id() {
         let tmp = tempfile::tempdir().unwrap();
         let app = router().with_state(state_with_workflow_dir(tmp.path()));
         let req = Request::builder()
@@ -1541,8 +1645,91 @@ mod tests {
             .await
             .unwrap();
         let html = String::from_utf8_lossy(&body);
-        assert!(html.contains("Add Workflow"));
-        assert!(html.contains(&tmp.path().display().to_string()));
+        assert!(html.contains("<workflow-canvas"));
+        assert!(html.contains("/editor-ui/workflow-canvas.js"));
+        assert!(html.contains("/editor-ui/editor-ui.css"));
+        assert!(html.contains(r#""nodes":[]"#));
+        assert!(html.contains(r#""edges":[]"#));
+        assert!(!html.contains("canvas.workflowId"));
+    }
+
+    const EDITOR_FIXTURE_DOT: &str = r#"
+digraph {
+    entry [shape=Mdiamond, label="Entry"];
+    gen [shape=box, label="Generate", prompt="write the thing", model="claude-sonnet-4-20250514"];
+    exit [shape=doublecircle, label="Exit"];
+
+    entry -> gen;
+    gen -> exit;
+}
+"#;
+
+    /// `/workflows/{id}/edit` bootstraps the same canvas from the real file's
+    /// parsed+resolved `Graph` (Task 3's `EditorGraph` DTO, called directly
+    /// rather than looping back through HTTP) -- every node's real attrs must
+    /// show up in the bootstrap script, not just a bare 200.
+    #[tokio::test]
+    async fn edit_workflow_renders_canvas_with_populated_graph_bootstrap() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::write(tmp.path().join("hello.dot"), EDITOR_FIXTURE_DOT).unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}/edit"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(html.contains("<workflow-canvas"));
+        assert!(html.contains(r#""id":"gen""#));
+        assert!(html.contains(r#""node_type":"Codergen""#));
+        assert!(html.contains(r#""prompt":"write the thing""#));
+        assert!(html.contains(&format!("canvas.workflowId = \"{id}\"")));
+    }
+
+    #[tokio::test]
+    async fn edit_workflow_unknown_id_returns_404() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri("/workflows/no-such-id/edit")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// A node label/attr containing a literal `</script>` must not be able to
+    /// break out of the bootstrap `<script>` block -- the JSON is embedded via
+    /// `|safe` (to avoid askama HTML-escaping mangling the JSON's quotes), so
+    /// without this the graph JSON itself is the only thing standing between
+    /// a maliciously-crafted `.dot` file and stored script injection into
+    /// every future viewer of this page.
+    #[tokio::test]
+    async fn edit_workflow_bootstrap_escapes_script_closing_tag_in_attrs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dot = r#"digraph { a [shape=box, label="</script><script>evil()</script>"]; }"#;
+        std::fs::write(tmp.path().join("hello.dot"), dot).unwrap();
+        let id = only_workflow_id(tmp.path());
+
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let req = Request::builder()
+            .uri(format!("/workflows/{id}/edit"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let html = String::from_utf8_lossy(&body);
+        assert!(!html.contains("</script><script>evil()"));
+        assert!(html.contains("\\u003c/script\\u003e"));
     }
 
     #[tokio::test]

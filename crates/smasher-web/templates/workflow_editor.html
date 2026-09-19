@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}SMASHER — {% if is_edit %}Edit Workflow{% else %}New Workflow{% endif %}{% endblock %}
+
+{% block content %}
+<section class="editor-section">
+    <a href="/" class="btn btn-small">&larr; All workflows</a>
+    <h2>{% if is_edit %}Edit Workflow{% else %}New Workflow{% endif %}</h2>
+    <link rel="stylesheet" href="/editor-ui/editor-ui.css">
+    <workflow-canvas id="editor-canvas" style="display: block; width: 100%; height: 75vh;"></workflow-canvas>
+    <script type="module" src="/editor-ui/workflow-canvas.js"></script>
+    <script>
+        (function () {
+            // `<script type="module">` above is deferred (fetched async,
+            // executed only after the document finishes parsing); this
+            // plain classic script runs synchronously in document order,
+            // i.e. *before* it -- so `customElements.define('workflow-
+            // canvas', ...)` hasn't necessarily run yet when this executes.
+            // Setting the `graph`/`workflowId` properties on a not-yet-
+            // upgraded element and relying on the browser's upgrade-time
+            // property replay was found (via a real-browser check while
+            // wiring this template up) to leave the element with no props
+            // at all in practice, so wait for the element to actually be
+            // defined/upgraded first.
+            customElements.whenDefined('workflow-canvas').then(function () {
+                var canvas = document.getElementById('editor-canvas');
+                // `graph` is set imperatively as a JS property (not an HTML
+                // attribute string) per spec Assumption 1 -- the value
+                // below is server-rendered JSON, `|safe` because askama
+                // would otherwise HTML-escape its quotes, and pre-escaped
+                // against a script-closing-tag breakout (see
+                // `to_inline_script_json` in routes/pages.rs). NOTE: do not
+                // spell out the literal "close angle bracket, slash,
+                // script" sequence anywhere in this element's own source,
+                // even in a comment -- the HTML parser treats <script>
+                // content as raw text and ends the element the instant it
+                // sees that byte sequence, regardless of JS syntax
+                // (confirmed the hard way: an earlier draft of this exact
+                // comment, explaining the escaping below, contained that
+                // literal sequence itself and silently truncated this
+                // entire script block before the real assignments below
+                // ever ran).
+                canvas.graph = {{ graph_json|safe }};
+                {% match workflow_id_js %}
+                {% when Some with (id_js) %}
+                canvas.workflowId = {{ id_js|safe }};
+                {% when None %}
+                {% endmatch %}
+            });
+        })();
+    </script>
+</section>
+{% endblock %}
