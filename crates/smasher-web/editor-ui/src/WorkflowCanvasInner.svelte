@@ -1,10 +1,40 @@
 <script lang="ts">
   import { Background, Controls, MiniMap, SvelteFlow, type Edge as FlowEdge, type Node as FlowNode } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
+  import type { Component } from 'svelte';
   import Palette from './Palette.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import { toEditorGraph, toFlowEdges, toFlowNodes, type WorkflowEdgeData, type WorkflowNodeData } from './convert';
-  import type { AttrValue, EditorGraph } from './types';
+  import type { AttrValue, EditorGraph, NodeFormChange, NodeFormProps } from './types';
+  import CodergenForm from './nodeForms/CodergenForm.svelte';
+  import InterviewerForm from './nodeForms/InterviewerForm.svelte';
+  import ToolForm from './nodeForms/ToolForm.svelte';
+  import ManagerForm from './nodeForms/ManagerForm.svelte';
+  import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
+  import StructuralForm from './nodeForms/StructuralForm.svelte';
+
+  // Task 7: one form component per NodeType, rendered in a selected-node
+  // side panel. Start/Exit/Parallel/FanIn/Conditional (no kind-specific
+  // attrs per grounding) *and* any unrecognized/future node_type string
+  // (same "don't crash on unknown kind" convention Task 4/6 already
+  // established for canvas rendering/the palette) fall back to
+  // StructuralForm via the `default` arm below.
+  function formComponentFor(nodeType: string): Component<NodeFormProps> {
+    switch (nodeType) {
+      case 'Codergen':
+        return CodergenForm;
+      case 'Interviewer':
+        return InterviewerForm;
+      case 'Tool':
+        return ToolForm;
+      case 'Manager':
+        return ManagerForm;
+      case 'SubPipeline':
+        return SubPipelineForm;
+      default:
+        return StructuralForm;
+    }
+  }
 
   // All the actual canvas UI/state logic, kept as a plain (non-custom-
   // element) Svelte component so it can be unit-tested via
@@ -93,6 +123,59 @@
     nodes = [...nodes, newNode];
   }
 
+  // Task 7: selected-node side panel. Svelte Flow's own `onnodeclick`/
+  // `onpaneclick` events (events.d.ts's NodeEvents/PaneEvents) drive
+  // selection instead of reading `nodes.find(n => n.selected)` -- both
+  // approaches observe the same underlying selection state, but the event
+  // handlers avoid needing a $derived scan of `nodes` on every click and
+  // read naturally as "the thing the user just clicked". `selectedNode` is
+  // still derived live from the `nodes` array (not captured once at click
+  // time) so the panel keeps reflecting the node's current attrs/label as
+  // they're edited, and gracefully disappears if the node is deleted out
+  // from under it (Backspace) instead of pointing at a stale id.
+  let selectedNodeId = $state<string | null>(null);
+  const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
+
+  function handleNodeClick({ node }: { node: FlowNode<WorkflowNodeData> }) {
+    selectedNodeId = node.id;
+  }
+
+  function handlePaneClick() {
+    selectedNodeId = null;
+  }
+
+  // Applies a nodeForms/*.svelte onChange patch to the selected node's live
+  // graph state. `patch.attrs` is merged key-by-key rather than spread
+  // wholesale, so a key mapped to `undefined` deletes that attr (e.g.
+  // InterviewerForm unchecking gallery) without disturbing attrs the patch
+  // doesn't mention (e.g. `pos`, or a future attr no current form knows
+  // about). `patch.label` is separate from every per-kind form's own attrs
+  // patch -- see the shared Label field below -- but this function accepts
+  // both so one code path handles either kind of edit.
+  function applyNodeFormChange(nodeId: string, patch: NodeFormChange) {
+    nodes = nodes.map((n) => {
+      if (n.id !== nodeId) return n;
+      const nextAttrs = { ...n.data.attrs };
+      if (patch.attrs) {
+        for (const [key, value] of Object.entries(patch.attrs)) {
+          if (value === undefined) {
+            delete nextAttrs[key];
+          } else {
+            nextAttrs[key] = value;
+          }
+        }
+      }
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          label: patch.label !== undefined ? patch.label : n.data.label,
+          attrs: nextAttrs,
+        },
+      };
+    });
+  }
+
   let canvasAreaEl: HTMLDivElement | undefined;
 
   function handleDragOver(event: DragEvent) {
@@ -175,7 +258,7 @@
       ondragover={handleDragOver}
       ondrop={handleDrop}
     >
-      <SvelteFlow bind:nodes bind:edges fitView>
+      <SvelteFlow bind:nodes bind:edges fitView onnodeclick={handleNodeClick} onpaneclick={handlePaneClick}>
         <Background />
         <Controls />
         <MiniMap />
@@ -188,4 +271,91 @@
       <p role="alert" data-testid="save-error">{saveError}</p>
     {/if}
   </div>
+  {#if selectedNode}
+    {@const node = selectedNode}
+    {@const FormComponent = formComponentFor(node.data.nodeType)}
+    <aside class="node-inspector" data-testid="node-inspector">
+      <div class="node-inspector-header">
+        <span class="node-inspector-title" data-testid="node-inspector-title">
+          {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.title ?? node.data.nodeType}
+        </span>
+        <button
+          type="button"
+          class="node-inspector-close"
+          onclick={() => (selectedNodeId = null)}
+          aria-label="Close node inspector"
+        >
+          ×
+        </button>
+      </div>
+      <!-- Remount on selection change: each nodeForms/*.svelte component
+           seeds its local field state from `attrs` only once per mount
+           (documented in each form's own comment) -- {#key} forces a fresh
+           instance instead of letting a prop update slip past that
+           intentional one-time read when the user selects a different node. -->
+      {#key node.id}
+        <label class="node-form-field node-inspector-label-field">
+          Label
+          <input
+            type="text"
+            data-testid="node-inspector-label"
+            value={node.data.label}
+            oninput={(event) =>
+              applyNodeFormChange(node.id, { label: (event.target as HTMLInputElement).value })}
+          />
+        </label>
+        <FormComponent attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
+      {/key}
+    </aside>
+  {/if}
 </div>
+
+<style>
+  .node-inspector {
+    width: 260px;
+    flex: 0 0 260px;
+    overflow-y: auto;
+    border-left: 1px solid #e2e8f0;
+    padding: 0.6rem;
+    box-sizing: border-box;
+  }
+
+  .node-inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.6rem;
+  }
+
+  .node-inspector-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #1e293b;
+  }
+
+  .node-inspector-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    color: #64748b;
+  }
+
+  .node-inspector-label-field {
+    margin-bottom: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.8rem;
+    color: #475569;
+  }
+
+  .node-inspector-label-field input {
+    font: inherit;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #1e293b;
+  }
+</style>

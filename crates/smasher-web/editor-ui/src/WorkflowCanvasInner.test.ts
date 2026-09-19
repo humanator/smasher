@@ -297,6 +297,218 @@ describe('palette', () => {
 // coordinates); per that same precedent, the drop *logic* is tested by
 // calling the underlying handler directly instead of firing a synthetic
 // `drop` DragEvent at a screen coordinate.
+// Task 7: node-kind form components + the selected-node side panel that
+// swaps between them. `sampleGraph` above only has Start/Codergen; this
+// fixture adds one node per interesting kind so each form's testid can be
+// checked without perturbing the existing tests above.
+const multiKindGraph: EditorGraph = {
+  name: 'MultiKind',
+  graph_attrs: {},
+  nodes: [
+    { id: 'start', node_type: 'Start', label: 'Begin', attrs: {} },
+    { id: 'gen', node_type: 'Codergen', label: 'Generate', attrs: { prompt: 'write code', model: 'gpt-5' } },
+    { id: 'ask', node_type: 'Interviewer', label: 'Ask', attrs: { question: 'ok?' } },
+    { id: 'run', node_type: 'Tool', label: 'Run', attrs: { tool: 'shell' } },
+    { id: 'mgr', node_type: 'Manager', label: 'Coordinate', attrs: { task: 'sync' } },
+    { id: 'sub', node_type: 'SubPipeline', label: 'Delegate', attrs: { pipeline: 'sub.dot' } },
+  ],
+  edges: [],
+};
+
+async function clickNodeByLabel(label: string) {
+  const el = screen.getByText(label).closest('.svelte-flow__node') as HTMLElement;
+  await fireEvent.click(el);
+}
+
+describe('node inspector (Task 7 side panel)', () => {
+  it('is absent until a node is selected', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('shows CodergenForm for a Codergen node, pre-populated from its attrs', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+
+    await clickNodeByLabel('Generate');
+
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+    expect(screen.getByTestId('codergen-form')).toBeInTheDocument();
+    expect(screen.getByTestId('codergen-prompt')).toHaveValue('write code');
+    expect(screen.getByTestId('codergen-model')).toHaveValue('gpt-5');
+    expect(screen.getByTestId('node-inspector-label')).toHaveValue('Generate');
+  });
+
+  it('shows InterviewerForm for an Interviewer node', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Ask')).toBeInTheDocument());
+
+    await clickNodeByLabel('Ask');
+
+    expect(screen.getByTestId('interviewer-form')).toBeInTheDocument();
+    expect(screen.getByTestId('interviewer-question')).toHaveValue('ok?');
+  });
+
+  it('shows ToolForm for a Tool node', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Run')).toBeInTheDocument());
+
+    await clickNodeByLabel('Run');
+
+    expect(screen.getByTestId('tool-form')).toBeInTheDocument();
+    expect(screen.getByTestId('tool-name')).toHaveValue('shell');
+  });
+
+  it('shows ManagerForm for a Manager node', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Coordinate')).toBeInTheDocument());
+
+    await clickNodeByLabel('Coordinate');
+
+    expect(screen.getByTestId('manager-form')).toBeInTheDocument();
+    expect(screen.getByTestId('manager-task')).toHaveValue('sync');
+  });
+
+  it('shows SubPipelineForm for a SubPipeline node', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Delegate')).toBeInTheDocument());
+
+    await clickNodeByLabel('Delegate');
+
+    expect(screen.getByTestId('sub-pipeline-form')).toBeInTheDocument();
+    expect(screen.getByTestId('sub-pipeline-path')).toHaveValue('sub.dot');
+  });
+
+  it('shows StructuralForm (label-only) for a Start node', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+
+    await clickNodeByLabel('Begin');
+
+    expect(screen.getByTestId('structural-form')).toBeInTheDocument();
+    expect(screen.getByTestId('node-inspector-label')).toHaveValue('Begin');
+  });
+
+  it('shows StructuralForm as a fallback for an unrecognized node_type string', async () => {
+    render(WorkflowCanvasInner, {
+      props: {
+        graph: {
+          name: null,
+          graph_attrs: {},
+          nodes: [{ id: 'mystery', node_type: 'FromTheFuture', label: 'Mystery', attrs: {} }],
+          edges: [],
+        },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Mystery')).toBeInTheDocument());
+
+    await clickNodeByLabel('Mystery');
+
+    expect(screen.getByTestId('structural-form')).toBeInTheDocument();
+  });
+
+  it('closes when the pane (not a node) is clicked', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+    await clickNodeByLabel('Generate');
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+
+    const pane = document.querySelector('.svelte-flow__pane') as HTMLElement;
+    await fireEvent.click(pane);
+
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('closes via the inspector\'s own close button', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+    await clickNodeByLabel('Generate');
+
+    await fireEvent.click(screen.getByLabelText('Close node inspector'));
+
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('editing a kind-specific field updates the node\'s attrs in live graph state immediately', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+    await clickNodeByLabel('Generate');
+
+    await fireEvent.input(screen.getByTestId('codergen-prompt'), { target: { value: 'write tests instead' } });
+
+    const updated = component.currentGraph().nodes.find((n) => n.id === 'gen');
+    expect(updated?.attrs.prompt).toBe('write tests instead');
+    // Untouched attrs on the same node survive the edit.
+    expect(updated?.attrs.model).toBe('gpt-5');
+  });
+
+  it('editing the shared Label field updates the node\'s label in live graph state immediately', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+    await clickNodeByLabel('Generate');
+
+    await fireEvent.input(screen.getByTestId('node-inspector-label'), { target: { value: 'Generate Code' } });
+
+    const updated = component.currentGraph().nodes.find((n) => n.id === 'gen');
+    expect(updated?.label).toBe('Generate Code');
+  });
+
+  it('unchecking a boolean-backed field (Interviewer gallery toggle) removes the attr from live graph state', async () => {
+    const { component } = render(WorkflowCanvasInner, {
+      props: {
+        graph: {
+          ...multiKindGraph,
+          nodes: multiKindGraph.nodes.map((n) =>
+            n.id === 'ask' ? { ...n, attrs: { question: 'ok?', gallery: true, candidate_count: '3' } } : n,
+          ),
+        },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Ask')).toBeInTheDocument());
+    await clickNodeByLabel('Ask');
+    expect(screen.getByTestId('interviewer-gallery-toggle')).toBeChecked();
+
+    await fireEvent.click(screen.getByTestId('interviewer-gallery-toggle'));
+
+    const updated = component.currentGraph().nodes.find((n) => n.id === 'ask');
+    expect(updated?.attrs.gallery).toBeUndefined();
+    expect(updated?.attrs.candidate_count).toBeUndefined();
+    expect(updated?.attrs.question).toBe('ok?');
+  });
+
+  it('switching selection to a different node swaps the form and shows that node\'s own attrs, not the previous selection\'s', async () => {
+    render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+
+    await clickNodeByLabel('Generate');
+    expect(screen.getByTestId('codergen-form')).toBeInTheDocument();
+
+    await clickNodeByLabel('Ask');
+
+    expect(screen.queryByTestId('codergen-form')).not.toBeInTheDocument();
+    expect(screen.getByTestId('interviewer-form')).toBeInTheDocument();
+    expect(screen.getByTestId('interviewer-question')).toHaveValue('ok?');
+  });
+
+  it('deselects gracefully when the selected node is deleted out from under the panel', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+    await clickNodeByLabel('Generate');
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+
+    await fireEvent.keyDown(document, { key: 'Backspace' });
+
+    await waitFor(() => {
+      expect(component.currentGraph().nodes.find((n) => n.id === 'gen')).toBeUndefined();
+    });
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+});
+
 describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
   it('creates a new node of the given NodeType at the given position, with the config default label', async () => {
     const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });

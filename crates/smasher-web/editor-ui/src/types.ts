@@ -47,3 +47,33 @@ export interface EditorGraph {
   edges: EditorEdge[];
   graph_attrs: Record<string, AttrValue>;
 }
+
+// Task 7 (node-kind form components): the `onChange` contract every
+// nodeForms/*.svelte component shares. A key mapped to `undefined` means
+// "delete this attr" (e.g. unchecking Interviewer's gallery toggle should
+// remove `gallery` entirely, not leave a stale value behind) -- plain
+// object-spread merging can't express deletion, so the side panel
+// (WorkflowCanvasInner.svelte's applyNodeFormChange) applies each entry
+// key-by-key instead of spreading. `label` is deliberately NOT part of
+// this patch shape: it's common to every node kind (and is itself every
+// handler's own fallback value -- Codergen's `prompt`, Tool's `tool`,
+// Manager's `task`, Interviewer's `question` all fall back to it), so it's
+// edited once via a shared field in the side panel, not duplicated across
+// six per-kind forms.
+export type NodeAttrsPatch = Record<string, AttrValue | undefined>;
+
+// Wrapped in `{ attrs: ... }` (rather than passing NodeAttrsPatch directly)
+// so the same callback shape extends cleanly to the shared side-panel Label
+// field, which calls it with `{ label: ... }` instead -- one callback type,
+// used identically by WorkflowCanvasInner.svelte's applyNodeFormChange
+// whether the edit came from a per-kind form's attrs or the panel's own
+// label input.
+export interface NodeFormChange {
+  label?: string;
+  attrs?: NodeAttrsPatch;
+}
+
+export interface NodeFormProps {
+  attrs: Record<string, AttrValue>;
+  onChange: (patch: NodeFormChange) => void;
+}
