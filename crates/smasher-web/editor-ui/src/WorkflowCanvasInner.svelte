@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Background, Controls, MiniMap, SvelteFlow, type Edge as FlowEdge, type Node as FlowNode } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
+  import Palette from './Palette.svelte';
+  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import { toEditorGraph, toFlowEdges, toFlowNodes, type WorkflowEdgeData, type WorkflowNodeData } from './convert';
   import type { AttrValue, EditorGraph } from './types';
 
@@ -56,6 +58,56 @@
     return toEditorGraph(graphName, graphAttrs, nodes, edges);
   }
 
+  // Task 6: dropping a Palette entry creates a new node of that NodeType.
+  // Position is computed by hand from the drop event's screen coordinates
+  // relative to the canvas container, rather than via @xyflow/svelte's
+  // useSvelteFlow()/screenToFlowPosition() -- that hook only works inside
+  // a component already rendered as a descendant of <SvelteFlow> (or
+  // wrapped in an explicit <SvelteFlowProvider>), and this component's own
+  // <script> runs before its <SvelteFlow> child mounts, so the context
+  // isn't available at the point this handler is defined. Screen-space
+  // (not pan/zoom-adjusted flow-space) is an accepted simplification for
+  // this task's "generic rendering only" scope -- correct at the default
+  // zoom/pan a freshly opened canvas starts at.
+  let nodeIdCounter = 0;
+
+  function nextNodeId(nodeType: string): string {
+    const base = nodeType.toLowerCase();
+    let id: string;
+    do {
+      nodeIdCounter += 1;
+      id = `${base}-${nodeIdCounter}`;
+    } while (nodes.some((n) => n.id === id));
+    return id;
+  }
+
+  export function addNodeAtPosition(nodeType: string, position: { x: number; y: number }) {
+    const config = (NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[nodeType];
+    if (!config) return;
+    const newNode: FlowNode<WorkflowNodeData> = {
+      id: nextNodeId(nodeType),
+      type: 'default',
+      position,
+      data: { label: config.title, nodeType, attrs: {} },
+    };
+    nodes = [...nodes, newNode];
+  }
+
+  let canvasAreaEl: HTMLDivElement | undefined;
+
+  function handleDragOver(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDrop(event: DragEvent) {
+    event.preventDefault();
+    const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
+    if (!nodeType || !canvasAreaEl) return;
+    const rect = canvasAreaEl.getBoundingClientRect();
+    addNodeAtPosition(nodeType, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+  }
+
   let saving = $state(false);
   let saveError = $state<string | null>(null);
 
@@ -90,39 +142,50 @@
   const saveDisabled = $derived(saving || (isCreateMode && !createName.trim()));
 </script>
 
-<div class="workflow-canvas-root" style="width: 100%; height: 100%; min-height: 480px; display: flex; flex-direction: column;">
-  {#if isCreateMode}
-    <div class="create-workflow-fields" style="display: flex; gap: 0.75rem; align-items: flex-end; padding-bottom: 0.5rem;">
-      <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-        Name
-        <input
-          type="text"
-          data-testid="create-name-input"
-          bind:value={createName}
-          placeholder="my-pipeline"
-        />
-      </label>
-      <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
-        Directory
-        <select data-testid="create-target-dir-select" bind:value={createTargetDir}>
-          {#each availableTargetDirs as dir (dir)}
-            <option value={dir}>{dir}</option>
-          {/each}
-        </select>
-      </label>
+<div class="workflow-canvas-root" style="width: 100%; height: 100%; min-height: 480px; display: flex; flex-direction: row;">
+  <Palette />
+  <div class="workflow-canvas-main" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    {#if isCreateMode}
+      <div class="create-workflow-fields" style="display: flex; gap: 0.75rem; align-items: flex-end; padding-bottom: 0.5rem;">
+        <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+          Name
+          <input
+            type="text"
+            data-testid="create-name-input"
+            bind:value={createName}
+            placeholder="my-pipeline"
+          />
+        </label>
+        <label style="display: flex; flex-direction: column; font-size: 0.85rem;">
+          Directory
+          <select data-testid="create-target-dir-select" bind:value={createTargetDir}>
+            {#each availableTargetDirs as dir (dir)}
+              <option value={dir}>{dir}</option>
+            {/each}
+          </select>
+        </label>
+      </div>
+    {/if}
+    <div
+      class="canvas-area"
+      style="flex: 1; position: relative;"
+      role="region"
+      aria-label="Workflow canvas drop zone"
+      bind:this={canvasAreaEl}
+      ondragover={handleDragOver}
+      ondrop={handleDrop}
+    >
+      <SvelteFlow bind:nodes bind:edges fitView>
+        <Background />
+        <Controls />
+        <MiniMap />
+      </SvelteFlow>
     </div>
-  {/if}
-  <div class="canvas-area" style="flex: 1; position: relative;">
-    <SvelteFlow bind:nodes bind:edges fitView>
-      <Background />
-      <Controls />
-      <MiniMap />
-    </SvelteFlow>
+    <button type="button" onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
+      {saving ? 'Saving…' : 'Save'}
+    </button>
+    {#if saveError}
+      <p role="alert" data-testid="save-error">{saveError}</p>
+    {/if}
   </div>
-  <button type="button" onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
-    {saving ? 'Saving…' : 'Save'}
-  </button>
-  {#if saveError}
-    <p role="alert" data-testid="save-error">{saveError}</p>
-  {/if}
 </div>

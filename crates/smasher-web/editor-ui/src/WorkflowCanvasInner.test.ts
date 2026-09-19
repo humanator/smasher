@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import WorkflowCanvasInner from './WorkflowCanvasInner.svelte';
+import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG } from './nodeConfig';
 import type { EditorGraph } from './types';
 
 const sampleGraph: EditorGraph = {
@@ -213,5 +214,125 @@ describe('create mode (no workflowId)', () => {
 
     expect(screen.getByTestId('save-button')).toBeDisabled();
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+// Task 6: node-kind visual registry + palette sidebar. Palette.svelte
+// itself calls @xyflow/svelte's context-dependent bits only indirectly (it
+// has none of its own -- see WorkflowCanvasInner.svelte's comment on why
+// drop-position math is done by hand instead of via useSvelteFlow(), which
+// would have required wrapping Palette in a <SvelteFlowProvider> just to
+// render it standalone). Tested here, through the real integration point,
+// rather than a throwaway Palette-only render harness.
+describe('palette', () => {
+  it('renders the 3 documented groups with their entries', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('palette-group-pipeline-steps')).toBeInTheDocument();
+    });
+
+    const pipelineSteps = within(screen.getByTestId('palette-group-pipeline-steps'));
+    expect(pipelineSteps.getByText('Codergen')).toBeInTheDocument();
+    expect(pipelineSteps.getByText('Tool')).toBeInTheDocument();
+    expect(pipelineSteps.getByText('Manager')).toBeInTheDocument();
+
+    const controlFlow = within(screen.getByTestId('palette-group-control-flow'));
+    expect(controlFlow.getByText('Human Gate')).toBeInTheDocument();
+    expect(controlFlow.getByText('Conditional')).toBeInTheDocument();
+    expect(controlFlow.getByText('Sub-Pipeline')).toBeInTheDocument();
+
+    const structural = within(screen.getByTestId('palette-group-structural'));
+    expect(structural.getByText('Start')).toBeInTheDocument();
+    expect(structural.getByText('Exit')).toBeInTheDocument();
+    expect(structural.getByText('Parallel')).toBeInTheDocument();
+    expect(structural.getByText('Fan-In')).toBeInTheDocument();
+  });
+
+  it('collapses and expands the Pipeline Steps group independently of Control Flow', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('palette-entry-Codergen')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('palette-entry-Interviewer')).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByTestId('palette-group-toggle-pipeline-steps'));
+
+    expect(screen.queryByTestId('palette-entry-Codergen')).not.toBeInTheDocument();
+    // Control Flow wasn't touched -- stays expanded.
+    expect(screen.getByTestId('palette-entry-Interviewer')).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByTestId('palette-group-toggle-pipeline-steps'));
+
+    expect(screen.getByTestId('palette-entry-Codergen')).toBeInTheDocument();
+  });
+
+  it('renders the structural group with no collapse toggle (always visible)', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('palette-entry-Start')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('palette-group-toggle-structural')).not.toBeInTheDocument();
+  });
+
+  it('marks entries draggable and puts the NodeType on the drag payload via dragstart', async () => {
+    render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+
+    const entry = await screen.findByTestId('palette-entry-Codergen');
+    expect(entry).toHaveAttribute('draggable', 'true');
+
+    const setData = vi.fn();
+    await fireEvent.dragStart(entry, {
+      dataTransfer: { setData, effectAllowed: '' } as unknown as DataTransfer,
+    });
+
+    expect(setData).toHaveBeenCalledWith(NODE_DRAG_DATA_TYPE, 'Codergen');
+  });
+});
+
+// The actual HTML5 drag-and-drop *gesture* isn't reliably simulatable in
+// jsdom (Task 4's own documented limitation -- no real pointer capture or
+// coordinates); per that same precedent, the drop *logic* is tested by
+// calling the underlying handler directly instead of firing a synthetic
+// `drop` DragEvent at a screen coordinate.
+describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
+  it('creates a new node of the given NodeType at the given position, with the config default label', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
+
+    component.addNodeAtPosition('Codergen', { x: 321, y: 87 });
+
+    await waitFor(() => {
+      expect(component.currentGraph().nodes).toHaveLength(3);
+    });
+    // sampleGraph already has a Codergen node ('b') -- find by exclusion
+    // to unambiguously grab the newly-created one, not the pre-existing.
+    const created = component.currentGraph().nodes.find((n) => !['a', 'b'].includes(n.id));
+    expect(created).toBeDefined();
+    expect(created?.node_type).toBe('Codergen');
+    expect(created?.label).toBe(NODE_KIND_CONFIG.Codergen.title);
+    expect(created?.attrs.pos).toBe('321,87');
+  });
+
+  it('ignores an unrecognized node type instead of crashing or adding a node', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
+
+    expect(() => component.addNodeAtPosition('FromTheFuture', { x: 0, y: 0 })).not.toThrow();
+    expect(component.currentGraph().nodes).toHaveLength(2);
+  });
+
+  it('assigns distinct ids when the same kind is dropped twice', async () => {
+    const { component } = render(WorkflowCanvasInner, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
+
+    component.addNodeAtPosition('Tool', { x: 0, y: 0 });
+    component.addNodeAtPosition('Tool', { x: 10, y: 10 });
+
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(4));
+    const toolIds = component.currentGraph().nodes.filter((n) => n.node_type === 'Tool').map((n) => n.id);
+    expect(new Set(toolIds).size).toBe(2);
   });
 });
