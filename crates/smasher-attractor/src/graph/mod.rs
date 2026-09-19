@@ -45,7 +45,7 @@ pub enum NodeAttrValue {
 }
 
 /// A resolved graph node with semantic type and attributes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GraphNode {
     pub id: String,
     pub node_type: NodeType,
@@ -74,7 +74,7 @@ impl GraphNode {
 }
 
 /// A resolved graph edge with extracted metadata.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GraphEdge {
     pub from: String,
     pub to: String,
@@ -88,7 +88,7 @@ pub struct GraphEdge {
 }
 
 /// A fully resolved semantic graph with typed nodes and edges.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Graph {
     pub name: Option<String>,
     pub nodes: Vec<GraphNode>,
@@ -193,6 +193,14 @@ fn convert_attrs(attrs: &[DotAttr]) -> HashMap<String, NodeAttrValue> {
         .map(|a| (a.key.clone(), convert_value(&a.value)))
         .collect()
 }
+
+/// Node attribute keys that are always re-derived from `node_type` by
+/// `style_for_node_type()` (in `rendering.rs`) rather than stored as
+/// independent data — excluded from a node's generic `attrs` map on parse
+/// so they don't get double-counted as both derived styling and generic
+/// data.
+pub(crate) const NODE_DERIVED_ATTRS: &[&str] =
+    &["shape", "label", "style", "fillcolor", "fontcolor"];
 
 /// Determine the NodeType from a shape string.
 pub(crate) fn node_type_from_shape(shape: &str) -> NodeType {
@@ -321,10 +329,15 @@ pub fn resolve(dot_graph: &DotGraph) -> Result<Graph, ResolutionError> {
                 .unwrap_or(NodeType::Codergen);
             let label = extract_label(&all_attrs);
 
-            // Store non-reserved attributes.
+            // Store non-reserved attributes. `style`/`fillcolor`/`fontcolor`
+            // are excluded alongside `shape`/`label` because they're always
+            // re-derived from `node_type` by `style_for_node_type()` on
+            // render — keeping them out of `attrs` here means a render then
+            // re-parse doesn't fabricate generic attrs that were never part
+            // of the original authored graph.
             let mut extra_attrs = HashMap::new();
             for (k, v) in &all_attrs {
-                if k != "shape" && k != "label" {
+                if !NODE_DERIVED_ATTRS.contains(&k.as_str()) {
                     extra_attrs.insert(k.clone(), v.clone());
                 }
             }

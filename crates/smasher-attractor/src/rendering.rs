@@ -8,7 +8,7 @@ use std::process::Stdio;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 
-use crate::graph::{Graph, GraphEdge, GraphNode, NodeType};
+use crate::graph::{Graph, GraphEdge, GraphNode, NodeAttrValue, NodeType};
 
 /// Supported output formats for graph rendering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,28 +166,69 @@ fn dot_escape(s: &str) -> String {
     format!("\"{escaped}\"")
 }
 
+/// Format a NodeAttrValue for embedding as a DOT attribute value.
+fn format_attr_value(v: &NodeAttrValue) -> String {
+    match v {
+        NodeAttrValue::String(s) => dot_escape(s),
+        NodeAttrValue::Number(n) => n.to_string(),
+        // Quoted so it round-trips through the lexer's StringLit path
+        // regardless of whether a bare duration token is ever produced.
+        NodeAttrValue::Duration(d) => dot_escape(&format!("{}s", d.as_secs())),
+        NodeAttrValue::Bool(b) => b.to_string(),
+    }
+}
+
+/// Append `key=value` DOT attribute pairs for every entry in `attrs` not in
+/// `skip`, sorted by key for deterministic output.
+fn write_extra_attrs(out: &mut Vec<String>, attrs: &HashMap<String, NodeAttrValue>, skip: &[&str]) {
+    let mut keys: Vec<&String> = attrs.keys().filter(|k| !skip.contains(&k.as_str())).collect();
+    keys.sort();
+    for key in keys {
+        out.push(format!("{key}={}", format_attr_value(&attrs[key])));
+    }
+}
+
 /// Render a single GraphNode to a DOT node statement line.
 fn render_node(node: &GraphNode) -> String {
     let style = style_for_node_type(&node.node_type);
     let label = node.label.as_deref().unwrap_or(&node.id);
-    format!(
-        "    {} [label={} shape={} style={} fillcolor={} fontcolor={}];",
-        dot_escape(&node.id),
-        dot_escape(label),
-        dot_escape(style.shape),
-        dot_escape(style.style),
-        dot_escape(style.fill_color),
-        dot_escape(style.font_color),
-    )
+    let mut fields = vec![
+        format!("label={}", dot_escape(label)),
+        format!("shape={}", dot_escape(style.shape)),
+        format!("style={}", dot_escape(style.style)),
+        format!("fillcolor={}", dot_escape(style.fill_color)),
+        format!("fontcolor={}", dot_escape(style.font_color)),
+    ];
+    write_extra_attrs(
+        &mut fields,
+        &node.attrs,
+        &["shape", "style", "fillcolor", "fontcolor"],
+    );
+    format!("    {} [{}];", dot_escape(&node.id), fields.join(" "))
 }
 
 /// Render a single GraphEdge to a DOT edge statement line.
 fn render_edge(edge: &GraphEdge) -> String {
-    let mut attrs = Vec::new();
+    let mut fields = Vec::new();
     if let Some(label) = &edge.label {
-        attrs.push(format!("label={}", dot_escape(label)));
+        fields.push(format!("label={}", dot_escape(label)));
     }
-    if attrs.is_empty() {
+    if let Some(condition) = &edge.condition {
+        fields.push(format!("condition={}", dot_escape(condition)));
+    }
+    if let Some(priority) = edge.priority {
+        fields.push(format!("priority={priority}"));
+    }
+    if edge.loop_restart {
+        fields.push("loop_restart=true".to_string());
+    }
+    write_extra_attrs(
+        &mut fields,
+        &edge.attrs,
+        &["label", "condition", "priority", "loop_restart"],
+    );
+
+    if fields.is_empty() {
         format!(
             "    {} -> {};",
             dot_escape(&edge.from),
@@ -198,9 +239,42 @@ fn render_edge(edge: &GraphEdge) -> String {
             "    {} -> {} [{}];",
             dot_escape(&edge.from),
             dot_escape(&edge.to),
-            attrs.join(" "),
+            fields.join(" "),
         )
     }
+}
+
+/// Build the graph-level preamble lines shared by both DOT writers:
+/// layout defaults (rankdir/bgcolor/node&edge fontname) overridden by any
+/// matching key already present in `graph.graph_attrs`, plus any other
+/// graph_attrs re-emitted verbatim — so a parse/edit/render round trip
+/// doesn't silently drop hand-authored graph-level attrs (e.g. `goal=`,
+/// `default_max_retry=`, read by the pipeline engine, not this renderer).
+fn render_graph_preamble(graph: &Graph) -> Vec<String> {
+    let mut lines = Vec::new();
+
+    let rankdir = graph
+        .graph_attrs
+        .get("rankdir")
+        .map(format_attr_value)
+        .unwrap_or_else(|| "LR".to_string());
+    let bgcolor = graph
+        .graph_attrs
+        .get("bgcolor")
+        .map(format_attr_value)
+        .unwrap_or_else(|| dot_escape("#FAFAFA"));
+    lines.push(format!("    rankdir={rankdir};"));
+    lines.push(format!("    bgcolor={bgcolor};"));
+    lines.push("    node [fontname=\"Helvetica\" fontsize=12];".to_string());
+    lines.push("    edge [fontname=\"Helvetica\" fontsize=10];".to_string());
+
+    let mut extra_graph_attrs = Vec::new();
+    write_extra_attrs(&mut extra_graph_attrs, &graph.graph_attrs, &["rankdir", "bgcolor"]);
+    for attr in extra_graph_attrs {
+        lines.push(format!("    {attr};"));
+    }
+
+    lines
 }
 
 /// Render a Graph into a styled DOT format string.
@@ -213,11 +287,7 @@ pub fn render_to_dot(graph: &Graph) -> String {
     let name = graph.name.as_deref().map(dot_escape).unwrap_or_default();
     lines.push(format!("digraph {name} {{"));
 
-    // Graph-level attributes for layout
-    lines.push("    rankdir=LR;".to_string());
-    lines.push("    bgcolor=\"#FAFAFA\";".to_string());
-    lines.push("    node [fontname=\"Helvetica\" fontsize=12];".to_string());
-    lines.push("    edge [fontname=\"Helvetica\" fontsize=10];".to_string());
+    lines.extend(render_graph_preamble(graph));
     lines.push(String::new());
 
     // Render nodes
@@ -382,16 +452,21 @@ fn render_node_with_status(node: &GraphNode, status: &NodeExecutionStatus) -> St
     let base_label = node.label.as_deref().unwrap_or(&node.id);
     let label = format!("{base_label}{}", status_style.label_suffix);
 
-    format!(
-        "    {} [label={} shape={} style=\"filled\" fillcolor={} fontcolor={} color={} penwidth={}];",
-        dot_escape(&node.id),
-        dot_escape(&label),
-        dot_escape(base_style.shape),
-        dot_escape(status_style.fill_color),
-        dot_escape(base_style.font_color),
-        dot_escape(status_style.border_color),
-        status_style.pen_width,
-    )
+    let mut fields = vec![
+        format!("label={}", dot_escape(&label)),
+        format!("shape={}", dot_escape(base_style.shape)),
+        "style=\"filled\"".to_string(),
+        format!("fillcolor={}", dot_escape(status_style.fill_color)),
+        format!("fontcolor={}", dot_escape(base_style.font_color)),
+        format!("color={}", dot_escape(status_style.border_color)),
+        format!("penwidth={}", status_style.pen_width),
+    ];
+    write_extra_attrs(
+        &mut fields,
+        &node.attrs,
+        &["shape", "style", "fillcolor", "fontcolor"],
+    );
+    format!("    {} [{}];", dot_escape(&node.id), fields.join(" "))
 }
 
 /// Render a Graph into styled DOT format with execution status overlays.
@@ -407,11 +482,7 @@ pub fn render_to_dot_with_status(
     let name = graph.name.as_deref().map(dot_escape).unwrap_or_default();
     lines.push(format!("digraph {name} {{"));
 
-    // Graph-level attributes for layout
-    lines.push("    rankdir=LR;".to_string());
-    lines.push("    bgcolor=\"#FAFAFA\";".to_string());
-    lines.push("    node [fontname=\"Helvetica\" fontsize=12];".to_string());
-    lines.push("    edge [fontname=\"Helvetica\" fontsize=10];".to_string());
+    lines.extend(render_graph_preamble(graph));
     lines.push(String::new());
 
     // Render nodes with status overlays
@@ -1958,5 +2029,219 @@ mod tests {
         assert!(rendered.contains("label=\"Do Work\""));
         assert!(rendered.contains("\"start\" -> \"process\""));
         assert!(rendered.contains("label=\"done\""));
+    }
+
+    // ---------------------------------------------------------------
+    // Task 2: full-attribute round-trip
+    // ---------------------------------------------------------------
+
+    /// Parse a DOT source string straight through to a resolved Graph.
+    fn parse_resolve(src: &str) -> Graph {
+        let ast = crate::dot::parse(src).expect("parse");
+        crate::graph::resolve(&ast).expect("resolve")
+    }
+
+    /// Assert that everything this task's round-trip contract covers
+    /// (name, nodes, edges, graph-level attrs) survives a render + re-parse.
+    ///
+    /// `graph_attrs` is checked as "every original entry survives with its
+    /// original value" rather than exact map equality: `render_to_dot`
+    /// always emits `rankdir`/`bgcolor` (falling back to its own visual
+    /// defaults when the source graph didn't set them), so a graph that
+    /// never set them will gain them on re-parse — an accepted side effect
+    /// of the renderer supplying sane visual defaults, not data loss.
+    ///
+    /// Deliberately excludes `default_node_attrs`/`default_edge_attrs`:
+    /// `render_to_dot` always emits its own hardcoded `node [...]`/
+    /// `edge [...]` layout defaults, which re-parse into those two maps
+    /// regardless of the source graph's originals — a known, explicitly
+    /// out-of-scope gap for this task, not a regression introduced by it.
+    fn assert_round_trips(g: &Graph, g2: &Graph) {
+        assert_eq!(g.name, g2.name);
+        assert_eq!(g.nodes, g2.nodes);
+        assert_eq!(g.edges, g2.edges);
+        for (key, value) in &g.graph_attrs {
+            assert_eq!(
+                g2.graph_attrs.get(key),
+                Some(value),
+                "graph_attrs[{key}] should survive a render/re-parse round trip"
+            );
+        }
+    }
+
+    /// One representative fixture covering every NodeType with a
+    /// realistic attribute set per the node-kind contracts documented in
+    /// plan-workflow-editor.md's grounding section, plus edge metadata and
+    /// graph-level attrs (as real fixtures like examples/ask_and_execute.dot
+    /// use for `goal`/`default_max_retry`, read by the pipeline engine).
+    const FULL_ATTR_FIXTURE: &str = r#"
+digraph {
+    goal="Prove every attribute survives a save";
+    default_max_retry=5;
+
+    entry [shape=Mdiamond, label="Entry"];
+    gen [shape=box, label="Generate", prompt="write the thing", model="claude-sonnet-4-20250514", retry_count=3, urgent=true];
+    ask [shape=hexagon, label="Ask", question="proceed?", gallery=true];
+    tool [shape=parallelogram, label="Tool", tool="grep", args="{\"pattern\":\"foo\"}"];
+    mgr [shape=house, label="Manager", task="coordinate", config="{\"retries\":3}"];
+    sub [shape=folder, label="Sub", pipeline="child.dot"];
+    branch [shape=diamond, label="Branch"];
+    par [shape=component, label="Parallel"];
+    joiner [shape=tripleoctagon, label="Join"];
+    exit [shape=doublecircle, label="Exit"];
+
+    entry -> gen;
+    gen -> ask [condition="ask_next", priority=1, loop_restart=true];
+    ask -> tool;
+    tool -> mgr;
+    mgr -> sub;
+    sub -> branch;
+    branch -> par;
+    par -> joiner;
+    joiner -> exit;
+}
+"#;
+
+    #[test]
+    fn structural_round_trip_every_node_kind() {
+        let g = parse_resolve(FULL_ATTR_FIXTURE);
+        let rendered = render_to_dot(&g);
+        let g2 = parse_resolve(&rendered);
+        assert_round_trips(&g, &g2);
+    }
+
+    #[test]
+    fn graph_level_attrs_survive_render() {
+        let g = parse_resolve(FULL_ATTR_FIXTURE);
+        let rendered = render_to_dot(&g);
+        let g2 = parse_resolve(&rendered);
+        assert_eq!(
+            g2.graph_attrs.get("goal"),
+            Some(&NodeAttrValue::String(
+                "Prove every attribute survives a save".to_string()
+            ))
+        );
+        assert_eq!(
+            g2.graph_attrs.get("default_max_retry"),
+            Some(&NodeAttrValue::Number(5.0))
+        );
+    }
+
+    #[test]
+    fn pos_attr_round_trips_unchanged() {
+        let src = r#"
+digraph {
+    a [shape=box, label="A", pos="120,80"];
+    b [shape=box, label="B"];
+    a -> b;
+}
+"#;
+        let g = parse_resolve(src);
+        let rendered = render_to_dot(&g);
+        let g2 = parse_resolve(&rendered);
+        assert_round_trips(&g, &g2);
+        assert_eq!(
+            g2.nodes[0].attrs.get("pos"),
+            Some(&NodeAttrValue::String("120,80".to_string()))
+        );
+    }
+
+    #[test]
+    fn no_pos_attr_parses_and_renders_without_error() {
+        let src = r#"
+digraph {
+    a [shape=box, label="A"];
+    b [shape=box, label="B"];
+    a -> b;
+}
+"#;
+        let g = parse_resolve(src);
+        assert!(!g.nodes[0].attrs.contains_key("pos"));
+        let rendered = render_to_dot(&g);
+        let g2 = parse_resolve(&rendered);
+        assert_round_trips(&g, &g2);
+        assert!(!g2.nodes[0].attrs.contains_key("pos"));
+    }
+
+    #[test]
+    fn edge_condition_priority_loop_restart_round_trip() {
+        let g = parse_resolve(FULL_ATTR_FIXTURE);
+        let rendered = render_to_dot(&g);
+        let g2 = parse_resolve(&rendered);
+
+        let edge = g2
+            .edges
+            .iter()
+            .find(|e| e.from == "gen" && e.to == "ask")
+            .expect("gen -> ask edge");
+        assert_eq!(edge.condition.as_deref(), Some("ask_next"));
+        assert_eq!(edge.priority, Some(1));
+        assert!(edge.loop_restart);
+    }
+
+    #[test]
+    fn generic_number_and_bool_node_attrs_round_trip() {
+        let g = parse_resolve(FULL_ATTR_FIXTURE);
+        let rendered = render_to_dot(&g);
+        let g2 = parse_resolve(&rendered);
+
+        let gen_node = g2.nodes.iter().find(|n| n.id == "gen").expect("gen node");
+        assert_eq!(
+            gen_node.attrs.get("retry_count"),
+            Some(&NodeAttrValue::Number(3.0))
+        );
+        assert_eq!(
+            gen_node.attrs.get("urgent"),
+            Some(&NodeAttrValue::Bool(true))
+        );
+    }
+
+    #[test]
+    fn render_to_dot_never_double_emits_derived_keys() {
+        let g = parse_resolve(FULL_ATTR_FIXTURE);
+        let rendered = render_to_dot(&g);
+
+        for node in &g.nodes {
+            let node_line = rendered
+                .lines()
+                .find(|l| l.trim_start().starts_with(&dot_escape(&node.id)))
+                .unwrap_or_else(|| panic!("no rendered line for node {}", node.id));
+            for derived_key in ["shape=", "style=", "fillcolor=", "fontcolor="] {
+                let count = node_line.matches(derived_key).count();
+                assert_eq!(
+                    count, 1,
+                    "node {} line should contain '{derived_key}' exactly once, got {count}: {node_line}",
+                    node.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn render_to_dot_with_status_round_trips_generic_node_attrs() {
+        let g = parse_resolve(FULL_ATTR_FIXTURE);
+        let statuses: HashMap<String, NodeExecutionStatus> = HashMap::new();
+        let rendered = render_to_dot_with_status(&g, &statuses);
+        let g2 = parse_resolve(&rendered);
+
+        let gen_node = g2.nodes.iter().find(|n| n.id == "gen").expect("gen node");
+        assert_eq!(
+            gen_node.attrs.get("prompt"),
+            Some(&NodeAttrValue::String("write the thing".to_string()))
+        );
+        assert_eq!(
+            gen_node.attrs.get("model"),
+            Some(&NodeAttrValue::String(
+                "claude-sonnet-4-20250514".to_string()
+            ))
+        );
+        assert_eq!(
+            gen_node.attrs.get("retry_count"),
+            Some(&NodeAttrValue::Number(3.0))
+        );
+        assert_eq!(
+            gen_node.attrs.get("urgent"),
+            Some(&NodeAttrValue::Bool(true))
+        );
     }
 }
