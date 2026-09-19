@@ -195,7 +195,7 @@ fn convert_attrs(attrs: &[DotAttr]) -> HashMap<String, NodeAttrValue> {
 }
 
 /// Determine the NodeType from a shape string.
-fn node_type_from_shape(shape: &str) -> NodeType {
+pub(crate) fn node_type_from_shape(shape: &str) -> NodeType {
     match shape {
         "circle" | "point" | "Mdiamond" => NodeType::Start,
         "doublecircle" | "Msquare" => NodeType::Exit,
@@ -206,6 +206,7 @@ fn node_type_from_shape(shape: &str) -> NodeType {
         "component" => NodeType::Parallel,
         "tripleoctagon" => NodeType::FanIn,
         "house" => NodeType::Manager,
+        "folder" => NodeType::SubPipeline,
         _ => NodeType::Generic,
     }
 }
@@ -1071,6 +1072,14 @@ mod tests {
         let dot = make_graph(vec![node_with_shape("n", "parallelogram")]);
         let g = resolve(&dot).unwrap();
         assert_eq!(g.nodes[0].node_type, NodeType::Tool);
+    }
+
+    // ---- Spec-critical: folder shape maps to SubPipeline ----
+    #[test]
+    fn folder_shape_maps_to_sub_pipeline() {
+        let dot = make_graph(vec![node_with_shape("n", "folder")]);
+        let g = resolve(&dot).unwrap();
+        assert_eq!(g.nodes[0].node_type, NodeType::SubPipeline);
     }
 
     // ---- Spec-critical: tripleoctagon shape maps to FanIn ----

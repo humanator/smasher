@@ -126,7 +126,7 @@ pub fn style_for_node_type(node_type: &NodeType) -> NodeStyle {
             style: "filled",
         },
         NodeType::SubPipeline => NodeStyle {
-            shape: "component",
+            shape: "folder",
             fill_color: "#FF9800",
             font_color: "white",
             style: "filled",
@@ -144,7 +144,7 @@ pub fn style_for_node_type(node_type: &NodeType) -> NodeStyle {
             style: "filled",
         },
         NodeType::Tool => NodeStyle {
-            shape: "hexagon",
+            shape: "parallelogram",
             fill_color: "#607D8B",
             font_color: "white",
             style: "filled",
@@ -907,7 +907,7 @@ mod tests {
     #[test]
     fn style_for_subpipeline_node() {
         let style = style_for_node_type(&NodeType::SubPipeline);
-        assert_eq!(style.shape, "component");
+        assert_eq!(style.shape, "folder");
         assert_eq!(style.fill_color, "#FF9800");
     }
 
@@ -928,7 +928,7 @@ mod tests {
     #[test]
     fn style_for_tool_node() {
         let style = style_for_node_type(&NodeType::Tool);
-        assert_eq!(style.shape, "hexagon");
+        assert_eq!(style.shape, "parallelogram");
         assert_eq!(style.fill_color, "#607D8B");
     }
 
@@ -937,6 +937,36 @@ mod tests {
         let style = style_for_node_type(&NodeType::Interviewer);
         assert_eq!(style.shape, "ellipse");
         assert_eq!(style.fill_color, "#795548");
+    }
+
+    // ---- Spec-critical: every NodeType's rendered shape parses back to itself ----
+    //
+    // Generic is excluded: it's the parse-side catch-all for unrecognized
+    // shapes (no shape maps to it), and it deliberately renders with the
+    // same "box" shape as Codergen, which parses back to Codergen. That
+    // collision predates this test and is out of scope here.
+    #[test]
+    fn every_node_type_shape_round_trips() {
+        let all_types = [
+            NodeType::Start,
+            NodeType::Exit,
+            NodeType::Codergen,
+            NodeType::Conditional,
+            NodeType::Tool,
+            NodeType::Interviewer,
+            NodeType::Parallel,
+            NodeType::FanIn,
+            NodeType::Manager,
+            NodeType::SubPipeline,
+        ];
+        for nt in all_types {
+            let shape = style_for_node_type(&nt).shape;
+            assert_eq!(
+                crate::graph::node_type_from_shape(shape),
+                nt,
+                "shape '{shape}' rendered for {nt:?} does not parse back to it"
+            );
+        }
     }
 
     // ---------------------------------------------------------------
