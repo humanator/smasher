@@ -1,0 +1,67 @@
+digraph ManualWorkflowRunShellCheck {
+  graph [
+    goal="Fixture for manually checking workflow-run-shell: launch from /workflows/{id}, watch it pause at a real gallery gate without needing any LLM credentials (render_capture just serves a pre-built fixture candidate), edit this file while it's paused to prove fresh-reads, then kill/restart the server to prove rehydration.",
+    rankdir=LR
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+
+  // Comment out this single line to test that a workflow re-reads its .dot
+  // file fresh on every run rather than using a stale snapshot from an
+  // earlier page load: with it present, the rendered pipeline graph shows
+  // an extra "Notes" node; comment it out, launch a new run, and the graph
+  // should show one fewer node. It has no edges, so it's a pure add/remove
+  // with nothing else to rewire -- the rest of the graph is unaffected
+  // either way.
+  Notes [shape=note, label="Scratch node (comment me out)"];
+
+  // --- Real render_capture candidates, chained ---
+  Render1 [
+    shape=parallelogram,
+    label="Render Candidate A",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"/Users/simon/Desktop/Projects/semi-dark design/smasher/crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"manual-check\", \"candidate_id\": \"candidate-a\"}"
+  ];
+  Render2 [
+    shape=parallelogram,
+    label="Render Candidate B",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"/Users/simon/Desktop/Projects/semi-dark design/smasher/crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"manual-check\", \"candidate_id\": \"candidate-b\"}"
+  ];
+  Render3 [
+    shape=parallelogram,
+    label="Render Candidate C",
+    tool="render_capture",
+    args="{\"candidate_dir\": \"/Users/simon/Desktop/Projects/semi-dark design/smasher/crates/smasher-render-capture/fixtures/candidate\", \"run_id\": \"manual-check\", \"candidate_id\": \"candidate-c\"}"
+  ];
+
+  // Gallery gate: pipeline pauses here (status stays "Running") until a
+  // human picks a candidate -- no LLM call needed to reach this point, so
+  // this is a safe, deterministic place to kill -9 the server for the
+  // restart-survival check.
+  Gate1 [
+    shape=hexagon,
+    label="Pick your favorite candidate(s)",
+    gallery="true",
+    candidate_count=3
+  ];
+
+  // Only reached if you actually answer the gate -- these are real
+  // Codergen nodes and DO need live LLM credentials configured. Leave the
+  // gate unanswered if you just want to exercise the paused/rehydrated
+  // state.
+  Proceed [shape=box, label="Proceed to polish"];
+  Iterate [shape=box, label="Iterate on candidates"];
+  Exit [shape=Msquare, label="Exit"];
+
+  Start -> Render1;
+  Render1 -> Render2;
+  Render2 -> Render3;
+  Render3 -> Gate1;
+
+  Gate1 -> Proceed [label="proceed"];
+  Gate1 -> Iterate [label="iterate"];
+
+  Proceed -> Exit;
+  Iterate -> Exit;
+}
