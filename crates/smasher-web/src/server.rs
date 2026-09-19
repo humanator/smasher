@@ -21,6 +21,7 @@ pub fn design_kit_dir() -> std::path::PathBuf {
 /// Build the complete axum router with all routes and middleware.
 pub fn build_router(state: AppState) -> Router {
     let api_routes = crate::routes::api::router();
+    let editor_api_routes = crate::routes::editor_api::router();
     let page_routes = crate::routes::pages::router();
     let question_routes = crate::routes::questions::router();
     let gallery_routes = crate::routes::gallery::router();
@@ -40,6 +41,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .merge(page_routes)
         .merge(api_routes)
+        .merge(editor_api_routes)
         .merge(question_routes)
         .merge(gallery_routes)
         .nest_service("/static", ServeDir::new(static_dir))

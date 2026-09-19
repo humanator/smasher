@@ -91,15 +91,17 @@ impl Parser {
             }
         };
 
-        // Optional name
-        let name = if let Token::Ident(_) = self.peek() {
-            if let Token::Ident(name) = self.advance() {
-                Some(name)
-            } else {
-                None
-            }
-        } else {
-            None
+        // Optional name. Real Graphviz syntax allows either a bare
+        // identifier or a quoted string here (`digraph "My Graph" { ... }`)
+        // — render_to_dot (rendering.rs) always quotes graph.name when
+        // writing one, so a quoted name must parse or no named graph can
+        // survive a render/re-parse round trip.
+        let name = match self.peek() {
+            Token::Ident(_) | Token::StringLit(_) => match self.advance() {
+                Token::Ident(name) | Token::StringLit(name) => Some(name),
+                _ => None,
+            },
+            _ => None,
         };
 
         self.expect(&Token::LBrace)?;
@@ -398,6 +400,17 @@ mod tests {
         let graph = parse("graph G {}").unwrap();
         assert!(!graph.is_digraph);
         assert_eq!(graph.name, Some("G".to_string()));
+    }
+
+    #[test]
+    fn parse_digraph_with_quoted_name() {
+        // Real Graphviz syntax allows a quoted graph name; render_to_dot
+        // (rendering.rs) always quotes graph.name when writing one, so this
+        // must parse or no named graph can ever survive a render/re-parse
+        // round trip.
+        let graph = parse(r#"digraph "My Graph" {}"#).unwrap();
+        assert!(graph.is_digraph);
+        assert_eq!(graph.name, Some("My Graph".to_string()));
     }
 
     #[test]
