@@ -36,7 +36,7 @@
 <body>
   <header class="catalog-header">
     <h1>Component Kit</h1>
-    <p>Design-factory component catalog — button, input, drawer, modal, list-row.</p>
+    <p>Design-factory component catalog — button, input, drawer, modal, list-row, table.</p>
   </header>
   <main class="catalog-body">
     <section class="catalog-section">
@@ -99,6 +99,32 @@
           <button class="btn btn-primary" type="button" data-modal-close="example-modal">Confirm</button>
         </div>
       </div>
+    </section>
+
+    <section class="catalog-section">
+      <h2>Table</h2>
+      <table class="table">
+        <caption class="table-caption">Months and rates</caption>
+        <thead>
+          <tr>
+            <th scope="col">Month you apply</th>
+            <th scope="col" class="table-numeric">Rate for bicycles</th>
+            <th scope="col" class="table-numeric">Rate for vehicles</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>January</td>
+            <td class="table-numeric">£85</td>
+            <td class="table-numeric">£95</td>
+          </tr>
+          <tr>
+            <td>February</td>
+            <td class="table-numeric">£75</td>
+            <td class="table-numeric">£55</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
   </main>
   <script src="components.js" defer></script>

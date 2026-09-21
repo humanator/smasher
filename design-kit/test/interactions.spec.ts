@@ -109,6 +109,21 @@ test.describe('Drawer', () => {
   });
 });
 
+test.describe('Table', () => {
+  test('renders a caption, header cells, and right-aligns numeric columns', async ({ page }) => {
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+    await expect(page.getByText('Months and rates')).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Month you apply' })).toBeVisible();
+
+    const numericCell = page.getByRole('cell', { name: '£85' });
+    await expect(numericCell).toHaveCSS('text-align', 'right');
+
+    const textCell = page.getByRole('cell', { name: 'January' });
+    await expect(textCell).toHaveCSS('text-align', 'left');
+  });
+});
+
 test.describe('Modal', () => {
   test('opens on trigger click and returns focus to the trigger on close', async ({ page }) => {
     const trigger = page.getByRole('button', { name: 'Open modal' });

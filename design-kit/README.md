@@ -4,7 +4,7 @@
 <!-- ABOUTME: and usage rules an agent needs to compose a screen from these parts. -->
 
 A small, versioned library of real (not static-mock) HTML/CSS/JS components —
-button, input, drawer, modal, list-row — for composing Discover-phase pipeline
+button, input, drawer, modal, list-row, table — for composing Discover-phase pipeline
 candidates cheaply, per `../docs/design-factory/SPEC-component-kit.md`.
 
 Open [`catalog.html`](./catalog.html) in a browser to see every component and state
@@ -14,17 +14,24 @@ these five patterns from scratch.
 ## Usage rules
 
 1. **Compose from these classes and snippets.** Don't write a new button, input,
-   drawer, modal, or list-row from scratch — copy the relevant file in `components/`
-   and adjust content/attributes.
+   drawer, modal, list-row, or table from scratch — copy the relevant file in
+   `components/` and adjust content/attributes.
 2. **Never write a raw color, radius, spacing, or shadow value in your own CSS.**
    Reference a token (below) instead. If the token you need doesn't exist yet, add it
    to `tokens.css` rather than hardcoding a value — that keeps `test/lint-tokens.mjs`
    passing and keeps the kit's palette consistent.
-3. **Don't add a sixth component** without checking `SPEC-component-kit.md` first —
-   the kit intentionally ships only five components; growing it is a deliberate,
-   spec-level decision, not a per-screen one.
+3. **Don't add a seventh component** without checking `SPEC-component-kit.md` first —
+   the kit intentionally ships six components; growing it is a deliberate, spec-level
+   decision, not a per-screen one.
 4. **No framework, no build step.** Everything here is plain HTML/CSS/vanilla JS. Load
    `tokens.css`, `components.css`, and `components.js` — nothing else is required.
+5. **New components default to a GOV.UK Design System source.** When a new component
+   is approved, hand-copy the equivalent
+   [GOV.UK Design System](https://design-system.service.gov.uk/components/) pattern's
+   HTML structure, then reskin it with this kit's tokens and flat class-naming
+   convention (`.table`, not `govuk-table__header`) — markup/structure reference only,
+   never the `govuk-frontend` package. See `SPEC-component-kit.md`'s `table` addendum
+   for the worked example.
 
 ## Components
 
@@ -96,6 +103,34 @@ custom close-handling JS, as shown in `components/modal.html`.
 
 Start every drawer/modal `hidden`; `components.js` toggles the `hidden` attribute (not
 a CSS class) to show/hide both the panel and its overlay.
+
+### Table (`components/table.html`)
+
+| Class | Use |
+|---|---|
+| `.table` | Base `<table>` — border-collapse, row hover, header styling |
+| `.table-caption` | Optional `<caption>` labeling the table |
+| `.table-numeric` | Add to a `<th>`/`<td>` to right-align numeric column content |
+
+Header cells use `<th scope="col">`; body cells are plain `<td>` (no `scope="row"`
+pattern — add it by hand if a specific table needs row-label semantics).
+
+```html
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Name</th>
+      <th scope="col" class="table-numeric">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>January</td>
+      <td class="table-numeric">£85</td>
+    </tr>
+  </tbody>
+</table>
+```
 
 ## Tokens
 

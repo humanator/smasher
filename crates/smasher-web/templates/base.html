@@ -6,6 +6,11 @@
     <title>{% block title %}SMASHER{% endblock %}</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x26A1;</text></svg>">
     <link rel="stylesheet" href="/static/style.css">
+    <!-- design-kit is mounted at /design-kit by server.rs for candidate bundles;
+         the dashboard's own chrome reuses it here too so .table (and any future
+         kit component) has one source of truth instead of a style.css copy. -->
+    <link rel="stylesheet" href="/design-kit/tokens.css">
+    <link rel="stylesheet" href="/design-kit/components.css">
     {% block head %}{% endblock %}
     <script src="/static/htmx.min.js"></script>
     <script src="/static/htmx-ext-sse.js"></script>
