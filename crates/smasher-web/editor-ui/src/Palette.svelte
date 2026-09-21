@@ -55,6 +55,7 @@
               data-testid={`palette-entry-${nodeType}`}
               draggable="true"
               role="listitem"
+              title={config.description}
               ondragstart={(event) => handleDragStart(event, nodeType)}
               style={`--palette-entry-color: ${THEME_COLORS[config.theme].border}; --palette-entry-bg: ${THEME_COLORS[config.theme].bg};`}
             >

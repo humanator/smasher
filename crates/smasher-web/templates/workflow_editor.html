@@ -2,11 +2,22 @@
 
 {% block title %}SMASHER — {% if is_edit %}Edit Workflow{% else %}New Workflow{% endif %}{% endblock %}
 
+{% block head %}
+<!-- Must load in <head>, not the body -- this stylesheet and this
+     component's own JS-injected <style> tags (see WorkflowCanvasInner.svelte)
+     both set the same `.svelte-flow { --xy-edge-stroke-default: ... }`
+     custom property at equal selector specificity, so whichever loads
+     later in document order wins the cascade. A <link> placed in the body
+     (as this one previously was) parses after the component mounts and
+     silently overrides the app's own edge/handle theming back to Svelte
+     Flow's barely-visible library defaults. -->
+<link rel="stylesheet" href="/editor-ui/editor-ui.css">
+{% endblock %}
+
 {% block content %}
 <section class="editor-section">
     <a href="/" class="btn btn-small">&larr; All workflows</a>
     <h2>{% if is_edit %}Edit Workflow{% else %}New Workflow{% endif %}</h2>
-    <link rel="stylesheet" href="/editor-ui/editor-ui.css">
     <workflow-canvas id="editor-canvas" style="display: block; width: 100%; height: 75vh;"></workflow-canvas>
     <script type="module" src="/editor-ui/workflow-canvas.js"></script>
     <script>

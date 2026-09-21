@@ -47,4 +47,14 @@ describe('ManagerForm', () => {
     expect(screen.queryByTestId('manager-config-error')).not.toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { config: undefined } });
   });
+
+  it('offers task suggestions via a datalist without constraining the field to them', () => {
+    const onChange = vi.fn();
+    render(ManagerForm, { props: { attrs: {}, onChange } });
+
+    const input = screen.getByTestId('manager-task');
+    expect(input).toHaveAttribute('list', 'manager-task-suggestions');
+    const options = document.querySelectorAll('#manager-task-suggestions option');
+    expect(Array.from(options).map((o) => o.getAttribute('value'))).toContain('coordinate-review');
+  });
 });

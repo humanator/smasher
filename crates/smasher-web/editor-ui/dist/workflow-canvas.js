@@ -41,7 +41,7 @@ function S(e, t) {
 }
 //#endregion
 //#region node_modules/svelte/src/internal/client/constants.js
-var C = 1 << 24, w = 1024, T = 2048, E = 4096, D = 8192, ee = 16384, te = 32768, ne = 1 << 25, re = 65536, ie = 1 << 19, ae = 1 << 20, O = 1 << 25, k = 1 << 21, oe = 1 << 22, se = 1 << 23, ce = Symbol("$state"), le = Symbol("component"), ue = Symbol("legacy props"), de = Symbol(""), fe = Symbol("attributes"), pe = Symbol("class"), me = Symbol("style"), he = Symbol("text"), ge = Symbol("form reset"), _e = new class extends Error {
+var C = 1 << 24, w = 1024, T = 2048, E = 4096, D = 8192, O = 16384, ee = 32768, te = 1 << 25, ne = 65536, re = 1 << 19, ie = 1 << 20, k = 1 << 25, ae = 1 << 21, oe = 1 << 22, se = 1 << 23, ce = Symbol("$state"), le = Symbol("component"), ue = Symbol("legacy props"), de = Symbol(""), fe = Symbol("attributes"), pe = Symbol("class"), me = Symbol("style"), he = Symbol("text"), ge = Symbol("form reset"), _e = new class extends Error {
 	name = "StaleReactionError";
 	message = "The reaction that called `getAbortSignal()` was re-run or destroyed";
 }(), ve = !!globalThis.document?.contentType && /* @__PURE__ */ globalThis.document.contentType.includes("xml");
@@ -372,7 +372,7 @@ function St() {
 /*#__NO_SIDE_EFFECTS__*/
 function Ct(e) {
 	var n = 2 | T;
-	return G !== null && (G.f |= ie), {
+	return G !== null && (G.f |= re), {
 		ctx: Qe,
 		deps: null,
 		effects: null,
@@ -1095,7 +1095,7 @@ function Dn(e, t) {
 		} catch (e) {
 			throw Wn(r), e;
 		}
-		i.deps === null && i.teardown === null && i.nodes === null && i.first === i.last && !(i.f & 524288) && (i = i.first, e & 16 && e & 65536 && i !== null && (i.f |= re));
+		i.deps === null && i.teardown === null && i.nodes === null && i.first === i.last && !(i.f & 524288) && (i = i.first, e & 16 && e & 65536 && i !== null && (i.f |= ne));
 	}
 	if (i !== null && (i.parent = n, n !== null && En(i, n), W !== null && W.f & 2 && !(e & 64))) {
 		var a = W;
@@ -1119,21 +1119,21 @@ function An(e) {
 	} else return jn(e);
 }
 function jn(e) {
-	return Dn(4 | ae, e);
+	return Dn(4 | ie, e);
 }
 function Mn(e) {
-	return Tn("$effect.pre"), Dn(8 | ae, e);
+	return Tn("$effect.pre"), Dn(8 | ie, e);
 }
 function Nn(e) {
 	Ht.ensure();
-	let t = Dn(64 | ie, e);
+	let t = Dn(64 | re, e);
 	return () => {
 		Wn(t);
 	};
 }
 function Pn(e) {
 	Ht.ensure();
-	let t = Dn(64 | ie, e);
+	let t = Dn(64 | re, e);
 	return (e = {}) => new Promise((n) => {
 		e.outro ? qn(t, () => {
 			Wn(t), n(void 0);
@@ -1144,7 +1144,7 @@ function Fn(e) {
 	return Dn(4, e);
 }
 function In(e) {
-	return Dn(oe | ie, e);
+	return Dn(oe | re, e);
 }
 function Ln(e, t = 0) {
 	return Dn(8 | t, e);
@@ -1163,7 +1163,7 @@ function zn(e, t = 0) {
 	return Dn(C | t, e);
 }
 function Bn(e) {
-	return Dn(32 | ie, e);
+	return Dn(32 | re, e);
 }
 function Vn(e) {
 	var t = e.teardown;
@@ -1198,10 +1198,10 @@ function Un(e) {
 }
 function Wn(e, t = !0) {
 	var n = !1;
-	(t || e.f & 262144) && e.nodes !== null && e.nodes.end !== null && (Gn(e.nodes.start, e.nodes.end), n = !0), e.f |= ne, Hn(e, t && !n), xr(e, 0);
+	(t || e.f & 262144) && e.nodes !== null && e.nodes.end !== null && (Gn(e.nodes.start, e.nodes.end), n = !0), e.f |= te, Hn(e, t && !n), xr(e, 0);
 	var r = e.nodes && e.nodes.t;
 	if (r !== null) for (let e of r) e.stop();
-	Vn(e), e.f ^= ne, e.f |= ee;
+	Vn(e), e.f ^= te, e.f |= O;
 	var i = e.parent;
 	i !== null && i.first !== null && Kn(e), e.next = e.prev = e.teardown = e.ctx = e.deps = e.fn = e.nodes = e.ac = e.b = null;
 }
@@ -1315,9 +1315,9 @@ function vr(e) {
 		e.ac.abort(_e);
 	}), e.ac = null);
 	try {
-		e.f |= k;
+		e.f |= ae;
 		var u = e.fn, d = u();
-		e.f |= te;
+		e.f |= ee;
 		var f = yr(e);
 		if (it() && lr !== null && !nr && f !== null && !(e.f & 6146)) for (var p = 0; p < lr.length; p++) _r(lr[p], e);
 		if (i !== null && i !== e) {
@@ -1329,7 +1329,7 @@ function vr(e) {
 	} catch (t) {
 		return yr(e), Cn(t);
 	} finally {
-		e.f ^= k, sr = t, cr = n, lr = r, W = i, ar = a, $e(o), nr = s, pr = c;
+		e.f ^= ae, sr = t, cr = n, lr = r, W = i, ar = a, $e(o), nr = s, pr = c;
 	}
 }
 function yr(e) {
@@ -1398,7 +1398,7 @@ function K(e) {
 			var o = i.v;
 			return (!(i.f & 1024) && i.reactions !== null || Tr(i)) && (o = Ot(i)), Xt.set(i, o), o;
 		}
-		var s = !(i.f & 512) && !nr && W !== null && ($n || !!(W.f & 512)), c = (i.f & te) === 0;
+		var s = !(i.f & 512) && !nr && W !== null && ($n || !!(W.f & 512)), c = (i.f & ee) === 0;
 		gr(i) && (s && (i.f |= 512), kt(i)), s && !c && (jt(i), wr(i));
 	}
 	if (Pt?.has(e)) return Pt.get(e);
@@ -1677,7 +1677,7 @@ function ni(e) {
 }
 //#endregion
 //#region node_modules/svelte/src/internal/client/dom/blocks/boundary.js
-var ri = re | ie;
+var ri = ne | re;
 function ii(e, t, n, r) {
 	new ai(e, t, n, r);
 }
@@ -2003,7 +2003,7 @@ function mi(e, t, ...n) {
 	Rn(() => {
 		let e = t() ?? null;
 		r.ensure(e, e && ((t) => e(t, ...n)));
-	}, re);
+	}, ne);
 }
 function hi(e) {
 	Qe === null && Me("onMount"), Ge && Qe.l !== null ? _i(Qe).m.push(e) : An(() => {
@@ -2027,7 +2027,7 @@ function _i(e) {
 function Y(e, t, n = !1) {
 	var r;
 	A && (r = j, Te());
-	var i = new pi(e), a = n ? re : 0;
+	var i = new pi(e), a = n ? ne : 0;
 	function o(e, t) {
 		if (A) {
 			var n = Oe(r);
@@ -2102,7 +2102,7 @@ function Si(e, t, n = !0) {
 	}
 	for (var i = 0; i < t.length; i++) {
 		var a = t[i];
-		r?.has(a) ? (a.f |= O, Zn(a, document.createDocumentFragment())) : Wn(t[i], n);
+		r?.has(a) ? (a.f |= k, Zn(a, document.createDocumentFragment())) : Wn(t[i], n);
 	}
 }
 var Ci;
@@ -2118,7 +2118,7 @@ function wi(e, t, n, i, a, s = null) {
 		return r(e) ? e : e == null ? [] : o(e);
 	}), p, m = /* @__PURE__ */ new Map(), h = !0;
 	function g(e) {
-		v.effect.f & 16384 || (v.pending.delete(e), v.fallback = d, Ei(v, p, c, t, i), d !== null && (p.length === 0 ? d.f & 33554432 ? (d.f ^= O, Oi(d, null, c)) : Yn(d) : qn(d, () => {
+		v.effect.f & 16384 || (v.pending.delete(e), v.fallback = d, Ei(v, p, c, t, i), d !== null && (p.length === 0 ? d.f & 33554432 ? (d.f ^= k, Oi(d, null, c)) : Yn(d) : qn(d, () => {
 			d = null;
 		})));
 	}
@@ -2134,9 +2134,9 @@ function wi(e, t, n, i, a, s = null) {
 			for (var o = /* @__PURE__ */ new Set(), u = I, v = bn(), y = 0; y < e; y += 1) {
 				A && j.nodeType === 8 && j.data === "]" && (c = j, r = !0, Ce(!1));
 				var b = p[y], x = i(b, y), S = h ? null : l.get(x);
-				S ? (S.v && nn(S.v, b), S.i && nn(S.i, y), v && u.unskip_effect(S.e)) : (S = Di(l, h ? c : Ci ??= mn(), b, x, y, a, t, n), h || (S.e.f |= O), l.set(x, S)), o.add(x);
+				S ? (S.v && nn(S.v, b), S.i && nn(S.i, y), v && u.unskip_effect(S.e)) : (S = Di(l, h ? c : Ci ??= mn(), b, x, y, a, t, n), h || (S.e.f |= k), l.set(x, S)), o.add(x);
 			}
-			if (e === 0 && s && !d && (h ? d = Bn(() => s(c)) : (d = Bn(() => s(Ci ??= mn())), d.f |= O)), e > o.size && Pe("", "", ""), A && e > 0 && we(De()), !h) {
+			if (e === 0 && s && !d && (h ? d = Bn(() => s(c)) : (d = Bn(() => s(Ci ??= mn())), d.f |= k)), e > o.size && Pe("", "", ""), A && e > 0 && we(De()), !h) {
 				if (m.set(u, o), v) {
 					for (let [e, t] of l) o.has(e) || u.skip_effect(t.e);
 					u.oncommit(g), u.ondiscard(_);
@@ -2162,7 +2162,7 @@ function Ei(e, t, n, r, i) {
 	for (v = 0; v < s; v += 1) {
 		if (h = t[v], g = i(h, v), _ = c.get(g).e, e.outrogroups !== null) for (let t of e.outrogroups) t.pending.delete(_), t.done.delete(_);
 		if (_.f & 8192 && (Yn(_), a && (_.nodes?.a?.unfix(), (f ??= /* @__PURE__ */ new Set()).delete(_))), _.f & 33554432) {
-			if (_.f ^= O, _ === l) Oi(_, null, n);
+			if (_.f ^= k, _ === l) Oi(_, null, n);
 			else {
 				var y = d ? d.next : l;
 				_ === e.effect.last && (e.effect.last = _.prev), _.prev && (_.prev.next = _.next), _.next && (_.next.prev = _.prev), ki(e, d, _), ki(e, _, y), Oi(_, y, n), d = _, p = [], m = [], l = Ti(d.next);
@@ -2242,7 +2242,7 @@ function Ai(e, t, n) {
 			return;
 		}
 		i.ensure(e, e && ((t) => n(t, e)));
-	}, re);
+	}, ne);
 }
 //#endregion
 //#region node_modules/svelte/src/internal/client/dom/css.js
@@ -5211,7 +5211,7 @@ function _d(e, t, n) {
 function vd() {
 	var e = fd, t = pd, n = _d, r = hd, i = gd, a = [0, Infinity], o = [[-Infinity, -Infinity], [Infinity, Infinity]], s = 250, c = yl, l = La("start", "zoom", "end"), u, d, f, p = 500, m = 150, h = 0, g = 10;
 	function _(e) {
-		e.property("__zoom", md).on("wheel.zoom", w, { passive: !1 }).on("mousedown.zoom", T).on("dblclick.zoom", E).filter(i).on("touchstart.zoom", D).on("touchmove.zoom", ee).on("touchend.zoom touchcancel.zoom", te).style("-webkit-tap-highlight-color", "rgba(0,0,0,0)");
+		e.property("__zoom", md).on("wheel.zoom", w, { passive: !1 }).on("mousedown.zoom", T).on("dblclick.zoom", E).filter(i).on("touchstart.zoom", D).on("touchmove.zoom", O).on("touchend.zoom touchcancel.zoom", ee).style("-webkit-tap-highlight-color", "rgba(0,0,0,0)");
 	}
 	_.transform = function(e, t, n, r) {
 		var i = e.selection ? e.selection() : e;
@@ -5339,7 +5339,7 @@ function vd() {
 			}, p)), Jl(this), a.start());
 		}
 	}
-	function ee(e, ...t) {
+	function O(e, ...t) {
 		if (this.__zooming) {
 			var r = S(this, t).event(e), i = e.changedTouches, a = i.length, s, c, l, u;
 			for (dd(e), s = 0; s < a; ++s) c = i[s], l = Us(c, this), r.touch0 && r.touch0[2] === c.identifier ? r.touch0[0] = l : r.touch1 && r.touch1[2] === c.identifier && (r.touch1[0] = l);
@@ -5351,7 +5351,7 @@ function vd() {
 			r.zoom("touch", n(y(c, l, u), r.extent, o));
 		}
 	}
-	function te(e, ...t) {
+	function ee(e, ...t) {
 		if (this.__zooming) {
 			var n = S(this, t).event(e), r = e.changedTouches, i = r.length, a, o;
 			for (ud(e), f && clearTimeout(f), f = setTimeout(function() {
@@ -6669,24 +6669,24 @@ function Op(e, t) {
 }
 var kp = () => !0;
 function Ap(e, { connectionMode: t, connectionRadius: n, handleId: r, nodeId: i, edgeUpdaterType: a, isTarget: o, domNode: s, nodeLookup: c, lib: l, autoPanOnConnect: u, flowId: d, panBy: f, cancelConnection: p, onConnectStart: m, onConnect: h, onConnectEnd: g, isValidConnection: _ = kp, onReconnectEnd: v, updateConnection: y, getTransform: b, getFromHandle: x, autoPanSpeed: S, dragThreshold: C = 1, handleDomNode: w }) {
-	let T = Cf(e.target), E = 0, D, { x: ee, y: te } = Df(e), ne = Dp(a, w), re = s?.getBoundingClientRect(), ie = !1;
-	if (!re || !ne) return;
-	let ae = Ep(i, ne, r, c, t);
-	if (!ae) return;
-	let O = Df(e, re), k = !1, oe = null, se = !1, ce = null;
+	let T = Cf(e.target), E = 0, D, { x: O, y: ee } = Df(e), te = Dp(a, w), ne = s?.getBoundingClientRect(), re = !1;
+	if (!ne || !te) return;
+	let ie = Ep(i, te, r, c, t);
+	if (!ie) return;
+	let k = Df(e, ne), ae = !1, oe = null, se = !1, ce = null;
 	function le() {
-		if (!u || !re) return;
-		let [e, t] = Kd(O, re, S);
+		if (!u || !ne) return;
+		let [e, t] = Kd(k, ne, S);
 		f({
 			x: e,
 			y: t
 		}), E = requestAnimationFrame(le);
 	}
 	let ue = {
-		...ae,
+		...ie,
 		nodeId: i,
-		type: ne,
-		position: ae.position
+		type: te,
+		position: ie.position
 	}, de = c.get(i), fe = {
 		inProgress: !0,
 		isValid: null,
@@ -6694,23 +6694,23 @@ function Ap(e, { connectionMode: t, connectionRadius: n, handleId: r, nodeId: i,
 		fromHandle: ue,
 		fromPosition: ue.position,
 		fromNode: de,
-		to: O,
+		to: k,
 		toHandle: null,
 		toPosition: kd[ue.position],
 		toNode: null,
-		pointer: O
+		pointer: k
 	};
 	function pe() {
-		ie = !0, y(fe), m?.(e, {
+		re = !0, y(fe), m?.(e, {
 			nodeId: i,
 			handleId: r,
-			handleType: ne
+			handleType: te
 		});
 	}
 	C === 0 && pe();
 	function me(e) {
-		if (!ie) {
-			let { x: t, y: n } = Df(e), r = t - ee, i = n - te;
+		if (!re) {
+			let { x: t, y: n } = Df(e), r = t - O, i = n - ee;
 			if (!(r * r + i * i > C * C)) return;
 			pe();
 		}
@@ -6719,7 +6719,7 @@ function Ap(e, { connectionMode: t, connectionRadius: n, handleId: r, nodeId: i,
 			return;
 		}
 		let a = b();
-		O = Df(e, re), D = Tp(of(O, a, !1, [1, 1]), n, c, ue), k ||= (le(), !0);
+		k = Df(e, ne), D = Tp(of(k, a, !1, [1, 1]), n, c, ue), ae ||= (le(), !0);
 		let s = jp(e, {
 			handle: D,
 			connectionMode: t,
@@ -6740,17 +6740,17 @@ function Ap(e, { connectionMode: t, connectionRadius: n, handleId: r, nodeId: i,
 			to: s.toHandle && se ? sf({
 				x: s.toHandle.x,
 				y: s.toHandle.y
-			}, a) : O,
+			}, a) : k,
 			toHandle: s.toHandle,
 			toPosition: se && s.toHandle ? s.toHandle.position : kd[ue.position],
 			toNode: s.toHandle ? c.get(s.toHandle.nodeId) : null,
-			pointer: O
+			pointer: k
 		};
 		y(p), fe = p;
 	}
 	function he(e) {
 		if (!("touches" in e && e.touches.length > 0)) {
-			if (ie) {
+			if (re) {
 				(D || ce) && oe && se && h?.(oe);
 				let { inProgress: t, ...n } = fe, r = {
 					...n,
@@ -6758,7 +6758,7 @@ function Ap(e, { connectionMode: t, connectionRadius: n, handleId: r, nodeId: i,
 				};
 				g?.(e, r), a && v?.(e, r);
 			}
-			p(), cancelAnimationFrame(E), k = !1, se = !1, oe = null, ce = null, T.removeEventListener("mousemove", me), T.removeEventListener("mouseup", he), T.removeEventListener("touchmove", me), T.removeEventListener("touchend", he);
+			p(), cancelAnimationFrame(E), ae = !1, se = !1, oe = null, ce = null, T.removeEventListener("mousemove", me), T.removeEventListener("mouseup", he), T.removeEventListener("touchmove", me), T.removeEventListener("touchend", he);
 		}
 	}
 	T.addEventListener("mousemove", me), T.addEventListener("mouseup", he), T.addEventListener("touchmove", me), T.addEventListener("touchend", he);
@@ -6922,11 +6922,11 @@ function qp({ domNode: e, minZoom: t, maxZoom: n, translateExtent: r, viewport: 
 			f?.interpolate(t?.interpolate === "linear" ? al : yl).transform(zp(p, t?.duration, t?.ease, () => n(!0)), e);
 		}) : !1;
 	}
-	function _({ noWheelClassName: e, noPanClassName: t, onPaneContextMenu: n, userSelectionActive: r, panOnScroll: i, panOnDrag: u, panOnScrollMode: d, panOnScrollSpeed: g, preventScrolling: _, zoomOnPinch: y, zoomOnScroll: b, zoomOnDoubleClick: x, panActivationKeyPressed: S = !1, zoomActivationKeyPressed: C, lib: w, onTransformChange: T, connectionInProgress: E, paneClickDistance: D, selectionOnDrag: ee }) {
+	function _({ noWheelClassName: e, noPanClassName: t, onPaneContextMenu: n, userSelectionActive: r, panOnScroll: i, panOnDrag: u, panOnScrollMode: d, panOnScrollSpeed: g, preventScrolling: _, zoomOnPinch: y, zoomOnScroll: b, zoomOnDoubleClick: x, panActivationKeyPressed: S = !1, zoomActivationKeyPressed: C, lib: w, onTransformChange: T, connectionInProgress: E, paneClickDistance: D, selectionOnDrag: O }) {
 		r && !l.isZoomingOrPanning && v();
-		let te = i && !C && !r;
-		f.clickDistance(ee ? Infinity : !nf(D) || D < 0 ? 0 : D);
-		let ne = te ? Vp({
+		let ee = i && !C && !r;
+		f.clickDistance(O ? Infinity : !nf(D) || D < 0 ? 0 : D);
+		let te = ee ? Vp({
 			zoomPanValues: l,
 			noWheelClassName: e,
 			d3Selection: p,
@@ -6942,22 +6942,22 @@ function qp({ domNode: e, minZoom: t, maxZoom: n, translateExtent: r, viewport: 
 			preventScrolling: _,
 			d3ZoomHandler: m
 		});
-		p.on("wheel.zoom", ne, { passive: !1 });
-		let re = Up({
+		p.on("wheel.zoom", te, { passive: !1 });
+		let ne = Up({
 			zoomPanValues: l,
 			onDraggingChange: c,
 			onPanZoomStart: o
 		});
-		f.on("start", re);
-		let ie = Wp({
+		f.on("start", ne);
+		let re = Wp({
 			zoomPanValues: l,
 			panOnDrag: u,
 			onPaneContextMenu: !!n,
 			onPanZoom: a,
 			onTransformChange: T
 		});
-		f.on("zoom", ie);
-		let ae = Gp({
+		f.on("zoom", re);
+		let ie = Gp({
 			zoomPanValues: l,
 			panOnDrag: u,
 			panOnScroll: i,
@@ -6965,8 +6965,8 @@ function qp({ domNode: e, minZoom: t, maxZoom: n, translateExtent: r, viewport: 
 			onPanZoomEnd: s,
 			onDraggingChange: c
 		});
-		f.on("end", ae);
-		let O = Kp({
+		f.on("end", ie);
+		let k = Kp({
 			panActivationKeyPressed: S,
 			zoomActivationKeyPressed: C,
 			panOnDrag: u,
@@ -6980,7 +6980,7 @@ function qp({ domNode: e, minZoom: t, maxZoom: n, translateExtent: r, viewport: 
 			lib: w,
 			connectionInProgress: E
 		});
-		f.filter(O), x ? p.on("dblclick.zoom", h) : p.on("dblclick.zoom", null);
+		f.filter(k), x ? p.on("dblclick.zoom", h) : p.on("dblclick.zoom", null);
 	}
 	function v() {
 		f.on("zoom", null);
@@ -7115,12 +7115,12 @@ function om(e, t) {
 			b.connectionMode === Cd.Strict ? e?.type !== r() : h !== e?.nodeId || n() !== e?.id,
 			o && i
 		];
-	}), T = /* @__PURE__ */ F(() => x(K(w), 5)), E = /* @__PURE__ */ F(() => K(T)[0]), D = /* @__PURE__ */ F(() => K(T)[1]), ee = /* @__PURE__ */ F(() => K(T)[2]), te = /* @__PURE__ */ F(() => K(T)[3]), ne = /* @__PURE__ */ F(() => K(T)[4]);
-	function re(e) {
+	}), T = /* @__PURE__ */ F(() => x(K(w), 5)), E = /* @__PURE__ */ F(() => K(T)[0]), D = /* @__PURE__ */ F(() => K(T)[1]), O = /* @__PURE__ */ F(() => K(T)[2]), ee = /* @__PURE__ */ F(() => K(T)[3]), te = /* @__PURE__ */ F(() => K(T)[4]);
+	function ne(e) {
 		let t = b.onbeforeconnect ? b.onbeforeconnect(e) : e;
 		t && (b.addEdge(t), b.onconnect?.(e));
 	}
-	function ie(e) {
+	function re(e) {
 		let t = Ef(e);
 		e.currentTarget && (t && e.button === 0 || !t) && Mp.onPointerDown(e, {
 			handleId: n(),
@@ -7138,7 +7138,7 @@ function om(e, t) {
 			updateConnection: b.updateConnection,
 			cancelConnection: b.cancelConnection,
 			panBy: b.panBy,
-			onConnect: re,
+			onConnect: ne,
 			onConnectStart: b.onconnectstart,
 			onConnectEnd: (...e) => b.onconnectend?.(...e),
 			getTransform: () => [
@@ -7151,7 +7151,7 @@ function om(e, t) {
 			handleDomNode: e.currentTarget
 		});
 	}
-	function ae(e) {
+	function ie(e) {
 		if (!h || !b.clickConnectStartHandle && !c()) return;
 		if (!b.clickConnectStartHandle) {
 			b.onclickconnectstart?.(e, {
@@ -7181,11 +7181,11 @@ function om(e, t) {
 			lib: "svelte",
 			nodeLookup: l
 		});
-		f && d && re(d);
+		f && d && ne(d);
 		let p = structuredClone(Je(b.connection));
 		delete p.inProgress, p.toPosition = p.toHandle ? p.toHandle.position : null, b.onclickconnectend?.(e, p), b.clickConnectStartHandle = null;
 	}
-	var O = {
+	var k = {
 		get id() {
 			return n();
 		},
@@ -7258,8 +7258,8 @@ function om(e, t) {
 		set children(e) {
 			p(e), L();
 		}
-	}, k = am(), oe = () => {};
-	return fa(k, () => ({
+	}, ae = am(), oe = () => {};
+	return fa(ae, () => ({
 		"data-handleid": n(),
 		"data-nodeid": h,
 		"data-handlepos": i(),
@@ -7272,9 +7272,9 @@ function om(e, t) {
 			i(),
 			o()
 		],
-		onmousedown: ie,
-		ontouchstart: ie,
-		onclick: b.clickConnect ? ae : void 0,
+		onmousedown: re,
+		ontouchstart: re,
+		onclick: b.clickConnect ? ie : void 0,
 		onkeypress: oe,
 		style: a(),
 		role: "button",
@@ -7282,17 +7282,17 @@ function om(e, t) {
 		tabindex: "-1",
 		...m,
 		[$i]: {
-			valid: K(ne),
-			connectingto: K(ee),
+			valid: K(te),
+			connectingto: K(O),
 			connectingfrom: K(D),
 			source: !K(v),
 			target: K(v),
 			connectablestart: c(),
 			connectableend: l(),
 			connectable: K(y),
-			connectionindicator: K(y) && (!K(E) || K(te)) && (K(E) || b.clickConnectStartHandle ? l() : c())
+			connectionindicator: K(y) && (!K(E) || K(ee)) && (K(E) || b.clickConnectStartHandle ? l() : c())
 		}
-	})), mi(V(k), () => p() ?? g), M(k), J(e, k), P(O);
+	})), mi(V(ae), () => p() ?? g), M(ae), J(e, ae), P(k);
 }
 Q(om, {
 	id: {},
@@ -9535,7 +9535,7 @@ function th(e, t) {
 	gi(() => {
 		typeof window < "u" && D();
 	});
-	function ee(e) {
+	function O(e) {
 		if (!K(v) || !p || !n().selectionRect) return;
 		let t = Df(e, p);
 		S = {
@@ -9557,33 +9557,33 @@ function th(e, t) {
 		}
 		b = !0, C ||= (E(), !0), T(t.x, t.y);
 	}
-	function te(e) {
+	function ee(e) {
 		if (!K(y)) {
 			e.target === f && n().connection.inProgress && (m = !0);
 			return;
 		}
-		e.button === 0 && (e.target?.releasePointerCapture?.(e.pointerId), !b && e.target === f && ae?.(e), n(n().selectionRect = null, !0), b && n(n().selectionRectMode = h.size > 0 ? "nodes" : null, !0), b && u()?.(e), D());
+		e.button === 0 && (e.target?.releasePointerCapture?.(e.pointerId), !b && e.target === f && ie?.(e), n(n().selectionRect = null, !0), b && n(n().selectionRectMode = h.size > 0 ? "nodes" : null, !0), b && u()?.(e), D());
 	}
-	function ne(e) {
+	function te(e) {
 		e.target?.releasePointerCapture?.(e.pointerId), D();
 	}
-	let re = (e) => {
+	let ne = (e) => {
 		if (Array.isArray(K(_)) && K(_).includes(2)) {
 			e.preventDefault();
 			return;
 		}
 		c()?.({ event: e });
-	}, ie = (e) => {
+	}, re = (e) => {
 		b &&= (e.stopPropagation(), !1);
 	};
-	function ae(e) {
+	function ie(e) {
 		if (b || n().connection.inProgress || m) {
 			b = !1, m = !1;
 			return;
 		}
 		s()?.({ event: e }), n().unselectNodesAndEdges(), n(n().selectionRectMode = null, !0), n(n().selectionRect = null, !0);
 	}
-	var O = {
+	var k = {
 		get store() {
 			return n();
 		},
@@ -9644,26 +9644,26 @@ function th(e, t) {
 		set children(e) {
 			d(e), L();
 		}
-	}, k = eh();
+	}, ae = eh();
 	let oe;
-	var se = /* @__PURE__ */ F(() => K(y) ? void 0 : Zm(ae, f)), ce = /* @__PURE__ */ F(() => Zm(re, f));
-	return mi(V(k), d), M(k), Sa(k, (e) => f = e, () => f), U((e) => oe = Hi(k, 1, "svelte-flow__pane svelte-flow__container", null, oe, {
+	var se = /* @__PURE__ */ F(() => K(y) ? void 0 : Zm(ie, f)), ce = /* @__PURE__ */ F(() => Zm(ne, f));
+	return mi(V(ae), d), M(ae), Sa(ae, (e) => f = e, () => f), U((e) => oe = Hi(ae, 1, "svelte-flow__pane svelte-flow__container", null, oe, {
 		draggable: e,
 		dragging: n().dragging,
 		selection: K(v)
-	}), [() => r() === !0 || Array.isArray(r()) && r().includes(0)]), Fr("click", k, function(...e) {
+	}), [() => r() === !0 || Array.isArray(r()) && r().includes(0)]), Fr("click", ae, function(...e) {
 		K(se)?.apply(this, e);
-	}), Pr("pointerdown", k, function(...e) {
+	}), Pr("pointerdown", ae, function(...e) {
 		(K(y) ? w : void 0)?.apply(this, e);
-	}, !0), Fr("pointermove", k, function(...e) {
-		(K(y) ? ee : void 0)?.apply(this, e);
-	}), Fr("pointerup", k, te), Pr("pointercancel", k, function(...e) {
-		(K(y) ? ne : void 0)?.apply(this, e);
-	}), Fr("contextmenu", k, function(...e) {
+	}, !0), Fr("pointermove", ae, function(...e) {
+		(K(y) ? O : void 0)?.apply(this, e);
+	}), Fr("pointerup", ae, ee), Pr("pointercancel", ae, function(...e) {
+		(K(y) ? te : void 0)?.apply(this, e);
+	}), Fr("contextmenu", ae, function(...e) {
 		K(ce)?.apply(this, e);
-	}), Pr("click", k, function(...e) {
-		(K(y) ? ie : void 0)?.apply(this, e);
-	}, !0), J(e, k), P(O);
+	}), Pr("click", ae, function(...e) {
+		(K(y) ? re : void 0)?.apply(this, e);
+	}, !0), J(e, ae), P(k);
 }
 Ir([
 	"click",
@@ -9804,32 +9804,32 @@ Q(ch, { store: {} }, [], [], { mode: "open" });
 var lh = "svelte-flow__node-desc", uh = "svelte-flow__edge-desc", dh = "svelte-flow__aria-live", fh = /* @__PURE__ */ q("<div><!></div>");
 function ph(e, t) {
 	N(t, !0);
-	let n = Z(t, "store", 15), r = Z(t, "node", 7), i = Z(t, "resizeObserver", 7), a = Z(t, "nodeClickDistance", 7), o = Z(t, "onnodeclick", 7), s = Z(t, "onnodedrag", 7), c = Z(t, "onnodedragstart", 7), l = Z(t, "onnodedragstop", 7), u = Z(t, "onnodepointerenter", 7), d = Z(t, "onnodepointerleave", 7), f = Z(t, "onnodepointermove", 7), p = Z(t, "onnodecontextmenu", 7), m = /* @__PURE__ */ F(() => b(r().data, () => ({}), !0)), h = /* @__PURE__ */ F(() => b(r().selected, !1)), g = /* @__PURE__ */ F(() => r().draggable), _ = /* @__PURE__ */ F(() => r().selectable), v = /* @__PURE__ */ F(() => b(r().deletable, !0)), y = /* @__PURE__ */ F(() => r().connectable), x = /* @__PURE__ */ F(() => r().focusable), S = /* @__PURE__ */ F(() => b(r().hidden, !1)), C = /* @__PURE__ */ F(() => b(r().dragging, !1)), w = /* @__PURE__ */ F(() => b(r().style, "")), T = /* @__PURE__ */ F(() => r().class), E = /* @__PURE__ */ F(() => b(r().type, "default")), D = /* @__PURE__ */ F(() => r().parentId), ee = /* @__PURE__ */ F(() => r().sourcePosition), te = /* @__PURE__ */ F(() => r().targetPosition), ne = /* @__PURE__ */ F(() => b(r().measured, () => ({
+	let n = Z(t, "store", 15), r = Z(t, "node", 7), i = Z(t, "resizeObserver", 7), a = Z(t, "nodeClickDistance", 7), o = Z(t, "onnodeclick", 7), s = Z(t, "onnodedrag", 7), c = Z(t, "onnodedragstart", 7), l = Z(t, "onnodedragstop", 7), u = Z(t, "onnodepointerenter", 7), d = Z(t, "onnodepointerleave", 7), f = Z(t, "onnodepointermove", 7), p = Z(t, "onnodecontextmenu", 7), m = /* @__PURE__ */ F(() => b(r().data, () => ({}), !0)), h = /* @__PURE__ */ F(() => b(r().selected, !1)), g = /* @__PURE__ */ F(() => r().draggable), _ = /* @__PURE__ */ F(() => r().selectable), v = /* @__PURE__ */ F(() => b(r().deletable, !0)), y = /* @__PURE__ */ F(() => r().connectable), x = /* @__PURE__ */ F(() => r().focusable), S = /* @__PURE__ */ F(() => b(r().hidden, !1)), C = /* @__PURE__ */ F(() => b(r().dragging, !1)), w = /* @__PURE__ */ F(() => b(r().style, "")), T = /* @__PURE__ */ F(() => r().class), E = /* @__PURE__ */ F(() => b(r().type, "default")), D = /* @__PURE__ */ F(() => r().parentId), O = /* @__PURE__ */ F(() => r().sourcePosition), ee = /* @__PURE__ */ F(() => r().targetPosition), te = /* @__PURE__ */ F(() => b(r().measured, () => ({
 		width: 0,
 		height: 0
-	}), !0).width), re = /* @__PURE__ */ F(() => b(r().measured, () => ({
+	}), !0).width), ne = /* @__PURE__ */ F(() => b(r().measured, () => ({
 		width: 0,
 		height: 0
-	}), !0).height), ie = /* @__PURE__ */ F(() => r().initialWidth), ae = /* @__PURE__ */ F(() => r().initialHeight), O = /* @__PURE__ */ F(() => r().width), k = /* @__PURE__ */ F(() => r().height), oe = /* @__PURE__ */ F(() => r().dragHandle), se = /* @__PURE__ */ F(() => b(r().internals.z, 0)), ce = /* @__PURE__ */ F(() => r().internals.positionAbsolute.x), le = /* @__PURE__ */ F(() => r().internals.positionAbsolute.y), ue = /* @__PURE__ */ F(() => r().internals.userNode), { id: de } = r(), fe = /* @__PURE__ */ F(() => K(g) ?? n().nodesDraggable), pe = /* @__PURE__ */ F(() => K(_) ?? n().elementsSelectable), me = /* @__PURE__ */ F(() => K(y) ?? n().nodesConnectable), he = /* @__PURE__ */ F(() => hf(r())), ge = /* @__PURE__ */ F(() => !!r().internals.handleBounds), _e = /* @__PURE__ */ F(() => K(he) && K(ge)), ve = /* @__PURE__ */ F(() => K(x) ?? n().nodesFocusable);
+	}), !0).height), re = /* @__PURE__ */ F(() => r().initialWidth), ie = /* @__PURE__ */ F(() => r().initialHeight), k = /* @__PURE__ */ F(() => r().width), ae = /* @__PURE__ */ F(() => r().height), oe = /* @__PURE__ */ F(() => r().dragHandle), se = /* @__PURE__ */ F(() => b(r().internals.z, 0)), ce = /* @__PURE__ */ F(() => r().internals.positionAbsolute.x), le = /* @__PURE__ */ F(() => r().internals.positionAbsolute.y), ue = /* @__PURE__ */ F(() => r().internals.userNode), { id: de } = r(), fe = /* @__PURE__ */ F(() => K(g) ?? n().nodesDraggable), pe = /* @__PURE__ */ F(() => K(_) ?? n().elementsSelectable), me = /* @__PURE__ */ F(() => K(y) ?? n().nodesConnectable), he = /* @__PURE__ */ F(() => hf(r())), ge = /* @__PURE__ */ F(() => !!r().internals.handleBounds), _e = /* @__PURE__ */ F(() => K(he) && K(ge)), ve = /* @__PURE__ */ F(() => K(x) ?? n().nodesFocusable);
 	function ye(e) {
 		return n().parentLookup.has(e);
 	}
-	let be = /* @__PURE__ */ F(() => ye(de)), xe = /* @__PURE__ */ R(null), Se = null, A = K(E), Ce = K(ee), j = K(te), we = /* @__PURE__ */ F(() => n().nodeTypes[K(E)] ?? cm), Te = /* @__PURE__ */ F(() => n().ariaLabelConfig);
+	let be = /* @__PURE__ */ F(() => ye(de)), xe = /* @__PURE__ */ R(null), Se = null, A = K(E), Ce = K(O), j = K(ee), we = /* @__PURE__ */ F(() => n().nodeTypes[K(E)] ?? cm), Te = /* @__PURE__ */ F(() => n().ariaLabelConfig);
 	$p(de), tm({ get value() {
 		return K(me);
 	} });
 	let Ee = /* @__PURE__ */ F(() => {
-		let e = K(ne) === void 0 ? K(O) ?? K(ie) : K(O), t = K(re) === void 0 ? K(k) ?? K(ae) : K(k);
+		let e = K(te) === void 0 ? K(k) ?? K(re) : K(k), t = K(ne) === void 0 ? K(ae) ?? K(ie) : K(ae);
 		if (e !== void 0 || t !== void 0 || K(w) !== void 0) return `${K(w)};${e ? `width:${ym(e)};` : ""}${t ? `height:${ym(t)};` : ""}`;
 	});
 	An(() => {
-		(K(E) !== A || K(ee) !== Ce || K(te) !== j) && K(xe) !== null && requestAnimationFrame(() => {
+		(K(E) !== A || K(O) !== Ce || K(ee) !== j) && K(xe) !== null && requestAnimationFrame(() => {
 			K(xe) !== null && n().updateNodeInternals(/* @__PURE__ */ new Map([[de, {
 				id: de,
 				nodeElement: K(xe),
 				force: !0
 			}]]));
-		}), A = K(E), Ce = K(ee), j = K(te);
+		}), A = K(E), Ce = K(O), j = K(ee);
 	}), An(() => {
 		i() && (!K(_e) || K(xe) !== Se) && (Se && i().unobserve(Se), K(xe) && i().observe(K(xe)), Se = K(xe));
 	}), gi(() => {
@@ -10007,10 +10007,10 @@ function ph(e, t) {
 					return K(v);
 				},
 				get sourcePosition() {
-					return K(ee);
+					return K(O);
 				},
 				get targetPosition() {
-					return K(te);
+					return K(ee);
 				},
 				get zIndex() {
 					return K(se);
@@ -10040,10 +10040,10 @@ function ph(e, t) {
 					return K(le);
 				},
 				get width() {
-					return K(O);
+					return K(k);
 				},
 				get height() {
-					return K(k);
+					return K(ae);
 				}
 			});
 		}), M(t), Mi(t, (e, t) => ih?.(e, t), () => ({
@@ -10238,9 +10238,9 @@ Q(hh, {
 var gh = /* @__PURE__ */ Gr("<svg class=\"svelte-flow__edge-wrapper\"><g><!></g></svg>");
 function _h(e, t) {
 	N(t, !0);
-	let n = Z(t, "edge", 7), r = Z(t, "store", 15), i = Z(t, "onedgeclick", 7), a = Z(t, "onedgecontextmenu", 7), o = Z(t, "onedgepointerenter", 7), s = Z(t, "onedgepointerleave", 7), c = /* @__PURE__ */ F(() => n().id), l = /* @__PURE__ */ F(() => n().source), u = /* @__PURE__ */ F(() => n().target), d = /* @__PURE__ */ F(() => n().sourceX), f = /* @__PURE__ */ F(() => n().sourceY), p = /* @__PURE__ */ F(() => n().targetX), m = /* @__PURE__ */ F(() => n().targetY), h = /* @__PURE__ */ F(() => n().sourcePosition), g = /* @__PURE__ */ F(() => n().targetPosition), _ = /* @__PURE__ */ F(() => b(n().animated, !1)), v = /* @__PURE__ */ F(() => b(n().selected, !1)), y = /* @__PURE__ */ F(() => n().label), x = /* @__PURE__ */ F(() => n().labelStyle), S = /* @__PURE__ */ F(() => b(n().data, () => ({}), !0)), C = /* @__PURE__ */ F(() => n().style), w = /* @__PURE__ */ F(() => n().interactionWidth), T = /* @__PURE__ */ F(() => b(n().type, "default")), E = /* @__PURE__ */ F(() => n().sourceHandle), D = /* @__PURE__ */ F(() => n().targetHandle), ee = /* @__PURE__ */ F(() => n().markerStart), te = /* @__PURE__ */ F(() => n().markerEnd), ne = /* @__PURE__ */ F(() => n().selectable), re = /* @__PURE__ */ F(() => n().focusable), ie = /* @__PURE__ */ F(() => b(n().deletable, !0)), ae = /* @__PURE__ */ F(() => n().hidden), O = /* @__PURE__ */ F(() => n().zIndex), k = /* @__PURE__ */ F(() => n().class), oe = /* @__PURE__ */ F(() => n().ariaLabel);
+	let n = Z(t, "edge", 7), r = Z(t, "store", 15), i = Z(t, "onedgeclick", 7), a = Z(t, "onedgecontextmenu", 7), o = Z(t, "onedgepointerenter", 7), s = Z(t, "onedgepointerleave", 7), c = /* @__PURE__ */ F(() => n().id), l = /* @__PURE__ */ F(() => n().source), u = /* @__PURE__ */ F(() => n().target), d = /* @__PURE__ */ F(() => n().sourceX), f = /* @__PURE__ */ F(() => n().sourceY), p = /* @__PURE__ */ F(() => n().targetX), m = /* @__PURE__ */ F(() => n().targetY), h = /* @__PURE__ */ F(() => n().sourcePosition), g = /* @__PURE__ */ F(() => n().targetPosition), _ = /* @__PURE__ */ F(() => b(n().animated, !1)), v = /* @__PURE__ */ F(() => b(n().selected, !1)), y = /* @__PURE__ */ F(() => n().label), x = /* @__PURE__ */ F(() => n().labelStyle), S = /* @__PURE__ */ F(() => b(n().data, () => ({}), !0)), C = /* @__PURE__ */ F(() => n().style), w = /* @__PURE__ */ F(() => n().interactionWidth), T = /* @__PURE__ */ F(() => b(n().type, "default")), E = /* @__PURE__ */ F(() => n().sourceHandle), D = /* @__PURE__ */ F(() => n().targetHandle), O = /* @__PURE__ */ F(() => n().markerStart), ee = /* @__PURE__ */ F(() => n().markerEnd), te = /* @__PURE__ */ F(() => n().selectable), ne = /* @__PURE__ */ F(() => n().focusable), re = /* @__PURE__ */ F(() => b(n().deletable, !0)), ie = /* @__PURE__ */ F(() => n().hidden), k = /* @__PURE__ */ F(() => n().zIndex), ae = /* @__PURE__ */ F(() => n().class), oe = /* @__PURE__ */ F(() => n().ariaLabel);
 	rm(K(c));
-	let se = null, ce = /* @__PURE__ */ F(() => K(ne) ?? r().elementsSelectable), le = /* @__PURE__ */ F(() => K(re) ?? r().edgesFocusable), ue = /* @__PURE__ */ F(() => r().edgeTypes[K(T)] ?? km), de = /* @__PURE__ */ F(() => K(ee) ? `url('#${Zf(K(ee), r().flowId)}')` : void 0), fe = /* @__PURE__ */ F(() => K(te) ? `url('#${Zf(K(te), r().flowId)}')` : void 0);
+	let se = null, ce = /* @__PURE__ */ F(() => K(te) ?? r().elementsSelectable), le = /* @__PURE__ */ F(() => K(ne) ?? r().edgesFocusable), ue = /* @__PURE__ */ F(() => r().edgeTypes[K(T)] ?? km), de = /* @__PURE__ */ F(() => K(O) ? `url('#${Zf(K(O), r().flowId)}')` : void 0), fe = /* @__PURE__ */ F(() => K(ee) ? `url('#${Zf(K(ee), r().flowId)}')` : void 0);
 	function pe(e) {
 		let t = r().edgeLookup.get(K(c));
 		t && (K(ce) && r().handleEdgeSelection(K(c)), i()?.({
@@ -10303,7 +10303,7 @@ function _h(e, t) {
 		let i;
 		var b = V(t);
 		fa(b, () => ({
-			class: ["svelte-flow__edge", K(k)],
+			class: ["svelte-flow__edge", K(ae)],
 			"data-id": K(c),
 			onclick: pe,
 			oncontextmenu: a() ? (e) => {
@@ -10381,7 +10381,7 @@ function _h(e, t) {
 					return K(ce);
 				},
 				get deletable() {
-					return K(ie);
+					return K(re);
 				},
 				get type() {
 					return K(T);
@@ -10399,10 +10399,10 @@ function _h(e, t) {
 					return K(fe);
 				}
 			});
-		}), M(b), Sa(b, (e) => se = e, () => se), M(t), U(() => i = Wi(t, "", i, { "z-index": K(O) })), J(e, t);
+		}), M(b), Sa(b, (e) => se = e, () => se), M(t), U(() => i = Wi(t, "", i, { "z-index": K(k) })), J(e, t);
 	};
 	return Y(ve, (e) => {
-		K(ae) || e(ye);
+		K(ie) || e(ye);
 	}), J(e, _e), P(ge);
 }
 //#endregion
@@ -11410,7 +11410,7 @@ Q(qh, {
 var Jh = /* @__PURE__ */ new Set(/* @__PURE__ */ "$$slots.$$events.$$legacy.$$host.width.height.proOptions.selectionKey.deleteKey.panActivationKey.multiSelectionKey.zoomActivationKey.paneClickDistance.nodeClickDistance.onmovestart.onmoveend.onmove.oninit.onnodeclick.onnodecontextmenu.onnodedrag.onnodedragstart.onnodedragstop.onnodepointerenter.onnodepointermove.onnodepointerleave.onselectionclick.onselectioncontextmenu.onselectionstart.onselectionend.onedgeclick.onedgecontextmenu.onedgepointerenter.onedgepointerleave.onpaneclick.onpanecontextmenu.panOnScrollMode.preventScrolling.zoomOnScroll.zoomOnDoubleClick.zoomOnPinch.panOnScroll.panOnScrollSpeed.panOnDrag.selectionOnDrag.autoPanOnSelection.connectionLineComponent.connectionLineStyle.connectionLineContainerStyle.connectionLineType.attributionPosition.children.nodes.edges.viewport".split(".")), Yh = /* @__PURE__ */ q("<div class=\"svelte-flow__viewport-back svelte-flow__container\"></div> <!> <div class=\"svelte-flow__edge-labels svelte-flow__container\"></div> <!> <!> <!> <div class=\"svelte-flow__viewport-front svelte-flow__container\"></div>", 1), Xh = /* @__PURE__ */ q("<!> <!>", 1), Zh = /* @__PURE__ */ q("<!> <!> <!> <!> <!>", 1);
 function Qh(e, t) {
 	N(t, !0);
-	let n = Z(t, "width", 7), r = Z(t, "height", 7), i = Z(t, "proOptions", 7), a = Z(t, "selectionKey", 7), o = Z(t, "deleteKey", 7), s = Z(t, "panActivationKey", 7), c = Z(t, "multiSelectionKey", 7), l = Z(t, "zoomActivationKey", 7), u = Z(t, "paneClickDistance", 7, 1), d = Z(t, "nodeClickDistance", 7, 1), f = Z(t, "onmovestart", 7), p = Z(t, "onmoveend", 7), m = Z(t, "onmove", 7), h = Z(t, "oninit", 7), _ = Z(t, "onnodeclick", 7), v = Z(t, "onnodecontextmenu", 7), y = Z(t, "onnodedrag", 7), b = Z(t, "onnodedragstart", 7), x = Z(t, "onnodedragstop", 7), S = Z(t, "onnodepointerenter", 7), C = Z(t, "onnodepointermove", 7), w = Z(t, "onnodepointerleave", 7), T = Z(t, "onselectionclick", 7), E = Z(t, "onselectioncontextmenu", 7), D = Z(t, "onselectionstart", 7), ee = Z(t, "onselectionend", 7), te = Z(t, "onedgeclick", 7), ne = Z(t, "onedgecontextmenu", 7), re = Z(t, "onedgepointerenter", 7), ie = Z(t, "onedgepointerleave", 7), ae = Z(t, "onpaneclick", 7), O = Z(t, "onpanecontextmenu", 7), k = Z(t, "panOnScrollMode", 23, () => wd.Free), oe = Z(t, "preventScrolling", 7, !0), se = Z(t, "zoomOnScroll", 7, !0), ce = Z(t, "zoomOnDoubleClick", 7, !0), le = Z(t, "zoomOnPinch", 7, !0), ue = Z(t, "panOnScroll", 7, !1), de = Z(t, "panOnScrollSpeed", 7, .5), fe = Z(t, "panOnDrag", 7, !0), pe = Z(t, "selectionOnDrag", 7, !1), me = Z(t, "autoPanOnSelection", 7, !0), he = Z(t, "connectionLineComponent", 7), ge = Z(t, "connectionLineStyle", 7), _e = Z(t, "connectionLineContainerStyle", 7), ve = Z(t, "connectionLineType", 23, () => Dd.Bezier), ye = Z(t, "attributionPosition", 7), be = Z(t, "children", 7), xe = Z(t, "nodes", 31, () => B([])), Se = Z(t, "edges", 31, () => B([])), A = Z(t, "viewport", 15, void 0), Ce = /* @__PURE__ */ Oa(t, Jh), j = qm({
+	let n = Z(t, "width", 7), r = Z(t, "height", 7), i = Z(t, "proOptions", 7), a = Z(t, "selectionKey", 7), o = Z(t, "deleteKey", 7), s = Z(t, "panActivationKey", 7), c = Z(t, "multiSelectionKey", 7), l = Z(t, "zoomActivationKey", 7), u = Z(t, "paneClickDistance", 7, 1), d = Z(t, "nodeClickDistance", 7, 1), f = Z(t, "onmovestart", 7), p = Z(t, "onmoveend", 7), m = Z(t, "onmove", 7), h = Z(t, "oninit", 7), _ = Z(t, "onnodeclick", 7), v = Z(t, "onnodecontextmenu", 7), y = Z(t, "onnodedrag", 7), b = Z(t, "onnodedragstart", 7), x = Z(t, "onnodedragstop", 7), S = Z(t, "onnodepointerenter", 7), C = Z(t, "onnodepointermove", 7), w = Z(t, "onnodepointerleave", 7), T = Z(t, "onselectionclick", 7), E = Z(t, "onselectioncontextmenu", 7), D = Z(t, "onselectionstart", 7), O = Z(t, "onselectionend", 7), ee = Z(t, "onedgeclick", 7), te = Z(t, "onedgecontextmenu", 7), ne = Z(t, "onedgepointerenter", 7), re = Z(t, "onedgepointerleave", 7), ie = Z(t, "onpaneclick", 7), k = Z(t, "onpanecontextmenu", 7), ae = Z(t, "panOnScrollMode", 23, () => wd.Free), oe = Z(t, "preventScrolling", 7, !0), se = Z(t, "zoomOnScroll", 7, !0), ce = Z(t, "zoomOnDoubleClick", 7, !0), le = Z(t, "zoomOnPinch", 7, !0), ue = Z(t, "panOnScroll", 7, !1), de = Z(t, "panOnScrollSpeed", 7, .5), fe = Z(t, "panOnDrag", 7, !0), pe = Z(t, "selectionOnDrag", 7, !1), me = Z(t, "autoPanOnSelection", 7, !0), he = Z(t, "connectionLineComponent", 7), ge = Z(t, "connectionLineStyle", 7), _e = Z(t, "connectionLineContainerStyle", 7), ve = Z(t, "connectionLineType", 23, () => Dd.Bezier), ye = Z(t, "attributionPosition", 7), be = Z(t, "children", 7), xe = Z(t, "nodes", 31, () => B([])), Se = Z(t, "edges", 31, () => B([])), A = Z(t, "viewport", 15, void 0), Ce = /* @__PURE__ */ Oa(t, Jh), j = qm({
 		props: Ce,
 		width: n(),
 		height: r(),
@@ -11512,7 +11512,7 @@ function Qh(e, t) {
 			var xe = H(r, 2);
 			Xm(xe, {
 				get panOnScrollMode() {
-					return k();
+					return ae();
 				},
 				get preventScrolling() {
 					return oe();
@@ -11562,16 +11562,16 @@ function Qh(e, t) {
 				children: (e, t) => {
 					th(e, {
 						get onpaneclick() {
-							return ae();
+							return ie();
 						},
 						get onpanecontextmenu() {
-							return O();
+							return k();
 						},
 						get onselectionstart() {
 							return D();
 						},
 						get onselectionend() {
-							return ee();
+							return O();
 						},
 						get panOnDrag() {
 							return fe();
@@ -11604,16 +11604,16 @@ function Qh(e, t) {
 									var n = Yh(), r = H(_n(n), 2);
 									Th(r, {
 										get onedgeclick() {
-											return te();
+											return ee();
 										},
 										get onedgecontextmenu() {
-											return ne();
+											return te();
 										},
 										get onedgepointerenter() {
-											return re();
+											return ne();
 										},
 										get onedgepointerleave() {
-											return ie();
+											return re();
 										},
 										get store() {
 											return j;
@@ -11899,52 +11899,52 @@ function Qh(e, t) {
 			D(e), L();
 		},
 		get onselectionend() {
-			return ee();
-		},
-		set onselectionend(e) {
-			ee(e), L();
-		},
-		get onedgeclick() {
-			return te();
-		},
-		set onedgeclick(e) {
-			te(e), L();
-		},
-		get onedgecontextmenu() {
-			return ne();
-		},
-		set onedgecontextmenu(e) {
-			ne(e), L();
-		},
-		get onedgepointerenter() {
-			return re();
-		},
-		set onedgepointerenter(e) {
-			re(e), L();
-		},
-		get onedgepointerleave() {
-			return ie();
-		},
-		set onedgepointerleave(e) {
-			ie(e), L();
-		},
-		get onpaneclick() {
-			return ae();
-		},
-		set onpaneclick(e) {
-			ae(e), L();
-		},
-		get onpanecontextmenu() {
 			return O();
 		},
-		set onpanecontextmenu(e) {
+		set onselectionend(e) {
 			O(e), L();
 		},
-		get panOnScrollMode() {
+		get onedgeclick() {
+			return ee();
+		},
+		set onedgeclick(e) {
+			ee(e), L();
+		},
+		get onedgecontextmenu() {
+			return te();
+		},
+		set onedgecontextmenu(e) {
+			te(e), L();
+		},
+		get onedgepointerenter() {
+			return ne();
+		},
+		set onedgepointerenter(e) {
+			ne(e), L();
+		},
+		get onedgepointerleave() {
+			return re();
+		},
+		set onedgepointerleave(e) {
+			re(e), L();
+		},
+		get onpaneclick() {
+			return ie();
+		},
+		set onpaneclick(e) {
+			ie(e), L();
+		},
+		get onpanecontextmenu() {
 			return k();
 		},
-		set panOnScrollMode(e = wd.Free) {
+		set onpanecontextmenu(e) {
 			k(e), L();
+		},
+		get panOnScrollMode() {
+			return ae();
+		},
+		set panOnScrollMode(e = wd.Free) {
+			ae(e), L();
 		},
 		get preventScrolling() {
 			return oe();
@@ -12273,13 +12273,13 @@ function hg(e, t) {
 		K(y).zoomIn();
 	}, D = () => {
 		K(y).zoomOut();
-	}, ee = () => {
+	}, O = () => {
 		K(y).fitView(m());
-	}, te = () => {
+	}, ee = () => {
 		let e = !K(x);
 		K(y).nodesDraggable = e, K(y).nodesConnectable = e, K(y).elementsSelectable = e;
 	};
-	var ne = {
+	var te = {
 		get position() {
 			return n();
 		},
@@ -12450,7 +12450,7 @@ function hg(e, t) {
 				var u = H(c, 2), d = (e) => {
 					tg(e, Aa({
 						class: "svelte-flow__controls-fitview",
-						onclick: ee,
+						onclick: O,
 						get title() {
 							return K(w)["controls.fitView.ariaLabel"];
 						},
@@ -12470,7 +12470,7 @@ function hg(e, t) {
 				var f = H(u, 2), p = (e) => {
 					tg(e, Aa({
 						class: "svelte-flow__controls-interactive",
-						onclick: te,
+						onclick: ee,
 						get title() {
 							return K(w)["controls.interactive.ariaLabel"];
 						},
@@ -12512,7 +12512,7 @@ function hg(e, t) {
 			$$slots: { default: !0 }
 		}));
 	}
-	return P(ne);
+	return P(te);
 }
 Q(hg, {
 	position: {},
@@ -12994,7 +12994,7 @@ function Ng(e, t) {
 		y: -K(S).viewport.y / K(S).viewport.zoom,
 		width: K(S).width / K(S).viewport.zoom,
 		height: K(S).height / K(S).viewport.zoom
-	})), D = /* @__PURE__ */ F(() => K(S).nodes.some((e) => !e.hidden)), ee = /* @__PURE__ */ F(() => K(D) ? Qd(Fd(K(S).nodeLookup, { filter: (e) => !e.hidden }), K(E)) : K(E)), te = /* @__PURE__ */ F(() => K(ee).width / m()), ne = /* @__PURE__ */ F(() => K(ee).height / h()), re = /* @__PURE__ */ F(() => Math.max(K(te), K(ne))), ie = /* @__PURE__ */ F(() => K(re) * m()), ae = /* @__PURE__ */ F(() => K(re) * h()), O = /* @__PURE__ */ F(() => 5 * K(re)), k = /* @__PURE__ */ F(() => K(ee).x - (K(ie) - K(ee).width) / 2 - K(O)), oe = /* @__PURE__ */ F(() => K(ee).y - (K(ae) - K(ee).height) / 2 - K(O)), se = /* @__PURE__ */ F(() => K(ie) + K(O) * 2), ce = /* @__PURE__ */ F(() => K(ae) + K(O) * 2), le = () => K(re);
+	})), D = /* @__PURE__ */ F(() => K(S).nodes.some((e) => !e.hidden)), O = /* @__PURE__ */ F(() => K(D) ? Qd(Fd(K(S).nodeLookup, { filter: (e) => !e.hidden }), K(E)) : K(E)), ee = /* @__PURE__ */ F(() => K(O).width / m()), te = /* @__PURE__ */ F(() => K(O).height / h()), ne = /* @__PURE__ */ F(() => Math.max(K(ee), K(te))), re = /* @__PURE__ */ F(() => K(ne) * m()), ie = /* @__PURE__ */ F(() => K(ne) * h()), k = /* @__PURE__ */ F(() => 5 * K(ne)), ae = /* @__PURE__ */ F(() => K(O).x - (K(re) - K(O).width) / 2 - K(k)), oe = /* @__PURE__ */ F(() => K(O).y - (K(ie) - K(O).height) / 2 - K(k)), se = /* @__PURE__ */ F(() => K(re) + K(k) * 2), ce = /* @__PURE__ */ F(() => K(ie) + K(k) * 2), le = () => K(ne);
 	var ue = {
 		get position() {
 			return n();
@@ -13189,11 +13189,11 @@ function Ng(e, t) {
 						pannable: g(),
 						zoomable: _()
 					})), U(() => {
-						X(t, "width", m()), X(t, "height", h()), X(t, "viewBox", `${K(k) ?? ""} ${K(oe) ?? ""} ${K(se) ?? ""} ${K(ce) ?? ""}`), X(t, "aria-labelledby", K(T)), n = Wi(t, "", n, {
+						X(t, "width", m()), X(t, "height", h()), X(t, "viewBox", `${K(ae) ?? ""} ${K(oe) ?? ""} ${K(se) ?? ""} ${K(ce) ?? ""}`), X(t, "aria-labelledby", K(T)), n = Wi(t, "", n, {
 							"--xy-minimap-mask-background-color-props": d(),
 							"--xy-minimap-mask-stroke-color-props": f(),
-							"--xy-minimap-mask-stroke-width-props": p() ? p() * K(re) : void 0
-						}), X(D, "d", `M${K(k) - K(O)},${K(oe) - K(O)}h${K(se) + K(O) * 2}v${K(ce) + K(O) * 2}h${-K(se) - K(O) * 2}z
+							"--xy-minimap-mask-stroke-width-props": p() ? p() * K(ne) : void 0
+						}), X(D, "d", `M${K(ae) - K(k)},${K(oe) - K(k)}h${K(se) + K(k) * 2}v${K(ce) + K(k) * 2}h${-K(se) - K(k) * 2}z
       M${K(E).x ?? ""},${K(E).y ?? ""}h${K(E).width ?? ""}v${K(E).height ?? ""}h${-K(E).width}z`);
 					}), J(e, t);
 				};
@@ -13234,61 +13234,71 @@ var Pg = {
 		icon: "LLM",
 		title: "Codergen",
 		theme: "blue",
-		paletteGroup: "pipeline-steps"
+		paletteGroup: "pipeline-steps",
+		description: "Runs an AI coding agent from a prompt to generate or modify code."
 	},
 	Tool: {
 		icon: "TL",
 		title: "Tool",
 		theme: "green",
-		paletteGroup: "pipeline-steps"
+		paletteGroup: "pipeline-steps",
+		description: "Runs a registered tool (render/capture, lint, critique, etc.) against the working directory."
 	},
 	Manager: {
 		icon: "MGR",
 		title: "Manager",
 		theme: "orange",
-		paletteGroup: "pipeline-steps"
+		paletteGroup: "pipeline-steps",
+		description: "Delegates a coordination task to an AI agent."
 	},
 	Interviewer: {
 		icon: "?",
 		title: "Human Gate",
 		theme: "orange",
-		paletteGroup: "control-flow"
+		paletteGroup: "control-flow",
+		description: "Pauses for human input -- asks a question, optionally with a gallery of candidates to pick from."
 	},
 	Conditional: {
 		icon: "IF",
 		title: "Conditional",
 		theme: "orange",
-		paletteGroup: "control-flow"
+		paletteGroup: "control-flow",
+		description: "Branches the pipeline based on a condition evaluated against the current context."
 	},
 	SubPipeline: {
 		icon: "SUB",
 		title: "Sub-Pipeline",
 		theme: "green",
-		paletteGroup: "control-flow"
+		paletteGroup: "control-flow",
+		description: "Runs another workflow file as a nested sub-pipeline."
 	},
 	Start: {
 		icon: "▶",
 		title: "Start",
 		theme: "green",
-		paletteGroup: "structural"
+		paletteGroup: "structural",
+		description: "The pipeline's single entry point."
 	},
 	Exit: {
 		icon: "■",
 		title: "Exit",
 		theme: "red",
-		paletteGroup: "structural"
+		paletteGroup: "structural",
+		description: "A pipeline exit point."
 	},
 	Parallel: {
 		icon: "⑂",
 		title: "Parallel",
 		theme: "blue",
-		paletteGroup: "structural"
+		paletteGroup: "structural",
+		description: "Runs its downstream branches concurrently."
 	},
 	FanIn: {
 		icon: "⑃",
 		title: "Fan-In",
 		theme: "blue",
-		paletteGroup: "structural"
+		paletteGroup: "structural",
+		description: "Waits for concurrent branches to finish before continuing."
 	}
 }, Fg = {
 	blue: {
@@ -13376,7 +13386,7 @@ function Gg(e, t) {
 				let n = /* @__PURE__ */ F(() => Pg[t]);
 				var r = Bg(), a = V(r), o = vn(a, !0), s = vn(H(a, 2), !0);
 				M(r), U(() => {
-					X(r, "data-testid", `palette-entry-${t}`), Wi(r, `--palette-entry-color: ${Fg[K(n).theme].border}; --palette-entry-bg: ${Fg[K(n).theme].bg};`), oi(o, K(n).icon), oi(s, K(n).title);
+					X(r, "data-testid", `palette-entry-${t}`), X(r, "title", K(n).description), Wi(r, `--palette-entry-color: ${Fg[K(n).theme].border}; --palette-entry-bg: ${Fg[K(n).theme].bg};`), oi(o, K(n).icon), oi(s, K(n).title);
 				}), Pr("dragstart", r, (e) => i(e, t)), J(e, r);
 			}), M(n), J(e, n);
 		};
@@ -13561,8 +13571,8 @@ function i_(e, t) {
 		set interactionWidth(e) {
 			h(e), L();
 		}
-	}, D = n_(), ee = _n(D);
-	Om(ee, {
+	}, D = n_(), O = _n(D);
+	Om(O, {
 		get id() {
 			return n();
 		},
@@ -13588,7 +13598,7 @@ function i_(e, t) {
 			return h();
 		}
 	});
-	var te = H(ee, 2), ne = (e) => {
+	var ee = H(O, 2), te = (e) => {
 		wm(e, {
 			get x() {
 				return K(C);
@@ -13604,8 +13614,8 @@ function i_(e, t) {
 			$$slots: { default: !0 }
 		});
 	};
-	return Y(te, (e) => {
-		K(v) && e(ne);
+	return Y(ee, (e) => {
+		K(v) && e(te);
 	}), J(e, D), P(E);
 }
 Ir(["click"]), Q(i_, {
@@ -13803,20 +13813,20 @@ function p_(e, t) {
 	});
 	var T = H(C, 2), E = H(V(T)), D = V(E);
 	D.value = D.__value = "freeform";
-	var ee = H(D);
-	ee.value = ee.__value = "approve";
-	var te = H(ee);
-	te.value = te.__value = "options", M(E);
-	var ne;
+	var O = H(D);
+	O.value = O.__value = "approve";
+	var ee = H(O);
+	ee.value = ee.__value = "options", M(E);
+	var te;
 	Yi(E), M(T);
-	var re = H(T, 2), ie = (e) => {
+	var ne = H(T, 2), re = (e) => {
 		var t = d_(), n = H(V(t));
 		ca(n), M(t), U(() => la(n, K(d))), Fr("input", n, g), J(e, t);
 	};
-	return Y(re, (e) => {
-		K(c) === "options" && e(ie);
+	return Y(ne, (e) => {
+		K(c) === "options" && e(re);
 	}), M(v), U(() => {
-		la(b, K(s)), ua(S, K(l)), S.disabled = K(c) !== "freeform", E.disabled = K(l), ne !== (ne = K(c)) && (E.value = (E.__value = ne) ?? "", Ji(E, ne));
+		la(b, K(s)), ua(S, K(l)), S.disabled = K(c) !== "freeform", E.disabled = K(l), te !== (te = K(c)) && (E.value = (E.__value = te) ?? "", Ji(E, te));
 	}), Fr("input", b, f), Fr("change", S, p), Fr("change", E, h), J(e, v), P(_);
 }
 Ir(["input", "change"]), Q(p_, {
@@ -13825,11 +13835,32 @@ Ir(["input", "change"]), Q(p_, {
 }, [], [], { mode: "open" });
 //#endregion
 //#region src/nodeForms/ToolForm.svelte
-var m_ = /* @__PURE__ */ q("<p class=\"node-form-error\" role=\"alert\" data-testid=\"tool-args-error\"> </p>"), h_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"tool-form\"><label class=\"node-form-field\">Tool <input type=\"text\" data-testid=\"tool-name\" placeholder=\"e.g. shell\"/></label> <label class=\"node-form-field\">Args (JSON) <textarea data-testid=\"tool-args\" rows=\"4\"></textarea></label> <!></div>");
-function g_(e, t) {
+var m_ = /* @__PURE__ */ q("<option> </option>"), h_ = /* @__PURE__ */ q("<p class=\"node-form-hint\"> </p>"), g_ = /* @__PURE__ */ q("<label class=\"node-form-field\">Custom tool name <input type=\"text\" data-testid=\"tool-name\" placeholder=\"e.g. shell\"/></label>"), __ = /* @__PURE__ */ q("<p class=\"node-form-error\" role=\"alert\" data-testid=\"tool-args-error\"> </p>"), v_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"tool-form\"><label class=\"node-form-field\">Tool <select data-testid=\"tool-select\"><option>Select a tool…</option><!><option>Custom…</option></select></label> <!> <!> <label class=\"node-form-field\">Args (JSON) <textarea data-testid=\"tool-args\" rows=\"4\"></textarea></label> <!></div>");
+function y_(e, t) {
 	N(t, !0);
-	let n = Z(t, "attrs", 7), r = Z(t, "onChange", 7), i = /* @__PURE__ */ R(B(Er(() => typeof n().tool == "string" ? n().tool : ""))), a = /* @__PURE__ */ R(B(Er(() => typeof n().args == "string" ? n().args : ""))), o = /* @__PURE__ */ R(B(Er(() => s(K(a)))));
-	function s(e) {
+	let n = [
+		{
+			value: "render_capture",
+			description: "Render a candidate and capture a screenshot/manifest."
+		},
+		{
+			value: "system_lint",
+			description: "Run the design-system lint check against a candidate."
+		},
+		{
+			value: "task_critic",
+			description: "Run a persona-based usability critique of a candidate."
+		},
+		{
+			value: "synthesis",
+			description: "Synthesise prior critiques into a single summary."
+		}
+	], r = "__custom__";
+	function i(e) {
+		return n.some((t) => t.value === e);
+	}
+	let a = Z(t, "attrs", 7), o = Z(t, "onChange", 7), s = /* @__PURE__ */ R(B(Er(() => typeof a().tool == "string" ? a().tool : ""))), c = /* @__PURE__ */ R(B(Er(() => typeof a().args == "string" ? a().args : ""))), l = /* @__PURE__ */ R(B(Er(() => p(K(c))))), u = /* @__PURE__ */ R(B(Er(() => K(s) && !i(K(s)) ? r : K(s)))), d = /* @__PURE__ */ F(() => K(u) === r), f = /* @__PURE__ */ F(() => n.find((e) => e.value === K(u)));
+	function p(e) {
 		let t = e.trim();
 		if (!t) return null;
 		try {
@@ -13838,50 +13869,87 @@ function g_(e, t) {
 			return e instanceof Error ? e.message : "invalid JSON";
 		}
 	}
-	function c(e) {
-		z(i, e.target.value, !0), r()({ attrs: { tool: K(i) || void 0 } });
+	function m(e) {
+		z(s, e, !0), o()({ attrs: { tool: K(s) || void 0 } });
 	}
-	function l(e) {
-		z(a, e.target.value, !0), z(o, s(K(a)), !0), r()({ attrs: { args: K(a).trim() ? K(a) : void 0 } });
+	function h(e) {
+		let t = e.target.value;
+		z(u, t, !0), m(t === r ? K(s) && !i(K(s)) ? K(s) : "" : t);
 	}
-	var u = {
+	function g(e) {
+		m(e.target.value);
+	}
+	function _(e) {
+		z(c, e.target.value, !0), z(l, p(K(c)), !0), o()({ attrs: { args: K(c).trim() ? K(c) : void 0 } });
+	}
+	var v = {
 		get attrs() {
-			return n();
+			return a();
 		},
 		set attrs(e) {
-			n(e), L();
+			a(e), L();
 		},
 		get onChange() {
-			return r();
+			return o();
 		},
 		set onChange(e) {
-			r(e), L();
+			o(e), L();
 		}
-	}, d = h_(), f = V(d), p = H(V(f));
-	ca(p), M(f);
-	var m = H(f, 2), h = H(V(m));
-	mt(h), M(m);
-	var g = H(m, 2), _ = (e) => {
-		var t = m_(), n = vn(t);
-		U(() => oi(n, `Invalid JSON: ${K(o) ?? ""}`)), J(e, t);
+	}, y = v_(), b = V(y), x = H(V(b)), S = V(x);
+	S.value = S.__value = "";
+	var C = H(S);
+	wi(C, 17, () => n, (e) => e.value, (e, t) => {
+		var n = m_(), r = vn(n, !0), i = {};
+		U(() => {
+			oi(r, K(t).value), i !== (i = K(t).value) && (n.value = (n.__value = i) ?? "");
+		}), J(e, n);
+	});
+	var w = H(C);
+	w.value = w.__value = r, M(x);
+	var T;
+	Yi(x), M(b);
+	var E = H(b, 2), D = (e) => {
+		var t = h_(), n = vn(t, !0);
+		U(() => oi(n, K(f).description)), J(e, t);
 	};
-	return Y(g, (e) => {
-		K(o) && e(_);
-	}), M(d), U(() => {
-		la(p, K(i)), la(h, K(a));
-	}), Fr("input", p, c), Fr("input", h, l), J(e, d), P(u);
+	Y(E, (e) => {
+		K(f) && e(D);
+	});
+	var O = H(E, 2), ee = (e) => {
+		var t = g_(), n = H(V(t));
+		ca(n), M(t), U(() => la(n, K(s))), Fr("input", n, g), J(e, t);
+	};
+	Y(O, (e) => {
+		K(d) && e(ee);
+	});
+	var te = H(O, 2), ne = H(V(te));
+	mt(ne), M(te);
+	var re = H(te, 2), ie = (e) => {
+		var t = __(), n = vn(t);
+		U(() => oi(n, `Invalid JSON: ${K(l) ?? ""}`)), J(e, t);
+	};
+	return Y(re, (e) => {
+		K(l) && e(ie);
+	}), M(y), U(() => {
+		T !== (T = K(u)) && (x.value = (x.__value = T) ?? "", Ji(x, T)), la(ne, K(c));
+	}), Fr("change", x, h), Fr("input", ne, _), J(e, y), P(v);
 }
-Ir(["input"]), Q(g_, {
+Ir(["change", "input"]), Q(y_, {
 	attrs: {},
 	onChange: {}
 }, [], [], { mode: "open" });
 //#endregion
 //#region src/nodeForms/ManagerForm.svelte
-var __ = /* @__PURE__ */ q("<p class=\"node-form-error\" role=\"alert\" data-testid=\"manager-config-error\"> </p>"), v_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"manager-form\"><label class=\"node-form-field\">Task <input type=\"text\" data-testid=\"manager-task\" placeholder=\"e.g. coordinate-review\"/></label> <label class=\"node-form-field\">Config (JSON) <textarea data-testid=\"manager-config\" rows=\"4\"></textarea></label> <!></div>");
-function y_(e, t) {
+var b_ = /* @__PURE__ */ q("<option></option>"), x_ = /* @__PURE__ */ q("<p class=\"node-form-error\" role=\"alert\" data-testid=\"manager-config-error\"> </p>"), S_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"manager-form\"><label class=\"node-form-field\">Task <input type=\"text\" data-testid=\"manager-task\" list=\"manager-task-suggestions\" placeholder=\"e.g. coordinate-review\"/> <datalist id=\"manager-task-suggestions\"></datalist></label> <p class=\"node-form-hint\">A free-text description of the coordination task, sent to the LLM as-is -- the suggestions above are starting points, not fixed options.</p> <label class=\"node-form-field\">Config (JSON) <textarea data-testid=\"manager-config\" rows=\"4\"></textarea></label> <!></div>");
+function C_(e, t) {
 	N(t, !0);
-	let n = Z(t, "attrs", 7), r = Z(t, "onChange", 7), i = /* @__PURE__ */ R(B(Er(() => typeof n().task == "string" ? n().task : ""))), a = /* @__PURE__ */ R(B(Er(() => typeof n().config == "string" ? n().config : ""))), o = /* @__PURE__ */ R(B(Er(() => s(K(a)))));
-	function s(e) {
+	let n = [
+		"coordinate-review",
+		"delegate-subtask",
+		"aggregate-results",
+		"escalate-to-human"
+	], r = Z(t, "attrs", 7), i = Z(t, "onChange", 7), a = /* @__PURE__ */ R(B(Er(() => typeof r().task == "string" ? r().task : ""))), o = /* @__PURE__ */ R(B(Er(() => typeof r().config == "string" ? r().config : ""))), s = /* @__PURE__ */ R(B(Er(() => c(K(o)))));
+	function c(e) {
 		let t = e.trim();
 		if (!t) return null;
 		try {
@@ -13890,47 +13958,54 @@ function y_(e, t) {
 			return e instanceof Error ? e.message : "invalid JSON";
 		}
 	}
-	function c(e) {
-		z(i, e.target.value, !0), r()({ attrs: { task: K(i) || void 0 } });
-	}
 	function l(e) {
-		z(a, e.target.value, !0), z(o, s(K(a)), !0), r()({ attrs: { config: K(a).trim() ? K(a) : void 0 } });
+		z(a, e.target.value, !0), i()({ attrs: { task: K(a) || void 0 } });
 	}
-	var u = {
+	function u(e) {
+		z(o, e.target.value, !0), z(s, c(K(o)), !0), i()({ attrs: { config: K(o).trim() ? K(o) : void 0 } });
+	}
+	var d = {
 		get attrs() {
-			return n();
-		},
-		set attrs(e) {
-			n(e), L();
-		},
-		get onChange() {
 			return r();
 		},
-		set onChange(e) {
+		set attrs(e) {
 			r(e), L();
+		},
+		get onChange() {
+			return i();
+		},
+		set onChange(e) {
+			i(e), L();
 		}
-	}, d = v_(), f = V(d), p = H(V(f));
-	ca(p), M(f);
-	var m = H(f, 2), h = H(V(m));
-	mt(h), M(m);
-	var g = H(m, 2), _ = (e) => {
-		var t = __(), n = vn(t);
-		U(() => oi(n, `Invalid JSON: ${K(o) ?? ""}`)), J(e, t);
+	}, f = S_(), p = V(f), m = H(V(p));
+	ca(m);
+	var h = H(m, 2);
+	wi(h, 20, () => n, (e) => e, (e, t) => {
+		var n = b_(), r = {};
+		U(() => {
+			r !== (r = t) && (n.value = (n.__value = r) ?? "");
+		}), J(e, n);
+	}), M(h), M(p);
+	var g = H(p, 4), _ = H(V(g));
+	mt(_), M(g);
+	var v = H(g, 2), y = (e) => {
+		var t = x_(), n = vn(t);
+		U(() => oi(n, `Invalid JSON: ${K(s) ?? ""}`)), J(e, t);
 	};
-	return Y(g, (e) => {
-		K(o) && e(_);
-	}), M(d), U(() => {
-		la(p, K(i)), la(h, K(a));
-	}), Fr("input", p, c), Fr("input", h, l), J(e, d), P(u);
+	return Y(v, (e) => {
+		K(s) && e(y);
+	}), M(f), U(() => {
+		la(m, K(a)), la(_, K(o));
+	}), Fr("input", m, l), Fr("input", _, u), J(e, f), P(d);
 }
-Ir(["input"]), Q(y_, {
+Ir(["input"]), Q(C_, {
 	attrs: {},
 	onChange: {}
 }, [], [], { mode: "open" });
 //#endregion
 //#region src/nodeForms/SubPipelineForm.svelte
-var b_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"sub-pipeline-form\"><label class=\"node-form-field\">Pipeline file <input type=\"text\" data-testid=\"sub-pipeline-path\" placeholder=\"e.g. examples/sub_flow.dot\"/></label></div>");
-function x_(e, t) {
+var w_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"sub-pipeline-form\"><label class=\"node-form-field\">Pipeline file <input type=\"text\" data-testid=\"sub-pipeline-path\" placeholder=\"e.g. examples/sub_flow.dot\"/></label></div>");
+function T_(e, t) {
 	N(t, !0);
 	let n = Z(t, "attrs", 7), r = Z(t, "onChange", 7), i = /* @__PURE__ */ R(B(Er(() => typeof n().pipeline == "string" ? n().pipeline : "")));
 	function a(e) {
@@ -13949,20 +14024,20 @@ function x_(e, t) {
 		set onChange(e) {
 			r(e), L();
 		}
-	}, s = b_(), c = V(s), l = H(V(c));
+	}, s = w_(), c = V(s), l = H(V(c));
 	return ca(l), M(c), M(s), U(() => la(l, K(i))), Fr("input", l, a), J(e, s), P(o);
 }
-Ir(["input"]), Q(x_, {
+Ir(["input"]), Q(T_, {
 	attrs: {},
 	onChange: {}
 }, [], [], { mode: "open" });
 //#endregion
 //#region src/nodeForms/StructuralForm.svelte
-var S_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"structural-form\"><p class=\"node-form-hint\">This node kind has no additional fields beyond its label.</p></div>");
-function C_(e, t) {
+var E_ = /* @__PURE__ */ q("<div class=\"node-form\" data-testid=\"structural-form\"><p class=\"node-form-hint\">This node kind has no additional fields beyond its label.</p></div>");
+function D_(e, t) {
 	N(t, !0);
 	let n = Z(t, "attrs", 7), r = Z(t, "onChange", 7);
-	return J(e, S_()), P({
+	return J(e, E_()), P({
 		get attrs() {
 			return n();
 		},
@@ -13977,27 +14052,27 @@ function C_(e, t) {
 		}
 	});
 }
-Q(C_, {
+Q(D_, {
 	attrs: {},
 	onChange: {}
 }, [], [], { mode: "open" });
 //#endregion
 //#region src/WorkflowCanvasInner.svelte
-var w_ = /* @__PURE__ */ q("<option> </option>"), T_ = /* @__PURE__ */ q("<div class=\"create-workflow-fields\" style=\"display: flex; gap: 0.75rem; align-items: flex-end; padding-bottom: 0.5rem;\"><label style=\"display: flex; flex-direction: column; font-size: 0.85rem;\">Name <input type=\"text\" data-testid=\"create-name-input\" placeholder=\"my-pipeline\"/></label> <label style=\"display: flex; flex-direction: column; font-size: 0.85rem;\">Directory <select data-testid=\"create-target-dir-select\"></select></label></div>"), E_ = /* @__PURE__ */ q("<!> <!> <!>", 1), D_ = /* @__PURE__ */ q("<p role=\"alert\" data-testid=\"save-error\"> </p>"), O_ = /* @__PURE__ */ q("<label class=\"node-form-field node-inspector-label-field svelte-14vsbi2\">Label <input type=\"text\" data-testid=\"node-inspector-label\" class=\"svelte-14vsbi2\"/></label> <!>", 1), k_ = /* @__PURE__ */ q("<aside class=\"node-inspector svelte-14vsbi2\" data-testid=\"node-inspector\"><div class=\"node-inspector-header svelte-14vsbi2\"><span class=\"node-inspector-title svelte-14vsbi2\" data-testid=\"node-inspector-title\"> </span> <button type=\"button\" class=\"node-inspector-close svelte-14vsbi2\" aria-label=\"Close node inspector\">×</button></div> <!></aside>"), A_ = /* @__PURE__ */ q("<aside class=\"node-inspector svelte-14vsbi2\" data-testid=\"edge-inspector\"><div class=\"node-inspector-header svelte-14vsbi2\"><span class=\"node-inspector-title svelte-14vsbi2\" data-testid=\"edge-inspector-title\">Edge</span> <button type=\"button\" class=\"node-inspector-close svelte-14vsbi2\" aria-label=\"Close edge inspector\">×</button></div> <!></aside>"), j_ = /* @__PURE__ */ q("<div class=\"workflow-canvas-root\" style=\"width: 100%; height: 100%; min-height: 480px; display: flex; flex-direction: row;\"><!> <div class=\"workflow-canvas-main\" style=\"flex: 1; min-width: 0; display: flex; flex-direction: column;\"><!> <div class=\"canvas-area\" style=\"flex: 1; position: relative;\" role=\"region\" aria-label=\"Workflow canvas drop zone\"><!></div> <button type=\"button\" data-testid=\"save-button\"> </button> <!></div> <!></div>"), M_ = {
+var O_ = /* @__PURE__ */ q("<option> </option>"), k_ = /* @__PURE__ */ q("<div class=\"create-workflow-fields\" style=\"display: flex; gap: 0.75rem; align-items: flex-end; padding-bottom: 0.5rem;\"><label style=\"display: flex; flex-direction: column; font-size: 0.85rem;\">Name <input type=\"text\" data-testid=\"create-name-input\" placeholder=\"my-pipeline\"/></label> <label style=\"display: flex; flex-direction: column; font-size: 0.85rem;\">Directory <select data-testid=\"create-target-dir-select\"></select></label></div>"), A_ = /* @__PURE__ */ q("<!> <!> <!>", 1), j_ = /* @__PURE__ */ q("<p role=\"alert\" data-testid=\"save-error\"> </p>"), M_ = /* @__PURE__ */ q("<label class=\"node-form-field node-inspector-label-field svelte-14vsbi2\">Label <input type=\"text\" data-testid=\"node-inspector-label\" class=\"svelte-14vsbi2\"/></label> <!>", 1), N_ = /* @__PURE__ */ q("<aside class=\"node-inspector svelte-14vsbi2\" data-testid=\"node-inspector\"><div class=\"node-inspector-header svelte-14vsbi2\"><span class=\"node-inspector-title svelte-14vsbi2\" data-testid=\"node-inspector-title\"> </span> <button type=\"button\" class=\"node-inspector-close svelte-14vsbi2\" aria-label=\"Close node inspector\">×</button></div> <p class=\"node-inspector-description svelte-14vsbi2\" data-testid=\"node-inspector-description\"> </p> <!></aside>"), P_ = /* @__PURE__ */ q("<aside class=\"node-inspector svelte-14vsbi2\" data-testid=\"edge-inspector\"><div class=\"node-inspector-header svelte-14vsbi2\"><span class=\"node-inspector-title svelte-14vsbi2\" data-testid=\"edge-inspector-title\">Edge</span> <button type=\"button\" class=\"node-inspector-close svelte-14vsbi2\" aria-label=\"Close edge inspector\">×</button></div> <!></aside>"), F_ = /* @__PURE__ */ q("<div class=\"workflow-canvas-root\" style=\"width: 100%; height: 100%; min-height: 480px; display: flex; flex-direction: row;\"><!> <div class=\"workflow-canvas-main\" style=\"flex: 1; min-width: 0; display: flex; flex-direction: column;\"><!> <div class=\"canvas-area\" style=\"flex: 1; position: relative;\" role=\"region\" aria-label=\"Workflow canvas drop zone\"><!></div> <button type=\"button\" data-testid=\"save-button\"> </button> <!></div> <!></div>"), I_ = {
 	hash: "svelte-14vsbi2",
-	code: "\n  /* Task 8: connection handles hidden until the owning node is hovered\n     (spec Assumption 2 / Agent Flow reference), revealed with a plain\n     opacity transition; a node that has at least one edge (wf-node-connected,\n     computed in this file's `connectedNodeIds` $effect above) keeps its\n     handles visibly accent-colored even without hovering, so a \"wired up\"\n     node reads as such at a glance instead of needing a hover to confirm.\n     :global() is required here -- these elements are rendered by @xyflow/\n     svelte's own child components (DefaultNode/Handle.svelte), not by this\n     component's own template, so Svelte's default per-component style\n     scoping never reaches them. */.svelte-flow__handle {opacity:0;transition:opacity 0.15s ease,\n      background-color 0.15s ease,\n      border-color 0.15s ease;}.svelte-flow__node:hover .svelte-flow__handle,\n  .svelte-flow__node.selected .svelte-flow__handle {opacity:1;}.svelte-flow__node.wf-node-connected .svelte-flow__handle {opacity:1;background-color:#3b82f6;border-color:#3b82f6;}.node-inspector.svelte-14vsbi2 {width:260px;flex:0 0 260px;overflow-y:auto;border-left:1px solid #e2e8f0;padding:0.6rem;box-sizing:border-box;}.node-inspector-header.svelte-14vsbi2 {display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;}.node-inspector-title.svelte-14vsbi2 {font-weight:600;font-size:0.85rem;color:#1e293b;}.node-inspector-close.svelte-14vsbi2 {background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;color:#64748b;}.node-inspector-label-field.svelte-14vsbi2 {margin-bottom:0.6rem;display:flex;flex-direction:column;gap:0.2rem;font-size:0.8rem;color:#475569;}.node-inspector-label-field.svelte-14vsbi2 input:where(.svelte-14vsbi2) {font:inherit;padding:0.35rem 0.45rem;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;}"
+	code: "\n  /* Connection handles dim (not fully hidden -- an earlier revision hid\n     them at opacity 0 until hover, which made it impossible to discover\n     where a connection could even be dragged from) until the owning node\n     is hovered, brightened to full opacity with a plain opacity\n     transition; a node that has at least one edge (wf-node-connected,\n     computed in this file's `connectedNodeIds` $effect above) keeps its\n     handles visibly accent-colored even without hovering, so a \"wired up\"\n     node reads as such at a glance instead of needing a hover to confirm.\n     :global() is required here -- these elements are rendered by @xyflow/\n     svelte's own child components (DefaultNode/Handle.svelte), not by this\n     component's own template, so Svelte's default per-component style\n     scoping never reaches them. */.svelte-flow__handle {opacity:0.45;transition:opacity 0.15s ease,\n      background-color 0.15s ease,\n      border-color 0.15s ease;}.svelte-flow__node:hover .svelte-flow__handle,\n  .svelte-flow__node.selected .svelte-flow__handle {opacity:1;}.svelte-flow__node.wf-node-connected .svelte-flow__handle {opacity:1;background-color:#3b82f6;border-color:#3b82f6;}\n\n  /* Edge lines default to Svelte Flow's own pale-gray 1px stroke\n     (--xy-edge-stroke-default: #b1b1b7), which is nearly invisible against\n     this app's light canvas background -- a loaded graph with every node\n     genuinely connected read as a disconnected grid of boxes because the\n     lines joining them couldn't be seen. Overriding the library's own\n     theming variables (rather than hand-styling every edge path) keeps\n     hover/selected states, arrowheads, etc. all still driven by the one\n     source of truth. */.svelte-flow {--xy-edge-stroke-default: #64748b;--xy-edge-stroke-width-default: 2;--xy-edge-stroke-selected-default: #3b82f6;}\n\n  /* @xyflow/svelte 1.6.6's own base.css gives `.svelte-flow__viewport` and\n     `.svelte-flow__pane` real dimensions via a shared `.svelte-flow__container`\n     class (`width: 100%; height: 100%`), but never gives `.svelte-flow__edges`\n     (each edge's wrapping <svg class=\"svelte-flow__edge-wrapper\"> included)\n     any sizing at all -- confirmed via computed-style inspection that both\n     collapse to a 0x0 CSS box (absolutely positioned, auto width, no content\n     to shrink-wrap around, so shrink-to-fit resolves to 0). A zero-width or\n     zero-height <svg> is spec'd to not render its content at all, `overflow:\n     visible` or not -- every edge line was being laid out with correct\n     path/stroke data (confirmed via getBoundingClientRect and computed\n     style) yet never painted a single pixel. Sizing both explicitly to fill\n     their real (non-zero) `.svelte-flow__viewport` ancestor fixes rendering\n     without touching the library's own files. */.svelte-flow__edges,\n  svg.svelte-flow__edge-wrapper {width:100%;height:100%;}.node-inspector.svelte-14vsbi2 {width:260px;flex:0 0 260px;overflow-y:auto;border-left:1px solid #e2e8f0;padding:0.6rem;box-sizing:border-box;}.node-inspector-header.svelte-14vsbi2 {display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;}.node-inspector-title.svelte-14vsbi2 {font-weight:600;font-size:0.85rem;color:#1e293b;}.node-inspector-close.svelte-14vsbi2 {background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;color:#64748b;}.node-inspector-description.svelte-14vsbi2 {margin:0 0 0.6rem;font-size:0.78rem;line-height:1.35;color:#64748b;}.node-inspector-label-field.svelte-14vsbi2 {margin-bottom:0.6rem;display:flex;flex-direction:column;gap:0.2rem;font-size:0.8rem;color:#475569;}.node-inspector-label-field.svelte-14vsbi2 input:where(.svelte-14vsbi2) {font:inherit;padding:0.35rem 0.45rem;border:1px solid #cbd5e1;border-radius:4px;color:#1e293b;}"
 };
-function N_(e, t) {
-	N(t, !0), ji(e, M_);
+function L_(e, t) {
+	N(t, !0), ji(e, I_);
 	let n = { workflow: i_ };
 	function r(e) {
 		switch (e) {
 			case "Codergen": return l_;
 			case "Interviewer": return p_;
-			case "Tool": return g_;
-			case "Manager": return y_;
-			case "SubPipeline": return x_;
-			default: return C_;
+			case "Tool": return y_;
+			case "Manager": return C_;
+			case "SubPipeline": return T_;
+			default: return D_;
 		}
 	}
 	let i = Z(t, "graph", 7, void 0), a = Z(t, "workflowId", 7, void 0), o = Z(t, "availableTargetDirs", 23, () => []), s = Z(t, "onSave", 7), c = /* @__PURE__ */ F(() => !a()), l = /* @__PURE__ */ R(""), u = /* @__PURE__ */ R("");
@@ -14055,15 +14130,15 @@ function N_(e, t) {
 		}
 	}));
 	tt(e_, K(D));
-	function ee({ edge: e }) {
+	function O({ edge: e }) {
 		K(D).hoveredEdgeId = e.id;
 	}
-	function te() {
+	function ee() {
 		K(D).hoveredEdgeId = null;
 	}
-	let ne = /* @__PURE__ */ F(() => new Set(K(f).flatMap((e) => [e.source, e.target])));
+	let te = /* @__PURE__ */ F(() => new Set(K(f).flatMap((e) => [e.source, e.target])));
 	An(() => {
-		let e = K(ne), t = Er(() => K(d)), n = t.map((t) => {
+		let e = K(te), t = Er(() => K(d)), n = t.map((t) => {
 			let n = typeof t.class == "string" ? t.class.replace(/\bwf-node-connected\b/g, "").trim() : "", r = e.has(t.id) ? n ? `${n} wf-node-connected` : "wf-node-connected" : n;
 			return (t.class ?? "") === r ? t : {
 				...t,
@@ -14072,7 +14147,7 @@ function N_(e, t) {
 		});
 		n.some((e, n) => e !== t[n]) && z(d, n);
 	});
-	function re(e, t) {
+	function ne(e, t) {
 		z(f, K(f).map((n) => n.id === e ? {
 			...n,
 			data: {
@@ -14083,7 +14158,7 @@ function N_(e, t) {
 			}
 		} : n));
 	}
-	function ie(e, t) {
+	function re(e, t) {
 		z(d, K(d).map((n) => {
 			if (n.id !== e) return n;
 			let r = { ...n.data.attrs };
@@ -14098,15 +14173,15 @@ function N_(e, t) {
 			};
 		}));
 	}
-	let ae;
-	function O(e) {
+	let ie;
+	function k(e) {
 		e.preventDefault(), e.dataTransfer && (e.dataTransfer.dropEffect = "move");
 	}
-	function k(e) {
+	function ae(e) {
 		e.preventDefault();
 		let t = e.dataTransfer?.getData(Lg);
-		if (!t || !ae) return;
-		let n = ae.getBoundingClientRect();
+		if (!t || !ie) return;
+		let n = ie.getBoundingClientRect();
 		v(t, {
 			x: e.clientX - n.left,
 			y: e.clientY - n.top
@@ -14175,14 +14250,14 @@ function N_(e, t) {
 		set onSave(e) {
 			s(e), L();
 		}
-	}, de = j_(), fe = V(de);
+	}, de = F_(), fe = V(de);
 	Gg(fe, {});
 	var pe = H(fe, 2), me = V(pe), he = (e) => {
-		var t = T_(), n = V(t), r = H(V(n));
+		var t = k_(), n = V(t), r = H(V(n));
 		ca(r), M(n);
 		var i = H(n, 2), a = H(V(i));
 		wi(a, 20, o, (e) => e, (e, t) => {
-			var n = w_(), r = vn(n, !0), i = {};
+			var n = O_(), r = vn(n, !0), i = {};
 			U(() => {
 				oi(r, t), i !== (i = t) && (n.value = (n.__value = i) ?? "");
 			}), J(e, n);
@@ -14201,8 +14276,8 @@ function N_(e, t) {
 		onnodeclick: C,
 		onpaneclick: E,
 		onedgeclick: w,
-		onedgepointerenter: ee,
-		onedgepointerleave: te,
+		onedgepointerenter: O,
+		onedgepointerleave: ee,
 		get nodes() {
 			return K(d);
 		},
@@ -14216,15 +14291,15 @@ function N_(e, t) {
 			z(f, e);
 		},
 		children: (e, t) => {
-			var n = E_(), r = _n(n);
+			var n = A_(), r = _n(n);
 			Cg(r, {});
 			var i = H(r, 2);
 			hg(i, {}), Ng(H(i, 2), {}), J(e, n);
 		},
 		$$slots: { default: !0 }
-	}), M(ge), Sa(ge, (e) => ae = e, () => ae);
+	}), M(ge), Sa(ge, (e) => ie = e, () => ie);
 	var _e = H(ge, 2), ve = vn(_e, !0), ye = H(_e, 2), be = (e) => {
-		var t = D_(), n = vn(t, !0);
+		var t = j_(), n = vn(t, !0);
 		U(() => oi(n, K(se))), J(e, t);
 	};
 	Y(ye, (e) => {
@@ -14232,21 +14307,25 @@ function N_(e, t) {
 	}), M(pe);
 	var xe = H(pe, 2), Se = (e) => {
 		let t = /* @__PURE__ */ F(() => K(b)), n = /* @__PURE__ */ F(() => r(K(t).data.nodeType));
-		var i = k_(), a = V(i), o = V(a), s = vn(o, !0), c = H(o, 2);
-		M(a), yi(H(a, 2), () => K(t).id, (e) => {
-			var r = O_(), i = _n(r), a = H(V(i));
+		var i = N_(), a = V(i), o = V(a), s = vn(o, !0), c = H(o, 2);
+		M(a);
+		var l = H(a, 2), u = vn(l, !0);
+		yi(H(l, 2), () => K(t).id, (e) => {
+			var r = M_(), i = _n(r), a = H(V(i));
 			ca(a), M(i), Ai(H(i, 2), () => K(n), (e, n) => {
 				n(e, {
 					get attrs() {
 						return K(t).data.attrs;
 					},
-					onChange: (e) => ie(K(t).id, e)
+					onChange: (e) => re(K(t).id, e)
 				});
-			}), U(() => la(a, K(t).data.label)), Fr("input", a, (e) => ie(K(t).id, { label: e.target.value })), J(e, r);
-		}), M(i), U(() => oi(s, Pg[K(t).data.nodeType]?.title ?? K(t).data.nodeType)), Fr("click", c, () => z(y, null)), J(e, i);
+			}), U(() => la(a, K(t).data.label)), Fr("input", a, (e) => re(K(t).id, { label: e.target.value })), J(e, r);
+		}), M(i), U(() => {
+			oi(s, Pg[K(t).data.nodeType]?.title ?? K(t).data.nodeType), oi(u, Pg[K(t).data.nodeType]?.description ?? "");
+		}), Fr("click", c, () => z(y, null)), J(e, i);
 	}, A = (e) => {
 		let t = /* @__PURE__ */ F(() => K(S));
-		var n = A_(), r = V(n), i = H(V(r), 2);
+		var n = P_(), r = V(n), i = H(V(r), 2);
 		M(r), yi(H(r, 2), () => K(t).id, (e) => {
 			{
 				let n = /* @__PURE__ */ F(() => K(t).data?.condition ?? null), r = /* @__PURE__ */ F(() => K(t).data?.priority ?? null), i = /* @__PURE__ */ F(() => K(t).data?.loopRestart ?? !1);
@@ -14260,7 +14339,7 @@ function N_(e, t) {
 					get loopRestart() {
 						return K(i);
 					},
-					onChange: (e) => re(K(t).id, e)
+					onChange: (e) => ne(K(t).id, e)
 				});
 			}
 		}), M(n), Fr("click", i, () => z(x, null)), J(e, n);
@@ -14269,9 +14348,9 @@ function N_(e, t) {
 		K(b) ? e(Se) : K(S) && e(A, 1);
 	}), M(de), U(() => {
 		_e.disabled = K(le), oi(ve, K(oe) ? "Saving…" : "Save");
-	}), Pr("dragover", ge, O), Pr("drop", ge, k), Fr("click", _e, ce), J(e, de), P(ue);
+	}), Pr("dragover", ge, k), Pr("drop", ge, ae), Fr("click", _e, ce), J(e, de), P(ue);
 }
-Ir(["click", "input"]), Q(N_, {
+Ir(["click", "input"]), Q(L_, {
 	graph: {},
 	workflowId: {},
 	availableTargetDirs: {},
@@ -14284,7 +14363,7 @@ Ir(["click", "input"]), Q(N_, {
 ], { mode: "open" });
 //#endregion
 //#region src/api.ts
-async function P_(e) {
+async function R_(e) {
 	if (!e.ok) {
 		let t = e.statusText;
 		try {
@@ -14295,14 +14374,14 @@ async function P_(e) {
 	}
 	return e.json();
 }
-function F_(e, t) {
+function z_(e, t) {
 	return fetch(`/api/workflows/${encodeURIComponent(e)}/graph`, {
 		method: "PUT",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(t)
-	}).then((e) => P_(e));
+	}).then((e) => R_(e));
 }
-function I_(e, t, n) {
+function B_(e, t, n) {
 	return fetch("/api/workflows/new", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -14311,16 +14390,16 @@ function I_(e, t, n) {
 			target_dir: t,
 			graph: e
 		})
-	}).then((e) => P_(e));
+	}).then((e) => R_(e));
 }
 //#endregion
 //#region src/WorkflowCanvas.svelte
-function L_(e, t) {
+function V_(e, t) {
 	N(t, !0);
 	let n = Z(t, "graph", 15, void 0), r = Z(t, "workflowId", 7, void 0), i = Z(t, "availableTargetDirs", 7, void 0), a = /* @__PURE__ */ R(void 0);
 	async function o(e, n) {
 		if (n) {
-			let r = await I_(e, n.targetDir, n.name);
+			let r = await B_(e, n.targetDir, n.name);
 			t.$$host.dispatchEvent(new CustomEvent("workflow-saved", {
 				detail: r,
 				bubbles: !0,
@@ -14329,7 +14408,7 @@ function L_(e, t) {
 			return;
 		}
 		if (!r()) throw Error("no workflowId set; cannot save");
-		let i = await F_(r(), e);
+		let i = await z_(r(), e);
 		t.$$host.dispatchEvent(new CustomEvent("workflow-saved", {
 			detail: i,
 			bubbles: !0,
@@ -14338,7 +14417,7 @@ function L_(e, t) {
 	}
 	return An(() => {
 		Object.assign(t.$$host, { getGraph: () => K(a)?.currentGraph() });
-	}), Sa(N_(e, {
+	}), Sa(L_(e, {
 		get graph() {
 			return n();
 		},
@@ -14370,10 +14449,10 @@ function L_(e, t) {
 		}
 	});
 }
-customElements.define("workflow-canvas", Q(L_, {
+customElements.define("workflow-canvas", Q(V_, {
 	graph: {},
 	workflowId: {},
 	availableTargetDirs: {}
 }, [], []));
 //#endregion
-export { L_ as default };
+export { V_ as default };

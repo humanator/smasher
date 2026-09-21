@@ -4,7 +4,10 @@
 
 {% block content %}
 <section class="workflow-catalog-section">
-    <h2>Workflows</h2>
+    <div class="workflow-catalog-header">
+        <h2>Workflows</h2>
+        <a href="/workflows/new" class="btn btn-primary">+ New Workflow</a>
+    </div>
     {% if workflows.is_empty() %}
     <p class="empty-state">No workflows found. Add one to get started.</p>
     {% else %}

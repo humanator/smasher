@@ -7,23 +7,47 @@ import ToolForm from './ToolForm.svelte';
 // JSON fails the *run*, not this panel, so the form must show a visible
 // error without crashing or blocking further edits.
 describe('ToolForm', () => {
-  it('pre-populates tool/args from attrs', () => {
+  it('pre-selects the matching option for a known tool and hides the custom field', () => {
     render(ToolForm, {
-      props: { attrs: { tool: 'shell', args: '{"cmd":"ls"}' }, onChange: vi.fn() },
+      props: { attrs: { tool: 'render_capture', args: '{"cmd":"ls"}' }, onChange: vi.fn() },
     });
 
-    expect(screen.getByTestId('tool-name')).toHaveValue('shell');
+    expect(screen.getByTestId('tool-select')).toHaveValue('render_capture');
     expect(screen.getByTestId('tool-args')).toHaveValue('{"cmd":"ls"}');
+    expect(screen.queryByTestId('tool-name')).not.toBeInTheDocument();
     expect(screen.queryByTestId('tool-args-error')).not.toBeInTheDocument();
   });
 
-  it('calls onChange with the updated tool name as the user types', async () => {
+  it('falls back to Custom for an unrecognized tool name and shows it in the text field', () => {
+    render(ToolForm, {
+      props: { attrs: { tool: 'shell' }, onChange: vi.fn() },
+    });
+
+    expect(screen.getByTestId('tool-select')).toHaveValue('__custom__');
+    expect(screen.getByTestId('tool-name')).toHaveValue('shell');
+  });
+
+  it('selecting a known tool calls onChange and hides the custom field', async () => {
     const onChange = vi.fn();
     render(ToolForm, { props: { attrs: {}, onChange } });
 
+    await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'system_lint' } });
+
+    expect(onChange).toHaveBeenCalledWith({ attrs: { tool: 'system_lint' } });
+    expect(screen.queryByTestId('tool-name')).not.toBeInTheDocument();
+    expect(screen.getByText(/design-system lint/)).toBeInTheDocument();
+  });
+
+  it('selecting Custom reveals a text field, and typing calls onChange with the typed name', async () => {
+    const onChange = vi.fn();
+    render(ToolForm, { props: { attrs: {}, onChange } });
+
+    await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: '__custom__' } });
+    expect(screen.getByTestId('tool-name')).toHaveValue('');
+
     await fireEvent.input(screen.getByTestId('tool-name'), { target: { value: 'http_fetch' } });
 
-    expect(onChange).toHaveBeenCalledWith({ attrs: { tool: 'http_fetch' } });
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { tool: 'http_fetch' } });
   });
 
   it('valid JSON in args calls onChange and shows no error', async () => {

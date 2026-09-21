@@ -16,19 +16,85 @@ export interface NodeKindConfig {
   title: string;
   theme: Theme;
   paletteGroup: PaletteGroupId;
+  // One-line, plain-language summary of what this node kind actually does
+  // at run time -- grounded in docs/handler-reference.md's per-handler
+  // description for each NodeType. Shown in the palette and in the
+  // selected-node inspector panel so a human authoring a graph doesn't
+  // have to already know the handler docs to guess what a kind is for.
+  description: string;
 }
 
 export const NODE_KIND_CONFIG: Record<NodeType, NodeKindConfig> = {
-  Codergen: { icon: 'LLM', title: 'Codergen', theme: 'blue', paletteGroup: 'pipeline-steps' },
-  Tool: { icon: 'TL', title: 'Tool', theme: 'green', paletteGroup: 'pipeline-steps' },
-  Manager: { icon: 'MGR', title: 'Manager', theme: 'orange', paletteGroup: 'pipeline-steps' },
-  Interviewer: { icon: '?', title: 'Human Gate', theme: 'orange', paletteGroup: 'control-flow' },
-  Conditional: { icon: 'IF', title: 'Conditional', theme: 'orange', paletteGroup: 'control-flow' },
-  SubPipeline: { icon: 'SUB', title: 'Sub-Pipeline', theme: 'green', paletteGroup: 'control-flow' },
-  Start: { icon: '▶', title: 'Start', theme: 'green', paletteGroup: 'structural' },
-  Exit: { icon: '■', title: 'Exit', theme: 'red', paletteGroup: 'structural' },
-  Parallel: { icon: '⑂', title: 'Parallel', theme: 'blue', paletteGroup: 'structural' },
-  FanIn: { icon: '⑃', title: 'Fan-In', theme: 'blue', paletteGroup: 'structural' },
+  Codergen: {
+    icon: 'LLM',
+    title: 'Codergen',
+    theme: 'blue',
+    paletteGroup: 'pipeline-steps',
+    description: 'Runs an AI coding agent from a prompt to generate or modify code.',
+  },
+  Tool: {
+    icon: 'TL',
+    title: 'Tool',
+    theme: 'green',
+    paletteGroup: 'pipeline-steps',
+    description: 'Runs a registered tool (render/capture, lint, critique, etc.) against the working directory.',
+  },
+  Manager: {
+    icon: 'MGR',
+    title: 'Manager',
+    theme: 'orange',
+    paletteGroup: 'pipeline-steps',
+    description: 'Delegates a coordination task to an AI agent.',
+  },
+  Interviewer: {
+    icon: '?',
+    title: 'Human Gate',
+    theme: 'orange',
+    paletteGroup: 'control-flow',
+    description: 'Pauses for human input -- asks a question, optionally with a gallery of candidates to pick from.',
+  },
+  Conditional: {
+    icon: 'IF',
+    title: 'Conditional',
+    theme: 'orange',
+    paletteGroup: 'control-flow',
+    description: 'Branches the pipeline based on a condition evaluated against the current context.',
+  },
+  SubPipeline: {
+    icon: 'SUB',
+    title: 'Sub-Pipeline',
+    theme: 'green',
+    paletteGroup: 'control-flow',
+    description: "Runs another workflow file as a nested sub-pipeline.",
+  },
+  Start: {
+    icon: '▶',
+    title: 'Start',
+    theme: 'green',
+    paletteGroup: 'structural',
+    description: "The pipeline's single entry point.",
+  },
+  Exit: {
+    icon: '■',
+    title: 'Exit',
+    theme: 'red',
+    paletteGroup: 'structural',
+    description: 'A pipeline exit point.',
+  },
+  Parallel: {
+    icon: '⑂',
+    title: 'Parallel',
+    theme: 'blue',
+    paletteGroup: 'structural',
+    description: 'Runs its downstream branches concurrently.',
+  },
+  FanIn: {
+    icon: '⑃',
+    title: 'Fan-In',
+    theme: 'blue',
+    paletteGroup: 'structural',
+    description: 'Waits for concurrent branches to finish before continuing.',
+  },
 };
 
 // Theme -> actual CSS colors, shared by Palette entries and by newly

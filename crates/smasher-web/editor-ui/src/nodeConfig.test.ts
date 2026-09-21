@@ -23,11 +23,12 @@ describe('NODE_KIND_CONFIG', () => {
     expect(Object.keys(NODE_KIND_CONFIG).sort()).toEqual([...ALL_NODE_TYPES].sort());
   });
 
-  it('gives every entry a non-blank icon/title, a known theme, and a valid paletteGroup', () => {
+  it('gives every entry a non-blank icon/title/description, a known theme, and a valid paletteGroup', () => {
     for (const nodeType of ALL_NODE_TYPES) {
       const config = NODE_KIND_CONFIG[nodeType];
       expect(config.icon.trim().length).toBeGreaterThan(0);
       expect(config.title.trim().length).toBeGreaterThan(0);
+      expect(config.description.trim().length).toBeGreaterThan(0);
       expect(THEME_COLORS[config.theme]).toBeDefined();
       expect(['pipeline-steps', 'control-flow', 'structural']).toContain(config.paletteGroup);
     }

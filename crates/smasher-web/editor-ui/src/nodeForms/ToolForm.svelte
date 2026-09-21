@@ -11,11 +11,43 @@
   // `provider` are also folded into `args` by the real handler but are
   // power-user overrides out of this task's scope (tool/args only, per the
   // plan).
+  //
+  // `tool` is a real closed-ish set, unlike Manager's `task` (see
+  // ManagerForm's own comment): the actual backend chain assembled in
+  // crates/smasher-web/src/routes/pages.rs (TaskCriticSynthesisToolBackend
+  // -> SystemLintToolBackend -> HybridToolBackend -> LlmToolBackend) routes
+  // each of these four names to a materially different Rust implementation
+  // (render_capture drives a headless-Chromium capture, system_lint runs a
+  // static design-system lint, task_critic/synthesis run persona-based LLM
+  // critique passes) -- picking the wrong one changes what actually runs,
+  // not just a label. Anything else still falls through to LlmToolBackend,
+  // which executes *any* tool name via a raw LLM prompt, so "Custom…" keeps
+  // that escape hatch rather than locking the field to only these four.
+  const KNOWN_TOOLS: { value: string; description: string }[] = [
+    { value: 'render_capture', description: 'Render a candidate and capture a screenshot/manifest.' },
+    { value: 'system_lint', description: 'Run the design-system lint check against a candidate.' },
+    { value: 'task_critic', description: 'Run a persona-based usability critique of a candidate.' },
+    { value: 'synthesis', description: 'Synthesise prior critiques into a single summary.' },
+  ];
+  const CUSTOM_VALUE = '__custom__';
+
+  function isKnownTool(name: string): boolean {
+    return KNOWN_TOOLS.some((t) => t.value === name);
+  }
+
   let { attrs, onChange }: NodeFormProps = $props();
 
   let tool = $state(untrack(() => (typeof attrs.tool === 'string' ? attrs.tool : '')));
   let argsText = $state(untrack(() => (typeof attrs.args === 'string' ? attrs.args : '')));
   let argsError = $state(untrack(() => validateArgs(argsText)));
+  // Seeded once from the loaded tool name (same one-time-read-on-mount
+  // convention as `tool`/`argsText` above -- the parent's {#key node.id}
+  // remounts this component on node selection change): an unrecognized
+  // (or blank) tool starts in "Custom" mode so its real value stays
+  // visible/editable instead of silently disappearing behind the select.
+  let selectValue = $state(untrack(() => (tool && !isKnownTool(tool) ? CUSTOM_VALUE : tool)));
+  let showCustomInput = $derived(selectValue === CUSTOM_VALUE);
+  let selectedKnownTool = $derived(KNOWN_TOOLS.find((t) => t.value === selectValue));
 
   function validateArgs(text: string): string | null {
     const trimmed = text.trim();
@@ -28,9 +60,25 @@
     }
   }
 
-  function handleToolInput(event: Event) {
-    tool = (event.target as HTMLInputElement).value;
+  function commitTool(next: string) {
+    tool = next;
     onChange({ attrs: { tool: tool || undefined } });
+  }
+
+  function handleSelectChange(event: Event) {
+    const value = (event.target as HTMLSelectElement).value;
+    selectValue = value;
+    if (value === CUSTOM_VALUE) {
+      // Keep whatever custom text was already there (e.g. switching back
+      // from a known tool and then back to Custom); otherwise start blank.
+      commitTool(tool && !isKnownTool(tool) ? tool : '');
+    } else {
+      commitTool(value);
+    }
+  }
+
+  function handleCustomToolInput(event: Event) {
+    commitTool((event.target as HTMLInputElement).value);
   }
 
   function handleArgsInput(event: Event) {
@@ -47,8 +95,29 @@
 <div class="node-form" data-testid="tool-form">
   <label class="node-form-field">
     Tool
-    <input type="text" data-testid="tool-name" value={tool} oninput={handleToolInput} placeholder="e.g. shell" />
+    <select data-testid="tool-select" value={selectValue} onchange={handleSelectChange}>
+      <option value="">Select a tool…</option>
+      {#each KNOWN_TOOLS as opt (opt.value)}
+        <option value={opt.value}>{opt.value}</option>
+      {/each}
+      <option value={CUSTOM_VALUE}>Custom…</option>
+    </select>
   </label>
+  {#if selectedKnownTool}
+    <p class="node-form-hint">{selectedKnownTool.description}</p>
+  {/if}
+  {#if showCustomInput}
+    <label class="node-form-field">
+      Custom tool name
+      <input
+        type="text"
+        data-testid="tool-name"
+        value={tool}
+        oninput={handleCustomToolInput}
+        placeholder="e.g. shell"
+      />
+    </label>
+  {/if}
   <label class="node-form-field">
     Args (JSON)
     <textarea data-testid="tool-args" rows="4" value={argsText} oninput={handleArgsInput}></textarea>

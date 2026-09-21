@@ -409,6 +409,9 @@
           ×
         </button>
       </div>
+      <p class="node-inspector-description" data-testid="node-inspector-description">
+        {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.description ?? ''}
+      </p>
       <!-- Remount on selection change: each nodeForms/*.svelte component
            seeds its local field state from `attrs` only once per mount
            (documented in each form's own comment) -- {#key} forces a fresh
@@ -459,9 +462,11 @@
 </div>
 
 <style>
-  /* Task 8: connection handles hidden until the owning node is hovered
-     (spec Assumption 2 / Agent Flow reference), revealed with a plain
-     opacity transition; a node that has at least one edge (wf-node-connected,
+  /* Connection handles dim (not fully hidden -- an earlier revision hid
+     them at opacity 0 until hover, which made it impossible to discover
+     where a connection could even be dragged from) until the owning node
+     is hovered, brightened to full opacity with a plain opacity
+     transition; a node that has at least one edge (wf-node-connected,
      computed in this file's `connectedNodeIds` $effect above) keeps its
      handles visibly accent-colored even without hovering, so a "wired up"
      node reads as such at a glance instead of needing a hover to confirm.
@@ -470,7 +475,7 @@
      component's own template, so Svelte's default per-component style
      scoping never reaches them. */
   :global(.svelte-flow__handle) {
-    opacity: 0;
+    opacity: 0.45;
     transition:
       opacity 0.15s ease,
       background-color 0.15s ease,
@@ -486,6 +491,39 @@
     opacity: 1;
     background-color: #3b82f6;
     border-color: #3b82f6;
+  }
+
+  /* Edge lines default to Svelte Flow's own pale-gray 1px stroke
+     (--xy-edge-stroke-default: #b1b1b7), which is nearly invisible against
+     this app's light canvas background -- a loaded graph with every node
+     genuinely connected read as a disconnected grid of boxes because the
+     lines joining them couldn't be seen. Overriding the library's own
+     theming variables (rather than hand-styling every edge path) keeps
+     hover/selected states, arrowheads, etc. all still driven by the one
+     source of truth. */
+  :global(.svelte-flow) {
+    --xy-edge-stroke-default: #64748b;
+    --xy-edge-stroke-width-default: 2;
+    --xy-edge-stroke-selected-default: #3b82f6;
+  }
+
+  /* @xyflow/svelte 1.6.6's own base.css gives `.svelte-flow__viewport` and
+     `.svelte-flow__pane` real dimensions via a shared `.svelte-flow__container`
+     class (`width: 100%; height: 100%`), but never gives `.svelte-flow__edges`
+     (each edge's wrapping <svg class="svelte-flow__edge-wrapper"> included)
+     any sizing at all -- confirmed via computed-style inspection that both
+     collapse to a 0x0 CSS box (absolutely positioned, auto width, no content
+     to shrink-wrap around, so shrink-to-fit resolves to 0). A zero-width or
+     zero-height <svg> is spec'd to not render its content at all, `overflow:
+     visible` or not -- every edge line was being laid out with correct
+     path/stroke data (confirmed via getBoundingClientRect and computed
+     style) yet never painted a single pixel. Sizing both explicitly to fill
+     their real (non-zero) `.svelte-flow__viewport` ancestor fixes rendering
+     without touching the library's own files. */
+  :global(.svelte-flow__edges),
+  :global(svg.svelte-flow__edge-wrapper) {
+    width: 100%;
+    height: 100%;
   }
 
   .node-inspector {
@@ -516,6 +554,13 @@
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
+    color: #64748b;
+  }
+
+  .node-inspector-description {
+    margin: 0 0 0.6rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
     color: #64748b;
   }
 

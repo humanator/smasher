@@ -6,6 +6,7 @@
     <title>{% block title %}SMASHER{% endblock %}</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x26A1;</text></svg>">
     <link rel="stylesheet" href="/static/style.css">
+    {% block head %}{% endblock %}
     <script src="/static/htmx.min.js"></script>
     <script src="/static/htmx-ext-sse.js"></script>
 </head>

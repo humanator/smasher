@@ -339,6 +339,9 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.getByTestId('codergen-prompt')).toHaveValue('write code');
     expect(screen.getByTestId('codergen-model')).toHaveValue('gpt-5');
     expect(screen.getByTestId('node-inspector-label')).toHaveValue('Generate');
+    expect(screen.getByTestId('node-inspector-description')).toHaveTextContent(
+      'Runs an AI coding agent from a prompt to generate or modify code.',
+    );
   });
 
   it('shows InterviewerForm for an Interviewer node', async () => {

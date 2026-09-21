@@ -9,6 +9,17 @@
   // with "invalid JSON in config attribute") -- same treatment as
   // ToolForm's tool/args. `model`/`provider` fold-in is also real but out
   // of this task's scope (task/config only, per the plan).
+  //
+  // Unlike Tool's `tool` attr (a closed set of real, differently-behaving
+  // Rust backends -- see ToolForm's own comment), `task` has no fixed
+  // vocabulary anywhere in the engine: `LlmManagerBackend::coordinate`
+  // (crates/smasher-web/src/backend.rs) sends it straight into an LLM
+  // prompt as free-form text ("Task: {task}"), so a `<select>` here would
+  // misrepresent it as a closed enum. `list=`/`<datalist>` gives a native
+  // dropdown of suggestions while keeping this a genuine free-text field --
+  // picking one, editing one, or ignoring them entirely all work.
+  const TASK_SUGGESTIONS = ['coordinate-review', 'delegate-subtask', 'aggregate-results', 'escalate-to-human'];
+
   let { attrs, onChange }: NodeFormProps = $props();
 
   let task = $state(untrack(() => (typeof attrs.task === 'string' ? attrs.task : '')));
@@ -41,8 +52,21 @@
 <div class="node-form" data-testid="manager-form">
   <label class="node-form-field">
     Task
-    <input type="text" data-testid="manager-task" value={task} oninput={handleTaskInput} placeholder="e.g. coordinate-review" />
+    <input
+      type="text"
+      data-testid="manager-task"
+      list="manager-task-suggestions"
+      value={task}
+      oninput={handleTaskInput}
+      placeholder="e.g. coordinate-review"
+    />
+    <datalist id="manager-task-suggestions">
+      {#each TASK_SUGGESTIONS as suggestion (suggestion)}
+        <option value={suggestion}></option>
+      {/each}
+    </datalist>
   </label>
+  <p class="node-form-hint">A free-text description of the coordination task, sent to the LLM as-is -- the suggestions above are starting points, not fixed options.</p>
   <label class="node-form-field">
     Config (JSON)
     <textarea data-testid="manager-config" rows="4" value={configText} oninput={handleConfigInput}></textarea>

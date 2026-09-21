@@ -71,7 +71,6 @@ struct WorkflowEditorTemplate {
 #[template(path = "workflow_detail.html")]
 struct WorkflowDetailTemplate {
     workflow: crate::workflows::WorkflowSummary,
-    dot_source: String,
     active_run: Option<RunSummary>,
     // Duplicated from `RunDetailTemplate` -- Askama template structs are
     // flat data, not composable, so `run_detail_body.html`'s `{% include %}`
@@ -500,7 +499,6 @@ async fn workflow_detail(
 ) -> Result<impl IntoResponse, WebError> {
     let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
         .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
-    let dot_source = std::fs::read_to_string(&workflow.path)?;
 
     let runs_map = state.runs.read().await;
     let runs = runs_for_workflow(&runs_map, Some(&id));
@@ -528,7 +526,6 @@ async fn workflow_detail(
 
     Ok(HtmlTemplate(WorkflowDetailTemplate {
         workflow,
-        dot_source,
         active_run,
         historical_events,
         initial_input_tokens,
@@ -1888,7 +1885,7 @@ digraph {
     }
 
     #[tokio::test]
-    async fn workflow_detail_known_id_shows_name_source_dir_and_dot_source() {
+    async fn workflow_detail_known_id_shows_name_and_source_dir() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
 
@@ -1914,8 +1911,9 @@ digraph {
             .unwrap();
         let html = String::from_utf8_lossy(&body);
         assert!(html.contains("hello.dot"));
-        // askama HTML-escapes the raw DOT source (`>` -> `&gt;`), correctly.
-        assert!(html.contains("digraph { a -&gt; b }"));
+        // The raw DOT source itself is no longer shown on this page -- see
+        // `workflow_detail_has_no_raw_dot_text_and_no_edit_form` below.
+        assert!(!html.contains("digraph { a -&gt; b }"));
         assert!(html.contains("All workflows"));
     }
 
@@ -1994,7 +1992,7 @@ digraph {
     }
 
     #[tokio::test]
-    async fn workflow_detail_shows_dot_source_read_only_with_no_edit_form() {
+    async fn workflow_detail_has_no_raw_dot_text_and_no_edit_form() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("hello.dot"), "digraph { a -> b }").unwrap();
         let id = only_workflow_id(tmp.path());
@@ -2010,7 +2008,12 @@ digraph {
             .unwrap();
         let html = String::from_utf8_lossy(&body);
 
-        assert!(html.contains("<pre class=\"dot-source-preview\">digraph { a -&gt; b }</pre>"));
+        // The raw DOT source is no longer shown on this page at all -- the
+        // visual editor (linked via the Edit button, see
+        // `workflow_detail_links_to_the_edit_route` below) is the only way
+        // to see/change a workflow's structure now.
+        assert!(!html.contains("dot-source-preview"));
+        assert!(!html.contains("digraph { a -&gt; b }"));
         // The DOT source itself is never editable -- no textarea named
         // `dot_source` and no form that could write it back to disk (the
         // spec's "Never do: DOT editing"). Other run-parameter textareas
