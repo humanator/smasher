@@ -660,7 +660,8 @@ Response body (200 OK):
       "source_dir": "examples",
       "path": "examples/consensus_task.dot"
     }
-  ]
+  ],
+  "available_target_dirs": ["examples"]
 }
 ```
 
@@ -670,6 +671,7 @@ Response body (200 OK):
 | `name` | string | Display name (relative path from configured root). |
 | `source_dir` | string | The configured directory root this workflow was found under. |
 | `path` | string | Full filesystem path to the workflow file. |
+| `available_target_dirs` | string[] | The server's configured workflow directories (`--workflow-dir`), regardless of whether any workflow has been found under them yet. Used to populate the node-editor's "new workflow" target-directory picker; `POST /api/workflows/new`'s `target_dir` must be one of these. |
 
 Empty array if no workflows are configured or found.
 

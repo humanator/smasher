@@ -38,7 +38,12 @@
 </script>
 
 <div class="workflow-catalog">
-  <h1>Workflows</h1>
+  <div class="catalog-header">
+    <h1>Workflows</h1>
+    <a href="/workflows/new" class="btn btn-primary btn-new-workflow">
+      + New Workflow
+    </a>
+  </div>
 
   {#if loading}
     <p class="loading">Loading workflows...</p>
@@ -53,9 +58,14 @@
           <h2>{formatWorkflowName(workflow.name)}</h2>
           <p class="workflow-path">{workflow.name}</p>
           <p class="workflow-source">From: {workflow.source_dir}</p>
-          <a href="/runs/new?workflow={workflow.id}" class="btn btn-primary">
-            Run Workflow
-          </a>
+          <div class="workflow-actions">
+            <a href="/workflows/{workflow.id}/edit" class="btn btn-secondary btn-sm">
+              Edit
+            </a>
+            <a href="/runs/new?workflow={workflow.id}" class="btn btn-primary btn-sm">
+              Run Workflow
+            </a>
+          </div>
         </div>
       {/each}
     </div>
@@ -67,9 +77,16 @@
     padding: 2rem;
   }
 
+  .catalog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+  }
+
   h1 {
     font-size: 2rem;
-    margin-bottom: 2rem;
+    margin: 0;
     color: #1e293b;
   }
 
@@ -99,6 +116,8 @@
     background-color: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
   }
 
   .workflow-card:hover {
@@ -124,6 +143,12 @@
     color: #94a3b8;
   }
 
+  .workflow-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+  }
+
   .btn {
     display: inline-block;
     padding: 0.5rem 1rem;
@@ -131,6 +156,8 @@
     text-decoration: none;
     font-size: 0.875rem;
     transition: all 0.2s;
+    border: none;
+    cursor: pointer;
   }
 
   .btn-primary {
@@ -140,5 +167,24 @@
 
   .btn-primary:hover {
     background-color: #2563eb;
+  }
+
+  .btn-secondary {
+    background-color: #6b7280;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background-color: #4b5563;
+  }
+
+  .btn-new-workflow {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  .btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
   }
 </style>

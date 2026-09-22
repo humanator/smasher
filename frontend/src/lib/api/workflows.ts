@@ -36,10 +36,11 @@ export interface WorkflowSummary {
 
 export interface WorkflowsListResponse {
   workflows: WorkflowSummary[];
+  available_target_dirs: string[];
 }
 
 export interface CreateGraphResponse {
-  workflow_id: string;
+  id: string;
 }
 
 interface ApiError {
@@ -85,11 +86,20 @@ export async function updateWorkflowGraph(id: string, graph: EditorGraph): Promi
   }
 }
 
-export async function createWorkflowGraph(graph: EditorGraph): Promise<CreateGraphResponse> {
+export async function createWorkflowGraph(
+  graph: EditorGraph,
+  targetDir: string,
+  name: string
+): Promise<CreateGraphResponse> {
+  const request = {
+    name,
+    target_dir: targetDir,
+    graph,
+  };
   const response = await fetch(getApiUrl('/workflows/new'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(graph),
+    body: JSON.stringify(request),
   });
   return handleResponse<CreateGraphResponse>(response);
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Root app shell - routes to components based on URL path
-  // ABOUTME: Minimal manual routing: catalog at /, run detail at /runs/{id}
+  // ABOUTME: Minimal manual routing: catalog at /, run detail at /runs/{id}, workflow editor at /workflows/*
 
   import './app.css';
   import { onMount } from 'svelte';
@@ -13,8 +13,12 @@
   import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
+  import NewWorkflowPage from './components/dashboard/NewWorkflowPage.svelte';
+  import WorkflowEditorPage from './components/dashboard/WorkflowEditorPage.svelte';
 
   let runId = $state<string | null>(null);
+  let workflowPageType = $state<'new' | 'edit' | null>(null);
+  let workflowId = $state<string | null>(null);
 
   onMount(() => {
     // Set initial path from window.location
@@ -35,14 +39,49 @@
     const runMatch = path.match(/^\/runs\/([a-z0-9-]+)$/);
     if (runMatch) {
       runId = runMatch[1];
-    } else {
-      runId = null;
+      workflowPageType = null;
+      workflowId = null;
+      return;
     }
+
+    // Extract workflow page type and ID
+    // /workflows/new -> create new
+    const newWorkflowMatch = path.match(/^\/workflows\/new$/);
+    if (newWorkflowMatch) {
+      runId = null;
+      workflowPageType = 'new';
+      workflowId = null;
+      return;
+    }
+
+    // /workflows/{id}/edit -> edit existing
+    const editWorkflowMatch = path.match(/^\/workflows\/([a-z0-9_-]+)\/edit$/);
+    if (editWorkflowMatch) {
+      runId = null;
+      workflowPageType = 'edit';
+      workflowId = editWorkflowMatch[1];
+      return;
+    }
+
+    // Default to catalog view
+    runId = null;
+    workflowPageType = null;
+    workflowId = null;
   }
 </script>
 
 <main class="min-h-screen bg-gray-50">
-  {#if runId}
+  {#if workflowPageType === 'new'}
+    <!-- New Workflow Page -->
+    <div class="max-w-7xl mx-auto">
+      <NewWorkflowPage />
+    </div>
+  {:else if workflowPageType === 'edit' && workflowId}
+    <!-- Edit Workflow Page -->
+    <div class="max-w-7xl mx-auto">
+      <WorkflowEditorPage {workflowId} />
+    </div>
+  {:else if runId}
     <!-- Run Detail View: EventLog + QuestionCard -->
     <div class="max-w-6xl mx-auto p-8">
       <div class="mb-8">

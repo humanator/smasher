@@ -106,6 +106,7 @@ pub struct CandidatesResponse {
 #[derive(Debug, Serialize)]
 pub struct WorkflowsResponse {
     pub workflows: Vec<crate::workflows::WorkflowSummary>,
+    pub available_target_dirs: Vec<String>,
 }
 
 /// A single recorded gallery-gate decision, JSON-shaped from
@@ -577,7 +578,10 @@ async fn list_decisions(
 
 async fn list_workflows(State(state): State<AppState>) -> Json<WorkflowsResponse> {
     let workflows = crate::workflows::scan_workflows(&state.workflow_dirs);
-    Json(WorkflowsResponse { workflows })
+    Json(WorkflowsResponse {
+        workflows,
+        available_target_dirs: state.workflow_dirs.clone(),
+    })
 }
 
 #[cfg(test)]
@@ -1112,8 +1116,38 @@ mod tests {
         let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
             .await
             .unwrap();
-        // The empty test_state() has no workflow_dirs, so the response should be {"workflows":[]}
+        // The empty test_state() has no workflow_dirs, so the response should include empty arrays
         let body_str = String::from_utf8(body.to_vec()).unwrap();
-        assert_eq!(body_str, r#"{"workflows":[]}"#);
+        assert_eq!(body_str, r#"{"workflows":[],"available_target_dirs":[]}"#);
+    }
+
+    #[tokio::test]
+    async fn list_workflows_includes_available_target_dirs() {
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            "/tmp".into(),
+            vec!["/workflows".into(), "/examples".into()],
+        );
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri("/api/workflows")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_str = String::from_utf8(body.to_vec()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+
+        assert_eq!(
+            parsed.get("available_target_dirs").unwrap(),
+            &serde_json::json!(["/workflows", "/examples"])
+        );
     }
 }
