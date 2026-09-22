@@ -390,6 +390,7 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/runs/{id}/questions` | List pending human-gate questions. |
 | `POST` | `/api/runs/{id}/questions/{qid}/answer` | Answer a human-gate question (JSON). |
 | `POST` | `/api/graph/nodes` | Parse DOT source and return node list. |
+| `GET` | `/spa/*` | Serve the `smasher-spa` static bundle, with SPA-style fallback to `index.html` for unmatched paths. Not yet mounted at `/` (still owned by the legacy dashboard until `smasher-spa` ships parity, see the Boundaries section of `SPEC-smasher-web-api.md`). |
 
 ### POST /api/runs -- Submit Pipeline
 
@@ -413,26 +414,32 @@ Response body:
 
 ```json
 {
-  "run_id": "run-abc-123",
-  "status": "running"
+  "run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "status": "Running",
+  "run_working_dir": "artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV"
 }
 ```
 
+`status` is always `"Running"` on submit (submission is synchronous only up to launch; execution continues in the background). `run_working_dir` is relative to the server's `data_dir`.
+
 ### GET /api/runs -- List Runs
 
-Response body:
+Response body — `runs` is a list of the same shape as `GET /api/runs/{id}` below:
 
 ```json
 {
   "runs": [
     {
-      "run_id": "run-1",
-      "graph_name": "pipeline_a",
+      "id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "status": "Completed",
       "started_at": "2026-02-07T10:00:00Z",
-      "completed_at": null,
-      "status": "running",
-      "total_nodes_executed": 3,
-      "variables": {}
+      "completed_at": "2026-02-07T10:00:05Z",
+      "graph_name": "pipeline_a",
+      "error": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "run_working_dir": "artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "workflow_id": null
     }
   ]
 }
@@ -440,23 +447,24 @@ Response body:
 
 ### GET /api/runs/{id} -- Run Status
 
-Response body:
+Response body (flat `RunSummary`, no nested `metadata` wrapper):
 
 ```json
 {
-  "run_id": "run-abc-123",
-  "status": "running",
-  "metadata": {
-    "run_id": "run-abc-123",
-    "graph_name": "my_pipeline",
-    "started_at": "2026-02-07T10:00:00Z",
-    "completed_at": null,
-    "status": "running",
-    "total_nodes_executed": 5,
-    "variables": {"env": "production"}
-  }
+  "id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "status": "Running",
+  "started_at": "2026-02-07T10:00:00Z",
+  "completed_at": null,
+  "graph_name": "my_pipeline",
+  "error": null,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "run_working_dir": "artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "workflow_id": null
 }
 ```
+
+`status` is one of `Running`, `Completed`, `Failed`, `Aborted` (PascalCase — it's Rust's `{:?}` `Debug` output of `RunStatus`, not a lowercase string).
 
 ### GET /api/runs/{id}/events -- SSE Event Stream
 
@@ -536,7 +544,9 @@ Returns empty array if run exists but has no candidates yet.
 
 ### GET /api/runs/{id}/questions -- List Questions
 
-List all pending human-gate questions for a run.
+List all pending human-gate questions for a run. Poll this to detect a pause — `RunStatus`
+has no `Paused`/`Waiting` variant, so `status` stays `"Running"` the entire time a run is
+blocked on a human-gate answer; a non-empty `questions` array is the actual pause signal.
 
 Response body (200 OK):
 
@@ -545,17 +555,22 @@ Response body (200 OK):
   "questions": [
     {
       "id": "q-uuid-1",
-      "node_id": "gate_node",
       "question": "Is this acceptable?",
-      "response": null
+      "choices": [],
+      "kind": "free_form",
+      "node_id": "gate_node"
     }
   ]
 }
 ```
 
+`kind` is one of `free_form`, `multiple_choice`, `approval`. `choices` is populated for
+`multiple_choice` questions, empty otherwise.
+
 ### POST /api/runs/{id}/questions/{qid}/answer -- Answer Question
 
-Answer a human-gate question with a JSON body.
+Answer a human-gate question with a JSON body. Requires `Content-Type: application/json`;
+a form-encoded body is rejected with `415 Unsupported Media Type`.
 
 Request body (application/json):
 
@@ -569,10 +584,11 @@ Response body (200 OK):
 
 ```json
 {
-  "response": "yes",
-  "pending": false
+  "success": true
 }
 ```
+
+On failure (e.g. unknown question id), `success` is `false` and an `error` field is included.
 
 ### GET /api/health -- Health Check
 
@@ -586,23 +602,43 @@ Response body:
 }
 ```
 
+### GET /spa/* -- Static SPA Serving
+
+Serves the `smasher-spa` build's static assets, disk-based (not embedded in the binary).
+Falls back to `index.html` for any unmatched path (SPA client-side routing pattern).
+
+Configuration:
+
+- Reads the dist directory from the `SMASHER_SPA_DIST` environment variable.
+- Defaults to `../../frontend/dist` relative to the `smasher-web` crate.
+- If the dist directory doesn't exist at server startup, the mount 404s everything
+  instead of crashing the server — useful on a dev machine with no `smasher-spa`
+  build yet.
+
+Not yet mounted at `/` — the legacy askama/HTMX dashboard (`pages.rs`) still owns `/`
+until `smasher-spa` ships and confirms dashboard parity (the final-cutover task).
+
 ### Run Statuses
+
+`status` values are PascalCase (Rust `Debug` output of `RunStatus`), not lowercase:
 
 | Status | Description |
 |---|---|
-| `running` | Pipeline is actively executing. |
-| `completed` | Pipeline finished successfully. |
-| `failed` | Pipeline terminated with an error. |
-| `aborted` | Pipeline was cancelled before completion. |
+| `Running` | Pipeline is actively executing (also covers "paused on a human-gate question" — see [List Questions](#get-apirunsidquestions----list-questions)). |
+| `Completed` | Pipeline finished successfully. |
+| `Failed` | Pipeline terminated with an error. |
+| `Aborted` | Pipeline was cancelled before completion. |
 
 ### Server Configuration
 
 ```rust
 pub struct ServerConfig {
-    pub host: String,           // Default: "127.0.0.1"
-    pub port: u16,              // Default: 2389
-    pub enable_status_endpoint: bool,   // Default: true
-    pub enable_trigger_endpoint: bool,  // Default: true
+    pub port: u16,               // Default: 21541
+    pub host: [u8; 4],           // Default: [127, 0, 0, 1] (never binds beyond localhost)
+    pub model: String,           // Default LLM model for pipeline execution
+    pub provider: Option<String>,// Optional provider override, bypasses model-name inference
+    pub data_dir: String,        // Default: ~/.smasher (override: SMASHER_DATA_DIR)
+    pub workflow_dirs: Vec<String>, // Additional dirs scanned for .dot/.gv workflow files
 }
 ```
 
@@ -861,15 +897,16 @@ determines their `NodeType`.
 
 | Shape | NodeType | Description |
 |---|---|---|
-| `circle`, `point` | `Start` | Entry point of the pipeline. |
-| `doublecircle` | `Exit` | Terminal node. |
+| `circle`, `point`, `Mdiamond` | `Start` | Entry point of the pipeline. |
+| `doublecircle`, `Msquare` | `Exit` | Terminal node. |
 | `box`, `rectangle` | `Codergen` | Code generation node (runs an agent session). |
 | `diamond` | `Conditional` | Conditional branching node. |
-| `hexagon` | `Tool` | Tool execution node. |
-| `oval`, `ellipse` | `Interviewer` | Human interaction node. |
-| `parallelogram` | `Parallel` | Parallel fan-out node. |
+| `hexagon`, `oval`, `ellipse` | `Interviewer` | Human-gate node — pauses the pipeline for a question/answer round trip via `GET /api/runs/{id}/questions` + `POST .../answer`. |
+| `parallelogram` | `Tool` | Tool execution node (e.g. `render_capture`). |
+| `component` | `Parallel` | Parallel fan-out node. |
+| `tripleoctagon` | `FanIn` | Parallel fan-in join node. |
 | `house` | `Manager` | Manager/coordinator node. |
-| `component` | `SubPipeline` | Sub-pipeline node referencing an external DOT file. |
+| `folder` | `SubPipeline` | Sub-pipeline node referencing an external DOT file. |
 | *(any other)* | `Generic` | Generic processing node. |
 
 ### Edge Attributes

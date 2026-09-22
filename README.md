@@ -15,7 +15,7 @@ Five crates, bottom to top:
 | `smasher-agent` | Agent loop with tools (read, write, edit, shell, grep, glob). Steering rules, subagents, sandboxed execution. |
 | `smasher-attractor` | The graph engine. Parses DOT, resolves node types from shapes, dispatches handlers, runs the pipeline. |
 | `smasher-cli` | `smasher complete`, `smasher chat`, `smasher run`, `smasher serve`, `smasher resume`, `smasher render`, `smasher ingest`, `smasher archive`, `smasher lint`. |
-| `smasher-web` | HTMX dashboard on port 21541. Live event stream, graph visualization, human Q&A. |
+| `smasher-web` | JSON+SSE API on port 21541 (submit, live event stream, human-gate Q&A, static SPA serving). Legacy HTMX dashboard still lives here too, pending removal once `smasher-spa` ships. |
 
 ## Setup
 
@@ -103,7 +103,7 @@ crates/
   smasher-agent/        # Agent loop, tools, steering, events
   smasher-attractor/    # DOT parser, graph engine, handlers
   smasher-cli/          # CLI binary
-  smasher-web/          # Web dashboard (axum + askama + HTMX)
+  smasher-web/          # JSON+SSE API + static SPA serving (axum); legacy askama/HTMX dashboard still present
 docs/                   # Reference docs, quickstart guide
 examples/               # Sample DOT pipelines
 scripts/                # CI helpers

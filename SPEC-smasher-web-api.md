@@ -107,11 +107,11 @@ impl ApiError {
 
 ## Success Criteria
 
-- [ ] JSON/SSE endpoints cover: submit pipeline, live event stream, list/status, human-gate answer.
-- [ ] Static file route serves `smasher-spa`'s build output with SPA-style fallback routing.
-- [ ] `smasher serve` behavior is otherwise unchanged from the user's perspective (same command, same port).
-- [ ] askama templates and HTMX JS removed.
-- [ ] All new/changed code has unit + integration coverage; `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean.
+- [x] JSON/SSE endpoints cover: submit pipeline, live event stream, list/status, human-gate answer.
+- [x] Static file route serves `smasher-spa`'s build output with SPA-style fallback routing. (Mounted at `/spa`, not yet at `/` — moving it to `/` is Task 9, blocked below.)
+- [x] `smasher serve` behavior is otherwise unchanged from the user's perspective (same command, same port).
+- [ ] askama templates and HTMX JS removed. **Blocked on Task 9** — deliberately not done yet; waiting on `smasher-spa` to ship and confirm dashboard parity before deleting the legacy dashboard.
+- [x] All new/changed code has unit + integration coverage; `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean.
 
 ## Open Questions
 
