@@ -772,9 +772,11 @@ Tauri command calls later. Wire it into the node editor's save/load flow
 call-sites the spec's boundary requires ("implement OS-native features via
 the `lib/native/` shim so the same components run in-browser").
 
+**Scope decision (confirmed with Jobsworth before implementing):** "node-editor save/load flow" in this task's description originally suggested routing the editor's save/load through `lib/native/`'s `saveFile`/`loadFile` (local file-dialog download/import of raw `.dot` text) — but the editor's real save/load already goes through the REST API (Task 19), and no backend endpoint exists to export a workflow's raw `.dot` text for a local download; adding one would be new scope beyond this task's "Small (3-4 files)" budget and beyond anything else in this plan. Decided: skip the file-dialog wiring entirely — the REST-API flow already is the correct abstraction (a future `smasher-desktop` would still go through the same HTTP API, not local Tauri fs calls, since server-side DOT validation is a hard boundary). This task is scoped down to just the unambiguous half: wire `showNotification()` to pipeline-completion SSE events.
+
 **Acceptance criteria:**
 - [ ] `isTauri()` correctly detects absence of `window.__TAURI__` (still `false` — `smasher-desktop` doesn't exist yet) and the code path is structured so a future `smasher-desktop` only needs to provide the global, not change any SPA code
-- [ ] At least node-editor save/load and pipeline-completion notification call through the shim, not directly through browser APIs
+- [ ] Pipeline-completion (and abort) notifications call through the shim's `showNotification`, not directly through the browser `Notification` API
 
 **Verification:**
 - [ ] Vitest tests for shim call-sites
