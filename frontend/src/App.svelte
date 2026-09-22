@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
   import WorkflowCatalog from './components/dashboard/WorkflowCatalog.svelte';
   import RunForm from './components/dashboard/RunForm.svelte';
+  import RunList from './components/dashboard/RunList.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
   import QuestionCard from './components/dashboard/QuestionCard.svelte';
 
@@ -76,6 +77,10 @@
           <h2 class="text-2xl font-semibold mb-4">Submit Pipeline</h2>
           <RunForm />
         </div>
+      </div>
+
+      <div class="mt-8">
+        <RunList />
       </div>
     </div>
   {/if}
