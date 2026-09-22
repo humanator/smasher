@@ -84,7 +84,7 @@ Questions).
 ### Phase 2: JSON/SSE Contract Completion
 
 - [x] Task 2: SSE events as JSON
-- [ ] Task 3: Human-gate answer as JSON
+- [x] Task 3: Human-gate answer as JSON
 - [ ] Task 4: Gallery candidate listing endpoint
 - [ ] Task 5: API reference documentation
 

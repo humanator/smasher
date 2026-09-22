@@ -1,7 +1,7 @@
 // ABOUTME: Interviewer question and answer route handlers for human-in-the-loop pipelines.
 // ABOUTME: Lists pending questions and submits answers to the HttpInterviewer queue.
 
-use axum::extract::{Form, Path, State};
+use axum::extract::{Path, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 
@@ -43,7 +43,7 @@ async fn list_questions(
 async fn answer_question(
     State(state): State<AppState>,
     Path((id, qid)): Path<(String, String)>,
-    Form(req): Form<AnswerQuestionRequest>,
+    Json(req): Json<AnswerQuestionRequest>,
 ) -> Result<Json<AnswerQuestionResponse>, WebError> {
     let runs = state.runs.read().await;
     let record = runs
@@ -78,24 +78,19 @@ mod tests {
     #[tokio::test]
     async fn answer_question_run_not_found() {
         let app = router().with_state(test_state());
+        let body = serde_json::json!({"answer": "yes"});
         let req = Request::builder()
             .method("POST")
             .uri("/api/runs/nonexistent/questions/q1/answer")
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("answer=yes"))
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
-    /// Regression guard: `question_card.html`'s `<form hx-post=...>` has no
-    /// `hx-ext="json-enc"`, so htmx (like any plain HTML form) submits it as
-    /// `application/x-www-form-urlencoded` — not JSON. This exercises the
-    /// exact content type and body shape that form actually sends, proving
-    /// the plain (non-gallery) human-gate answer path works from a real
-    /// browser rather than only from a test client free to pick JSON.
     #[tokio::test]
-    async fn answer_question_accepts_the_content_type_the_rendered_form_sends() {
+    async fn answer_question_accepts_json() {
         use crate::state::RunRecord;
         use chrono::Utc;
         use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
@@ -148,11 +143,12 @@ mod tests {
         tokio::task::yield_now().await;
         let qid = interviewer.list_questions().questions[0].id.clone();
 
+        let body = serde_json::json!({"answer": "yes"});
         let req = Request::builder()
             .method("POST")
             .uri(format!("/api/runs/run1/questions/{qid}/answer"))
-            .header("content-type", "application/x-www-form-urlencoded")
-            .body(Body::from("answer=yes"))
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
