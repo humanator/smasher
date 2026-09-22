@@ -75,7 +75,7 @@ Questions).
 
 ### Phase 1: Foundation
 
-- [ ] Task 1: Deduplicate pipeline-launch logic
+- [x] Task 1: Deduplicate pipeline-launch logic
 
 ### Checkpoint: Foundation
 - [ ] `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean

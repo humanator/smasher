@@ -7,6 +7,7 @@ pub mod decision_history;
 pub mod error;
 pub mod rehydrate;
 pub mod routes;
+pub mod run_launch;
 pub mod server;
 pub mod sse;
 pub mod state;

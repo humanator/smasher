@@ -2,8 +2,12 @@
 // ABOUTME: Provides the browser-facing pages: dashboard, run detail, and fragments.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
+
+#[cfg(test)]
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::atomic::AtomicU64;
 
 use askama::Template;
 use axum::Router;
@@ -603,28 +607,10 @@ async fn create_run(
     node_overrides: Option<String>,
     workflow_id: Option<String>,
 ) -> Result<String, WebError> {
-    use chrono::Utc;
-    use std::sync::Arc;
-    use tokio_util::sync::CancellationToken;
-
-    use smasher_attractor::artifact::ArtifactStore;
     use smasher_attractor::dot::parser;
-    use smasher_attractor::engine::{Engine, EngineConfig};
-    use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
     use smasher_attractor::graph;
-    use smasher_attractor::handler::{CodergenHandler, HandlerRegistry, default_registry};
-    use smasher_attractor::http_interviewer::HttpInterviewer;
-    use smasher_attractor::interviewer::InterviewerHandler;
     use smasher_attractor::lint::LintRunner;
-    use smasher_attractor::log_sink::LogSink;
-    use smasher_attractor::manager_handler::ManagerHandler;
-    use smasher_attractor::parallel::ParallelHandler;
-    use smasher_attractor::state::{Context, RunStatus};
-    use smasher_attractor::tool_handler::{ToolBackend, ToolHandler};
     use smasher_attractor::transforms;
-
-    use crate::backend::{AgentCodergenBackend, LlmManagerBackend, LlmToolBackend};
-    use crate::state::RunRecord;
 
     let dot_graph = parser::parse(&dot_source)?;
     let mut resolved = graph::resolve(&dot_graph)?;
@@ -677,235 +663,39 @@ async fn create_run(
         )));
     }
 
-    let run_id = uuid::Uuid::new_v4().to_string();
-
-    // Create per-run artifact directory for isolation.
-    let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
-    let graph_name =
-        smasher_attractor::run_dir::sanitize_graph_name(&resolved.name.clone().unwrap_or_default());
-    let mut run_directory = smasher_attractor::run_dir::RunDirectory::create(
-        &artifacts_base,
-        &run_id,
-        &graph_name,
-        &dot_source,
+    let record = crate::run_launch::launch_pipeline(
+        state,
+        crate::run_launch::LaunchConfig {
+            graph: resolved,
+            dot_source: dot_source.clone(),
+            variables,
+            model,
+            provider,
+            resume_info: None,
+            workflow_id: workflow_id.clone(),
+            use_checkpointing: true,
+        },
     )
-    .map_err(|e| WebError::Internal(format!("failed to create run directory: {e}")))?;
-    if let Err(e) = run_directory.symlink_into_root("design-kit", &crate::server::design_kit_dir())
-    {
-        tracing::warn!(error = %e, "failed to link design-kit into run directory");
-    }
-    std::fs::write(
-        run_directory.manifest().directories.root.join("graph.dot"),
-        &dot_source,
-    )?;
+    .await?;
+
+    let run_id = record.id.clone();
+    let run_working_dir = record.run_working_dir.clone().unwrap_or_default();
+
+    // Dashboard-specific: write graph.dot and persist initial run metadata
+    // (API doesn't require these, so they stay here instead of in run_launch)
+    let run_path = std::path::Path::new(&run_working_dir);
+    std::fs::write(run_path.join("graph.dot"), &dot_source)?;
+
+    let mut run_directory = smasher_attractor::run_dir::RunDirectory::open(run_path)
+        .map_err(|e| WebError::Internal(format!("failed to open run directory: {e}")))?;
     run_directory
         .persist_run_metadata(workflow_id.clone(), Some("Running".to_string()), 0, 0, None)
         .map_err(|e| WebError::Internal(format!("failed to persist run metadata: {e}")))?;
-    let run_working_dir = run_directory
-        .manifest()
-        .directories
-        .root
-        .display()
-        .to_string();
-
-    let emitter = Arc::new(PipelineEventEmitter::default());
-    let event_log = Arc::new(PipelineEventLog::new());
-    let cancellation = CancellationToken::new();
-    let interviewer = HttpInterviewer::new().with_cancellation(cancellation.clone());
-    let input_tokens = Arc::new(AtomicU64::new(0));
-    let output_tokens = Arc::new(AtomicU64::new(0));
-
-    let record = RunRecord {
-        id: run_id.clone(),
-        dot_source: dot_source.clone(),
-        graph: resolved.clone(),
-        status: RunStatus::Running,
-        started_at: Utc::now(),
-        completed_at: None,
-        emitter: Arc::clone(&emitter),
-        event_log: Arc::clone(&event_log),
-        cancellation: cancellation.clone(),
-        interviewer: interviewer.clone(),
-        variables: variables.clone(),
-        error: None,
-        input_tokens: Arc::clone(&input_tokens),
-        output_tokens: Arc::clone(&output_tokens),
-        run_working_dir: Some(run_working_dir.clone()),
-        workflow_id: workflow_id.clone(),
-    };
 
     {
         let mut runs = state.runs.write().await;
         runs.insert(run_id.clone(), record);
     }
-
-    // Event log subscriber (in-memory for dashboard).
-    let mut log_rx = emitter.subscribe();
-    let log_clone = Arc::clone(&event_log);
-    tokio::spawn(async move {
-        loop {
-            match log_rx.recv().await {
-                Ok(event) => log_clone.push(event),
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    tracing::warn!(missed = n, "event log subscriber lagged");
-                }
-            }
-        }
-    });
-
-    // Event log subscriber (JSONL file on disk).
-    let mut file_log_rx = emitter.subscribe();
-    let file_sink = smasher_attractor::log_sink::FileLogSink::new(run_directory.event_log_path());
-    tokio::spawn(async move {
-        loop {
-            match file_log_rx.recv().await {
-                Ok(event) => {
-                    if let Err(e) = file_sink.append(event).await {
-                        tracing::warn!(error = %e, "failed to write event to JSONL log");
-                    }
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    tracing::warn!(missed = n, "file log subscriber lagged");
-                }
-            }
-        }
-    });
-
-    // Pipeline execution task.
-    let run_id_clone = run_id.clone();
-    let runs = Arc::clone(&state.runs);
-    let client = Arc::clone(&state.client);
-    let checkpoint_dir = run_directory.manifest().directories.checkpoints.clone();
-    let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
-    let mut run_directory_clone = run_directory.clone();
-    tokio::spawn(async move {
-        let backend = Arc::new(AgentCodergenBackend::new(
-            Arc::clone(&client),
-            model.clone(),
-            provider.clone(),
-            run_working_dir.clone(),
-            input_tokens,
-            output_tokens,
-            Arc::clone(&emitter),
-        ));
-        let interviewer_arc: Arc<dyn smasher_attractor::interviewer::Interviewer> =
-            Arc::new(interviewer);
-
-        let manager_backend = Arc::new(LlmManagerBackend::new(
-            Arc::clone(&client),
-            model.clone(),
-            provider.clone(),
-            run_working_dir.clone(),
-        ));
-        let llm_tool_backend = Arc::new(LlmToolBackend::new(
-            Arc::clone(&client),
-            model.clone(),
-            provider.clone(),
-            run_working_dir.clone(),
-        ));
-        let render_capture_backend =
-            Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
-                llm_tool_backend as Arc<dyn ToolBackend>,
-                candidate_artifacts_dir.clone(),
-                PathBuf::from(&run_working_dir),
-            ));
-        let system_lint_backend =
-            Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
-                render_capture_backend as Arc<dyn ToolBackend>,
-                candidate_artifacts_dir.clone(),
-                PathBuf::from(&run_working_dir),
-            ));
-        let tool_backend = Arc::new(
-            smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
-                system_lint_backend as Arc<dyn ToolBackend>,
-                model.clone(),
-                model.clone(),
-                provider.clone(),
-                candidate_artifacts_dir.clone(),
-            ),
-        );
-
-        // Build a child registry for ParallelHandler to dispatch within parallel nodes.
-        // Clone the backends as trait object Arcs for the child registry.
-        let child_codergen: Arc<dyn smasher_attractor::handler::CodergenBackend> = backend.clone();
-        let child_manager: Arc<dyn smasher_attractor::manager_handler::ManagerBackend> =
-            manager_backend.clone();
-        let child_tool: Arc<dyn smasher_attractor::tool_handler::ToolBackend> =
-            tool_backend.clone();
-        // Shared with InterviewerHandler below so a hexagon gate's
-        // `question_source` attribute can pull a prior Codergen node's
-        // response text out of the same store the engine records into.
-        let artifact_store = ArtifactStore::new();
-
-        let mut child_registry = HandlerRegistry::new();
-        child_registry.register(Arc::new(CodergenHandler::new(child_codergen)));
-        child_registry.register(Arc::new(
-            InterviewerHandler::builder(Arc::clone(&interviewer_arc))
-                .with_artifact_store(artifact_store.clone())
-                .build(),
-        ));
-        child_registry.register(Arc::new(ManagerHandler::new(child_manager)));
-        child_registry.register(Arc::new(ToolHandler::new(child_tool)));
-
-        let mut registry = default_registry();
-        registry.register(Arc::new(CodergenHandler::new(backend)));
-        registry.register(Arc::new(
-            InterviewerHandler::builder(interviewer_arc)
-                .with_artifact_store(artifact_store.clone())
-                .build(),
-        ));
-        registry.register(Arc::new(ManagerHandler::new(manager_backend)));
-        registry.register(Arc::new(ToolHandler::new(tool_backend)));
-        registry.register(Arc::new(ParallelHandler::new(Arc::new(child_registry))));
-
-        let config = EngineConfig {
-            max_steps: 1000,
-            enable_checkpointing: true,
-            checkpoint_dir: Some(checkpoint_dir),
-            cancellation_token: Some(cancellation),
-            artifact_store: Some(artifact_store),
-            ..EngineConfig::default()
-        };
-
-        let mut engine = Engine::with_config(resolved, registry, config).with_emitter(emitter);
-        if let Err(e) = engine.apply_sub_pipeline_transform(&run_working_dir) {
-            tracing::warn!(error = %e, "sub-pipeline transform failed, continuing without");
-        }
-        let context = Context::default();
-
-        for (key, value) in &variables {
-            context.set(key, serde_json::Value::String(value.clone()));
-        }
-
-        let result = engine.run(context).await;
-
-        let mut runs = runs.write().await;
-        if let Some(record) = runs.get_mut(&run_id_clone) {
-            record.completed_at = Some(Utc::now());
-            match result {
-                Ok(_) => record.status = RunStatus::Completed,
-                Err(e) => {
-                    if matches!(e, smasher_attractor::engine::EngineError::Cancelled) {
-                        record.status = RunStatus::Aborted;
-                    } else {
-                        record.status = RunStatus::Failed;
-                        record.error = Some(e.to_string());
-                    }
-                }
-            }
-            if let Err(e) = run_directory_clone.persist_run_metadata(
-                workflow_id.clone(),
-                Some(format!("{:?}", record.status)),
-                record.input_tokens.load(Ordering::Relaxed),
-                record.output_tokens.load(Ordering::Relaxed),
-                record.completed_at,
-            ) {
-                tracing::warn!(error = %e, "failed to persist run metadata after run completion");
-            }
-        }
-    });
 
     Ok(run_id)
 }

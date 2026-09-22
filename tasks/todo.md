@@ -4,11 +4,11 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 
 ## Phase 1: Foundation
 
-- [ ] Task 1: Deduplicate pipeline-launch logic (`api.rs`::submit_pipeline/resume_run + `pages.rs`::create_run → shared `run_launch.rs`)
+- [x] Task 1: Deduplicate pipeline-launch logic (`api.rs`::submit_pipeline/resume_run + `pages.rs`::create_run → shared `run_launch.rs`)
 
 ### Checkpoint: Foundation
-- [ ] `cargo test -p smasher-web` clean
-- [ ] `cargo clippy -p smasher-web` clean
+- [x] `cargo test -p smasher-web` clean
+- [x] `cargo clippy -p smasher-web` clean
 - [ ] Manual: dashboard submit + `POST /api/runs` both still launch runs correctly
 
 ## Phase 2: JSON/SSE Contract Completion
