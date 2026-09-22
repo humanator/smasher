@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:backend": "cargo run -p smasher-web -- serve --workflow-dir examples",
+    "dev:backend": "cd .. && SMASHER_WORKFLOWS_DIR=examples cargo run -p smasher-web",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
