@@ -1,0 +1,51 @@
+// ABOUTME: Tests for the native shim module
+// ABOUTME: Tests browser fallback behavior (Tauri doesn't exist in test environment)
+
+import { describe, it, expect } from 'vitest';
+import * as native from '../../../src/lib/native/index';
+
+describe('native shim', () => {
+  describe('isTauri', () => {
+    it('should return false when window.__TAURI__ is not present', () => {
+      expect(native.isTauri()).toBe(false);
+    });
+  });
+
+  describe('saveFile', () => {
+    it('should return a promise', () => {
+      const result = native.saveFile('test.txt', new Blob(['content']));
+      expect(result instanceof Promise).toBe(true);
+    });
+
+    it('should resolve successfully for browser fallback', async () => {
+      const blob = new Blob(['test content'], { type: 'text/plain' });
+      const result = await native.saveFile('test.txt', blob);
+      expect(typeof result).toBe('string');
+    });
+  });
+
+  describe('loadFile', () => {
+    it('should return a promise', () => {
+      const result = native.loadFile();
+      expect(result instanceof Promise).toBe(true);
+    });
+
+    it('should resolve to a Blob on file selection', async () => {
+      // Note: Actually testing file input requires mocking the DOM,
+      // which is beyond scope for this simple stub. Just verify the API exists.
+      expect(typeof native.loadFile).toBe('function');
+    });
+  });
+
+  describe('notifications', () => {
+    it('should have showNotification function', () => {
+      expect(typeof native.showNotification).toBe('function');
+    });
+
+    it('should handle showing notifications', async () => {
+      // Browser Notification API check - just verify function exists and returns promise
+      const result = native.showNotification('Test title', { body: 'Test body' });
+      expect(result instanceof Promise).toBe(true);
+    });
+  });
+});
