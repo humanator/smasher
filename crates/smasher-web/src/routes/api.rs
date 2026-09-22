@@ -108,6 +108,22 @@ pub struct WorkflowsResponse {
     pub workflows: Vec<crate::workflows::WorkflowSummary>,
 }
 
+/// A single recorded gallery-gate decision, JSON-shaped from
+/// `crate::decision_history::GalleryDecision`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DecisionResponse {
+    pub node_id: String,
+    pub selected: Vec<String>,
+    pub decision: String,
+    pub comments: HashMap<String, String>,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListDecisionsResponse {
+    pub decisions: Vec<DecisionResponse>,
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -123,6 +139,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/runs/{id}/tokens", get(get_tokens))
         .route("/api/runs/{id}/graph", get(render_graph))
         .route("/api/runs/{id}/candidates", get(list_candidates))
+        .route("/api/runs/{id}/decisions", get(list_decisions))
         .route("/api/graph/nodes", post(list_graph_nodes))
         .route("/api/workflows", get(list_workflows))
 }
@@ -534,6 +551,30 @@ async fn list_candidates(
     Ok(Json(CandidatesResponse { candidates }))
 }
 
+async fn list_decisions(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ListDecisionsResponse>, WebError> {
+    let runs = state.runs.read().await;
+    let record = runs
+        .get(&id)
+        .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+
+    let events = record.event_log.events();
+    let decisions = crate::decision_history::gallery_decisions(&events, &record.graph)
+        .into_iter()
+        .map(|d| DecisionResponse {
+            node_id: d.node_id,
+            selected: d.selected,
+            decision: d.decision,
+            comments: d.comments,
+            timestamp: d.timestamp,
+        })
+        .collect();
+
+    Ok(Json(ListDecisionsResponse { decisions }))
+}
+
 async fn list_workflows(State(state): State<AppState>) -> Json<WorkflowsResponse> {
     let workflows = crate::workflows::scan_workflows(&state.workflow_dirs);
     Json(WorkflowsResponse { workflows })
@@ -940,6 +981,121 @@ mod tests {
             .unwrap();
         let parsed: CandidatesResponse = serde_json::from_slice(&body).unwrap();
         assert!(parsed.candidates.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_decisions_not_found() {
+        let app = router().with_state(test_state());
+        let req = Request::builder()
+            .uri("/api/runs/nonexistent/decisions")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn list_decisions_empty_for_run_with_no_gate_decisions() {
+        let state = test_state();
+        let _token = insert_test_record(&state, "run-no-decisions", RunStatus::Running).await;
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri("/api/runs/run-no-decisions/decisions")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: ListDecisionsResponse = serde_json::from_slice(&body).unwrap();
+        assert!(parsed.decisions.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_decisions_returns_recorded_gallery_decisions_oldest_first() {
+        use smasher_attractor::state::Outcome;
+
+        let dot_graph = parser::parse(
+            r#"digraph {
+                Start [shape=Mdiamond];
+                Gate1 [shape=hexagon, label="Pick", gallery="true"];
+                NextA [shape=box];
+                NextB [shape=box];
+                Start -> Gate1;
+                Gate1 -> NextA [label="proceed"];
+                Gate1 -> NextB [label="iterate"];
+            }"#,
+        )
+        .unwrap();
+        let resolved = graph::resolve(&dot_graph).unwrap();
+
+        let state = test_state();
+        let event_log = Arc::new(PipelineEventLog::new());
+        let first_ts = Utc::now();
+        let second_ts = first_ts + chrono::Duration::seconds(5);
+        event_log.push(smasher_attractor::events::PipelineEvent::NodeCompleted {
+            node_id: "Gate1".into(),
+            outcome: Outcome::success_with(
+                serde_json::json!({"selected": ["candidate-a"], "decision": "proceed", "comments": {"candidate-b": "needs contrast"}}),
+            )
+            .with_preferred_label("proceed"),
+            duration_ms: 0,
+            timestamp: first_ts,
+        });
+        event_log.push(smasher_attractor::events::PipelineEvent::NodeCompleted {
+            node_id: "Gate1".into(),
+            outcome: Outcome::success_with(
+                serde_json::json!({"selected": [], "decision": "iterate"}),
+            )
+            .with_preferred_label("iterate"),
+            duration_ms: 0,
+            timestamp: second_ts,
+        });
+
+        let record = crate::state::RunRecord {
+            id: "run-with-decisions".into(),
+            dot_source: String::new(),
+            graph: resolved,
+            status: RunStatus::Completed,
+            started_at: first_ts,
+            completed_at: Some(second_ts),
+            emitter: Arc::new(PipelineEventEmitter::default()),
+            event_log,
+            cancellation: CancellationToken::new(),
+            interviewer: HttpInterviewer::new(),
+            variables: HashMap::new(),
+            error: None,
+            input_tokens: Arc::new(AtomicU64::new(0)),
+            output_tokens: Arc::new(AtomicU64::new(0)),
+            run_working_dir: None,
+            workflow_id: None,
+        };
+        state.runs.write().await.insert("run-with-decisions".into(), record);
+
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri("/api/runs/run-with-decisions/decisions")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: ListDecisionsResponse = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(parsed.decisions.len(), 2);
+        assert_eq!(parsed.decisions[0].decision, "proceed");
+        assert_eq!(parsed.decisions[0].selected, vec!["candidate-a".to_string()]);
+        assert_eq!(
+            parsed.decisions[0].comments.get("candidate-b"),
+            Some(&"needs contrast".to_string())
+        );
+        assert_eq!(parsed.decisions[1].decision, "iterate");
+        assert!(parsed.decisions[1].selected.is_empty());
     }
 
     #[tokio::test]

@@ -387,6 +387,7 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/runs/{id}/graph` | Render the run's graph as SVG with node execution status. |
 | `GET` | `/api/runs/{id}/events` | Stream run events as Server-Sent Events (JSON). |
 | `GET` | `/api/runs/{id}/candidates` | List gallery-gate candidate summaries with scorecards. |
+| `GET` | `/api/runs/{id}/decisions` | List recorded gallery-gate decisions, oldest first. |
 | `GET` | `/api/runs/{id}/questions` | List pending human-gate questions. |
 | `POST` | `/api/runs/{id}/questions/{qid}/answer` | Answer a human-gate question (JSON). |
 | `POST` | `/api/graph/nodes` | Parse DOT source and return node list. |
@@ -545,6 +546,29 @@ Response body (200 OK):
 ```
 
 Returns empty array if run exists but has no candidates yet.
+
+### GET /api/runs/{id}/decisions -- Gallery Gate Decision History
+
+List every recorded gallery-gate decision for a run, extracted from its event log,
+oldest first. A gate node can appear more than once if a pipeline loop revisits it.
+
+Response body (200 OK):
+
+```json
+{
+  "decisions": [
+    {
+      "node_id": "Gate1",
+      "selected": ["candidate-001"],
+      "decision": "proceed",
+      "comments": { "candidate-002": "needs more contrast" },
+      "timestamp": "2026-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+Returns an empty array if the run exists but has no recorded gate decisions yet.
 
 ### GET /api/runs/{id}/questions -- List Questions
 

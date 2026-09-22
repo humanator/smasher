@@ -12,6 +12,7 @@
   import QuestionCard from './components/dashboard/QuestionCard.svelte';
   import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
+  import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
 
   let runId = $state<string | null>(null);
 
@@ -74,6 +75,11 @@
       <div class="mt-8">
         <h2 class="text-xl font-semibold mb-4">Candidates</h2>
         <CandidateGallery {runId} />
+      </div>
+
+      <div class="mt-8">
+        <h2 class="text-xl font-semibold mb-4">Decision History</h2>
+        <DecisionHistory {runId} />
       </div>
     </div>
   {:else}

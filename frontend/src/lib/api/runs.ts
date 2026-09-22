@@ -65,6 +65,18 @@ export interface ListCandidatesResponse {
   candidates: CandidateResponse[];
 }
 
+export interface DecisionResponse {
+  node_id: string;
+  selected: string[];
+  decision: string;
+  comments: Record<string, string>;
+  timestamp: string;
+}
+
+export interface ListDecisionsResponse {
+  decisions: DecisionResponse[];
+}
+
 export interface GraphNodeSummary {
   id: string;
   node_type: string;
@@ -152,6 +164,11 @@ export async function renderGraph(id: string): Promise<string> {
 export async function listCandidates(id: string): Promise<ListCandidatesResponse> {
   const response = await fetch(getApiUrl(`/runs/${id}/candidates`));
   return handleResponse<ListCandidatesResponse>(response);
+}
+
+export async function listDecisions(id: string): Promise<ListDecisionsResponse> {
+  const response = await fetch(getApiUrl(`/runs/${id}/decisions`));
+  return handleResponse<ListDecisionsResponse>(response);
 }
 
 export async function parseGraphNodes(req: GraphNodesRequest): Promise<GraphNodesResponse> {

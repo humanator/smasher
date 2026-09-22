@@ -52,11 +52,11 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 
 - [x] Task 13: Candidate gallery view (CandidateGallery.svelte + CandidateCard.svelte, wired into App.svelte's run view; real-API tests write manifest/scorecard fixtures directly to the real server's data dir rather than running an actual render_capture node, since that launches real headless Chromium via chromiumoxide and this dev machine has none installed — see test file header)
 - [x] Task 14: Gallery-gate decision UI (GalleryGate.svelte: checkboxes, per-candidate comments, outgoing-edge decision buttons; extracted ScorecardBadges.svelte, shared with CandidateCard.svelte). Discovered mid-task: no JSON API told the frontend a pending question belonged to a gallery gate at all — that logic (`find_gallery_gate_for_node` + candidate scoping + outgoing edges) existed only inside `pages.rs`'s askama template rendering. Folded a `gallery_gate` field onto `GET /api/runs/{id}/questions` in `crates/smasher-web/src/routes/questions.rs` (same "small backend gap, fold into this plan" precedent as Tasks 6/6b) — additive and backward-compatible, dedupes the gate's own question out of `questions` only when a gate card is actually returned. Also fixed `lib/api/gallery.ts` to surface the backend's real error message (e.g. "exceeds 4000 characters") instead of a bare "HTTP 400", per Task 14's own acceptance criteria. `docs/api-reference.md` updated for the new field.
-- [ ] Task 15: Decision history view
+- [x] Task 15: Decision history view (DecisionHistory.svelte, wired into App.svelte's run view). No JSON endpoint existed for this either — `crate::decision_history::gallery_decisions()` was only ever called from `pages.rs`'s askama template handler. Added `GET /api/runs/{id}/decisions` in `crates/smasher-web/src/routes/api.rs` (same fold-in precedent as Tasks 6/6b/14), reusing the existing pure `gallery_decisions()` function unchanged. `docs/api-reference.md` updated.
 
 ### Checkpoint: Gallery/Decision Complete
-- [ ] Vitest clean
-- [ ] Manual/E2E check against real run from `examples/gallery_gate_showcase.dot`
+- [x] Vitest clean (73 tests, all real-API)
+- [x] Manual/E2E check against a real run from `examples/gallery_gate_showcase.dot`: verified via curl end-to-end (submit → write real candidate fixtures, since render_capture needs headless Chromium unavailable here → gallery_gate appears on `/questions` → decision submitted → `/decisions` shows it), and independently through Vitest exercising the same flow via the real GalleryGate.svelte + DecisionHistory.svelte components against the real backend
 
 ## Phase 5: Node editor port — BLOCKED on Task 5's decision
 
