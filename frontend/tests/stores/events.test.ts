@@ -1,0 +1,79 @@
+// ABOUTME: Tests for event store with dedup logic
+// ABOUTME: Verifies accumulation, dedup by (kind, timestamp), and terminal state tracking
+
+import { describe, it, expect, beforeEach } from 'vitest';
+import { eventStore } from '../../src/stores/events.svelte';
+
+describe('event store', () => {
+  beforeEach(() => {
+    eventStore.clear();
+  });
+
+  it('starts with empty events', () => {
+    expect(eventStore.events).toEqual([]);
+    expect(eventStore.isComplete).toBe(false);
+  });
+
+  it('accumulates events in order', () => {
+    const event1 = { kind: 'pipeline_started' as const, timestamp: '2026-09-22T10:00:00Z', graph_name: 'test' };
+    const event2 = { kind: 'node_started' as const, timestamp: '2026-09-22T10:00:01Z', node_id: 'n1', node_type: 'start' };
+
+    eventStore.add(event1);
+    eventStore.add(event2);
+
+    expect(eventStore.events).toHaveLength(2);
+    expect(eventStore.events[0].kind).toBe('pipeline_started');
+    expect(eventStore.events[1].kind).toBe('node_started');
+  });
+
+  it('dedups by (kind, timestamp)', () => {
+    const event = { kind: 'node_completed' as const, timestamp: '2026-09-22T10:00:05Z', node_id: 'n1', outcome: { type: 'success' }, duration_ms: 1000 };
+
+    eventStore.add(event);
+    eventStore.add(event); // Same event twice (at-least-once delivery from SSE replay)
+
+    // Should only have one event due to dedup
+    expect(eventStore.events).toHaveLength(1);
+  });
+
+  it('allows same kind with different timestamp', () => {
+    const event1 = { kind: 'node_completed' as const, timestamp: '2026-09-22T10:00:05Z', node_id: 'n1', outcome: { type: 'success' }, duration_ms: 1000 };
+    const event2 = { kind: 'node_completed' as const, timestamp: '2026-09-22T10:00:10Z', node_id: 'n2', outcome: { type: 'success' }, duration_ms: 1000 };
+
+    eventStore.add(event1);
+    eventStore.add(event2);
+
+    expect(eventStore.events).toHaveLength(2);
+  });
+
+  it('tracks terminal state on pipeline_completed', () => {
+    const startEvent = { kind: 'pipeline_started' as const, timestamp: '2026-09-22T10:00:00Z', graph_name: 'test' };
+    const endEvent = { kind: 'pipeline_completed' as const, timestamp: '2026-09-22T10:00:10Z', outcome: { type: 'success' }, total_nodes: 5, duration_ms: 10000 };
+
+    eventStore.add(startEvent);
+    expect(eventStore.isComplete).toBe(false);
+
+    eventStore.add(endEvent);
+    expect(eventStore.isComplete).toBe(true);
+  });
+
+  it('tracks terminal state on pipeline_aborted', () => {
+    const abortEvent = { kind: 'pipeline_aborted' as const, timestamp: '2026-09-22T10:00:05Z', reason: 'user cancelled' };
+
+    eventStore.add(abortEvent);
+    expect(eventStore.isComplete).toBe(true);
+  });
+
+  it('clears events and terminal state', () => {
+    const event = { kind: 'pipeline_completed' as const, timestamp: '2026-09-22T10:00:10Z', outcome: { type: 'success' }, total_nodes: 5, duration_ms: 10000 };
+    eventStore.add(event);
+
+    expect(eventStore.events).toHaveLength(1);
+    expect(eventStore.isComplete).toBe(true);
+
+    eventStore.clear();
+
+    expect(eventStore.events).toHaveLength(0);
+    expect(eventStore.isComplete).toBe(false);
+  });
+});
