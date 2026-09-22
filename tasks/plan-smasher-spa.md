@@ -126,6 +126,7 @@ Playwright E2E does this by nature (spec requirement); Vitest tests for
 
 - [ ] Task 16: Port node-editor data layer (types, nodeConfig, convert)
 - [ ] Task 17: Port node-editor presentational components (Palette, WorkflowNode, WorkflowEdge, EdgeForm)
+- [ ] Task 17b: Port node-editor per-kind form components (`nodeForms/`: CodergenForm, InterviewerForm, ManagerForm, StructuralForm, SubPipelineForm, ToolForm, `nodeForms.css`) — discovered mid-plan: `WorkflowCanvasInner.svelte` (Task 18) imports all six directly and none were assigned to any task; same "small gap, fold into the plan" precedent as Task 6b. Kept as its own task rather than merged into Task 17 since combined that would be ~21 files, well past the sizing guideline.
 - [ ] Task 18: Port node-editor canvas orchestrator
 - [ ] Task 19: Node-editor page routing (new/edit workflow)
 
@@ -683,6 +684,30 @@ without changing behavior.
 
 ---
 
+## Task 17b: Port node-editor per-kind form components
+
+**Description:** Port `editor-ui/src/nodeForms/{CodergenForm,InterviewerForm,ManagerForm,StructuralForm,SubPipelineForm,ToolForm}.svelte` and their tests, plus `nodeForms.css`, into `components/node-editor/nodeForms/`. These are the per-node-kind side-panel editing forms `WorkflowCanvasInner.svelte` (Task 18) selects between via `selectedNode.node_type` — Task 18 cannot compile without them. Same reskin treatment as Task 17 (Tailwind utility classes for static styling; `nodeForms.css`'s shared `.node-form`/`.node-form-field`/`.node-form-error` classes reused as-is by EdgeForm.svelte already ported in Task 17, so keep that contract intact rather than diverging per-component).
+
+**Acceptance criteria:**
+- [ ] Each component's existing test coverage passes after the port
+- [ ] Visual styling uses Tailwind utility classes for static/structural CSS; `nodeForms.css`'s shared classes stay a shared stylesheet (already load-bearing for EdgeForm.svelte from Task 17) rather than being fragmented per-component
+- [ ] Node-kind attr semantics (CodergenForm's `prompt`, ToolForm's `tool`, ManagerForm's `task`, InterviewerForm's `question`/gallery toggle, SubPipelineForm, StructuralForm) preserved exactly — these round-trip through `graph/mod.rs`'s resolver server-side, so a silent field/attr-key rename breaks save
+
+**Verification:**
+- [ ] `npm run test` passes
+- [ ] `npm run lint` clean
+- [ ] `npm run check` (svelte-check) introduces no new errors beyond the 5 pre-existing ones already on this branch (see Task 16's commit)
+
+**Dependencies:** Task 16 (types.ts's `NodeFormProps`/`NodeFormChange`), Task 17 (shares `nodeForms.css` with EdgeForm.svelte)
+
+**Files likely touched:**
+- `frontend/src/components/node-editor/nodeForms/*.svelte` (6 ported), `nodeForms.css` (ported)
+- corresponding test files
+
+**Estimated scope:** Large (13 files — same "mechanical, already-tested port, not further splittable" reasoning as Task 17)
+
+---
+
 ## Task 18: Port node-editor canvas orchestrator
 
 **Description:** Port `WorkflowCanvasInner.svelte` (617 lines, the bulk of
@@ -701,7 +726,7 @@ Task 19).
 - [ ] `npm run test` passes (ported suite)
 - [ ] `npm run lint` clean
 
-**Dependencies:** Task 17
+**Dependencies:** Task 17, Task 17b
 
 **Files likely touched:**
 - `frontend/src/components/node-editor/WorkflowCanvas.svelte` (ported, renamed from `...Inner`)
