@@ -269,8 +269,57 @@ async fn events_stream(
     let record = runs
         .get(&id)
         .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
-    let rx = record.emitter.subscribe();
-    Ok(sse::event_stream(rx))
+
+    // Subscribe to the broadcast FIRST to ensure no live events are missed.
+    // Then read the historical snapshot before switching to the live tail.
+    // This matches the documented pattern in smasher-attractor:
+    // "subscribe before emitting so the receiver sees events".
+    let mut rx = record.emitter.subscribe();
+    let history = record.event_log.events();
+
+    // Build a stream that yields historical events first, then continues with live events.
+    // We accept "at least once" delivery: an event may appear in both history and rx
+    // if it arrived after subscribe() but before events() read. This is fine — duplicates
+    // are cosmetic and easily absorbed by the frontend event-log store (Task 7).
+    // The frontend can dedupe by (kind, timestamp) if needed.
+    let stream = async_stream::stream! {
+        // Yield all historical events first
+        for event in history {
+            let sse_event = sse::to_sse_event(&event);
+            yield Ok(sse_event);
+        }
+
+        // Then switch to draining the live broadcast subscription.
+        // Terminate on PipelineCompleted or PipelineAborted (or channel close).
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    let is_terminal = matches!(
+                        event,
+                        PipelineEvent::PipelineCompleted { .. }
+                        | PipelineEvent::PipelineAborted { .. }
+                    );
+
+                    let sse_event = sse::to_sse_event(&event);
+                    yield Ok(sse_event);
+
+                    if is_terminal {
+                        break;
+                    }
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(missed = n, "SSE subscriber lagged behind");
+                    // Continue receiving — we just missed some events.
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    break;
+                }
+            }
+        }
+    };
+
+    Ok(axum::response::sse::Sse::new(stream)
+        .keep_alive(axum::response::sse::KeepAlive::default()))
 }
 
 async fn cancel_run(
