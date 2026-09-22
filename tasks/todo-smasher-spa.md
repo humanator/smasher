@@ -17,14 +17,14 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 
 ## Phase 2: Derisking
 
-- [ ] Task 5: Spike — node-editor graph library decision (compare keeping `@xyflow/svelte`+dagre vs. at least one alternative; written decision required before Phase 5)
-- [ ] Task 6: `GET /api/workflows` endpoint (smasher-web-api, reuse `scan_workflows()`; drive-by fix `docs/api-reference.md` gaps)
+- [x] Task 5: Spike — node-editor graph library decision (kept `@xyflow/svelte`+dagre; decision recorded in `tasks/plan-smasher-spa.md` lines 806-843; spot-checked svelvet's npm version independently, matched)
+- [x] Task 6: `GET /api/workflows` endpoint (smasher-web-api, reuse `scan_workflows()`; drive-by fix `docs/api-reference.md` gaps — independently re-verified, 34 real workflows returned)
 - [x] Task 6b: Fix SSE early-event loss in `events_stream` (replay `event_log` before live-subscribing — independently confirmed fixed with a standalone repro script, not just the implementing agent's own claim)
 
 ### Checkpoint: Derisking Complete
-- [ ] Graph-library decision recorded in writing
+- [x] Graph-library decision recorded in writing
 - [x] `cargo test -p smasher-web` / `cargo clippy -p smasher-web` clean (re-run independently)
-- [ ] `curl http://127.0.0.1:21541/api/workflows` returns real data
+- [x] `curl http://127.0.0.1:21541/api/workflows` returns real data (independently re-verified: 34 workflows)
 - [x] Task 3's SSE tests pass against the real server (unblocked by Task 6b, independently re-verified)
 
 ## Phase 3: Dashboard core (spec Success Criterion #1: submit → events → human-gate)
