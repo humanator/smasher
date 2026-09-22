@@ -390,6 +390,10 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/runs/{id}/questions` | List pending human-gate questions. |
 | `POST` | `/api/runs/{id}/questions/{qid}/answer` | Answer a human-gate question (JSON). |
 | `POST` | `/api/graph/nodes` | Parse DOT source and return node list. |
+| `GET` | `/api/workflows` | List all discovered workflow files from configured directories. |
+| `POST` | `/editor/workflows` | Save a new workflow (used by node-editor). |
+| `PUT` | `/editor/workflows/{id}/graph` | Update an existing workflow's graph (used by node-editor). |
+| `POST` | `/api/runs/{id}/gallery/{qid}/decision` | Submit a gallery-gate decision (used by gallery-gate component). |
 | `GET` | `/spa/*` | Serve the `smasher-spa` static bundle, with SPA-style fallback to `index.html` for unmatched paths. Not yet mounted at `/` (still owned by the legacy dashboard until `smasher-spa` ships parity, see the Boundaries section of `SPEC-smasher-web-api.md`). |
 
 ### POST /api/runs -- Submit Pipeline
@@ -589,6 +593,95 @@ Response body (200 OK):
 ```
 
 On failure (e.g. unknown question id), `success` is `false` and an `error` field is included.
+
+### GET /api/workflows -- List Workflows
+
+List all discovered workflow files from the server's configured workflow directories.
+
+Response body (200 OK):
+
+```json
+{
+  "workflows": [
+    {
+      "id": "examples__consensus_task",
+      "name": "consensus_task.dot",
+      "source_dir": "examples",
+      "path": "examples/consensus_task.dot"
+    }
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Stable slug derived from source directory and relative path. |
+| `name` | string | Display name (relative path from configured root). |
+| `source_dir` | string | The configured directory root this workflow was found under. |
+| `path` | string | Full filesystem path to the workflow file. |
+
+Empty array if no workflows are configured or found.
+
+### POST /editor/workflows -- Create Workflow
+
+Create a new workflow file via the node-editor. Used by the editor UI to save newly-created pipelines.
+
+Request body:
+
+```json
+{
+  "dot_source": "digraph { ... }",
+  "name": "my_workflow",
+  "target_dir": "examples"
+}
+```
+
+Response body (200 OK):
+
+```json
+{
+  "id": "examples__my_workflow",
+  "name": "my_workflow.dot",
+  "source_dir": "examples",
+  "path": "examples/my_workflow.dot"
+}
+```
+
+### PUT /editor/workflows/{id}/graph -- Update Workflow
+
+Update an existing workflow's graph definition (used by the node-editor's save/update flow).
+
+Request body:
+
+```json
+{
+  "dot_source": "digraph { ... }"
+}
+```
+
+Response body (200 OK): Same shape as Create Workflow above.
+
+### POST /api/runs/{id}/gallery/{qid}/decision -- Gallery-Gate Decision
+
+Submit a gallery-gate decision (selected candidates, edge, optional comments).
+
+Request body:
+
+```json
+{
+  "edge": "candidate-001",
+  "selected": ["candidate-001", "candidate-003"],
+  "comment": "Selected best and most cost-effective options"
+}
+```
+
+Response body (200 OK):
+
+```json
+{
+  "success": true
+}
+```
 
 ### GET /api/health -- Health Check
 

@@ -3,9 +3,10 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use serde::Serialize;
 
 /// A single discovered workflow file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct WorkflowSummary {
     /// Stable slug derived from the configured root's name plus the file's
     /// path relative to that root (extension stripped) -- the same file
