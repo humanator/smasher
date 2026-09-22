@@ -18,7 +18,7 @@ describe('RunForm', () => {
 
   it('renders form with textarea for DOT source', () => {
     render(RunForm);
-    const textarea = screen.getByPlaceholderText('digraph { ... }');
+    const textarea = screen.getByPlaceholderText('digraph ...');
     expect(textarea).toBeTruthy();
     expect(screen.getByText('Submit')).toBeTruthy();
   });
@@ -33,15 +33,13 @@ describe('RunForm', () => {
       run_working_dir: 'artifacts/run-123',
     });
 
-    // Mock window.location.href assignment
-    const originalHref = window.location.href;
-    delete (window.location as any).href;
-    window.location.href = '';
+    // Stub window.location
+    vi.stubGlobal('location', { href: '' });
 
     render(RunForm);
 
-    const textarea = screen.getByPlaceholderText('digraph { ... }') as HTMLTextAreaElement;
-    await user.type(textarea, 'digraph { a -> b }');
+    const textarea = screen.getByPlaceholderText('digraph ...') as HTMLTextAreaElement;
+    await user.type(textarea, 'digraph sample');
 
     const submitBtn = screen.getByText('Submit');
     await user.click(submitBtn);
@@ -50,12 +48,9 @@ describe('RunForm', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(runsApi.submitRun).toHaveBeenCalledWith({
-      dot_source: 'digraph { a -> b }',
+      dot_source: 'digraph sample',
       variables: {},
     });
-
-    // Restore window.location.href
-    window.location.href = originalHref;
   });
 
   it('shows error on submission failure', async () => {
@@ -65,15 +60,15 @@ describe('RunForm', () => {
 
     render(RunForm);
 
-    const textarea = screen.getByPlaceholderText('digraph { ... }') as HTMLTextAreaElement;
-    await user.type(textarea, 'digraph { invalid }');
+    const textarea = screen.getByPlaceholderText('digraph ...') as HTMLTextAreaElement;
+    await user.type(textarea, 'invalid workflow');
 
     await user.click(screen.getByText('Submit'));
 
     // Wait for error
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    expect(screen.getByText(/Error:/)).toBeTruthy();
+    expect(screen.getByText(/API error/)).toBeTruthy();
   });
 
   it('disables form during submission', async () => {
@@ -85,8 +80,8 @@ describe('RunForm', () => {
 
     render(RunForm);
 
-    const textarea = screen.getByPlaceholderText('digraph { ... }') as HTMLTextAreaElement;
-    await user.type(textarea, 'digraph { a -> b }');
+    const textarea = screen.getByPlaceholderText('digraph ...') as HTMLTextAreaElement;
+    await user.type(textarea, 'digraph workflow');
 
     const submitBtn = screen.getByText('Submit') as HTMLButtonElement;
     await user.click(submitBtn);

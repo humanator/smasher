@@ -32,7 +32,7 @@
 
   async function handleAnswer(questionId: string, answer: string) {
     try {
-      await questionsApi.answerQuestion(runId, questionId, { answer });
+      await questionsApi.answerQuestion(runId, questionId, answer);
       questionStore.answer(questionId, answer);
     } catch (err) {
       console.error('Failed to answer question:', err);

@@ -10,7 +10,9 @@
   let submitting = $state(false);
   let error: string | null = $state(null);
 
-  async function handleSubmit() {
+  async function handleSubmit(e: Event) {
+    e.preventDefault();
+
     if (!dotSource.trim()) {
       error = 'Please enter workflow DOT source';
       return;
@@ -36,7 +38,7 @@
 
       // Optionally navigate to run detail (would be handled by router)
       window.location.href = `/runs/${response.run_id}`;
-    } catch (err) {
+    } catch (err: unknown) {
       error = err instanceof Error ? err.message : 'Failed to submit run';
     } finally {
       submitting = false;
@@ -47,7 +49,7 @@
 <div class="run-form">
   <h2>Submit Pipeline</h2>
 
-  <form onsubmit|preventDefault={handleSubmit}>
+  <form onsubmit={handleSubmit}>
     <div class="form-group">
       <label for="dot-source">DOT Source:</label>
       <textarea
@@ -55,7 +57,7 @@
         bind:value={dotSource}
         disabled={submitting}
         rows={10}
-        placeholder="digraph { ... }"
+        placeholder="digraph ..."
       ></textarea>
     </div>
 

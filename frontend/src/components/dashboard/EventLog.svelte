@@ -4,6 +4,7 @@
 
   import { eventStore } from '../../stores/events.svelte';
   import * as eventsApi from '../../lib/api/events';
+  import type { PipelineEvent } from '../../lib/api/events';
 
   interface Props {
     runId: string;
@@ -28,7 +29,7 @@
     };
   });
 
-  function eventDescription(event: any): string {
+  function eventDescription(event: PipelineEvent): string {
     switch (event.kind) {
       case 'pipeline_started':
         return `Pipeline started: ${event.graph_name}`;

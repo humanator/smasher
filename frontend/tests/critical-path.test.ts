@@ -7,6 +7,8 @@ import { join } from 'path';
 import * as runsApi from '../src/lib/api/runs';
 import * as questionsApi from '../src/lib/api/questions';
 import { setApiBaseUrl } from '../src/lib/api/client-config';
+import type { PipelineEvent } from '../src/lib/api/events';
+import type { Question } from '../src/lib/api/questions';
 
 const BASE_URL = 'http://127.0.0.1:21541';
 
@@ -32,8 +34,8 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
     const runId = submitResponse.run_id;
 
     // Step 2: Connect to events stream and wait for pipeline_started
-    const events = await new Promise<any[]>((resolve) => {
-      const eventsList: any[] = [];
+    const events = await new Promise<PipelineEvent[]>((resolve) => {
+      const eventsList: PipelineEvent[] = [];
       const eventSource = new EventSource(`${BASE_URL}/api/runs/${runId}/events`);
 
       const timeout = setTimeout(() => {
@@ -42,8 +44,9 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
       }, 10000);
 
       // Listen for the actual event names sent by the server (not 'message')
-      eventSource.addEventListener('pipeline_started', (e: any) => {
-        const event = JSON.parse(e.data);
+      eventSource.addEventListener('pipeline_started', (e: Event) => {
+        const messageEvent = e as MessageEvent;
+        const event: PipelineEvent = JSON.parse(messageEvent.data);
         event.kind = 'pipeline_started';
         eventsList.push(event);
         eventSource.close();
@@ -60,10 +63,10 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
     // CRITICAL: Verify Task 6b fix - pipeline_started must be replayed
     const pipelineStartedEvent = events.find((e) => e.kind === 'pipeline_started');
     expect(pipelineStartedEvent).toBeTruthy();
-    expect(pipelineStartedEvent.graph_name).toBe('HumanGateShowcase');
+    expect(pipelineStartedEvent?.graph_name).toBe('HumanGateShowcase');
 
     // Step 3: Poll for human-gate question
-    let questions: any[] = [];
+    let questions: Question[] = [];
     let attempts = 0;
     while (questions.length === 0 && attempts < 20) {
       const response = await questionsApi.listQuestions(runId);
@@ -97,6 +100,7 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
       expect.fail('Pipeline did not complete within 120 seconds');
     }, 120000);
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       // Poll run status
       const runResponse = await runsApi.getRun(runId);

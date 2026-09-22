@@ -37,18 +37,18 @@ function createRunStore() {
       Object.assign(run, update);
     },
 
-    setFromApi(apiRun: any) {
+    setFromApi(apiRun: Record<string, unknown>) {
       run = {
-        id: apiRun.id,
-        status: apiRun.status,
-        startedAt: apiRun.started_at,
-        completedAt: apiRun.completed_at,
-        graphName: apiRun.graph_name,
-        error: apiRun.error,
-        inputTokens: apiRun.input_tokens,
-        outputTokens: apiRun.output_tokens,
-        runWorkingDir: apiRun.run_working_dir,
-        workflowId: apiRun.workflow_id,
+        id: apiRun.id as string,
+        status: apiRun.status as RunState['status'],
+        startedAt: apiRun.started_at as string | null,
+        completedAt: apiRun.completed_at as string | null,
+        graphName: apiRun.graph_name as string | null,
+        error: apiRun.error as string | null,
+        inputTokens: (apiRun.input_tokens as number) || 0,
+        outputTokens: (apiRun.output_tokens as number) || 0,
+        runWorkingDir: apiRun.run_working_dir as string | null,
+        workflowId: apiRun.workflow_id as string | null,
       };
     },
 
