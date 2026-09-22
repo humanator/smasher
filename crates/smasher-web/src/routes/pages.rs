@@ -5,8 +5,6 @@ use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
 #[cfg(test)]
-use std::sync::Arc;
-#[cfg(test)]
 use std::sync::atomic::AtomicU64;
 
 use askama::Template;

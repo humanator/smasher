@@ -6,3 +6,4 @@ pub mod editor_api;
 pub mod gallery;
 pub mod pages;
 pub mod questions;
+pub mod static_files;
