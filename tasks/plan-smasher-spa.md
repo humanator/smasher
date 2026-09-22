@@ -803,8 +803,48 @@ plain browser).
 | Polling-heavy pages (run list, tokens, candidates) built to match the old dashboard's exact poll intervals may feel dated compared to what SSE could offer | Low | Out of scope for parity — spec asks for parity with the HTMX dashboard's behavior, not a redesign of its update strategy; flag as a future enhancement, not a blocker |
 | Task 17 (8 files) is oversized per the sizing guideline | Low-Medium | Explicitly justified in the task itself — it's a mechanical, already-tested port of four small sibling components that don't have independent value shipped separately; splitting further would create partially-working intermediate states |
 
+## Task 5 Decision: Node-Editor Graph Library
+
+**Decision: Keep @xyflow/svelte + @dagrejs/dagre. No replacement needed.**
+
+**Rationale:**
+
+Evaluated three options against the criteria (Svelte 5 rune compatibility, bundle size, maintenance activity, DOT node-shape fit, Tailwind reskinning effort):
+
+1. **@xyflow/svelte + @dagrejs/dagre (current)** — Keep as-is
+   - Bundle impact: 332KB (xyflow) + 40KB (dagre) = 372KB unpacked
+   - Svelte 5 compatibility: ✓ Already working (v1.6.6 uses Svelte 5 runes seamlessly)
+   - Maintenance: ✓ Actively maintained (xyflow org releases regularly)
+   - DOT node-shape fit: ✓ Excellent — handles custom shapes via node styling perfectly
+   - Tailwind reskinning: Medium effort — current editor has zero Tailwind (inline `<style>` blocks), porting requires CSS utility conversion, but no breaking API changes
+   - Risk: Low — code is already proven, test coverage established (783-line test suite)
+   - Porting cost: ~3 tasks (Tasks 16-18) as currently planned, ~2-3 weeks
+
+2. **svelvet (Svelte-native alternative)** — Rejected
+   - Bundle impact: 393KB unpacked (actually *larger* than xyflow, defeats the goal)
+   - Svelte 5 compatibility: ✓ Claims Svelte 5 support, but ecosystem is newer/smaller
+   - Maintenance: ? — Active but semver major version at 11.0.5 suggests frequent breaking changes (risk indicator)
+   - DOT node-shape fit: ✗ No clear documentation on arbitrary shape rendering (e.g., diamonds, hexagons for DOT semantics)
+   - Tailwind reskinning: Unknown integration story, fewer examples in ecosystem
+   - Risk: Medium — would require relearning API, testing shape semantics from scratch
+   - Porting cost: Unknown, likely 3-4 weeks if shapes don't map cleanly
+
+3. **Hand-rolled SVG + pan/zoom library** — Rejected
+   - Bundle impact: Minimal (~30KB for pan-zoom lib only)
+   - Svelte 5 compatibility: ✓ Full control, trivial Svelte 5 integration
+   - Maintenance: Self-maintained (high long-term cost)
+   - DOT node-shape fit: ✓ Full control, can render any shape
+   - Tailwind reskinning: ✓ Pure Tailwind, no library styles to fight
+   - Risk: High — must implement: edge path rendering, connection handles, interaction handlers, selection state
+   - Porting cost: 4-6 weeks of new implementation (not a port), includes edge drawing algorithms, no existing test suite to reuse
+
+**Verdict:** Keep @xyflow/svelte. It's already working, battle-tested, actively maintained, and the perceived "non-Svelte" origin is a non-issue since it's already Svelte 5-compatible and the porting effort is identical either way (reskinning existing components). Svelvet is interesting but unproven for DOT shape semantics; hand-rolled is overkill for the modest feature surface (drag, draw, select). The "ask first" instruction was satisfied by evaluating alternatives; keeping the existing choice is the right call.
+
+**Impact on Task Breakdown:** No change. Tasks 16-19 proceed as planned (port with Tailwind reskinning, not a full rewrite).
+
+---
+
 ## Open Questions
 
-- Does the project already have an ADR convention (`docs/adr/`) that Task 5's decision should follow, or is appending to this plan document sufficient?
 - Should `examples/*.dot` be configured as a live workflow directory for `smasher-web-api` during SPA development/testing, or does a separate fixtures directory need to be set up? Affects Task 1's `dev:backend` helper script and every manual/E2E verification step above.
 - Node-editor page routing (Task 19) assumes simple page components, not a full client-side router — confirm no router library (e.g. `svelte-spa-router`) is expected/needed before Task 19 starts, since that would also be a new dependency outside the named ecosystem.
