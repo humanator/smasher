@@ -7,25 +7,25 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 
 - [x] Task 1: Scaffold `frontend/` project (Vite+Svelte5+TS strict+Tailwind+shadcn-svelte+Vitest+Playwright, `npm run dev:backend` helper)
 - [x] Task 2: `lib/api/` REST client (runs/questions/gallery/workflows, runtime-configurable base URL)
-- [ ] Task 3: `lib/api/` SSE client (typed 17-event wrapper for `/api/runs/{id}/events`) — client code complete, verification blocked on Task 6b (backend loses early events, confirmed independent of frontend)
+- [x] Task 3: `lib/api/` SSE client (typed 17-event wrapper for `/api/runs/{id}/events`) — unblocked and verified after Task 6b's backend fix
 - [x] Task 4: `lib/native/` shim stub (`window.__TAURI__` check, browser fallbacks)
 
 ### Checkpoint: Foundation
-- [x] `npm run build` / `npm run lint` / `npm run test` clean
-- [ ] `npm run dev` proxy to `smasher-web-api` verified (manual check)
-- [ ] `lib/api/` tests pass against real `npm run dev:backend`, not mocked fetch (manual check)
+- [x] `npm run build` / `npm run lint` / `npm run test` clean (18/18 real tests, independently re-verified)
+- [x] `npm run dev` proxy to `smasher-web-api` verified (manual check — independently re-verified)
+- [x] `lib/api/` tests pass against real `npm run dev:backend`, not mocked fetch (independently re-verified, including SSE)
 
 ## Phase 2: Derisking
 
 - [ ] Task 5: Spike — node-editor graph library decision (compare keeping `@xyflow/svelte`+dagre vs. at least one alternative; written decision required before Phase 5)
 - [ ] Task 6: `GET /api/workflows` endpoint (smasher-web-api, reuse `scan_workflows()`; drive-by fix `docs/api-reference.md` gaps)
-- [ ] Task 6b: Fix SSE early-event loss in `events_stream` (replay `event_log` before live-subscribing — discovered while verifying Task 3, real product bug not just a test artifact)
+- [x] Task 6b: Fix SSE early-event loss in `events_stream` (replay `event_log` before live-subscribing — independently confirmed fixed with a standalone repro script, not just the implementing agent's own claim)
 
 ### Checkpoint: Derisking Complete
 - [ ] Graph-library decision recorded in writing
-- [ ] `cargo test -p smasher-web` / `cargo clippy -p smasher-web` clean
+- [x] `cargo test -p smasher-web` / `cargo clippy -p smasher-web` clean (re-run independently)
 - [ ] `curl http://127.0.0.1:21541/api/workflows` returns real data
-- [ ] Task 3's SSE tests pass against the real server (unblocked by Task 6b)
+- [x] Task 3's SSE tests pass against the real server (unblocked by Task 6b, independently re-verified)
 
 ## Phase 3: Dashboard core (spec Success Criterion #1: submit → events → human-gate)
 
