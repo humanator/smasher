@@ -331,6 +331,53 @@ planning cycle.
 
 ---
 
+## Task 6b: Fix SSE early-event loss in `events_stream` (smasher-web-api)
+
+**Description:** Discovered while verifying Task 3: `crates/smasher-web/src/routes/api.rs::events_stream`
+subscribes directly to the run's live `tokio::broadcast` emitter with no
+replay, so any event fired before a client's `GET /api/runs/{id}/events`
+request connects is lost forever — confirmed independently with a raw `curl`
+and a bare Node `fetch` script (no frontend/Vitest/jsdom involved), losing
+`pipeline_started`/`human_prompt_issued` even with a ~22ms submit-to-connect
+round trip. This is a real product bug (any dashboard client opening a run's
+live view shortly after submission misses early events), not just a test
+artifact. Jobsworth approved folding a fix into this plan, same precedent as
+Task 6.
+
+Fix: subscribe to the broadcast channel *before* reading the snapshot (the
+existing `smasher-attractor` docs already say "subscribe before emitting so
+the receiver sees events" — `events_stream` violates its own dependency's
+documented pattern), then replay `record.event_log.events()` (already
+populated by an existing background drain task — see `run_launch.rs`) to the
+client first, then continue streaming the live `rx` on top. This accepts
+"at least once" delivery (a rare duplicate of the last 0-1 events at the
+snapshot/subscribe boundary is possible) rather than building sequence-number
+based exactly-once dedup — duplicates are a minor, easily-absorbed UI
+concern; silent loss is not. Do not build a dedup mechanism here; instead
+leave a one-line note for Task 7 (event-log store) to dedupe defensively by
+`(kind, timestamp)` when appending incoming events, since it's a natural,
+cheap place for it.
+
+**Acceptance criteria:**
+- [ ] `events_stream` subscribes to the emitter before reading `event_log.events()`, replays the snapshot as SSE events, then continues with the live stream
+- [ ] A client connecting shortly after a run starts reliably receives `pipeline_started` (verified by re-running Task 3's SSE tests, not just manually)
+- [ ] No new sequence-number/dedup infrastructure added — duplicates at the boundary are an accepted, documented tradeoff
+
+**Verification:**
+- [ ] `cargo test -p smasher-web` passes
+- [ ] `cargo clippy -p smasher-web` clean
+- [ ] Re-run the raw Node `fetch`-based repro (submit `examples/human_gate_showcase.dot`, connect immediately, expect `pipeline_started` within the response) and confirm it now arrives
+- [ ] Task 3's Vitest SSE tests (events.test.ts) pass against the real server, not skipped
+
+**Dependencies:** None (independent of Task 6, both touch `smasher-web`'s routes but different handlers)
+
+**Files likely touched:**
+- `crates/smasher-web/src/routes/api.rs` (`events_stream`)
+
+**Estimated scope:** Small (1 file)
+
+---
+
 ## Task 7: `stores/` — run state, event log store
 
 **Description:** Svelte 5 rune-based stores (`$state` in `.svelte.ts`
