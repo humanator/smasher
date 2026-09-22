@@ -9,6 +9,12 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   page,
   baseURL,
 }) => {
+  // 10 min: each box node between gates is a real Codergen agentic
+  // tool-calling loop (not a single LLM completion), so per-node latency
+  // across 5 chained gates is genuinely variable -- observed range during
+  // debugging was ~38s to 3+ min for just the first two nodes.
+  test.setTimeout(600000);
+
   // Read human_gate_showcase.dot workflow
   const workflowPath = join(process.cwd(), '..', 'examples', 'human_gate_showcase.dot');
   const dotSource = readFileSync(workflowPath, 'utf-8');
@@ -19,14 +25,8 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   // Wait for page load
   await page.waitForLoadState('networkidle');
 
-  // Debug: log what's on the page
-  const h1 = await page.locator('h1').allTextContents();
-  const main = await page.locator('main').textContent();
-  console.log('H1 texts:', h1);
-  console.log('Main text (first 300 chars):', main?.substring(0, 300));
-
-  // Wait for the app to render - look for the catalog heading or RunForm
-  await expect(page.locator('text=Smasher Pipelines')).toBeVisible({ timeout: 10000 });
+  // Wait for the app to render - look for the catalog heading
+  await expect(page.locator('h1', { hasText: 'Smasher Pipelines' })).toBeVisible({ timeout: 10000 });
 
   // Wait for the RunForm to load
   const form = page.locator('form');
@@ -41,126 +41,68 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   await submitButton.click();
 
   // After submission, the page should navigate to /runs/{id}
-  // Wait for navigation to happen
   await page.waitForURL(/\/runs\/[a-z0-9-]+/);
 
-  // Extract run ID from URL for reference
   const runId = page.url().split('/runs/')[1];
   expect(runId).toBeTruthy();
 
-  // The EventLog component should be visible and streaming events
-  const eventLog = page.locator('text=Events');
-  await expect(eventLog).toBeVisible({ timeout: 10000 });
+  // The EventLog component's heading should be visible (scope to the events panel
+  // specifically -- "Events" also appears as the page's own section heading).
+  const eventLogHeading = page.locator('.event-log h3', { hasText: 'Events' });
+  await expect(eventLogHeading).toBeVisible({ timeout: 10000 });
 
-  // Wait for pipeline_started event to appear in EventLog
-  const pipelineStartedEvent = page.locator('text=Pipeline started');
-  await expect(pipelineStartedEvent).toBeVisible({ timeout: 15000 });
+  // Wait for pipeline_started event to appear in EventLog (Task 6b replay)
+  await expect(page.locator('text=Pipeline started')).toBeVisible({ timeout: 15000 });
 
-  // Map of gate names to their expected answer values
-  const gateAnswers: Record<string, string> = {
-    'Tell me something interesting': 'This is an interesting response!', // FreeformGate
-    'Do you want to continue to the fun part': 'Yes', // BinaryGate (approval)
-    'Pick your favorite color': 'Red', // MultiChoiceGate
-    'How spicy do you like your food': 'Medium', // DefaultGate
-    'Any last words before we wrap up': 'Thanks for the adventure!', // FinalFreeform
-  };
+  // human_gate_showcase.dot has 5 chained gates. The backend's HttpInterviewer
+  // currently reports every gate as kind "free_form" regardless of the DOT's
+  // hexagon/binary/multi-choice/default shape (confirmed via direct API check),
+  // so QuestionCard always renders the free-form text input, never the
+  // approval/multiple_choice button variants. Answer every gate that way.
+  const answers = [
+    'This is an interesting response!',
+    'Yes',
+    'Red',
+    'Medium',
+    'Thanks for the adventure!',
+  ];
 
   let gatesAnswered = 0;
-
-  // Answer up to 5 human gates as they appear
-  for (let attempt = 0; attempt < 50; attempt++) {
-    // Look for pending questions in the QuestionCard component
-    const questionText = page.locator('.question-text');
-    const visibleQuestions = await questionText.allTextContents();
-
-    for (const question of visibleQuestions) {
-      let answered = false;
-
-      // Try to match the question to a known gate
-      for (const [gatePattern, answer] of Object.entries(gateAnswers)) {
-        if (question.includes(gatePattern.split(' ').slice(0, 3).join(' '))) {
-          // This is a known gate - answer it
-
-          // Check if it's a free_form input
-          const freeFormInput = page.locator('input[placeholder*="Enter your answer"]').nth(gatesAnswered);
-          if ((await freeFormInput.isVisible().catch(() => false))) {
-            // Free form - type the answer and press Enter
-            await freeFormInput.fill(answer);
-            await freeFormInput.press('Enter');
-            gatesAnswered++;
-            answered = true;
-            break;
-          }
-
-          // Check for yes/no buttons (approval gate)
-          const yesButton = page.locator('button:has-text("Yes")').nth(gatesAnswered);
-          const noButton = page.locator('button:has-text("No")').nth(gatesAnswered);
-
-          if (answer.toLowerCase() === 'yes' && (await yesButton.isVisible().catch(() => false))) {
-            await yesButton.click();
-            gatesAnswered++;
-            answered = true;
-            break;
-          }
-
-          if (answer.toLowerCase() === 'no' && (await noButton.isVisible().catch(() => false))) {
-            await noButton.click();
-            gatesAnswered++;
-            answered = true;
-            break;
-          }
-
-          // Check for color choice buttons (multiple_choice)
-          const colorButtons = page.locator('button:has-text("Red"), button:has-text("Blue"), button:has-text("Green")');
-          const colorCount = await colorButtons.count();
-          if (colorCount > 0 && answer === 'Red') {
-            const redButton = page.locator('button:has-text("Red")').nth(0);
-            if (await redButton.isVisible().catch(() => false)) {
-              await redButton.click();
-              gatesAnswered++;
-              answered = true;
-              break;
-            }
-          }
-
-          // Check for spice level buttons (default gate with options)
-          const spiceButtons = page.locator(
-            'button:has-text("Mild"), button:has-text("Medium"), button:has-text("Hot")'
-          );
-          const spiceCount = await spiceButtons.count();
-          if (spiceCount > 0 && answer === 'Medium') {
-            const mediumButton = page.locator('button:has-text("Medium")').nth(0);
-            if (await mediumButton.isVisible().catch(() => false)) {
-              await mediumButton.click();
-              gatesAnswered++;
-              answered = true;
-              break;
-            }
-          }
-        }
-      }
-
-      if (answered) break;
+  for (let attempt = 0; attempt < 700 && gatesAnswered < answers.length; attempt++) {
+    const freeFormInput = page.locator('.answer-form input[placeholder="Enter your answer"]').first();
+    if (await freeFormInput.isVisible().catch(() => false)) {
+      await freeFormInput.fill(answers[gatesAnswered]);
+      await freeFormInput.press('Enter');
+      gatesAnswered++;
+      // Give the poll loop (2s interval in QuestionCard) time to pick up the answer
+      // and move the question from pending to answered before checking again.
+      await page.waitForTimeout(2500);
+      continue;
     }
 
-    // Check if pipeline has completed
     const completionEvent = page.locator('text=Pipeline completed');
     if (await completionEvent.isVisible().catch(() => false)) {
       break;
     }
 
-    // Wait a bit before next check
     await page.waitForTimeout(500);
   }
 
-  // Verify at least one gate was answered
   expect(gatesAnswered).toBeGreaterThan(0);
 
   // Verify the pipeline completed - should see completion event in EventLog
-  const completionEvent = page.locator('text=Pipeline completed');
-  await expect(completionEvent).toBeVisible({ timeout: 120000 });
+  await expect(page.locator('text=Pipeline completed')).toBeVisible({ timeout: 540000 });
 
-  // Verify no error occurred
-  const errorMessage = page.locator('text=/error|failed/i');
-  await expect(errorMessage).not.toBeVisible();
+  // Verify the run's authoritative final status via the real API, not by
+  // text-matching the page: the EventLog legitimately renders historical
+  // "node_failed" entries as part of normal operation (a node can fail and
+  // the graph can still route around it), so scanning the whole page for
+  // /error|failed/i would false-positive on that real, correct log content.
+  const runResponse = await page.request.get(`${baseURL || 'http://127.0.0.1:5173'}/api/runs/${runId}`);
+  const runStatus = (await runResponse.json()).status;
+  expect(runStatus).toBe('Completed');
+
+  // The RunForm/WorkflowCatalog components render their own errors with
+  // role="alert" -- confirm none of those are present.
+  await expect(page.locator('[role="alert"]')).toHaveCount(0);
 });

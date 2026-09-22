@@ -94,12 +94,12 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
 
     let gatesAnswered = 0;
     let completedSuccessfully = false;
+    const answeredIds = new Set<string>();
 
-    // Keep polling until the run completes or we timeout
-    const pollTimeout = setTimeout(() => {
-      expect.fail('Pipeline did not complete within 120 seconds');
-    }, 120000);
-
+    // Keep polling until the run completes. The outer `it(...)` timeout below
+    // is the single source of truth for the deadline -- an extra internal
+    // setTimeout racing against it just produces a generic, less useful
+    // "test timed out" error instead of a real failure reason.
     // eslint-disable-next-line no-constant-condition
     while (true) {
       // Poll run status
@@ -111,31 +111,33 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
 
       // Poll for pending questions
       const questionsResponse = await questionsApi.listQuestions(runId);
-      if (questionsResponse.questions.length > 0) {
-        for (const q of questionsResponse.questions) {
-          // Extract gate name from node_id (e.g., FreeformGate, BinaryGate, etc.)
-          let answer = gateAnswers[q.node_id];
-          if (!answer) {
-            // Fallback: answer based on kind
-            if (q.kind === 'approval') answer = 'yes';
-            else if (q.kind === 'multiple_choice') answer = q.choices[0] || 'yes';
-            else answer = 'ok';
-          }
+      for (const q of questionsResponse.questions) {
+        if (answeredIds.has(q.id)) continue;
 
-          const answerResp = await questionsApi.answerQuestion(runId, q.id, answer);
-          expect(answerResp.success).toBe(true);
-          gatesAnswered++;
+        // Extract gate name from node_id (e.g., FreeformGate, BinaryGate, etc.)
+        let answer = gateAnswers[q.node_id];
+        if (!answer) {
+          // Fallback: answer based on kind
+          if (q.kind === 'approval') answer = 'yes';
+          else if (q.kind === 'multiple_choice') answer = q.choices[0] || 'yes';
+          else answer = 'ok';
         }
+
+        const answerResp = await questionsApi.answerQuestion(runId, q.id, answer);
+        expect(answerResp.success).toBe(true);
+        answeredIds.add(q.id);
+        gatesAnswered++;
       }
 
       // Small delay before next poll to avoid hammering the API
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    clearTimeout(pollTimeout);
-
     // Verify we answered at least one gate and run completed successfully
     expect(gatesAnswered).toBeGreaterThanOrEqual(1);
     expect(completedSuccessfully).toBe(true);
-  }, {timeout: 120000});
+  }, { timeout: 300000 }); // 5 min: each box node between gates is a real Codergen
+  // agentic tool-calling loop (read_file/write_file etc, not a single LLM completion),
+  // so per-node latency is genuinely variable -- confirmed by observing one node take
+  // ~2 minutes across multiple tool calls in a real run during debugging.
 });
