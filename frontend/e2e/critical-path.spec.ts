@@ -16,9 +16,21 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   // Navigate to the dev server
   await page.goto(baseURL || 'http://127.0.0.1:5173');
 
+  // Wait for page load
+  await page.waitForLoadState('networkidle');
+
+  // Debug: log what's on the page
+  const h1 = await page.locator('h1').allTextContents();
+  const main = await page.locator('main').textContent();
+  console.log('H1 texts:', h1);
+  console.log('Main text (first 300 chars):', main?.substring(0, 300));
+
+  // Wait for the app to render - look for the catalog heading or RunForm
+  await expect(page.locator('text=Smasher Pipelines')).toBeVisible({ timeout: 10000 });
+
   // Wait for the RunForm to load
   const form = page.locator('form');
-  await expect(form).toBeVisible();
+  await expect(form).toBeVisible({ timeout: 10000 });
 
   // Fill in the DOT source textarea
   const textarea = page.locator('textarea[placeholder*="digraph"]');
