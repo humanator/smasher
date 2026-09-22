@@ -62,7 +62,7 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 
 - [x] Task 16: Port node-editor data layer (types, nodeConfig, convert) — EditorGraph/Node/Edge reused from `lib/api/workflows.ts` instead of redefined; 18 ported tests pass, independently re-verified (91/91 full suite, lint clean, svelte-check shows only 5 pre-existing errors unrelated to this task, confirmed present on HEAD before this change too)
 - [x] Task 17: Port node-editor presentational components (Palette, WorkflowNode, WorkflowEdge, EdgeForm) — 99/99 tests, lint clean, svelte-check unchanged (5 pre-existing errors only), independently re-verified; one post-port cleanup (test-id used as a CSS hook in Palette.svelte swapped for a real class)
-- [ ] Task 17b: Port node-editor per-kind form components (`nodeForms/`) — added mid-plan, see `tasks/plan-smasher-spa.md`
+- [x] Task 17b: Port node-editor per-kind form components (`nodeForms/`) — added mid-plan, see `tasks/plan-smasher-spa.md`; byte-for-byte mechanical port (no scoped styles in any of the 6 components), 135/135 tests, lint clean, svelte-check unchanged, independently re-verified
 - [ ] Task 18: Port node-editor canvas orchestrator (`WorkflowCanvasInner` → normal component)
 - [ ] Task 19: Node-editor page routing (new/edit workflow)
 
