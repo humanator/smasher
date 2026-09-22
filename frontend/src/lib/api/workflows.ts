@@ -27,6 +27,17 @@ export interface EditorGraph {
   graph_attrs?: Record<string, unknown>;
 }
 
+export interface WorkflowSummary {
+  id: string;
+  name: string;
+  source_dir: string;
+  path: string;
+}
+
+export interface WorkflowsListResponse {
+  workflows: WorkflowSummary[];
+}
+
 export interface CreateGraphResponse {
   workflow_id: string;
 }
@@ -49,6 +60,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   throw new Error('Unexpected response format');
+}
+
+export async function listWorkflows(): Promise<WorkflowsListResponse> {
+  const response = await fetch(getApiUrl('/workflows'));
+  return handleResponse<WorkflowsListResponse>(response);
 }
 
 export async function getWorkflowGraph(id: string): Promise<EditorGraph> {
