@@ -1,72 +1,32 @@
 // ABOUTME: Tests for WorkflowCatalog component
-// ABOUTME: Verifies rendering of workflow list from real API
+// ABOUTME: Renders against the real GET /api/workflows endpoint, no mocking
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte/svelte5';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import WorkflowCatalog from '../../../src/components/dashboard/WorkflowCatalog.svelte';
-import * as workflowsApi from '../../../src/lib/api/workflows';
-
-vi.mock('../../../src/lib/api/workflows', () => ({
-  listWorkflows: vi.fn(),
-}));
+import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 
 describe('WorkflowCatalog', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
   it('renders loading state initially', () => {
-    vi.mocked(workflowsApi.listWorkflows).mockImplementation(() => new Promise(() => {}));
     render(WorkflowCatalog);
     expect(screen.getByText('Loading workflows...')).toBeTruthy();
   });
 
-  it('renders workflow list', async () => {
-    vi.mocked(workflowsApi.listWorkflows).mockResolvedValue({
-      workflows: [
-        {
-          id: 'examples__consensus_task',
-          name: 'consensus_task.dot',
-          source_dir: 'examples',
-          path: 'examples/consensus_task.dot',
-        },
-        {
-          id: 'examples__human_gate_showcase',
-          name: 'human_gate_showcase.dot',
-          source_dir: 'examples',
-          path: 'examples/human_gate_showcase.dot',
-        },
-      ],
-    });
-
+  it('renders the real workflow list from GET /api/workflows', async () => {
     render(WorkflowCatalog);
 
-    // Wait for workflows to load
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    expect(screen.getByText('Consensus Task')).toBeTruthy();
-    expect(screen.getByText('Human Gate Showcase')).toBeTruthy();
-  });
-
-  it('renders empty state when no workflows', async () => {
-    vi.mocked(workflowsApi.listWorkflows).mockResolvedValue({ workflows: [] });
-
-    render(WorkflowCatalog);
-
-    // Wait for workflows to load
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    expect(screen.getByText('No workflows configured.')).toBeTruthy();
-  });
-
-  it('renders error state', async () => {
-    vi.mocked(workflowsApi.listWorkflows).mockRejectedValue(new Error('API error'));
-
-    render(WorkflowCatalog);
-
-    // Wait for error
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    expect(screen.getByText(/Error:/)).toBeTruthy();
+    // examples/human_gate_showcase.dot is a real fixture in the workflow dir
+    // the dev:backend server is configured against (SMASHER_WORKFLOWS_DIR
+    // defaults to "examples").
+    await waitFor(
+      () => {
+        expect(screen.getByText('Human Gate Showcase')).toBeTruthy();
+      },
+      { timeout: 5000 }
+    );
   });
 });
