@@ -370,19 +370,26 @@ pub enum EngineError {
 
 ## HTTP API Endpoints
 
-The `ApiRouter` defines the canonical REST API for pipeline execution over HTTP.
-The default server binds to `127.0.0.1:2389`.
+The smasher-web HTTP API exposes a complete JSON+SSE contract for pipeline execution.
+The default server binds to `127.0.0.1:21541`.
 
 ### Routes
 
 | Method | Path | Description |
 |---|---|---|
+| `GET` | `/api/health` | Health check endpoint. |
 | `POST` | `/api/runs` | Submit a pipeline for execution. |
 | `GET` | `/api/runs` | List all pipeline runs. |
 | `GET` | `/api/runs/{id}` | Get status of a specific run. |
-| `GET` | `/api/runs/{id}/events` | Stream run events via SSE. |
 | `POST` | `/api/runs/{id}/cancel` | Cancel a running pipeline. |
-| `GET` | `/api/health` | Health check endpoint. |
+| `POST` | `/api/runs/{id}/resume` | Resume a completed/failed/aborted run from checkpoint. |
+| `GET` | `/api/runs/{id}/tokens` | Get input/output token counts for a run. |
+| `GET` | `/api/runs/{id}/graph` | Render the run's graph as SVG with node execution status. |
+| `GET` | `/api/runs/{id}/events` | Stream run events as Server-Sent Events (JSON). |
+| `GET` | `/api/runs/{id}/candidates` | List gallery-gate candidate summaries with scorecards. |
+| `GET` | `/api/runs/{id}/questions` | List pending human-gate questions. |
+| `POST` | `/api/runs/{id}/questions/{qid}/answer` | Answer a human-gate question (JSON). |
+| `POST` | `/api/graph/nodes` | Parse DOT source and return node list. |
 
 ### POST /api/runs -- Submit Pipeline
 
@@ -453,31 +460,131 @@ Response body:
 
 ### GET /api/runs/{id}/events -- SSE Event Stream
 
-Streams `PipelineEvent` objects as Server-Sent Events. Each event is JSON-encoded
-with a `kind` tag. See the [Event System](#event-system) section for event types.
+Streams `PipelineEvent` objects as Server-Sent Events with JSON data payloads.
+
+**Format:**
+```
+event: event_name
+data: {"field": "value", ...}
+```
+
+The stream terminates when `pipeline_completed` or `pipeline_aborted` is received.
+
+All 17 event types listed in the [PipelineEvent Variants](#pipelineevent-variants) section below.
 
 ### POST /api/runs/{id}/cancel -- Cancel Run
 
-Request body:
+Cancels a running pipeline. Only works on runs with status "Running".
+
+Response body (200 OK):
 
 ```json
 {
-  "run_id": "run-abc-123"
+  "success": true,
+  "status": "Aborted"
 }
 ```
 
-Response body:
+### POST /api/runs/{id}/resume -- Resume Run
+
+Resume a completed, failed, or aborted run from its last checkpoint. Creates a new run with a fresh id.
+
+Response body (200 OK):
 
 ```json
 {
-  "run_id": "run-abc-123",
-  "cancelled": true
+  "run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "status": "Running",
+  "resumed_from_node": "node_id"
+}
+```
+
+### GET /api/runs/{id}/tokens -- Token Usage
+
+Returns cumulative input/output token counts for a run.
+
+Response body (200 OK):
+
+```json
+{
+  "input_tokens": 5000,
+  "output_tokens": 12000
+}
+```
+
+### GET /api/runs/{id}/candidates -- Gallery Gate Candidates
+
+List all candidate summaries (from render-capture artifacts) for a run, including scorecards.
+
+Response body (200 OK):
+
+```json
+{
+  "candidates": [
+    {
+      "candidate_id": "candidate-001",
+      "screenshot_url": "/candidate-artifacts/run-abc/artifacts/candidate-001/screenshot.png",
+      "bundle_url": "/candidate-artifacts/run-abc/artifacts/candidate-001/bundle.html",
+      "manifest": { },
+      "scorecard": { }
+    }
+  ]
+}
+```
+
+Returns empty array if run exists but has no candidates yet.
+
+### GET /api/runs/{id}/questions -- List Questions
+
+List all pending human-gate questions for a run.
+
+Response body (200 OK):
+
+```json
+{
+  "questions": [
+    {
+      "id": "q-uuid-1",
+      "node_id": "gate_node",
+      "question": "Is this acceptable?",
+      "response": null
+    }
+  ]
+}
+```
+
+### POST /api/runs/{id}/questions/{qid}/answer -- Answer Question
+
+Answer a human-gate question with a JSON body.
+
+Request body (application/json):
+
+```json
+{
+  "answer": "yes"
+}
+```
+
+Response body (200 OK):
+
+```json
+{
+  "response": "yes",
+  "pending": false
 }
 ```
 
 ### GET /api/health -- Health Check
 
 Returns a 200 OK if the server is running.
+
+Response body:
+
+```json
+{
+  "status": "ok"
+}
+```
 
 ### Run Statuses
 
@@ -508,20 +615,27 @@ observability. Events carry a UTC timestamp and a `kind` tag for JSON serializat
 
 ### PipelineEvent Variants
 
-| Kind (JSON tag) | Fields | Description |
+All events are emitted on `/api/runs/{id}/events` as SSE with JSON data payloads. All events include a UTC `timestamp`.
+
+| Event Name | JSON Fields | Description |
 |---|---|---|
-| `node_started` | `node_id`, `node_type`, `timestamp` | A node has begun execution. |
-| `node_completed` | `node_id`, `outcome`, `duration_ms`, `timestamp` | A node finished with an outcome. |
-| `node_failed` | `node_id`, `error`, `duration_ms`, `timestamp` | A node execution failed. |
-| `edge_traversed` | `from`, `to`, `label`, `timestamp` | An edge was followed between two nodes. |
-| `human_prompt_issued` | `node_id`, `question`, `timestamp` | A human-in-the-loop prompt was issued. |
-| `human_response_received` | `node_id`, `response`, `timestamp` | A response was received from the operator. |
-| `context_updated` | `key`, `timestamp` | A key in the shared pipeline context was updated. |
-| `checkpoint_created` | `node_id`, `timestamp` | A checkpoint was persisted. |
-| `pipeline_started` | `graph_name`, `timestamp` | The pipeline began executing. |
-| `pipeline_completed` | `outcome`, `total_nodes`, `duration_ms`, `timestamp` | The pipeline completed. |
-| `pipeline_aborted` | `reason`, `timestamp` | The pipeline was aborted. |
-| `loop_restarted` | `from`, `to`, `restart_count`, `timestamp` | A loop edge was followed. |
+| `pipeline_started` | `graph_name`, `timestamp` | Pipeline began executing. |
+| `pipeline_completed` | `outcome`, `total_nodes`, `duration_ms`, `timestamp` | Pipeline finished successfully. |
+| `pipeline_aborted` | `reason`, `timestamp` | Pipeline was cancelled/aborted. |
+| `node_started` | `node_id`, `node_type`, `timestamp` | Node began execution. |
+| `node_completed` | `node_id`, `outcome`, `duration_ms`, `timestamp` | Node finished with outcome. |
+| `node_failed` | `node_id`, `error`, `duration_ms`, `timestamp` | Node execution failed. |
+| `edge_traversed` | `from`, `to`, `label`, `timestamp` | Edge was followed between nodes. |
+| `loop_restarted` | `from`, `to`, `restart_count`, `timestamp` | Loop edge was followed; context cleared. |
+| `context_updated` | `key`, `timestamp` | Pipeline context variable was updated. |
+| `checkpoint_created` | `node_id`, `timestamp` | Execution checkpoint persisted. |
+| `human_prompt_issued` | `node_id`, `question`, `timestamp` | Human-gate prompt issued; awaiting response. |
+| `human_response_received` | `node_id`, `response`, `timestamp` | Human provided an answer; resuming. |
+| `agent_turn_started` | `node_id`, `turn_number`, `timestamp` | Agent agentic turn began. |
+| `agent_message` | `node_id`, `text`, `timestamp` | Agent emitted a message. |
+| `agent_tool_call_started` | `node_id`, `tool_name`, `tool_call_id`, `input_preview`, `timestamp` | Agent invoked a tool. |
+| `agent_tool_call_completed` | `node_id`, `tool_name`, `tool_call_id`, `duration_ms`, `is_error`, `result_preview`, `timestamp` | Tool execution completed. |
+| `agent_token_usage` | `node_id`, `input_tokens`, `output_tokens`, `cost_usd`, `timestamp` | LLM token usage recorded. |
 
 ### Event Classification
 
