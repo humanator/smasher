@@ -5,7 +5,7 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 
 ## Phase 1: Foundation
 
-- [ ] Task 1: Scaffold `frontend/` project (Vite+Svelte5+TS strict+Tailwind+shadcn-svelte+Vitest+Playwright, `npm run dev:backend` helper)
+- [x] Task 1: Scaffold `frontend/` project (Vite+Svelte5+TS strict+Tailwind+shadcn-svelte+Vitest+Playwright, `npm run dev:backend` helper)
 - [ ] Task 2: `lib/api/` REST client (runs/questions/gallery/workflows, runtime-configurable base URL)
 - [ ] Task 3: `lib/api/` SSE client (typed 17-event wrapper for `/api/runs/{id}/events`)
 - [ ] Task 4: `lib/native/` shim stub (`window.__TAURI__` check, browser fallbacks)
