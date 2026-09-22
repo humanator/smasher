@@ -79,53 +79,59 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
     const question = questions[0];
     expect(question.kind).toBe('free_form');
 
-    // Step 4: Answer the question
-    const answerResponse = await questionsApi.answerQuestion(runId, question.id, 'yes');
-    expect(answerResponse.success).toBe(true);
+    // Step 4: Loop through all gates in the workflow, answering each one
+    // The workflow has 5 gates: FreeformGate → BinaryGate → MultiChoiceGate → DefaultGate → FinalFreeform
+    const gateAnswers: Record<string, string> = {
+      FreeformGate: 'This is an interesting response!',
+      BinaryGate: 'yes',
+      MultiChoiceGate: 'red',
+      DefaultGate: 'medium',
+      FinalFreeform: 'Thanks for the adventure!',
+    };
 
-    // Step 5: Wait for pipeline completion
-    const completionEvents = await new Promise<any[]>((resolve) => {
-      const eventsList: any[] = [];
-      const eventSource = new EventSource(`${BASE_URL}/api/runs/${runId}/events`);
+    let gatesAnswered = 0;
+    let completedSuccessfully = false;
 
-      const timeout = setTimeout(() => {
-        eventSource.close();
-        resolve(eventsList);
-      }, 30000);
+    // Keep polling until the run completes or we timeout
+    const pollTimeout = setTimeout(() => {
+      expect.fail('Pipeline did not complete within 120 seconds');
+    }, 120000);
 
-      // Listen for completion events
-      eventSource.addEventListener('pipeline_completed', (e: any) => {
-        const event = JSON.parse(e.data);
-        event.kind = 'pipeline_completed';
-        eventsList.push(event);
-        eventSource.close();
-        clearTimeout(timeout);
-        resolve(eventsList);
-      });
+    while (true) {
+      // Poll run status
+      const runResponse = await runsApi.getRun(runId);
+      if (runResponse.status === 'Completed' || runResponse.status === 'Failed' || runResponse.status === 'Aborted') {
+        completedSuccessfully = runResponse.status === 'Completed';
+        break;
+      }
 
-      eventSource.addEventListener('pipeline_aborted', (e: any) => {
-        const event = JSON.parse(e.data);
-        event.kind = 'pipeline_aborted';
-        eventsList.push(event);
-        eventSource.close();
-        clearTimeout(timeout);
-        resolve(eventsList);
-      });
+      // Poll for pending questions
+      const questionsResponse = await questionsApi.listQuestions(runId);
+      if (questionsResponse.questions.length > 0) {
+        for (const q of questionsResponse.questions) {
+          // Extract gate name from node_id (e.g., FreeformGate, BinaryGate, etc.)
+          let answer = gateAnswers[q.node_id];
+          if (!answer) {
+            // Fallback: answer based on kind
+            if (q.kind === 'approval') answer = 'yes';
+            else if (q.kind === 'multiple_choice') answer = q.choices[0] || 'yes';
+            else answer = 'ok';
+          }
 
-      eventSource.onerror = () => {
-        clearTimeout(timeout);
-        resolve(eventsList);
-      };
-    });
+          const answerResp = await questionsApi.answerQuestion(runId, q.id, answer);
+          expect(answerResp.success).toBe(true);
+          gatesAnswered++;
+        }
+      }
 
-    // Verify completion
-    const completionEvent = completionEvents.find(
-      (e) => e.kind === 'pipeline_completed' || e.kind === 'pipeline_aborted'
-    );
-    expect(completionEvent).toBeTruthy();
-
-    if (completionEvent?.kind === 'pipeline_completed') {
-      expect(completionEvent.outcome.type).toBe('success');
+      // Small delay before next poll to avoid hammering the API
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
+
+    clearTimeout(pollTimeout);
+
+    // Verify we answered at least one gate and run completed successfully
+    expect(gatesAnswered).toBeGreaterThanOrEqual(1);
+    expect(completedSuccessfully).toBe(true);
   }, {timeout: 120000});
 });
