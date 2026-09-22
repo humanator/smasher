@@ -32,7 +32,12 @@ async fn start_test_server() -> (String, task::JoinHandle<()>) {
     (base_url, server_task)
 }
 
-/// Simple workflow with a human-gate for testing
+/// Simple workflow with a real human-gate node for testing.
+///
+/// `shape=hexagon` is what actually resolves to `NodeType::Interviewer`
+/// (see `graph/mod.rs`'s shape table) — `shape=diamond` resolves to
+/// `NodeType::Conditional` instead and never pauses for input, which is
+/// why the previous version of this test never exercised a real gate.
 fn human_gate_workflow_dot() -> String {
     r#"
 digraph HumanGateTest {
@@ -44,16 +49,15 @@ digraph HumanGateTest {
   Start [shape=Mdiamond, label="Start"];
 
   Gate [
-    shape=diamond,
-    label="Approve?",
-    prompt="Do you approve?"
+    shape=hexagon,
+    label="Approve?"
   ];
 
   Exit [shape=Msquare, label="Exit"];
 
   Start -> Gate;
-  Gate -> Exit [condition="response=yes"];
-  Gate -> Exit [condition="response=no"];
+  Gate -> Exit [label="[Y] Yes"];
+  Gate -> Exit [label="[N] No"];
 }
 "#
     .to_string()
@@ -64,7 +68,7 @@ async fn test_human_gate_answer_round_trip() {
     let (base_url, _server) = start_test_server().await;
     let client = Client::new();
 
-    // Submit a pipeline with human-gate
+    // Submit a pipeline with a human-gate.
     let submit_response = client
         .post(format!("{}/api/runs", base_url))
         .json(&json!({
@@ -88,71 +92,69 @@ async fn test_human_gate_answer_round_trip() {
         .expect("response should contain run_id field")
         .to_string();
 
-    // Poll for the pipeline to pause at the human-gate
+    // Poll /api/runs/{id}/questions until the gate has actually issued a
+    // question. RunStatus has no Paused/Waiting variant (see
+    // smasher-attractor's state.rs) — status stays "Running" the whole
+    // time the pipeline is blocked on a human-gate answer, so the
+    // question list is the only reliable pause signal.
     let start = std::time::Instant::now();
-    let timeout = Duration::from_secs(30);
-    let mut human_prompt_question_id = None;
+    let timeout = Duration::from_secs(10);
+    let mut question_id = None;
 
     while start.elapsed() < timeout {
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        // Check if the run status is paused/waiting
-        let status_response = client
-            .get(format!("{}/api/runs/{}", base_url, run_id))
+        let questions_response = client
+            .get(format!("{}/api/runs/{}/questions", base_url, run_id))
             .send()
             .await
-            .expect("failed to get status");
+            .expect("failed to list questions");
 
-        let status_body: Value = status_response
+        let questions_body: Value = questions_response
             .json()
             .await
-            .expect("failed to parse status");
+            .expect("failed to parse questions response");
 
-        let status = status_body["status"]
-            .as_str()
-            .expect("should have status")
-            .to_lowercase();
-
-        // Check for terminal states
-        if status == "completed" || status == "failed" || status == "aborted" {
+        if let Some(id) = questions_body["questions"]
+            .get(0)
+            .and_then(|q| q["id"].as_str())
+        {
+            question_id = Some(id.to_string());
             break;
         }
 
-        // If paused, try to find the question
-        if status.contains("waiting") || status.contains("paused") {
-            // Note: In a real implementation, we'd fetch /api/runs/{id}/questions
-            // For this test, we'll just use a dummy question ID since the workflow
-            // architecture handles question ID generation
-            human_prompt_question_id = Some("dummy-q-id".to_string());
-            break;
-        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
     }
 
-    // If we found a human-gate question, try to answer it
-    // (This tests the JSON answer endpoint even if the question ID might not match exactly)
-    if human_prompt_question_id.is_some() {
-        let answer_response = client
-            .post(format!(
-                "{}/api/runs/{}/questions/dummy-q-id/answer",
-                base_url, run_id
-            ))
-            .json(&json!({ "response": "yes" }))
-            .send()
-            .await;
+    let question_id = question_id.expect("gate should have issued a pending question");
 
-        // We expect either 200 (success) or 404 (question not found, but that's OK for this test)
-        // The important thing is that the endpoint exists and accepts JSON
-        let status = answer_response.map(|r| r.status().as_u16()).ok();
-        assert!(
-            matches!(status, Some(200) | Some(404) | Some(500)),
-            "answer endpoint should accept JSON POST"
-        );
-    }
+    // Answer with the real JSON contract: `{"answer": "..."}`, not
+    // `{"response": "..."}` — the handler extracts `AnswerQuestionRequest`,
+    // whose only field is `answer` (see smasher-attractor's http_interviewer.rs).
+    let answer_response = client
+        .post(format!(
+            "{}/api/runs/{}/questions/{}/answer",
+            base_url, run_id, question_id
+        ))
+        .json(&json!({ "answer": "[Y] Yes" }))
+        .send()
+        .await
+        .expect("failed to post answer");
 
-    // Final poll for completion - the pipeline may complete with or without human-gate
+    assert_eq!(
+        answer_response.status(),
+        200,
+        "answering the real pending question should succeed"
+    );
+
+    let answer_body: Value = answer_response
+        .json()
+        .await
+        .expect("failed to parse answer response");
+    assert_eq!(answer_body["success"], true);
+
+    // The answer should unblock the pipeline and let it run to completion.
     let start = std::time::Instant::now();
-    let timeout = Duration::from_secs(30);
-    let mut completed = false;
+    let timeout = Duration::from_secs(10);
+    let mut final_status = None;
 
     while start.elapsed() < timeout {
         let status_response = client
@@ -172,16 +174,16 @@ async fn test_human_gate_answer_round_trip() {
             .to_lowercase();
 
         if status == "completed" || status == "failed" || status == "aborted" {
-            completed = true;
+            final_status = Some(status);
             break;
         }
 
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(Duration::from_millis(200)).await;
     }
 
-    // Assert that the pipeline reached a terminal state
-    assert!(
-        completed,
-        "pipeline should reach terminal state within timeout"
+    assert_eq!(
+        final_status.as_deref(),
+        Some("completed"),
+        "pipeline should complete after the human-gate is answered"
     );
 }
