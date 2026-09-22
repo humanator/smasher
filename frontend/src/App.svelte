@@ -7,6 +7,7 @@
   import WorkflowCatalog from './components/dashboard/WorkflowCatalog.svelte';
   import RunForm from './components/dashboard/RunForm.svelte';
   import RunList from './components/dashboard/RunList.svelte';
+  import RunDetail from './components/dashboard/RunDetail.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
   import QuestionCard from './components/dashboard/QuestionCard.svelte';
 
@@ -44,6 +45,10 @@
       <div class="mb-8">
         <a href="/" class="text-blue-600 hover:underline">← Back to Catalog</a>
         <h1 class="text-3xl font-bold mt-4">Pipeline Run: {runId}</h1>
+      </div>
+
+      <div class="mb-8">
+        <RunDetail {runId} />
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
