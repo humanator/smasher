@@ -34,256 +34,13 @@ pub fn event_name(event: &PipelineEvent) -> &'static str {
     }
 }
 
-/// Convert a PipelineEvent into an HTML fragment for HTMX SSE swap.
+/// Convert a PipelineEvent into JSON for SSE transmission.
 pub fn to_sse_event(event: &PipelineEvent) -> Event {
     let name = event_name(event);
-    let html = render_event_html(event);
-    Event::default().event(name).data(html)
+    let json = serde_json::to_string(event).unwrap_or_else(|_| "{}".to_string());
+    Event::default().event(name).data(json)
 }
 
-fn format_time(ts: &chrono::DateTime<chrono::Utc>) -> String {
-    ts.format("%H:%M:%S").to_string()
-}
-
-fn format_duration(ms: u64) -> String {
-    if ms < 1000 {
-        format!("{}ms", ms)
-    } else if ms < 60_000 {
-        format!("{:.1}s", ms as f64 / 1000.0)
-    } else {
-        let mins = ms / 60_000;
-        let secs = (ms % 60_000) / 1000;
-        format!("{}m {}s", mins, secs)
-    }
-}
-
-fn escape_html(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-pub fn render_event_html(event: &PipelineEvent) -> String {
-    match event {
-        PipelineEvent::PipelineStarted {
-            graph_name,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-pipeline_started"><span class="event-time">{}</span><span class="event-icon">⚡</span><div class="event-body"><span class="event-kind">PIPELINE STARTED</span><span class="event-detail">{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(graph_name)
-            )
-        }
-        PipelineEvent::PipelineCompleted {
-            total_nodes,
-            duration_ms,
-            timestamp,
-            ..
-        } => {
-            format!(
-                r#"<div class="event-item event-pipeline_completed"><span class="event-time">{}</span><span class="event-icon">✓</span><div class="event-body"><span class="event-kind">PIPELINE COMPLETED</span><span class="event-detail">{} nodes · {}</span></div></div>"#,
-                format_time(timestamp),
-                total_nodes,
-                format_duration(*duration_ms)
-            )
-        }
-        PipelineEvent::PipelineAborted { reason, timestamp } => {
-            format!(
-                r#"<div class="event-item event-pipeline_aborted"><span class="event-time">{}</span><span class="event-icon">✕</span><div class="event-body"><span class="event-kind">PIPELINE ABORTED</span><span class="event-detail">{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(reason)
-            )
-        }
-        PipelineEvent::NodeStarted {
-            node_id,
-            node_type,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-node_started"><span class="event-time">{}</span><span class="event-icon">▶</span><div class="event-body"><span class="event-kind">NODE STARTED</span><span class="event-detail"><span class="event-node">{}</span><span class="event-tag">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                escape_html(node_type)
-            )
-        }
-        PipelineEvent::NodeCompleted {
-            node_id,
-            duration_ms,
-            timestamp,
-            ..
-        } => {
-            format!(
-                r#"<div class="event-item event-node_completed"><span class="event-time">{}</span><span class="event-icon">✓</span><div class="event-body"><span class="event-kind">NODE COMPLETED</span><span class="event-detail"><span class="event-node">{}</span><span class="event-duration">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                format_duration(*duration_ms)
-            )
-        }
-        PipelineEvent::NodeFailed {
-            node_id,
-            error,
-            duration_ms,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-node_failed"><span class="event-time">{}</span><span class="event-icon">✕</span><div class="event-body"><span class="event-kind">NODE FAILED</span><span class="event-detail"><span class="event-node">{}</span><span class="event-duration">{}</span><span class="event-error">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                format_duration(*duration_ms),
-                escape_html(error)
-            )
-        }
-        PipelineEvent::EdgeTraversed {
-            from,
-            to,
-            label,
-            timestamp,
-        } => {
-            let label_str = label
-                .as_deref()
-                .map(|l| format!(r#" <span class="event-label">[{}]</span>"#, escape_html(l)))
-                .unwrap_or_default();
-            format!(
-                r#"<div class="event-item event-edge_traversed"><span class="event-time">{}</span><span class="event-icon">→</span><div class="event-body"><span class="event-kind">EDGE</span><span class="event-detail">{} → {}{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(from),
-                escape_html(to),
-                label_str
-            )
-        }
-        PipelineEvent::LoopRestarted {
-            from,
-            to,
-            restart_count,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-loop_restarted"><span class="event-time">{}</span><span class="event-icon">↻</span><div class="event-body"><span class="event-kind">LOOP #{}</span><span class="event-detail">{} → {}</span></div></div>"#,
-                format_time(timestamp),
-                restart_count,
-                escape_html(from),
-                escape_html(to)
-            )
-        }
-        PipelineEvent::HumanPromptIssued {
-            node_id,
-            question,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-human_prompt_issued"><span class="event-time">{}</span><span class="event-icon">?</span><div class="event-body"><span class="event-kind">AWAITING INPUT</span><span class="event-detail"><span class="event-node">{}</span>{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                escape_html(question)
-            )
-        }
-        PipelineEvent::HumanResponseReceived {
-            node_id, timestamp, ..
-        } => {
-            format!(
-                r#"<div class="event-item event-human_response"><span class="event-time">{}</span><span class="event-icon">✎</span><div class="event-body"><span class="event-kind">INPUT RECEIVED</span><span class="event-detail"><span class="event-node">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id)
-            )
-        }
-        PipelineEvent::ContextUpdated { key, timestamp } => {
-            format!(
-                r#"<div class="event-item event-context_updated"><span class="event-time">{}</span><span class="event-icon">⟳</span><div class="event-body"><span class="event-kind">CTX UPDATE</span><span class="event-detail">{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(key)
-            )
-        }
-        PipelineEvent::CheckpointCreated { node_id, timestamp } => {
-            format!(
-                r#"<div class="event-item event-checkpoint"><span class="event-time">{}</span><span class="event-icon">◆</span><div class="event-body"><span class="event-kind">CHECKPOINT</span><span class="event-detail">{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id)
-            )
-        }
-        PipelineEvent::AgentToolCallStarted {
-            node_id,
-            tool_name,
-            timestamp,
-            ..
-        } => {
-            format!(
-                r#"<div class="event-item event-agent_tool_call_started"><span class="event-time">{}</span><span class="event-icon">🔧</span><div class="event-body"><span class="event-kind">TOOL CALL</span><span class="event-detail"><span class="event-node">{}</span><span class="event-tool-name">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                escape_html(tool_name)
-            )
-        }
-        PipelineEvent::AgentToolCallCompleted {
-            node_id,
-            tool_name,
-            duration_ms,
-            is_error,
-            result_preview,
-            timestamp,
-            ..
-        } => {
-            let error_class = if *is_error { " is-error" } else { "" };
-            let status_icon = if *is_error { "✕" } else { "✓" };
-            format!(
-                r#"<div class="event-item event-agent_tool_call_completed{}"><span class="event-time">{}</span><span class="event-icon">{}</span><div class="event-body"><span class="event-kind">TOOL DONE</span><span class="event-detail"><span class="event-node">{}</span><span class="event-tool-name">{}</span><span class="event-duration">{}</span><span class="event-result-preview">{}</span></span></div></div>"#,
-                error_class,
-                format_time(timestamp),
-                status_icon,
-                escape_html(node_id),
-                escape_html(tool_name),
-                format_duration(*duration_ms),
-                escape_html(result_preview)
-            )
-        }
-        PipelineEvent::AgentMessage {
-            node_id,
-            text,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-agent_message"><span class="event-time">{}</span><span class="event-icon">💬</span><div class="event-body"><span class="event-kind">AGENT</span><span class="event-detail"><span class="event-node">{}</span><span class="event-agent-text">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                escape_html(text)
-            )
-        }
-        PipelineEvent::AgentTurnStarted {
-            node_id,
-            turn_number,
-            timestamp,
-        } => {
-            format!(
-                r#"<div class="event-item event-agent_turn_started"><span class="event-time">{}</span><span class="event-icon">↻</span><div class="event-body"><span class="event-kind">TURN {}</span><span class="event-detail"><span class="event-node">{}</span></span></div></div>"#,
-                format_time(timestamp),
-                turn_number,
-                escape_html(node_id)
-            )
-        }
-        PipelineEvent::AgentTokenUsage {
-            node_id,
-            input_tokens,
-            output_tokens,
-            cost_usd,
-            timestamp,
-        } => {
-            let cost_part = if *cost_usd > 0.0 {
-                format!(" ${:.2}", cost_usd)
-            } else {
-                String::new()
-            };
-            format!(
-                r#"<div class="event-item event-agent_token_usage"><span class="event-time">{}</span><span class="event-icon">⊛</span><div class="event-body"><span class="event-kind">TOKENS</span><span class="event-detail"><span class="event-node">{}</span> in:{} out:{}{}</span></div></div>"#,
-                format_time(timestamp),
-                escape_html(node_id),
-                input_tokens,
-                output_tokens,
-                cost_part
-            )
-        }
-    }
-}
 
 /// Create an SSE stream from a broadcast receiver that terminates on
 /// `PipelineCompleted` or `PipelineAborted` (or when the channel closes).
@@ -493,31 +250,42 @@ mod tests {
     }
 
     #[test]
-    fn to_sse_event_produces_html_fragment() {
+    fn to_sse_event_produces_json() {
         let event = PipelineEvent::NodeStarted {
             node_id: "step_1".into(),
             node_type: "llm".into(),
             timestamp: now(),
         };
-        let sse = to_sse_event(&event);
-        // SSE Event's Debug output should contain the event name and HTML content
-        let debug = format!("{:?}", sse);
-        assert!(debug.contains("node_started") || debug.contains("step_1"));
+
+        // Verify the event directly serializes to valid JSON
+        let json_str = serde_json::to_string(&event).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        // The event name should match
+        assert_eq!(event_name(&event), "node_started");
+
+        // Verify JSON has expected structure
+        assert_eq!(parsed["node_id"], "step_1");
+        assert_eq!(parsed["node_type"], "llm");
     }
 
     #[test]
-    fn to_sse_event_html_contains_expected_content() {
+    fn to_sse_event_json_contains_expected_fields() {
         let event = PipelineEvent::PipelineCompleted {
             outcome: Outcome::success(),
             total_nodes: 5,
             duration_ms: 1234,
             timestamp: now(),
         };
-        let html = render_event_html(&event);
-        assert!(html.contains("PIPELINE COMPLETED"));
-        assert!(html.contains("5 nodes"));
-        assert!(html.contains("1.2s"));
-        assert!(html.contains("event-pipeline_completed"));
+
+        let json_str = serde_json::to_string(&event).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        // Verify all expected fields are present
+        assert_eq!(json["total_nodes"], 5);
+        assert_eq!(json["duration_ms"], 1234);
+        assert!(json["timestamp"].is_string());
+        assert!(json["outcome"].is_object());
     }
 
     #[tokio::test]

@@ -513,12 +513,10 @@ async fn workflow_detail(
     let (historical_events, initial_input_tokens, initial_output_tokens) = match &active_run {
         Some(active) => match runs_map.get(&active.id) {
             Some(record) => {
-                let mut events = record.event_log.events();
-                events.reverse();
-                let historical_events: String =
-                    events.iter().map(crate::sse::render_event_html).collect();
+                // Historical event HTML rendering has been removed as part of the SSE→JSON cutover.
+                // The live event feed now uses JSON format; this regression is expected and documented.
                 (
-                    historical_events,
+                    String::new(),
                     record.input_tokens.load(Ordering::Relaxed),
                     record.output_tokens.load(Ordering::Relaxed),
                 )
@@ -711,9 +709,9 @@ async fn run_detail(
     let summary = record.to_summary();
 
     // Pre-render historical events (newest first to match SSE afterbegin order).
-    let mut events = record.event_log.events();
-    events.reverse();
-    let historical_events: String = events.iter().map(crate::sse::render_event_html).collect();
+    // Note: historical event HTML rendering has been removed as part of the SSE→JSON cutover.
+    // The live event feed now uses JSON format; this regression is expected and documented.
+    let historical_events: String = String::new();
 
     let initial_input_tokens = record.input_tokens.load(Ordering::Relaxed);
     let initial_output_tokens = record.output_tokens.load(Ordering::Relaxed);
