@@ -89,6 +89,20 @@ pub struct ResumeResponse {
     pub resumed_from_node: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CandidateResponse {
+    pub candidate_id: String,
+    pub screenshot_url: String,
+    pub bundle_url: Option<String>,
+    pub manifest: serde_json::Value,
+    pub scorecard: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CandidatesResponse {
+    pub candidates: Vec<CandidateResponse>,
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -103,6 +117,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/runs/{id}/resume", post(resume_run))
         .route("/api/runs/{id}/tokens", get(get_tokens))
         .route("/api/runs/{id}/graph", get(render_graph))
+        .route("/api/runs/{id}/candidates", get(list_candidates))
         .route("/api/graph/nodes", post(list_graph_nodes))
 }
 
@@ -427,6 +442,41 @@ async fn render_graph(
         output.content,
     )
         .into_response())
+}
+
+async fn list_candidates(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<CandidatesResponse>, WebError> {
+    // Verify the run exists.
+    {
+        let runs = state.runs.read().await;
+        if !runs.contains_key(&id) {
+            return Err(WebError::NotFound(format!("run {id}")));
+        }
+    }
+
+    // Scan for candidates using the existing candidates module.
+    let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
+    let summaries = crate::candidates::scan_candidates(&artifacts_base, &id);
+
+    let candidates = summaries
+        .into_iter()
+        .map(|summary| {
+            let scorecard = crate::candidates::read_scorecard(&artifacts_base, &id, &summary.candidate_id);
+            CandidateResponse {
+                candidate_id: summary.candidate_id,
+                screenshot_url: summary.screenshot_url,
+                bundle_url: summary.bundle_url,
+                manifest: serde_json::to_value(&summary.manifest)
+                    .unwrap_or(serde_json::Value::Null),
+                scorecard: serde_json::to_value(&scorecard)
+                    .unwrap_or(serde_json::Value::Null),
+            }
+        })
+        .collect();
+
+    Ok(Json(CandidatesResponse { candidates }))
 }
 
 #[cfg(test)]
@@ -800,5 +850,35 @@ mod tests {
         let parsed: TokenResponse = serde_json::from_slice(&body).unwrap();
         assert_eq!(parsed.input_tokens, 0);
         assert_eq!(parsed.output_tokens, 0);
+    }
+
+    #[tokio::test]
+    async fn list_candidates_not_found() {
+        let app = router().with_state(test_state());
+        let req = Request::builder()
+            .uri("/api/runs/nonexistent/candidates")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn list_candidates_empty_for_run_without_artifacts() {
+        let state = test_state();
+        let _token = insert_test_record(&state, "run-no-cand", RunStatus::Running).await;
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri("/api/runs/run-no-cand/candidates")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: CandidatesResponse = serde_json::from_slice(&body).unwrap();
+        assert!(parsed.candidates.is_empty());
     }
 }

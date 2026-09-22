@@ -99,7 +99,7 @@ pub fn scan_candidates(artifacts_base: &Path, run_id: &str) -> Vec<CandidateSumm
 /// A candidate's lint/critic/synthesis reports, whichever of the three have been
 /// written so far. Missing files are expected (a run can reach the gate before
 /// the critics finish, or before they exist on the pipeline at all) — not errors.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct CandidateScorecard {
     pub lint: Option<LintReport>,
     pub critic: Option<CriticReport>,

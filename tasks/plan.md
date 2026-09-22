@@ -85,7 +85,7 @@ Questions).
 
 - [x] Task 2: SSE events as JSON
 - [x] Task 3: Human-gate answer as JSON
-- [ ] Task 4: Gallery candidate listing endpoint
+- [x] Task 4: Gallery candidate listing endpoint
 - [ ] Task 5: API reference documentation
 
 ### Checkpoint: JSON/SSE Contract Complete

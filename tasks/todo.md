@@ -15,7 +15,7 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 
 - [x] Task 2: SSE events as JSON (`sse.rs`, delete `render_event_html`)
 - [x] Task 3: Human-gate answer as JSON (`questions.rs`, `Form` → `Json`)
-- [ ] Task 4: Gallery candidate listing endpoint (`GET /api/runs/{id}/candidates`, new)
+- [x] Task 4: Gallery candidate listing endpoint (`GET /api/runs/{id}/candidates`, new)
 - [ ] Task 5: API reference documentation (`docs/api-reference.md`)
 
 ### Checkpoint: JSON/SSE Contract Complete
