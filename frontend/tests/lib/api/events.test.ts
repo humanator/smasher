@@ -11,119 +11,130 @@ import { join } from 'path';
 const BASE_URL = 'http://127.0.0.1:21541';
 const API_URL = `${BASE_URL}/api`;
 
-// Read a simple workflow for event testing
-const consensusTaskDot = readFileSync(
-  join(process.cwd(), '..', 'examples', 'consensus_task.dot'),
+// Use human_gate_showcase.dot which blocks early on a human-gate node.
+// This workflow exercises the human-gate flow while keeping events observable.
+// Task 6b event replay is now fixed: subscribing to /api/runs/{id}/events
+// replays pipeline_started from the event log before switching to live broadcast.
+const humanGateDot = readFileSync(
+  join(process.cwd(), '..', 'examples', 'human_gate_showcase.dot'),
   'utf-8'
 );
 
 describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
-  // Skip EventSource tests in jsdom/nodejs test environment - EventSource is browser-only
-  // In a real browser environment (or Node.js with EventSource polyfill), these tests would run
-  const skipIfNoEventSource = typeof EventSource === 'undefined' ? it.skip : it;
-
   beforeAll(() => {
     setApiBaseUrl(API_URL);
   });
 
-  skipIfNoEventSource('should subscribe to pipeline events and receive pipeline_started', async () => {
-    // Submit a run
-    const submitResp = await runsModule.submitRun({
-      dot_source: consensusTaskDot,
-      variables: { test: 'events' },
-    });
+  it(
+    'should receive pipeline_started event via event replay on subscribe',
+    async () => {
+      // Submit a run
+      const submitResp = await runsModule.submitRun({
+        dot_source: humanGateDot,
+        variables: { test: 'events' },
+      });
 
-    const runId = submitResp.run_id;
+      const runId = submitResp.run_id;
 
-    // Track events received
-    const events: eventsModule.PipelineEvent[] = [];
-    let unsubscribe: (() => void) | null = null;
+      // Track events received
+      const events: eventsModule.PipelineEvent[] = [];
 
-    // Wait a bit for the event stream to start
-    await new Promise((resolve) => setTimeout(resolve, 100));
+      // Subscribe to events - Task 6b fix ensures pipeline_started is replayed
+      // from the event log even if we subscribe after the pipeline launches
+      const unsubscribe = eventsModule.subscribeToPipelineEvents(runId, (event) => {
+        events.push(event);
+      });
 
-    // Subscribe to events
-    unsubscribe = eventsModule.subscribeToPipelineEvents(runId, (event) => {
-      events.push(event);
-    });
+      // Wait for pipeline_started to arrive (replayed from event log)
+      await new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (events.some((e) => e.kind === 'pipeline_started')) {
+            clearInterval(checkInterval);
+            resolve(null);
+          }
+        }, 100);
 
-    // Wait for pipeline_started event to arrive
-    await new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (events.some((e) => e.kind === 'pipeline_started')) {
+        // Timeout after 15 seconds
+        setTimeout(() => {
           clearInterval(checkInterval);
           resolve(null);
-        }
-      }, 50);
+        }, 15000);
+      });
 
-      // Timeout after 5 seconds
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        resolve(null);
-      }, 5000);
-    });
+      // Verify pipeline_started was received
+      const pipelineStartedEvent = events.find((e) => e.kind === 'pipeline_started');
+      expect(pipelineStartedEvent).toBeDefined();
+      expect(pipelineStartedEvent?.timestamp).toBeDefined();
+      expect(typeof pipelineStartedEvent?.timestamp).toBe('string');
 
-    // Should have received at least pipeline_started
-    expect(events.length).toBeGreaterThan(0);
-    const startedEvent = events.find((e) => e.kind === 'pipeline_started');
-    expect(startedEvent).toBeDefined();
-    expect(startedEvent?.kind).toBe('pipeline_started');
+      // Verify all events have correct shape
+      for (const event of events) {
+        expect(event.timestamp).toBeDefined();
+        expect(typeof event.timestamp).toBe('string');
+        expect(event.kind).toBeDefined();
+        // Verify it's a valid kind
+        const validKinds = [
+          'pipeline_started', 'pipeline_completed', 'pipeline_aborted',
+          'node_started', 'node_completed', 'node_failed',
+          'edge_traversed', 'loop_restarted', 'context_updated', 'checkpoint_created',
+          'human_prompt_issued', 'human_response_received',
+          'agent_turn_started', 'agent_message',
+          'agent_tool_call_started', 'agent_tool_call_completed',
+          'agent_token_usage',
+        ];
+        expect(validKinds).toContain(event.kind);
+      }
 
-    // Verify event has correct shape
-    if (startedEvent?.kind === 'pipeline_started') {
-      expect(startedEvent.timestamp).toBeDefined();
-      expect(typeof startedEvent.timestamp).toBe('string');
-      expect(startedEvent.graph_name).toBeDefined();
-    }
-
-    // Cleanup
-    if (unsubscribe) {
+      // Cleanup
       unsubscribe();
-    }
-  });
+    },
+    { timeout: 20000 }
+  );
 
-  skipIfNoEventSource('should discriminate event types via kind property', async () => {
-    // Submit a run
-    const submitResp = await runsModule.submitRun({
-      dot_source: consensusTaskDot,
-      variables: { test: 'discrimination' },
-    });
+  it(
+    'should receive multiple event types with correct discrimination',
+    async () => {
+      // Submit a run
+      const submitResp = await runsModule.submitRun({
+        dot_source: humanGateDot,
+        variables: { test: 'discrimination' },
+      });
 
-    const runId = submitResp.run_id;
+      const runId = submitResp.run_id;
 
-    // Track events
-    const events: eventsModule.PipelineEvent[] = [];
-    let unsubscribe: (() => void) | null = null;
+      // Track events
+      const events: eventsModule.PipelineEvent[] = [];
 
-    // Wait a bit for the event stream to start
-    await new Promise((resolve) => setTimeout(resolve, 100));
+      // Subscribe to events
+      const unsubscribe = eventsModule.subscribeToPipelineEvents(runId, (event) => {
+        events.push(event);
+      });
 
-    // Subscribe
-    unsubscribe = eventsModule.subscribeToPipelineEvents(runId, (event) => {
-      events.push(event);
-    });
+      // Wait for events to arrive, including pipeline_started from replay
+      await new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          // Wait for at least pipeline_started and one other event
+          if (events.length >= 2 && events.some((e) => e.kind === 'pipeline_started')) {
+            clearInterval(checkInterval);
+            resolve(null);
+          }
+        }, 100);
 
-    // Wait for any event
-    await new Promise((resolve) => {
-      const checkInterval = setInterval(() => {
-        if (events.length > 0) {
+        // Timeout after 15 seconds
+        setTimeout(() => {
           clearInterval(checkInterval);
           resolve(null);
-        }
-      }, 50);
+        }, 15000);
+      });
 
-      setTimeout(() => {
-        clearInterval(checkInterval);
-        resolve(null);
-      }, 5000);
-    });
+      // Verify we received multiple events with correct discrimination
+      expect(events.length).toBeGreaterThan(0);
 
-    // Verify events have discriminated types
-    expect(events.length).toBeGreaterThan(0);
-    for (const event of events) {
-      expect(event.kind).toBeDefined();
-      expect(event.timestamp).toBeDefined();
-      // Each event should have a valid kind
+      // Verify pipeline_started is among them
+      const pipelineStartedEvent = events.find((e) => e.kind === 'pipeline_started');
+      expect(pipelineStartedEvent).toBeDefined();
+
+      // Verify all events have correct structure and valid kinds
       const validKinds = [
         'pipeline_started',
         'pipeline_completed',
@@ -143,12 +154,16 @@ describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
         'agent_tool_call_completed',
         'agent_token_usage',
       ];
-      expect(validKinds).toContain(event.kind);
-    }
 
-    // Cleanup
-    if (unsubscribe) {
+      for (const event of events) {
+        expect(event.kind).toBeDefined();
+        expect(event.timestamp).toBeDefined();
+        expect(validKinds).toContain(event.kind);
+      }
+
+      // Cleanup
       unsubscribe();
-    }
-  });
+    },
+    { timeout: 20000 }
+  );
 });

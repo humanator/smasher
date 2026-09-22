@@ -12,6 +12,10 @@ describe('native shim', () => {
   });
 
   describe('saveFile', () => {
+    it('should have saveFile function', () => {
+      expect(typeof native.saveFile).toBe('function');
+    });
+
     it('should return a promise', () => {
       const result = native.saveFile('test.txt', new Blob(['content']));
       expect(result instanceof Promise).toBe(true);
@@ -25,15 +29,13 @@ describe('native shim', () => {
   });
 
   describe('loadFile', () => {
+    it('should have loadFile function', () => {
+      expect(typeof native.loadFile).toBe('function');
+    });
+
     it('should return a promise', () => {
       const result = native.loadFile();
       expect(result instanceof Promise).toBe(true);
-    });
-
-    it('should resolve to a Blob on file selection', async () => {
-      // Note: Actually testing file input requires mocking the DOM,
-      // which is beyond scope for this simple stub. Just verify the API exists.
-      expect(typeof native.loadFile).toBe('function');
     });
   });
 
