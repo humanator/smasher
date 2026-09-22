@@ -80,9 +80,7 @@ describe('Critical Path: Submit → Events → Answer Gate → Complete', () => 
     expect(question.kind).toBe('free_form');
 
     // Step 4: Answer the question
-    const answerResponse = await questionsApi.answerQuestion(runId, question.id, {
-      answer: 'yes',
-    });
+    const answerResponse = await questionsApi.answerQuestion(runId, question.id, 'yes');
     expect(answerResponse.success).toBe(true);
 
     // Step 5: Wait for pipeline completion

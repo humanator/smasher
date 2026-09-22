@@ -2,7 +2,7 @@
 // ABOUTME: Verifies rendering of workflow list from real API
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte/svelte5';
 import WorkflowCatalog from '../../../src/components/dashboard/WorkflowCatalog.svelte';
 import * as workflowsApi from '../../../src/lib/api/workflows';
 
