@@ -30,7 +30,7 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
 
   // After submission, the page should navigate to /runs/{id}
   // Wait for navigation to happen
-  await page.waitForURL(/\/runs\/[a-z0-9\-]+/);
+  await page.waitForURL(/\/runs\/[a-z0-9-]+/);
 
   // Extract run ID from URL for reference
   const runId = page.url().split('/runs/')[1];
