@@ -11,7 +11,10 @@ describe('toFlowNodes', () => {
     expect(flow[0].position).toEqual({ x: 120, y: 80 });
   });
 
-  it('assigns a deterministic grid position when pos is absent', () => {
+  it('assigns a deterministic grid position when pos is absent and no edges connect the nodes', () => {
+    // Disconnected nodes (dagre can't rank them relative to each other)
+    // still fall back to the grid -- only a graph with edges to lay out by
+    // gets the dagre treatment below.
     const nodes: EditorNode[] = [
       { id: 'a', node_type: 'Start', label: 'A', attrs: {} },
       { id: 'b', node_type: 'Exit', label: 'B', attrs: {} },
@@ -19,6 +22,61 @@ describe('toFlowNodes', () => {
     const flow = toFlowNodes(nodes);
     expect(flow[0].position).not.toEqual(flow[1].position);
     expect(flow[0].position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('auto-lays-out a fully unpositioned graph top-to-bottom by default (matching the server-rendered SVG default rankdir) with no node/edge overlap', () => {
+    const nodes: EditorNode[] = [
+      { id: 'start', node_type: 'Start', label: 'Start', attrs: {} },
+      { id: 'gen', node_type: 'Codergen', label: 'Gen', attrs: {} },
+      { id: 'exit', node_type: 'Exit', label: 'Exit', attrs: {} },
+    ];
+    const edges: EditorEdge[] = [
+      { from: 'start', to: 'gen', label: null, condition: null, priority: null, loop_restart: false, attrs: {} },
+      { from: 'gen', to: 'exit', label: null, condition: null, priority: null, loop_restart: false, attrs: {} },
+    ];
+    const flow = toFlowNodes(nodes, edges);
+    const byId = Object.fromEntries(flow.map((n) => [n.id, n.position]));
+
+    // Default rankdir=TB: each successive rank sits strictly below the last.
+    expect(byId.gen.y).toBeGreaterThan(byId.start.y);
+    expect(byId.exit.y).toBeGreaterThan(byId.gen.y);
+  });
+
+  it('is deterministic across repeated calls for the same unpositioned graph', () => {
+    const nodes: EditorNode[] = [
+      { id: 'start', node_type: 'Start', label: 'Start', attrs: {} },
+      { id: 'exit', node_type: 'Exit', label: 'Exit', attrs: {} },
+    ];
+    const edges: EditorEdge[] = [
+      { from: 'start', to: 'exit', label: null, condition: null, priority: null, loop_restart: false, attrs: {} },
+    ];
+    expect(toFlowNodes(nodes, edges)).toEqual(toFlowNodes(nodes, edges));
+  });
+
+  it("respects an explicit graph_attrs.rankdir (matching render_to_dot's own preamble)", () => {
+    const nodes: EditorNode[] = [
+      { id: 'start', node_type: 'Start', label: 'Start', attrs: {} },
+      { id: 'exit', node_type: 'Exit', label: 'Exit', attrs: {} },
+    ];
+    const edges: EditorEdge[] = [
+      { from: 'start', to: 'exit', label: null, condition: null, priority: null, loop_restart: false, attrs: {} },
+    ];
+    const flow = toFlowNodes(nodes, edges, { rankdir: 'LR' });
+    const byId = Object.fromEntries(flow.map((n) => [n.id, n.position]));
+    expect(byId.exit.x).toBeGreaterThan(byId.start.x);
+  });
+
+  it('gives every node a kind-colored inline style (nodeConfig.THEME_COLORS)', () => {
+    const nodes: EditorNode[] = [{ id: 'a', node_type: 'Codergen', label: 'A', attrs: {} }];
+    const flow = toFlowNodes(nodes);
+    expect(flow[0].style).toContain('#e0edff');
+    expect(flow[0].style).toContain('#3b82f6');
+  });
+
+  it('leaves style undefined for an unknown/future node_type rather than crashing', () => {
+    const nodes: EditorNode[] = [{ id: 'weird', node_type: 'FromTheFuture', label: null, attrs: {} }];
+    expect(() => toFlowNodes(nodes)).not.toThrow();
+    expect(toFlowNodes(nodes)[0].style).toBeUndefined();
   });
 
   // Task 8 acceptance criterion: "Loading a graph where some nodes have pos
@@ -53,7 +111,7 @@ describe('toFlowNodes', () => {
     ];
     expect(() => toFlowNodes(nodes)).not.toThrow();
     const flow = toFlowNodes(nodes);
-    expect(flow[0].type).toBe('default');
+    expect(flow[0].type).toBe('workflow');
     expect(flow[0].data.label).toBe('weird');
     expect(flow[0].data.nodeType).toBe('FromTheFuture');
   });

@@ -1,13 +1,31 @@
 <script lang="ts">
-  import { Background, Controls, MiniMap, SvelteFlow, type Edge as FlowEdge, type Node as FlowNode } from '@xyflow/svelte';
+  import {
+    Background,
+    ConnectionMode,
+    Controls,
+    MarkerType,
+    MiniMap,
+    SvelteFlow,
+    type Edge as FlowEdge,
+    type Node as FlowNode,
+  } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { setContext, untrack, type Component } from 'svelte';
   import Palette from './Palette.svelte';
-  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
-  import { toEditorGraph, toFlowEdges, toFlowNodes, type WorkflowEdgeData, type WorkflowNodeData } from './convert';
+  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, nodeStyleFor, type NodeKindConfig } from './nodeConfig';
+  import {
+    DEFAULT_RANKDIR,
+    toEditorGraph,
+    toFlowEdges,
+    toFlowNodes,
+    type WorkflowEdgeData,
+    type WorkflowNodeData,
+  } from './convert';
   import type { AttrValue, EdgeFormChange, EditorGraph, NodeFormChange, NodeFormProps } from './types';
   import { EDGE_ACTIONS_CONTEXT_KEY, type WorkflowEdgeActions } from './edgeContext';
+  import { FLOW_DIRECTION_CONTEXT_KEY, type FlowDirection } from './flowDirectionContext';
   import WorkflowEdge from './WorkflowEdge.svelte';
+  import WorkflowNode from './WorkflowNode.svelte';
   import EdgeForm from './EdgeForm.svelte';
   import CodergenForm from './nodeForms/CodergenForm.svelte';
   import InterviewerForm from './nodeForms/InterviewerForm.svelte';
@@ -21,6 +39,11 @@
   // defaultEdgeOptions below) -- registered once here rather than inline in
   // the template so the object identity is stable across re-renders.
   const edgeTypes = { workflow: WorkflowEdge };
+
+  // WorkflowNode.svelte replaces the library's built-in "default" node type
+  // -- same look, plus left/right handles alongside top/bottom (see its own
+  // comment for why).
+  const nodeTypes = { workflow: WorkflowNode };
 
   // Task 7: one form component per NodeType, rendered in a selected-node
   // side panel. Start/Exit/Parallel/FanIn/Conditional (no kind-specific
@@ -84,12 +107,20 @@
   let graphName = $state<string | null>(null);
   let graphAttrs = $state<Record<string, AttrValue>>({});
 
+  // Read by every WorkflowNode.svelte instance (see flowDirectionContext.ts)
+  // to decide which handle pair renders first -- a single reactive object
+  // set once via setContext, updated in place below rather than reassigned
+  // so already-mounted node instances see the live value.
+  const flowDirection: FlowDirection = $state({ rankdir: DEFAULT_RANKDIR });
+  setContext(FLOW_DIRECTION_CONTEXT_KEY, flowDirection);
+
   $effect(() => {
     if (graph) {
-      nodes = toFlowNodes(graph.nodes);
+      nodes = toFlowNodes(graph.nodes, graph.edges, graph.graph_attrs);
       edges = toFlowEdges(graph.edges);
       graphName = graph.name;
       graphAttrs = graph.graph_attrs;
+      flowDirection.rankdir = typeof graph.graph_attrs.rankdir === 'string' ? graph.graph_attrs.rankdir : DEFAULT_RANKDIR;
     }
   });
 
@@ -125,8 +156,9 @@
     if (!config) return;
     const newNode: FlowNode<WorkflowNodeData> = {
       id: nextNodeId(nodeType),
-      type: 'default',
+      type: 'workflow',
       position,
+      style: nodeStyleFor(nodeType),
       data: { label: config.title, nodeType, attrs: {} },
     };
     nodes = [...nodes, newNode];
@@ -372,8 +404,10 @@
         bind:nodes
         bind:edges
         fitView
+        {nodeTypes}
         {edgeTypes}
-        defaultEdgeOptions={{ type: 'workflow' }}
+        connectionMode={ConnectionMode.Loose}
+        defaultEdgeOptions={{ type: 'workflow', markerEnd: { type: MarkerType.ArrowClosed } }}
         onnodeclick={handleNodeClick}
         onpaneclick={handlePaneClick}
         onedgeclick={handleEdgeClick}

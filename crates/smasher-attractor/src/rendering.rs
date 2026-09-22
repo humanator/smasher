@@ -253,11 +253,15 @@ fn render_edge(edge: &GraphEdge) -> String {
 fn render_graph_preamble(graph: &Graph) -> Vec<String> {
     let mut lines = Vec::new();
 
+    // Top-to-bottom default (not graphviz's own left-to-right): matches the
+    // web editor's client-side auto-layout default (editor-ui/src/convert.ts's
+    // DEFAULT_RANKDIR) so a graph that never sets `rankdir` explicitly lays
+    // out the same direction here as it does on canvas.
     let rankdir = graph
         .graph_attrs
         .get("rankdir")
         .map(format_attr_value)
-        .unwrap_or_else(|| "LR".to_string());
+        .unwrap_or_else(|| "TB".to_string());
     let bgcolor = graph
         .graph_attrs
         .get("bgcolor")
@@ -1069,7 +1073,7 @@ mod tests {
         let dot = render_to_dot(&graph);
         assert!(dot.starts_with("digraph  {"));
         assert!(dot.ends_with("}"));
-        assert!(dot.contains("rankdir=LR"));
+        assert!(dot.contains("rankdir=TB"));
     }
 
     #[test]
@@ -1673,7 +1677,7 @@ mod tests {
         let statuses = HashMap::new();
         let dot = render_to_dot_with_status(&graph, &statuses);
 
-        assert!(dot.contains("rankdir=LR"));
+        assert!(dot.contains("rankdir=TB"));
         assert!(dot.contains("bgcolor=\"#FAFAFA\""));
         assert!(dot.contains("fontname=\"Helvetica\""));
         assert!(dot.starts_with("digraph"));

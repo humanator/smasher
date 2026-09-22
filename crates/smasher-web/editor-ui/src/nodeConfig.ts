@@ -110,6 +110,20 @@ export const THEME_COLORS: Record<Theme, { bg: string; border: string }> = {
   red: { bg: '#fde8e8', border: '#ef4444' },
 };
 
+// Inline `style` string (Svelte Flow's `Node.style` is a raw CSS string, not
+// a style object) for a node's kind-colored card -- the actual consumer of
+// THEME_COLORS the comment above always described, now wired up in both
+// convert.ts's toFlowNodes (loaded graphs) and WorkflowCanvasInner's
+// addNodeAtPosition (freshly dropped nodes). Returns undefined for an
+// unrecognized/future node_type, same "don't crash on unknown kind"
+// fallback convention as formComponentFor/the palette.
+export function nodeStyleFor(nodeType: string): string | undefined {
+  const config = (NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[nodeType];
+  if (!config) return undefined;
+  const { bg, border } = THEME_COLORS[config.theme];
+  return `background-color: ${bg}; border-color: ${border};`;
+}
+
 export interface PaletteGroupDef {
   id: PaletteGroupId;
   label: string;

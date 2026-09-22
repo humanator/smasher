@@ -34,6 +34,60 @@ describe('setting the graph prop', () => {
     // state instead of DOM geometry for that reason, not node count.
     expect(component.currentGraph().edges).toHaveLength(1);
   });
+
+  it("renders each node's kind-colored background/border (nodeConfig.THEME_COLORS), not the library's uncolored default", async () => {
+    const { container } = render(WorkflowCanvasInner, {
+      props: { graph: sampleGraph, onSave: vi.fn() },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    // 'a' is a Start node (green theme), 'b' is Codergen (blue theme).
+    const nodeA = container.querySelector('.svelte-flow__node[data-id="a"]') as HTMLElement;
+    const nodeB = container.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
+    expect(nodeA.style.backgroundColor).not.toBe('');
+    expect(nodeA.style.backgroundColor).not.toBe(nodeB.style.backgroundColor);
+  });
+
+  it('gives every node all 4 attachment points (top/bottom for long jumps, left/right for horizontal flow)', async () => {
+    const { container } = render(WorkflowCanvasInner, {
+      props: { graph: sampleGraph, onSave: vi.fn() },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    const nodeA = container.querySelector('.svelte-flow__node[data-id="a"]') as HTMLElement;
+    for (const handleId of ['top', 'bottom', 'left', 'right']) {
+      expect(nodeA.querySelector(`[data-handleid="${handleId}"]`)).not.toBeNull();
+    }
+  });
+
+  it("defaults an unpositioned graph's implicit (no sourceHandle/targetHandle) connections to top/bottom, matching the default top-to-bottom rankdir", async () => {
+    // sampleGraph's own edge has no explicit handle, same as any edge
+    // loaded from a hand-authored .dot -- convert.ts's toFlowEdges never
+    // sets sourceHandle/targetHandle. @xyflow/system's getHandle falls back
+    // to whichever handle of the needed type is registered first in the DOM
+    // when none is given -- WorkflowNode.svelte has to put bottom/top first
+    // for that fallback to land on the pair matching this graph's actual
+    // (default TB) flow direction, not left/right.
+    const { container } = render(WorkflowCanvasInner, {
+      props: { graph: sampleGraph, onSave: vi.fn() },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    const nodeA = container.querySelector('.svelte-flow__node[data-id="a"]') as HTMLElement;
+    const handleIds = Array.from(nodeA.querySelectorAll('[data-handleid]')).map((el) =>
+      el.getAttribute('data-handleid'),
+    );
+    expect(handleIds[0]).toBe('bottom');
+  });
 });
 
 describe('built-in delete interaction', () => {
