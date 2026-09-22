@@ -14,20 +14,21 @@ export interface GalleryDecisionResponse {
   error?: string;
 }
 
-interface ApiError extends Error {
+interface ApiError {
   status: number;
+  message: string;
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error: ApiError = new Error(`HTTP ${response.status}`);
+    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
     error.status = response.status;
     throw error;
   }
 
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {
-    return response.json();
+    return (await response.json()) as T;
   }
 
   throw new Error('Unexpected response format');

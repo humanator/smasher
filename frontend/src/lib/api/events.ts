@@ -162,9 +162,14 @@ export interface PipelineEventStream {
 
 export { setApiBaseUrl } from './client-config';
 
-function parseEvent(eventType: string, data: unknown): PipelineEvent | null {
+function parseEvent(eventType: string | null, data: unknown): PipelineEvent | null {
   if (typeof data !== 'object' || data === null) {
     console.warn('Invalid event data:', data);
+    return null;
+  }
+
+  if (!eventType) {
+    console.warn('Event has no type');
     return null;
   }
 
@@ -320,13 +325,12 @@ export function subscribeToPipelineEvents(
   const eventSource = new EventSource(url);
   let isOpen = true;
 
-  const handleMessage = (event: Event): void => {
+  const handleMessage = (event: Event, eventType: string): void => {
     if (!isOpen) return;
 
     const messageEvent = event as MessageEvent;
     try {
       const data = JSON.parse(messageEvent.data) as unknown;
-      const eventType = messageEvent.type || messageEvent.event;
 
       const parsed = parseEvent(eventType, data);
       if (parsed) {
@@ -343,24 +347,30 @@ export function subscribeToPipelineEvents(
     }
   };
 
-  // EventSource event types use the event name in the event property
-  eventSource.addEventListener('pipeline_started', handleMessage);
-  eventSource.addEventListener('pipeline_completed', handleMessage);
-  eventSource.addEventListener('pipeline_aborted', handleMessage);
-  eventSource.addEventListener('node_started', handleMessage);
-  eventSource.addEventListener('node_completed', handleMessage);
-  eventSource.addEventListener('node_failed', handleMessage);
-  eventSource.addEventListener('edge_traversed', handleMessage);
-  eventSource.addEventListener('loop_restarted', handleMessage);
-  eventSource.addEventListener('context_updated', handleMessage);
-  eventSource.addEventListener('checkpoint_created', handleMessage);
-  eventSource.addEventListener('human_prompt_issued', handleMessage);
-  eventSource.addEventListener('human_response_received', handleMessage);
-  eventSource.addEventListener('agent_turn_started', handleMessage);
-  eventSource.addEventListener('agent_message', handleMessage);
-  eventSource.addEventListener('agent_tool_call_started', handleMessage);
-  eventSource.addEventListener('agent_tool_call_completed', handleMessage);
-  eventSource.addEventListener('agent_token_usage', handleMessage);
+  // EventSource event types use the event name as listener
+  const eventTypes = [
+    'pipeline_started',
+    'pipeline_completed',
+    'pipeline_aborted',
+    'node_started',
+    'node_completed',
+    'node_failed',
+    'edge_traversed',
+    'loop_restarted',
+    'context_updated',
+    'checkpoint_created',
+    'human_prompt_issued',
+    'human_response_received',
+    'agent_turn_started',
+    'agent_message',
+    'agent_tool_call_started',
+    'agent_tool_call_completed',
+    'agent_token_usage',
+  ];
+
+  for (const eventType of eventTypes) {
+    eventSource.addEventListener(eventType, (event: Event) => handleMessage(event, eventType));
+  }
 
   eventSource.onerror = (): void => {
     if (isOpen) {
