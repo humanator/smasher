@@ -50,7 +50,7 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 
 ## Phase 4: Gallery-gate + decision history
 
-- [ ] Task 13: Candidate gallery view
+- [x] Task 13: Candidate gallery view (CandidateGallery.svelte + CandidateCard.svelte, wired into App.svelte's run view; real-API tests write manifest/scorecard fixtures directly to the real server's data dir rather than running an actual render_capture node, since that launches real headless Chromium via chromiumoxide and this dev machine has none installed — see test file header)
 - [ ] Task 14: Gallery-gate decision UI
 - [ ] Task 15: Decision history view
 
