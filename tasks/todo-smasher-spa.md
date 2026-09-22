@@ -51,7 +51,7 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 ## Phase 4: Gallery-gate + decision history
 
 - [x] Task 13: Candidate gallery view (CandidateGallery.svelte + CandidateCard.svelte, wired into App.svelte's run view; real-API tests write manifest/scorecard fixtures directly to the real server's data dir rather than running an actual render_capture node, since that launches real headless Chromium via chromiumoxide and this dev machine has none installed — see test file header)
-- [ ] Task 14: Gallery-gate decision UI
+- [x] Task 14: Gallery-gate decision UI (GalleryGate.svelte: checkboxes, per-candidate comments, outgoing-edge decision buttons; extracted ScorecardBadges.svelte, shared with CandidateCard.svelte). Discovered mid-task: no JSON API told the frontend a pending question belonged to a gallery gate at all — that logic (`find_gallery_gate_for_node` + candidate scoping + outgoing edges) existed only inside `pages.rs`'s askama template rendering. Folded a `gallery_gate` field onto `GET /api/runs/{id}/questions` in `crates/smasher-web/src/routes/questions.rs` (same "small backend gap, fold into this plan" precedent as Tasks 6/6b) — additive and backward-compatible, dedupes the gate's own question out of `questions` only when a gate card is actually returned. Also fixed `lib/api/gallery.ts` to surface the backend's real error message (e.g. "exceeds 4000 characters") instead of a bare "HTTP 400", per Task 14's own acceptance criteria. `docs/api-reference.md` updated for the new field.
 - [ ] Task 15: Decision history view
 
 ### Checkpoint: Gallery/Decision Complete

@@ -21,7 +21,16 @@ interface ApiError {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
+    let message = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      if (typeof body?.error === 'string') {
+        message = body.error;
+      }
+    } catch {
+      // Body wasn't JSON (or was empty) - fall back to the generic message.
+    }
+    const error = new Error(message) as unknown as ApiError;
     error.status = response.status;
     throw error;
   }

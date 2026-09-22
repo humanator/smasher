@@ -2,6 +2,7 @@
 // ABOUTME: List and answer questions
 
 import { getApiUrl } from './client-config';
+import type { CandidateResponse } from './runs';
 
 export interface Question {
   id: string;
@@ -11,8 +12,16 @@ export interface Question {
   node_id: string;
 }
 
+export interface GalleryGateInfo {
+  question_id: string;
+  candidates: CandidateResponse[];
+  expected_count: number | null;
+  outgoing_edges: string[];
+}
+
 export interface ListQuestionsResponse {
   questions: Question[];
+  gallery_gate: GalleryGateInfo | null;
 }
 
 export interface AnswerQuestionRequest {

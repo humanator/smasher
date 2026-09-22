@@ -11,6 +11,7 @@
   import EventLog from './components/dashboard/EventLog.svelte';
   import QuestionCard from './components/dashboard/QuestionCard.svelte';
   import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
+  import GalleryGate from './components/dashboard/GalleryGate.svelte';
 
   let runId = $state<string | null>(null);
 
@@ -64,6 +65,10 @@
           <h2 class="text-xl font-semibold mb-4">Questions</h2>
           <QuestionCard {runId} />
         </div>
+      </div>
+
+      <div class="mt-8">
+        <GalleryGate {runId} />
       </div>
 
       <div class="mt-8">

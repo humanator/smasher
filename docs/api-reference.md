@@ -564,12 +564,39 @@ Response body (200 OK):
       "kind": "free_form",
       "node_id": "gate_node"
     }
-  ]
+  ],
+  "gallery_gate": null
 }
 ```
 
 `kind` is one of `free_form`, `multiple_choice`, `approval`. `choices` is populated for
 `multiple_choice` questions, empty otherwise.
+
+`gallery_gate` is non-null when the pending question belongs to a gallery gate node
+(`shape=hexagon gallery="true"`) *and* that gate's candidates exist on disk; the matching
+question is omitted from `questions` in that case (never both a plain question and a gate
+card for the same pending question). Its candidates and answer routing go through
+[`GET /api/runs/{id}/candidates`](#get-apirunsidcandidates----gallery-gate-candidates)'s
+`CandidateResponse` shape and
+[`POST /api/runs/{id}/gallery/{qid}/decision`](#post-apirunsidgalleryqiddecision----gallery-gate-decision),
+not the plain answer endpoint below:
+
+```json
+{
+  "questions": [],
+  "gallery_gate": {
+    "question_id": "q-uuid-2",
+    "candidates": [ /* CandidateResponse[], see List Candidates */ ],
+    "expected_count": 3,
+    "outgoing_edges": ["proceed", "iterate"]
+  }
+}
+```
+
+`expected_count` is a display hint only (from a `candidates=N` launch variable or the gate
+node's `candidate_count` attribute), never enforced. `outgoing_edges` are the gate's outgoing
+edge labels (falling back to the target node id when an edge has no label) — the valid
+`decision` values for the gallery decision endpoint.
 
 ### POST /api/runs/{id}/questions/{qid}/answer -- Answer Question
 
