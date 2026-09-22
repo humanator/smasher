@@ -9,7 +9,6 @@
   import EventLog from './components/dashboard/EventLog.svelte';
   import QuestionCard from './components/dashboard/QuestionCard.svelte';
 
-  let currentPath = $state('/');
   let runId = $state<string | null>(null);
 
   onMount(() => {
@@ -26,10 +25,9 @@
 
   function updatePath() {
     const path = window.location.pathname;
-    currentPath = path;
 
     // Extract run ID if path is /runs/{id}
-    const runMatch = path.match(/^\/runs\/([a-z0-9\-]+)$/);
+    const runMatch = path.match(/^\/runs\/([a-z0-9-]+)$/);
     if (runMatch) {
       runId = runMatch[1];
     } else {
