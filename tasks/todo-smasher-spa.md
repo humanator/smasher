@@ -73,10 +73,10 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 ## Phase 6: Native shim + final E2E
 
 - [x] Task 20: Wire `lib/native/` shim to real `window.__TAURI__` checks + browser fallbacks — scoped down to pipeline-completion notifications only (confirmed with Jobsworth, see plan for rationale — no backend endpoint exists to export raw .dot for the file-dialog half); EventLog.svelte now calls showNotification() on terminal events, 197/197 tests, lint/check clean, independently re-verified
-- [ ] Task 21: Full Playwright E2E suite (all spec Success Criteria)
+- [x] Task 21: Full Playwright E2E suite (all spec Success Criteria) — 3 new specs (gallery-gate, node-editor real drag-and-drop, no-tauri-breakage) + existing critical-path all green together in one run; new specs re-run twice with zero flakiness (caught and fixed a real Date.now() collision under parallel execution); Vitest 197/197, lint/check/build/cargo test --workspace all clean, independently re-verified
 
 ### Checkpoint: Complete
-- [ ] All SPEC-smasher-spa.md Success Criteria boxes satisfied
-- [ ] Vitest and Playwright suites green
-- [ ] Zero Tauri-only code paths break in a plain browser
-- [ ] Human review before this unblocks `smasher-web-api` Task 9 and `smasher-desktop` starts
+- [x] All SPEC-smasher-spa.md Success Criteria boxes satisfied (feature parity: Phase 3; visual DOT editor round-tripping through the API: Tasks 16-19 + node-editor.spec.ts; zero Tauri-only breakage in a plain browser: Task 20 + no-tauri-breakage.spec.ts; Vitest/Playwright green: this task)
+- [x] Vitest and Playwright suites green (197/197 Vitest, 4/4 Playwright specs)
+- [x] Zero Tauri-only code paths break in a plain browser (no-tauri-breakage.spec.ts)
+- [ ] Human review before this unblocks `smasher-web-api` Task 9 and `smasher-desktop` starts — **not something an agent can check off; flagged for Jobsworth**
