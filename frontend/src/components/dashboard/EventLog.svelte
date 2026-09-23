@@ -5,6 +5,7 @@
   import { eventStore } from '../../stores/events.svelte';
   import * as eventsApi from '../../lib/api/events';
   import type { PipelineEvent } from '../../lib/api/events';
+  import { showNotification } from '../../lib/native';
 
   interface Props {
     runId: string;
@@ -27,6 +28,32 @@
         unsubscribe();
       }
     };
+  });
+
+  // Task 20: OS-native completion notification via the lib/native shim
+  // (Notification API in-browser today, a real Tauri notification once
+  // smasher-desktop provides window.__TAURI__ -- no call-site change
+  // needed then). Driven off eventStore.isComplete rather than the SSE
+  // callback above so it fires exactly once regardless of how the
+  // terminal event arrived (live tail or Task 6b's replay), and so it's
+  // testable the same way the rest of this file's tests already are --
+  // by pushing directly into eventStore, not a real SSE connection.
+  let notified = $state(false);
+  $effect(() => {
+    if (eventStore.isComplete && !notified) {
+      notified = true;
+      const events = eventStore.events;
+      const terminal = [...events].reverse().find(
+        (e) => e.kind === 'pipeline_completed' || e.kind === 'pipeline_aborted'
+      );
+      if (terminal?.kind === 'pipeline_aborted') {
+        void showNotification('Pipeline aborted', { body: terminal.reason });
+      } else {
+        void showNotification('Pipeline complete', {
+          body: terminal?.kind === 'pipeline_completed' ? eventDescription(terminal) : undefined,
+        });
+      }
+    }
   });
 
   function eventDescription(event: PipelineEvent): string {
