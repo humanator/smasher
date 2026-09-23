@@ -79,4 +79,4 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 - [x] All SPEC-smasher-spa.md Success Criteria boxes satisfied (feature parity: Phase 3; visual DOT editor round-tripping through the API: Tasks 16-19 + node-editor.spec.ts; zero Tauri-only breakage in a plain browser: Task 20 + no-tauri-breakage.spec.ts; Vitest/Playwright green: this task)
 - [x] Vitest and Playwright suites green (197/197 Vitest, 4/4 Playwright specs)
 - [x] Zero Tauri-only code paths break in a plain browser (no-tauri-breakage.spec.ts)
-- [ ] Human review before this unblocks `smasher-web-api` Task 9 and `smasher-desktop` starts — **not something an agent can check off; flagged for Jobsworth**
+- [x] Human review before this unblocks `smasher-web-api` Task 9 and `smasher-desktop` starts — approved by Jobsworth; Task 9 (askama/HTMX removal) landed on top (0e5647c, a82c730), both merged to `main`
