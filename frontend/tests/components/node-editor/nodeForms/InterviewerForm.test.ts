@@ -43,8 +43,8 @@ describe('InterviewerForm', () => {
     it('defaults the toggle off and hides candidate_count when attrs.gallery is absent', () => {
       render(InterviewerForm, { props: { attrs: {}, onChange: vi.fn() } });
 
-      const galleryToggle = screen.getByTestId('interviewer-gallery-toggle') as HTMLInputElement;
-      expect(galleryToggle.checked).toBe(false);
+      const galleryToggle = screen.getByTestId('interviewer-gallery-toggle');
+      expect(galleryToggle).not.toBeChecked();
       expect(screen.queryByTestId('interviewer-candidate-count')).toBe(null);
     });
 
@@ -53,9 +53,9 @@ describe('InterviewerForm', () => {
         props: { attrs: { gallery: true, candidate_count: '3' }, onChange: vi.fn() },
       });
 
-      const galleryToggle = screen.getByTestId('interviewer-gallery-toggle') as HTMLInputElement;
+      const galleryToggle = screen.getByTestId('interviewer-gallery-toggle');
       const countInput = screen.getByTestId('interviewer-candidate-count') as HTMLInputElement;
-      expect(galleryToggle.checked).toBe(true);
+      expect(galleryToggle).toBeChecked();
       expect(countInput.value).toBe('3');
     });
 
@@ -148,8 +148,8 @@ describe('InterviewerForm', () => {
       expect(onChange).toHaveBeenLastCalledWith({
         attrs: { approve: true, options: undefined, gallery: undefined, candidate_count: undefined },
       });
-      const galleryToggle = screen.getByTestId('interviewer-gallery-toggle') as HTMLInputElement;
-      expect(galleryToggle.checked).toBe(false);
+      const galleryToggle = screen.getByTestId('interviewer-gallery-toggle');
+      expect(galleryToggle).not.toBeChecked();
     });
 
     it('disables the answer-mode select while gallery mode is on', () => {

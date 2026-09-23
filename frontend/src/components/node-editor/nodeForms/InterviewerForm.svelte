@@ -3,7 +3,11 @@
   // ABOUTME: Edits question/gallery/approve/options/candidate_count attributes
 
   import { untrack } from 'svelte';
-  import './nodeForms.css';
+  import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { NodeFormProps } from '../types';
 
   // Grounded in interviewer.rs:690-784 (InterviewerHandler::execute) --
@@ -34,6 +38,7 @@
   // - `approve` (Bool `true` exactly, not the string "true") for yes/no
   //   mode; `options` (comma-separated string) for a fixed-choice list.
   let { attrs, onChange }: NodeFormProps = $props();
+  const uid = $props.id();
 
   type AnswerMode = 'freeform' | 'approve' | 'options';
 
@@ -77,8 +82,8 @@
     onChange({ attrs: { question: question || undefined } });
   }
 
-  function handleGalleryToggle(event: Event) {
-    gallery = (event.target as HTMLInputElement).checked;
+  function handleGalleryToggle(checked: boolean) {
+    gallery = checked;
     onChange({
       attrs: {
         gallery: gallery || undefined,
@@ -113,56 +118,72 @@
   }
 </script>
 
-<div class="node-form" data-testid="interviewer-form">
-  <label class="node-form-field">
-    Question
-    <textarea data-testid="interviewer-question" rows="3" value={question} oninput={handleQuestionInput}></textarea>
-  </label>
-
-  <label class="node-form-field node-form-field-inline">
-    <input
-      type="checkbox"
-      data-testid="interviewer-gallery-toggle"
-      checked={gallery}
-      disabled={answerMode !== 'freeform'}
-      onchange={handleGalleryToggle}
+<div class="flex flex-col gap-3" data-testid="interviewer-form">
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-question">Question</Label>
+    <Textarea
+      id="{uid}-question"
+      class="font-mono text-xs"
+      data-testid="interviewer-question"
+      rows={3}
+      value={question}
+      oninput={handleQuestionInput}
     />
-    Gallery gate
-  </label>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <Checkbox
+      id="{uid}-gallery"
+      data-testid="interviewer-gallery-toggle"
+      bind:checked={gallery}
+      disabled={answerMode !== 'freeform'}
+      onCheckedChange={handleGalleryToggle}
+    />
+    <Label for="{uid}-gallery">Gallery gate</Label>
+  </div>
 
   {#if gallery}
-    <label class="node-form-field">
-      Candidate count
-      <input
+    <div class="flex flex-col gap-1.5">
+      <Label for="{uid}-candidate-count">Candidate count</Label>
+      <Input
+        id="{uid}-candidate-count"
         type="text"
         data-testid="interviewer-candidate-count"
         value={candidateCount}
         oninput={handleCandidateCountInput}
         placeholder="e.g. 3 or phase_default(discover)"
       />
-      <span class="node-form-hint">Read by the gallery dashboard card only, not the interviewer step itself.</span>
-    </label>
+      <span class="text-xs text-muted-foreground">Read by the gallery dashboard card only, not the interviewer step itself.</span>
+    </div>
   {/if}
 
-  <label class="node-form-field">
-    Answer mode
-    <select data-testid="interviewer-answer-mode" value={answerMode} disabled={gallery} onchange={handleAnswerModeChange}>
-      <option value="freeform">Free-form</option>
-      <option value="approve">Yes / No</option>
-      <option value="options">Options list</option>
-    </select>
-  </label>
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-answer-mode">Answer mode</Label>
+    <NativeSelect.Root
+      id="{uid}-answer-mode"
+      class="w-full"
+      data-testid="interviewer-answer-mode"
+      value={answerMode}
+      disabled={gallery}
+      onchange={handleAnswerModeChange}
+    >
+      <NativeSelect.Option value="freeform">Free-form</NativeSelect.Option>
+      <NativeSelect.Option value="approve">Yes / No</NativeSelect.Option>
+      <NativeSelect.Option value="options">Options list</NativeSelect.Option>
+    </NativeSelect.Root>
+  </div>
 
   {#if answerMode === 'options'}
-    <label class="node-form-field">
-      Options (comma-separated)
-      <input
+    <div class="flex flex-col gap-1.5">
+      <Label for="{uid}-options">Options (comma-separated)</Label>
+      <Input
+        id="{uid}-options"
         type="text"
         data-testid="interviewer-options"
         value={optionsText}
         oninput={handleOptionsInput}
         placeholder="e.g. approve, revise, reject"
       />
-    </label>
+    </div>
   {/if}
 </div>

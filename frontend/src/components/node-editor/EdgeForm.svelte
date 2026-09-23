@@ -3,7 +3,9 @@
   // ABOUTME: Edits condition/priority/loop_restart attributes
 
   import { untrack } from 'svelte';
-  import './nodeForms/nodeForms.css';
+  import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
   import type { EdgeFormProps } from './types';
 
   // Grounded in graph/mod.rs:245-283 (extract_condition/extract_priority/
@@ -18,6 +20,7 @@
   // client-side rather than letting a bad save round-trip fail server-side.
   // `loop_restart` defaults to `false` (extract_loop_restart), never absent.
   let { condition, priority, loopRestart, onChange }: EdgeFormProps = $props();
+  const uid = $props.id();
 
   // Seeded once per mount -- WorkflowCanvasInner.svelte remounts this
   // component via {#key edge.id} on every selection change (matching the
@@ -54,26 +57,28 @@
     onChange({ priority: Number(trimmed) });
   }
 
-  function handleLoopRestartChange(event: Event) {
-    loopRestartChecked = (event.target as HTMLInputElement).checked;
+  function handleLoopRestartChange(checked: boolean) {
+    loopRestartChecked = checked;
     onChange({ loopRestart: loopRestartChecked });
   }
 </script>
 
-<div class="node-form" data-testid="edge-form">
-  <label class="node-form-field">
-    Condition
-    <input
+<div class="flex flex-col gap-3" data-testid="edge-form">
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-condition">Condition</Label>
+    <Input
+      id="{uid}-condition"
       type="text"
       data-testid="edge-condition"
       value={conditionText}
       oninput={handleConditionInput}
       placeholder="e.g. x > 5 (falls back to this edge's label if blank)"
     />
-  </label>
-  <label class="node-form-field">
-    Priority
-    <input
+  </div>
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-priority">Priority</Label>
+    <Input
+      id="{uid}-priority"
       type="text"
       inputmode="numeric"
       data-testid="edge-priority"
@@ -81,17 +86,17 @@
       oninput={handlePriorityInput}
       placeholder="e.g. 1"
     />
-  </label>
+  </div>
   {#if priorityError}
-    <p class="node-form-error" role="alert" data-testid="edge-priority-error">{priorityError}</p>
+    <p class="m-0 text-xs text-destructive" role="alert" data-testid="edge-priority-error">{priorityError}</p>
   {/if}
-  <label class="node-form-field node-form-field-inline">
-    <input
-      type="checkbox"
+  <div class="flex items-center gap-2">
+    <Checkbox
+      id="{uid}-loop-restart"
       data-testid="edge-loop-restart"
-      checked={loopRestartChecked}
-      onchange={handleLoopRestartChange}
+      bind:checked={loopRestartChecked}
+      onCheckedChange={handleLoopRestartChange}
     />
-    Loop restart
-  </label>
+    <Label for="{uid}-loop-restart">Loop restart</Label>
+  </div>
 </div>

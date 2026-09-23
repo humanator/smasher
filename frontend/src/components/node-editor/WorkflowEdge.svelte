@@ -4,6 +4,7 @@
 
   import { getContext } from 'svelte';
   import { BaseEdge, EdgeLabel, getBezierPath, type EdgeProps } from '@xyflow/svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
   import { EDGE_ACTIONS_CONTEXT_KEY, type WorkflowEdgeActions } from './edgeContext';
 
   let {
@@ -51,14 +52,15 @@
 <BaseEdge {id} {path} {markerStart} {markerEnd} {style} {label} {labelStyle} {interactionWidth} />
 {#if showDelete}
   <EdgeLabel x={labelX} y={labelY} class="pointer-events-auto">
-    <button
-      type="button"
-      class="flex items-center justify-center w-[18px] h-[18px] rounded-full border border-red-500 bg-white text-red-500 text-sm leading-none cursor-pointer p-0 hover:bg-red-500 hover:text-white"
+    <Button
+      variant="outline"
+      size="icon-xs"
+      class="size-[18px] rounded-full border-destructive bg-background p-0 text-sm leading-none text-destructive hover:bg-destructive hover:text-white"
       data-testid="edge-delete-{id}"
       onclick={handleDeleteClick}
       aria-label="Delete edge"
     >
       ×
-    </button>
+    </Button>
   </EdgeLabel>
 {/if}

@@ -13,11 +13,11 @@ describe('EdgeForm', () => {
 
     const conditionInput = screen.getByTestId('edge-condition') as HTMLInputElement;
     const priorityInput = screen.getByTestId('edge-priority') as HTMLInputElement;
-    const loopRestartInput = screen.getByTestId('edge-loop-restart') as HTMLInputElement;
+    const loopRestartInput = screen.getByTestId('edge-loop-restart');
 
     expect(conditionInput.value).toBe('x > 5');
     expect(priorityInput.value).toBe('2');
-    expect(loopRestartInput.checked).toBe(true);
+    expect(loopRestartInput).toBeChecked();
   });
 
   it('renders blank/unchecked fields when condition/priority are null and loopRestart is false', () => {
@@ -27,11 +27,11 @@ describe('EdgeForm', () => {
 
     const conditionInput = screen.getByTestId('edge-condition') as HTMLInputElement;
     const priorityInput = screen.getByTestId('edge-priority') as HTMLInputElement;
-    const loopRestartInput = screen.getByTestId('edge-loop-restart') as HTMLInputElement;
+    const loopRestartInput = screen.getByTestId('edge-loop-restart');
 
     expect(conditionInput.value).toBe('');
     expect(priorityInput.value).toBe('');
-    expect(loopRestartInput.checked).toBe(false);
+    expect(loopRestartInput).not.toBeChecked();
   });
 
   it('calls onChange with the new condition text as edited', async () => {

@@ -3,7 +3,9 @@
   // ABOUTME: Edits prompt/model attributes
 
   import { untrack } from 'svelte';
-  import './nodeForms.css';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { NodeFormProps } from '../types';
 
   // Grounded in handler.rs:227-269 (CodergenHandler::execute): `prompt`
@@ -17,6 +19,7 @@
   // (prompt/model only, per the plan) -- can be added later without
   // changing this component's contract.
   let { attrs, onChange }: NodeFormProps = $props();
+  const uid = $props.id();
 
   // `attrs` seeds local field state exactly once per mount -- the parent
   // (WorkflowCanvasInner) remounts this component via {#key node.id} on
@@ -37,19 +40,27 @@
   }
 </script>
 
-<div class="node-form" data-testid="codergen-form">
-  <label class="node-form-field">
-    Prompt
-    <textarea data-testid="codergen-prompt" rows="4" value={prompt} oninput={handlePromptInput}></textarea>
-  </label>
-  <label class="node-form-field">
-    Model
-    <input
+<div class="flex flex-col gap-3" data-testid="codergen-form">
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-prompt">Prompt</Label>
+    <Textarea
+      id="{uid}-prompt"
+      class="font-mono text-xs"
+      data-testid="codergen-prompt"
+      rows={4}
+      value={prompt}
+      oninput={handlePromptInput}
+    />
+  </div>
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-model">Model</Label>
+    <Input
+      id="{uid}-model"
       type="text"
       data-testid="codergen-model"
       value={model}
       oninput={handleModelInput}
       placeholder="e.g. claude-sonnet-4-5 (optional override)"
     />
-  </label>
+  </div>
 </div>

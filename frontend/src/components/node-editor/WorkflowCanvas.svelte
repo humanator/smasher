@@ -36,6 +36,10 @@
   import ManagerForm from './nodeForms/ManagerForm.svelte';
   import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
   import StructuralForm from './nodeForms/StructuralForm.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import * as NativeSelect from '$lib/components/ui/native-select/index.js';
 
   // Task 8: WorkflowEdge.svelte is the only edge type this canvas renders
   // (loaded edges via convert.ts's toFlowEdges, freshly hand-drawn ones via
@@ -88,6 +92,8 @@
     availableTargetDirs?: string[];
     onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | Promise<void>;
   } = $props();
+
+  const uid = $props.id();
 
   const isCreateMode = $derived(!workflowId);
   let createName = $state('');
@@ -366,6 +372,9 @@
   }
 
   const saveDisabled = $derived(saving || (isCreateMode && !createName.trim()));
+
+  // Shared by the node and edge inspector <aside>s (one side-panel slot).
+  const inspectorClass = 'w-[260px] flex-[0_0_260px] overflow-y-auto border-l border-border p-2.5 box-border';
 </script>
 
 <div class="w-full h-full min-h-[480px] flex flex-row">
@@ -373,23 +382,28 @@
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
       <div class="flex gap-3 items-end pb-2">
-        <label class="flex flex-col text-sm">
-          Name
-          <input
+        <div class="flex flex-col gap-1.5">
+          <Label for="{uid}-create-name">Name</Label>
+          <Input
+            id="{uid}-create-name"
             type="text"
             data-testid="create-name-input"
             bind:value={createName}
             placeholder="my-pipeline"
           />
-        </label>
-        <label class="flex flex-col text-sm">
-          Directory
-          <select data-testid="create-target-dir-select" bind:value={createTargetDir}>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <Label for="{uid}-create-target-dir">Directory</Label>
+          <NativeSelect.Root
+            id="{uid}-create-target-dir"
+            data-testid="create-target-dir-select"
+            bind:value={createTargetDir}
+          >
             {#each availableTargetDirs as dir (dir)}
-              <option value={dir}>{dir}</option>
+              <NativeSelect.Option value={dir}>{dir}</NativeSelect.Option>
             {/each}
-          </select>
-        </label>
+          </NativeSelect.Root>
+        </div>
       </div>
     {/if}
     <div
@@ -419,31 +433,32 @@
         <MiniMap />
       </SvelteFlow>
     </div>
-    <button type="button" onclick={handleSave} disabled={saveDisabled} data-testid="save-button" class="px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed">
+    <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
       {saving ? 'Saving…' : 'Save'}
-    </button>
+    </Button>
     {#if saveError}
-      <p role="alert" data-testid="save-error" class="text-red-600 text-sm mt-2">{saveError}</p>
+      <p role="alert" data-testid="save-error" class="text-destructive text-sm mt-2">{saveError}</p>
     {/if}
   </div>
   {#if selectedNode}
     {@const node = selectedNode}
     {@const FormComponent = formComponentFor(node.data.nodeType)}
-    <aside class="node-inspector" data-testid="node-inspector">
-      <div class="node-inspector-header">
-        <span class="node-inspector-title" data-testid="node-inspector-title">
+    <aside class={inspectorClass} data-testid="node-inspector">
+      <div class="flex items-center justify-between mb-2.5">
+        <span class="font-semibold text-sm text-foreground" data-testid="node-inspector-title">
           {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.title ?? node.data.nodeType}
         </span>
-        <button
-          type="button"
-          class="node-inspector-close"
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          class="text-base text-muted-foreground"
           onclick={() => (selectedNodeId = null)}
           aria-label="Close node inspector"
         >
           ×
-        </button>
+        </Button>
       </div>
-      <p class="node-inspector-description" data-testid="node-inspector-description">
+      <p class="mb-2.5 text-xs leading-snug text-muted-foreground" data-testid="node-inspector-description">
         {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.description ?? ''}
       </p>
       <!-- Remount on selection change: each nodeForms/*.svelte component
@@ -452,32 +467,34 @@
            instance instead of letting a prop update slip past that
            intentional one-time read when the user selects a different node. -->
       {#key node.id}
-        <label class="node-form-field node-inspector-label-field">
-          Label
-          <input
+        <div class="mb-2.5 flex flex-col gap-1.5">
+          <Label for="{uid}-node-label">Label</Label>
+          <Input
+            id="{uid}-node-label"
             type="text"
             data-testid="node-inspector-label"
             value={node.data.label}
             oninput={(event) =>
               applyNodeFormChange(node.id, { label: (event.target as HTMLInputElement).value })}
           />
-        </label>
+        </div>
         <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
       {/key}
     </aside>
   {:else if selectedEdge}
     {@const edge = selectedEdge}
-    <aside class="node-inspector" data-testid="edge-inspector">
-      <div class="node-inspector-header">
-        <span class="node-inspector-title" data-testid="edge-inspector-title">Edge</span>
-        <button
-          type="button"
-          class="node-inspector-close"
+    <aside class={inspectorClass} data-testid="edge-inspector">
+      <div class="flex items-center justify-between mb-2.5">
+        <span class="font-semibold text-sm text-foreground" data-testid="edge-inspector-title">Edge</span>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          class="text-base text-muted-foreground"
           onclick={() => (selectedEdgeId = null)}
           aria-label="Close edge inspector"
         >
           ×
-        </button>
+        </Button>
       </div>
       <!-- Remount on selection change, same reasoning as the node
            inspector's own {#key} above -- EdgeForm.svelte seeds its local
@@ -558,60 +575,5 @@
   :global(svg.svelte-flow__edge-wrapper) {
     width: 100%;
     height: 100%;
-  }
-
-  .node-inspector {
-    width: 260px;
-    flex: 0 0 260px;
-    overflow-y: auto;
-    border-left: 1px solid #e2e8f0;
-    padding: 0.6rem;
-    box-sizing: border-box;
-  }
-
-  .node-inspector-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.6rem;
-  }
-
-  .node-inspector-title {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #1e293b;
-  }
-
-  .node-inspector-close {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    line-height: 1;
-    color: #64748b;
-  }
-
-  .node-inspector-description {
-    margin: 0 0 0.6rem;
-    font-size: 0.78rem;
-    line-height: 1.35;
-    color: #64748b;
-  }
-
-  .node-inspector-label-field {
-    margin-bottom: 0.6rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    font-size: 0.8rem;
-    color: #475569;
-  }
-
-  .node-inspector-label-field input {
-    font: inherit;
-    padding: 0.35rem 0.45rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    color: #1e293b;
   }
 </style>

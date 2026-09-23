@@ -2,7 +2,6 @@
   // ABOUTME: Structural node-kind side-panel form component (fallback for unrecognized kinds)
   // ABOUTME: Displays hint that no kind-specific attributes are available
 
-  import './nodeForms.css';
   import type { NodeFormProps } from '../types';
 
   // Used for Start/Exit/Parallel/FanIn/Conditional, plus (via
@@ -17,6 +16,6 @@
   let { attrs: _attrs, onChange: _onChange }: NodeFormProps = $props();
 </script>
 
-<div class="node-form" data-testid="structural-form">
-  <p class="node-form-hint">This node kind has no additional fields beyond its label.</p>
+<div class="flex flex-col gap-3" data-testid="structural-form">
+  <p class="m-0 text-xs text-muted-foreground">This node kind has no additional fields beyond its label.</p>
 </div>

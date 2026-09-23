@@ -3,7 +3,9 @@
   // ABOUTME: Edits task/config attributes
 
   import { untrack } from 'svelte';
-  import './nodeForms.css';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { NodeFormProps } from '../types';
 
   // Grounded in manager_handler.rs:49-90 (ManagerHandler::execute): `task`
@@ -24,6 +26,7 @@
   const TASK_SUGGESTIONS = ['coordinate-review', 'delegate-subtask', 'aggregate-results', 'escalate-to-human'];
 
   let { attrs, onChange }: NodeFormProps = $props();
+  const uid = $props.id();
 
   let task = $state(untrack(() => (typeof attrs.task === 'string' ? attrs.task : '')));
   let configText = $state(untrack(() => (typeof attrs.config === 'string' ? attrs.config : '')));
@@ -52,10 +55,11 @@
   }
 </script>
 
-<div class="node-form" data-testid="manager-form">
-  <label class="node-form-field">
-    Task
-    <input
+<div class="flex flex-col gap-3" data-testid="manager-form">
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-task">Task</Label>
+    <Input
+      id="{uid}-task"
       type="text"
       data-testid="manager-task"
       list="manager-task-suggestions"
@@ -68,13 +72,20 @@
         <option value={suggestion}></option>
       {/each}
     </datalist>
-  </label>
-  <p class="node-form-hint">A free-text description of the coordination task, sent to the LLM as-is -- the suggestions above are starting points, not fixed options.</p>
-  <label class="node-form-field">
-    Config (JSON)
-    <textarea data-testid="manager-config" rows="4" value={configText} oninput={handleConfigInput}></textarea>
-  </label>
+  </div>
+  <p class="m-0 text-xs text-muted-foreground">A free-text description of the coordination task, sent to the LLM as-is -- the suggestions above are starting points, not fixed options.</p>
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-config">Config (JSON)</Label>
+    <Textarea
+      id="{uid}-config"
+      class="font-mono text-xs"
+      data-testid="manager-config"
+      rows={4}
+      value={configText}
+      oninput={handleConfigInput}
+    />
+  </div>
   {#if configError}
-    <p class="node-form-error" role="alert" data-testid="manager-config-error">Invalid JSON: {configError}</p>
+    <p class="m-0 text-xs text-destructive" role="alert" data-testid="manager-config-error">Invalid JSON: {configError}</p>
   {/if}
 </div>

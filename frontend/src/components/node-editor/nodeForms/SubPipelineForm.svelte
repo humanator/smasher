@@ -3,7 +3,8 @@
   // ABOUTME: Edits pipeline attribute (path to sub-pipeline .dot file)
 
   import { untrack } from 'svelte';
-  import './nodeForms.css';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
   import type { NodeFormProps } from '../types';
 
   // Grounded in composition.rs:199-206 (SubPipelineTransform::apply):
@@ -13,6 +14,7 @@
   // the attr (surfacing that same missing-attr error at composition time)
   // rather than writing an empty-string path.
   let { attrs, onChange }: NodeFormProps = $props();
+  const uid = $props.id();
 
   let pipeline = $state(untrack(() => (typeof attrs.pipeline === 'string' ? attrs.pipeline : '')));
 
@@ -22,15 +24,16 @@
   }
 </script>
 
-<div class="node-form" data-testid="sub-pipeline-form">
-  <label class="node-form-field">
-    Pipeline file
-    <input
+<div class="flex flex-col gap-3" data-testid="sub-pipeline-form">
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-pipeline">Pipeline file</Label>
+    <Input
+      id="{uid}-pipeline"
       type="text"
       data-testid="sub-pipeline-path"
       value={pipeline}
       oninput={handleInput}
       placeholder="e.g. examples/sub_flow.dot"
     />
-  </label>
+  </div>
 </div>

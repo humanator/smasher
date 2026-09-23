@@ -3,7 +3,10 @@
   // ABOUTME: Edits tool/args attributes with JSON validation
 
   import { untrack } from 'svelte';
-  import './nodeForms.css';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { NodeFormProps } from '../types';
 
   // Grounded in tool_handler.rs:53-92 (ToolHandler::execute): `tool` (falls
@@ -39,6 +42,7 @@
   }
 
   let { attrs, onChange }: NodeFormProps = $props();
+  const uid = $props.id();
 
   let tool = $state(untrack(() => (typeof attrs.tool === 'string' ? attrs.tool : '')));
   let argsText = $state(untrack(() => (typeof attrs.args === 'string' ? attrs.args : '')));
@@ -95,37 +99,51 @@
   }
 </script>
 
-<div class="node-form" data-testid="tool-form">
-  <label class="node-form-field">
-    Tool
-    <select data-testid="tool-select" value={selectValue} onchange={handleSelectChange}>
-      <option value="">Select a tool…</option>
+<div class="flex flex-col gap-3" data-testid="tool-form">
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-tool">Tool</Label>
+    <NativeSelect.Root
+      id="{uid}-tool"
+      class="w-full"
+      data-testid="tool-select"
+      value={selectValue}
+      onchange={handleSelectChange}
+    >
+      <NativeSelect.Option value="">Select a tool…</NativeSelect.Option>
       {#each KNOWN_TOOLS as opt (opt.value)}
-        <option value={opt.value}>{opt.value}</option>
+        <NativeSelect.Option value={opt.value}>{opt.value}</NativeSelect.Option>
       {/each}
-      <option value={CUSTOM_VALUE}>Custom…</option>
-    </select>
-  </label>
+      <NativeSelect.Option value={CUSTOM_VALUE}>Custom…</NativeSelect.Option>
+    </NativeSelect.Root>
+  </div>
   {#if selectedKnownTool}
-    <p class="node-form-hint">{selectedKnownTool.description}</p>
+    <p class="m-0 text-xs text-muted-foreground">{selectedKnownTool.description}</p>
   {/if}
   {#if showCustomInput}
-    <label class="node-form-field">
-      Custom tool name
-      <input
+    <div class="flex flex-col gap-1.5">
+      <Label for="{uid}-custom-tool">Custom tool name</Label>
+      <Input
+        id="{uid}-custom-tool"
         type="text"
         data-testid="tool-name"
         value={tool}
         oninput={handleCustomToolInput}
         placeholder="e.g. shell"
       />
-    </label>
+    </div>
   {/if}
-  <label class="node-form-field">
-    Args (JSON)
-    <textarea data-testid="tool-args" rows="4" value={argsText} oninput={handleArgsInput}></textarea>
-  </label>
+  <div class="flex flex-col gap-1.5">
+    <Label for="{uid}-args">Args (JSON)</Label>
+    <Textarea
+      id="{uid}-args"
+      class="font-mono text-xs"
+      data-testid="tool-args"
+      rows={4}
+      value={argsText}
+      oninput={handleArgsInput}
+    />
+  </div>
   {#if argsError}
-    <p class="node-form-error" role="alert" data-testid="tool-args-error">Invalid JSON: {argsError}</p>
+    <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-args-error">Invalid JSON: {argsError}</p>
   {/if}
 </div>

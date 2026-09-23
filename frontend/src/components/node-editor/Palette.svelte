@@ -2,6 +2,7 @@
   // ABOUTME: Left-hand palette/panel for draggable node-kind entries
   // ABOUTME: Collapsible groups of draggable node kinds, plus structural section
 
+  import { Button } from '$lib/components/ui/button/index.js';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, PALETTE_GROUPS, THEME_COLORS, type PaletteGroupId } from './nodeConfig';
 
   // Left-hand palette/panel (spec Assumption 2's Agent Flow reference --
@@ -31,22 +32,23 @@
   }
 </script>
 
-<aside class="w-[200px] shrink-0 overflow-y-auto border-r border-slate-200 p-2 text-xs" data-testid="palette">
+<aside class="w-[200px] shrink-0 overflow-y-auto border-r border-border p-2 text-xs" data-testid="palette">
   {#each PALETTE_GROUPS as group (group.id)}
     <section class="mb-3" data-testid={`palette-group-${group.id}`}>
       {#if group.collapsible}
-        <button
-          type="button"
-          class="flex items-center gap-1 w-full bg-none border-0 font-semibold text-xs uppercase tracking-wider text-slate-700 cursor-pointer px-0 py-1 text-left"
+        <Button
+          variant="ghost"
+          size="xs"
+          class="w-full justify-start gap-1 px-1 font-semibold uppercase tracking-wider text-foreground"
           data-testid={`palette-group-toggle-${group.id}`}
           aria-expanded={expanded[group.id]}
           onclick={() => toggleGroup(group.id)}
         >
           <span aria-hidden="true">{expanded[group.id] ? '▾' : '▸'}</span>
           {group.label}
-        </button>
+        </Button>
       {:else}
-        <h3 class="font-semibold text-xs uppercase tracking-wider text-slate-700 m-0">{group.label}</h3>
+        <h3 class="font-semibold text-xs uppercase tracking-wider text-foreground m-0">{group.label}</h3>
       {/if}
 
       {#if !group.collapsible || expanded[group.id]}
