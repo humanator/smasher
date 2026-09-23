@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 use axum::response::IntoResponse;
 use axum::{http::StatusCode, Router};
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::state::AppState;
 
@@ -23,11 +24,19 @@ pub fn router() -> Router<AppState> {
     match std::fs::metadata(&dist_path) {
         Ok(metadata) if metadata.is_dir() => {
             tracing::info!(path = %dist_path.display(), "serving SPA from dist directory");
-            // Create router with SPA fallback: serve file if exists, fallback to index.html
-            Router::new()
-                .fallback(axum::routing::any(
-                    spa_fallback_handler,
-                ))
+            // ServeDir does real mime-type sniffing from each file's extension
+            // and its own path-traversal hardening (same as the /editor-ui,
+            // /design-kit, /candidate-artifacts, /static mounts below in
+            // server.rs) -- unlike the hand-rolled `read_to_string` +
+            // `(StatusCode::OK, String)` handler this replaced, which stamped
+            // every response `text/plain` regardless of the file served,
+            // silently breaking module script and stylesheet loading in a
+            // real browser (that handler's tests only ever asserted on
+            // status/body, never Content-Type). Falls back to index.html
+            // for any path ServeDir can't find on disk (SPA routing).
+            let index_path = dist_path.join("index.html");
+            let serve_dir = ServeDir::new(&dist_path).fallback(ServeFile::new(index_path));
+            Router::new().fallback_service(serve_dir)
         }
         Ok(_) => {
             tracing::warn!(path = %dist_path.display(), "dist path exists but is not a directory");
@@ -54,34 +63,6 @@ fn dist_path() -> PathBuf {
             .unwrap_or(&PathBuf::from("."))
             .join("frontend")
             .join("dist")
-    }
-}
-
-/// SPA fallback handler: tries to serve the requested file, falls back to index.html.
-async fn spa_fallback_handler(
-    req: axum::http::Request<axum::body::Body>,
-) -> impl IntoResponse {
-    let dist_path = dist_path();
-    let path_str = req.uri().path().trim_start_matches('/');
-
-    // Try to serve the requested file first
-    let file_path = dist_path.join(path_str);
-
-    // Security check: ensure the file is within dist_path and try to serve it
-    if let (Ok(canonical_file), Ok(canonical_dist)) = (
-        std::fs::canonicalize(&file_path),
-        std::fs::canonicalize(&dist_path),
-    )
-        && canonical_file.starts_with(&canonical_dist)
-            && let Ok(content) = tokio::fs::read_to_string(&file_path).await {
-                return (StatusCode::OK, content).into_response();
-            }
-
-    // File not found or security check failed, try index.html fallback
-    let index_path = dist_path.join("index.html");
-    match tokio::fs::read_to_string(&index_path).await {
-        Ok(content) => (StatusCode::OK, content).into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, "404 - SPA index not found").into_response(),
     }
 }
 
@@ -160,6 +141,94 @@ mod tests {
 
         let body = to_bytes(res.into_body(), usize::MAX).await.unwrap();
         assert_eq!(String::from_utf8_lossy(&body), "console.log('app');");
+
+        unsafe {
+            std::env::remove_var("SMASHER_SPA_DIST");
+        }
+    }
+
+    // Regression test: the hand-rolled fallback handler used to return
+    // every file (JS, CSS, index.html alike) as `(StatusCode::OK, String)`,
+    // which axum's IntoResponse always stamps `text/plain; charset=utf-8`
+    // regardless of the file it came from. A real browser refuses to
+    // execute a <script type="module"> served as text/plain, so the SPA
+    // never booted -- this only showed up in a real browser because every
+    // prior test here only asserted on status/body, never Content-Type.
+    #[tokio::test]
+    #[serial]
+    async fn serves_js_and_css_with_correct_content_types() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        std::fs::write(temp_dir.path().join("index.html"), "<html></html>").unwrap();
+        std::fs::write(temp_dir.path().join("app.js"), "console.log('app');").unwrap();
+        std::fs::write(temp_dir.path().join("app.css"), "body { color: red; }").unwrap();
+
+        unsafe {
+            std::env::set_var("SMASHER_SPA_DIST", temp_dir.path());
+        }
+
+        let app = router().with_state(test_state());
+
+        let js_res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/app.js")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let js_content_type = js_res
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            js_content_type.contains("javascript"),
+            "expected a JS content-type, got {js_content_type:?}"
+        );
+
+        let css_res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/app.css")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let css_content_type = css_res
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            css_content_type.contains("css"),
+            "expected a CSS content-type, got {css_content_type:?}"
+        );
+
+        let index_res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/some/unknown/spa/route")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let index_content_type = index_res
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        assert!(
+            index_content_type.contains("text/html"),
+            "expected an HTML content-type for the index.html SPA fallback, got {index_content_type:?}"
+        );
 
         unsafe {
             std::env::remove_var("SMASHER_SPA_DIST");
