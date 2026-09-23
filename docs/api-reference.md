@@ -395,7 +395,7 @@ The default server binds to `127.0.0.1:21541`.
 | `POST` | `/editor/workflows` | Save a new workflow (used by node-editor). |
 | `PUT` | `/editor/workflows/{id}/graph` | Update an existing workflow's graph (used by node-editor). |
 | `POST` | `/api/runs/{id}/gallery/{qid}/decision` | Submit a gallery-gate decision (used by gallery-gate component). |
-| `GET` | `/spa/*` | Serve the `smasher-spa` static bundle, with SPA-style fallback to `index.html` for unmatched paths. Not yet mounted at `/` (still owned by the legacy dashboard until `smasher-spa` ships parity, see the Boundaries section of `SPEC-smasher-web-api.md`). |
+| `GET` | `/` (and any unmatched non-`/api`/`/questions`/`/gallery` path) | Serve the `smasher-spa` static bundle, with SPA-style fallback to `index.html` for unmatched paths. |
 
 ### POST /api/runs -- Submit Pipeline
 
@@ -770,10 +770,12 @@ Response body:
 }
 ```
 
-### GET /spa/* -- Static SPA Serving
+### GET / -- Static SPA Serving
 
-Serves the `smasher-spa` build's static assets, disk-based (not embedded in the binary).
-Falls back to `index.html` for any unmatched path (SPA client-side routing pattern).
+Serves the `smasher-spa` build's static assets at the root path, disk-based (not
+embedded in the binary). Falls back to `index.html` for any unmatched path (SPA
+client-side routing pattern) — `/api/*`, `/questions/*`, and `/gallery/*` are matched
+by their own routers first and never captured by this fallback.
 
 Configuration:
 
@@ -782,9 +784,6 @@ Configuration:
 - If the dist directory doesn't exist at server startup, the mount 404s everything
   instead of crashing the server — useful on a dev machine with no `smasher-spa`
   build yet.
-
-Not yet mounted at `/` — the legacy askama/HTMX dashboard (`pages.rs`) still owns `/`
-until `smasher-spa` ships and confirms dashboard parity (the final-cutover task).
 
 ### Run Statuses
 

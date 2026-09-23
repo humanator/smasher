@@ -43,15 +43,14 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 - [x] `cargo clippy -p smasher-web` clean
 - [x] Spec's three Testing Strategy areas all covered: happy path, human-gate round trip, static-serving fallback
 
-## Phase 5: Final Cutover — BLOCKED on `smasher-spa` reaching parity
+## Phase 5: Final Cutover — complete
 
-- [ ] Task 9: Delete `pages.rs` + `templates/` + HTMX static assets + `askama` dep; mount static SPA router at `/`
-  - **Do not start until `smasher-spa` ships and confirms dashboard parity.**
+- [x] Task 9: Delete `pages.rs` + `templates/` + HTMX static assets + `askama` dep; mount static SPA router at `/`
 
 ### Checkpoint: Complete
-- [ ] All SPEC-smasher-web-api.md Success Criteria checkboxes satisfied
-- [ ] `cargo test -p smasher-web` clean
-- [ ] `cargo clippy -p smasher-web` clean
-- [ ] `smasher serve` still binds `127.0.0.1:21541`, now serving the real SPA at `/`
-- [ ] Zero server-rendered HTML remains in the crate
+- [x] All SPEC-smasher-web-api.md Success Criteria checkboxes satisfied
+- [x] `cargo test -p smasher-web` clean
+- [x] `cargo clippy -p smasher-web` clean
+- [x] `smasher serve` still binds `127.0.0.1:21541`, now serving the real SPA at `/`
+- [x] Zero server-rendered HTML remains in the crate
 - [ ] Human review before merge

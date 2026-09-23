@@ -112,13 +112,13 @@ Questions).
 
 ### Phase 5: Final Cutover — BLOCKED on `smasher-spa`
 
-- [ ] Task 9: Delete `pages.rs`, templates, HTMX static assets, `askama` dependency; wire static SPA serving onto `/`
+- [x] Task 9: Delete `pages.rs`, templates, HTMX static assets, `askama` dependency; wire static SPA serving onto `/`
 
 ### Checkpoint: Complete
-- [ ] All SPEC-smasher-web-api.md Success Criteria checkboxes satisfied
-- [ ] `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean
-- [ ] Zero server-rendered HTML remains in the crate
-- [ ] `smasher serve` still binds `127.0.0.1:21541`
+- [x] All SPEC-smasher-web-api.md Success Criteria checkboxes satisfied
+- [x] `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean
+- [x] Zero server-rendered HTML remains in the crate
+- [x] `smasher serve` still binds `127.0.0.1:21541`
 - [ ] Human review before merge
 
 ---
@@ -366,15 +366,15 @@ close it out unilaterally; it's a cross-module gate, not a technical
 blocker within this crate.
 
 **Acceptance criteria:**
-- [ ] `pages.rs`, `templates/`, HTMX static JS, and the `askama` crate dependency are gone
-- [ ] `build_router()` serves the real `smasher-spa` build at `/` with SPA fallback
-- [ ] `cargo tree -p smasher-web` shows no `askama` dependency
+- [x] `pages.rs`, `templates/`, HTMX static JS, and the `askama` crate dependency are gone (19 templates in the end, not the originally-estimated 17 — two more had accumulated since this plan was written)
+- [x] `build_router()` serves the real `smasher-spa` build at `/` with SPA fallback
+- [x] `cargo tree -p smasher-web` shows no `askama` dependency
 
 **Verification:**
-- [ ] `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean
-- [ ] `cargo run --bin smasher -- serve` on `127.0.0.1:21541` serves the real SPA at `/`
-- [ ] All SPEC-smasher-web-api.md Success Criteria checkboxes now satisfied
-- [ ] Human review + explicit go-ahead before starting (per the gate above)
+- [x] `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean (150 lib + 2 integration; clippy clean)
+- [x] `cargo run --bin smasher -- serve` on `127.0.0.1:21541` serves the real SPA at `/` (verified against the real `frontend/dist` build, not just a test fixture)
+- [x] All SPEC-smasher-web-api.md Success Criteria checkboxes now satisfied
+- [x] Human review + explicit go-ahead before starting (per the gate above) — confirmed directly with Jobsworth and cross-checked with the `smasher-spa` session itself before starting
 
 **Dependencies:** Tasks 1–8, plus the external `smasher-spa` module confirming parity
 

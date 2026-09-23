@@ -12,7 +12,7 @@ A Rust implementation of [strongdm/attractor](https://github.com/strongdm/attrac
 2. **smasher-agent** — Programmable coding agent loop with tools, steering, subagents
 3. **smasher-attractor** — DOT-based directed graph pipeline orchestrator
 4. **smasher-cli** — CLI binary (`smasher complete`, `smasher chat`, `smasher run`)
-5. **smasher-web** — JSON+SSE API for pipeline execution (axum, port 21541); legacy askama/HTMX dashboard still present pending removal once `smasher-spa` ships
+5. **smasher-web** — JSON+SSE API for pipeline execution (axum, port 21541); serves the `smasher-spa` static build at `/`
 
 ## Architecture
 
