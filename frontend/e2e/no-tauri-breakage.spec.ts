@@ -27,7 +27,7 @@ test('runs with zero Tauri-only code paths breaking in a plain browser', async (
 
   // Catalog -> new-workflow page (mounts WorkflowCanvas, Palette, node-editor
   // forms -- the biggest surface Task 20's shim call-sites touch).
-  await page.getByText('+ New Workflow').click();
+  await page.getByRole('link', { name: 'New Workflow' }).click();
   await page.waitForURL(/\/workflows\/new/);
   await expect(page.getByText('Create New Workflow')).toBeVisible();
   // Give the create-mode fields (populated from a real API fetch) time to

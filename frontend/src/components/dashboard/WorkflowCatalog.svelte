@@ -62,9 +62,6 @@
 <div class="workflow-catalog">
   <div class="catalog-header">
     <h1>Workflows</h1>
-    <a href="/workflows/new" class="btn btn-primary btn-new-workflow">
-      + New Workflow
-    </a>
   </div>
 
   {#if loading}
@@ -206,11 +203,6 @@
 
   .btn-secondary:hover {
     background-color: #4b5563;
-  }
-
-  .btn-new-workflow {
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
   }
 
   .btn-sm {
