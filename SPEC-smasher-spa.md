@@ -17,7 +17,7 @@ remotely later without code changes to the SPA itself.
 ## Tech Stack
 
 - Svelte 5 (runes), TypeScript, Vite
-- Tailwind CSS
+- Tailwind CSS v4
 - shadcn-svelte (Bits UI primitives) — components copied in and owned, not a black-box dependency
 - Node-editor implementation carried over from the current standalone project
 
@@ -49,7 +49,7 @@ frontend/
   tests/                 # vitest unit/component tests
   e2e/                   # playwright specs
   vite.config.ts
-  tailwind.config.ts
+  components.json        # shadcn-svelte config (Tailwind v4: theme lives in app.css)
   package.json
 ```
 

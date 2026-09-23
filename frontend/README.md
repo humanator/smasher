@@ -23,13 +23,16 @@ src/
     api/           # Typed fetch client for smasher-web-api
     native/        # Tauri shim with browser fallbacks
     components/
-      ui/          # shadcn-svelte components
-      node-editor/ # Graph editor components
-      dashboard/   # Dashboard page components
-    stores/        # Svelte 5 rune-based stores
+      ui/          # shadcn-svelte components (generated, owned)
+    utils.ts       # cn() + shadcn-svelte prop helper types
+  components/
+    node-editor/   # Graph editor components
+    dashboard/     # Dashboard page components
+  stores/          # Svelte 5 rune-based stores
   App.svelte
   main.ts
-  app.css
+  app.css          # Tailwind v4 entry + shadcn-svelte theme tokens
+components.json    # shadcn-svelte config (style, aliases)
 tests/             # Vitest unit/component tests
 e2e/               # Playwright E2E specs
 ```
@@ -39,8 +42,8 @@ e2e/               # Playwright E2E specs
 - **Svelte 5** (runes)
 - **TypeScript** (strict mode)
 - **Vite** (build tool)
-- **Tailwind CSS** (styling)
-- **shadcn-svelte** (UI primitives)
+- **Tailwind CSS v4** (styling, CSS-first config in `app.css`)
+- **shadcn-svelte** (UI primitives on Bits UI; add more with `npx shadcn-svelte@latest add <name>`)
 - **Vitest** (unit testing)
 - **Playwright** (E2E testing)
 
@@ -52,5 +55,5 @@ All backend calls go through `src/lib/api/`. Base URL is runtime-configurable vi
 
 - All components use Svelte 5 runes (`$state`, `$derived`, `$effect`) throughout, no legacy `$:` reactivity
 - TypeScript is strict mode, no implicit `any`
-- Use Tailwind utility classes; minimal CSS in component `<style>` blocks
+- Build UI from `$lib/components/ui` primitives and theme tokens (`bg-primary`, `text-muted-foreground`, …); Tailwind utilities for layout; minimal CSS in component `<style>` blocks
 - Tests run against a real running `smasher-web-api` instance, not mocked fetch
