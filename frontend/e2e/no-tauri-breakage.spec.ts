@@ -34,23 +34,30 @@ test('runs with zero Tauri-only code paths breaking in a plain browser', async (
   // settle so any async Tauri-detection code in that path has run.
   await expect(page.getByTestId('create-name-input')).toBeVisible();
 
-  // Back to the catalog, then submit a trivial run so EventLog.svelte's
-  // completion-notification shim call-site (Task 20) actually executes --
-  // a real browser has a real Notification global, so showNotification's
-  // browser-fallback branch runs for real here, not the jsdom
-  // "Notifications not supported" warning path.
-  await page.goto(base);
-  await page.waitForLoadState('networkidle');
-  const textarea = page.locator('textarea[placeholder*="digraph"]');
-  await textarea.fill(`
+  // Seed a trivial run directly via the real POST /api/runs endpoint (the
+  // catalog's "paste DOT source" panel has been removed from the UI, and
+  // every catalog workflow does real agentic work, so there's no UI path
+  // left to launch an ad-hoc zero-LLM-call graph). Then navigate to its
+  // detail page so EventLog.svelte's completion-notification shim
+  // call-site (Task 20) actually executes -- a real browser has a real
+  // Notification global, so showNotification's browser-fallback branch
+  // runs for real here, not the jsdom "Notifications not supported"
+  // warning path.
+  const submitResponse = await page.request.post(`${base}/api/runs`, {
+    data: {
+      dot_source: `
 digraph NoTauriBreakageE2E {
   Start [shape=Mdiamond, label="Start"];
   Exit [shape=Msquare, label="Exit"];
   Start -> Exit;
 }
-`);
-  await page.locator('button:has-text("Submit")').click();
-  await page.waitForURL(/\/runs\/[a-z0-9-]+/);
+`,
+      variables: {},
+    },
+  });
+  const { run_id: runId } = await submitResponse.json();
+  await page.goto(`${base}/runs/${runId}`);
+  await page.waitForLoadState('networkidle');
   await expect(page.locator('text=Pipeline completed')).toBeVisible({ timeout: 15000 });
 
   await page.goto(base);

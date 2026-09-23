@@ -2,8 +2,6 @@
 // ABOUTME: Real browser automation: submit pipeline → stream events → answer gates → observe completion
 
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 test('submit pipeline, stream events, answer 5 human gates, observe completion', async ({
   page,
@@ -15,10 +13,6 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   // debugging was ~38s to 3+ min for just the first two nodes.
   test.setTimeout(600000);
 
-  // Read human_gate_showcase.dot workflow
-  const workflowPath = join(process.cwd(), '..', 'examples', 'human_gate_showcase.dot');
-  const dotSource = readFileSync(workflowPath, 'utf-8');
-
   // Navigate to the dev server
   await page.goto(baseURL || 'http://127.0.0.1:5173');
 
@@ -28,17 +22,13 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   // Wait for the app to render - look for the catalog heading
   await expect(page.locator('h1', { hasText: 'Smasher Pipelines' })).toBeVisible({ timeout: 10000 });
 
-  // Wait for the RunForm to load
-  const form = page.locator('form');
-  await expect(form).toBeVisible({ timeout: 10000 });
-
-  // Fill in the DOT source textarea
-  const textarea = page.locator('textarea[placeholder*="digraph"]');
-  await textarea.fill(dotSource);
-
-  // Submit the form by clicking the Submit button
-  const submitButton = page.locator('button:has-text("Submit")');
-  await submitButton.click();
+  // Launch examples/human_gate_showcase.dot -- already on disk and listed
+  // in the catalog (SMASHER_WORKFLOWS_DIR=examples) -- via its "Run
+  // Workflow" button. The catalog is the only submission path now that
+  // the free-form "paste DOT source" panel has been removed from the UI.
+  const row = page.locator('tr', { hasText: 'Human Gate Showcase' });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await row.getByRole('button', { name: 'Run Workflow' }).click();
 
   // After submission, the page should navigate to /runs/{id}
   await page.waitForURL(/\/runs\/[a-z0-9-]+/);
@@ -102,7 +92,7 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   const runStatus = (await runResponse.json()).status;
   expect(runStatus).toBe('Completed');
 
-  // The RunForm/WorkflowCatalog components render their own errors with
+  // The WorkflowCatalog component renders its own errors with
   // role="alert" -- confirm none of those are present.
   await expect(page.locator('[role="alert"]')).toHaveCount(0);
 });

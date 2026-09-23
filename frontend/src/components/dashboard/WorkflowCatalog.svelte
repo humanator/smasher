@@ -74,28 +74,41 @@
     {#if runError}
       <p class="error" role="alert">{runError}</p>
     {/if}
-    <div class="workflow-list">
-      {#each workflows as workflow (workflow.id)}
-        <div class="workflow-card">
-          <h2>{formatWorkflowName(workflow.name)}</h2>
-          <p class="workflow-path">{workflow.name}</p>
-          <p class="workflow-source">From: {workflow.source_dir}</p>
-          <div class="workflow-actions">
-            <a href="/workflows/{workflow.id}/edit" class="btn btn-secondary btn-sm">
-              Edit
-            </a>
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              disabled={runningWorkflowId === workflow.id}
-              onclick={() => handleRunWorkflow(workflow.id)}
-            >
-              {runningWorkflowId === workflow.id ? 'Starting…' : 'Run Workflow'}
-            </button>
-          </div>
-        </div>
-      {/each}
-    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Source</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each workflows as workflow (workflow.id)}
+          <tr>
+            <td>
+              <div class="workflow-name">{formatWorkflowName(workflow.name)}</div>
+              <div class="workflow-path">{workflow.name}</div>
+            </td>
+            <td>{workflow.source_dir}</td>
+            <td>
+              <div class="workflow-actions">
+                <a href="/workflows/{workflow.id}/edit" class="btn btn-secondary btn-sm">
+                  Edit
+                </a>
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  disabled={runningWorkflowId === workflow.id}
+                  onclick={() => handleRunWorkflow(workflow.id)}
+                >
+                  {runningWorkflowId === workflow.id ? 'Starting…' : 'Run Workflow'}
+                </button>
+              </div>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
   {/if}
 </div>
 
@@ -130,50 +143,49 @@
     color: #dc2626;
   }
 
-  .workflow-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
-  }
-
-  .workflow-card {
-    border: 1px solid #e2e8f0;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
     border-radius: 8px;
-    padding: 1.5rem;
-    background-color: #fff;
+    overflow: hidden;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: box-shadow 0.2s;
-    display: flex;
-    flex-direction: column;
   }
 
-  .workflow-card:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  th,
+  td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
   }
 
-  .workflow-card h2 {
-    margin: 0 0 0.5rem 0;
-    font-size: 1.25rem;
+  th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.875rem;
+  }
+
+  td {
+    font-size: 0.875rem;
+    color: #1e293b;
+  }
+
+  .workflow-name {
+    font-weight: 600;
     color: #1e293b;
   }
 
   .workflow-path {
-    margin: 0.5rem 0;
-    font-size: 0.875rem;
+    margin-top: 0.125rem;
+    font-size: 0.8125rem;
     color: #64748b;
     font-family: monospace;
-  }
-
-  .workflow-source {
-    margin: 0.5rem 0 1.5rem 0;
-    font-size: 0.875rem;
-    color: #94a3b8;
   }
 
   .workflow-actions {
     display: flex;
     gap: 0.5rem;
-    margin-top: auto;
   }
 
   .btn {

@@ -5,7 +5,6 @@
   import './app.css';
   import { onMount } from 'svelte';
   import WorkflowCatalog from './components/dashboard/WorkflowCatalog.svelte';
-  import RunForm from './components/dashboard/RunForm.svelte';
   import RunList from './components/dashboard/RunList.svelte';
   import RunDetail from './components/dashboard/RunDetail.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
@@ -128,30 +127,22 @@
       </div>
     </div>
   {:else}
-    <!-- Catalog View: header, main column (WorkflowCatalog + RunList), RunForm side panel -->
-    <div class="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_32rem]">
-      <div class="min-w-0">
-        <header class="flex items-center justify-between gap-4 px-5 py-3">
-          <h1 class="text-3xl font-bold">Smasher Pipelines</h1>
-          <a
-            href="/workflows/new"
-            class="rounded bg-blue-500 px-11 py-3 text-sm text-white hover:bg-blue-600"
-          >
-            New Workflow
-          </a>
-        </header>
+    <!-- Catalog View: header, then Workflows and Runs stacked in the main column -->
+    <div class="min-h-screen">
+      <header class="flex items-center justify-between gap-4 px-5 py-3">
+        <h1 class="text-3xl font-bold">Smasher Pipelines</h1>
+        <a
+          href="/workflows/new"
+          class="rounded bg-blue-500 px-11 py-3 text-sm text-white hover:bg-blue-600"
+        >
+          New Workflow
+        </a>
+      </header>
 
-        <div class="px-4 sm:px-8 lg:px-24">
-          <WorkflowCatalog />
-          <RunList />
-        </div>
+      <div class="mx-auto max-w-6xl px-4 sm:px-8">
+        <WorkflowCatalog />
+        <RunList />
       </div>
-
-      <!-- Run Form (Manual Submission) -->
-      <aside aria-labelledby="submit-pipeline-heading" class="bg-white px-4 py-8 sm:px-8 lg:pt-32">
-        <h2 id="submit-pipeline-heading" class="text-2xl font-semibold mb-4">Submit Pipeline</h2>
-        <RunForm />
-      </aside>
     </div>
   {/if}
 </main>

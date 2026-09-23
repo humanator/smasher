@@ -29,10 +29,23 @@ describe('App catalog layout', () => {
     expect(screen.queryByText('Available Workflows')).toBeNull();
   });
 
-  it('shows Submit Pipeline in a side panel, separate from the main column', () => {
+  it('drops the Submit Pipeline panel entirely', () => {
     render(App);
-    const aside = screen.getByRole('complementary', { name: 'Submit Pipeline' });
-    expect(within(aside).getByLabelText('DOT Source:')).toBeTruthy();
-    expect(within(aside).queryByText('Loading workflows...')).toBeNull();
+    expect(screen.queryByText('Submit Pipeline')).toBeNull();
+    expect(screen.queryByLabelText('DOT Source:')).toBeNull();
+  });
+
+  it('renders workflows as a table, matching the Runs table', async () => {
+    render(App);
+    // Wait for a real workflow row to land before inspecting the table --
+    // the list starts empty while GET /api/workflows is in flight.
+    await screen.findByText('Human Gate Showcase', {}, { timeout: 5000 });
+    const table = screen.getByRole('heading', { name: 'Workflows' }).closest('.workflow-catalog')
+      ?.querySelector('table');
+    expect(table).toBeTruthy();
+    const headerRow = within(table as HTMLElement).getAllByRole('columnheader');
+    expect(headerRow.map((th) => th.textContent)).toEqual(
+      expect.arrayContaining(['Name', 'Source'])
+    );
   });
 });

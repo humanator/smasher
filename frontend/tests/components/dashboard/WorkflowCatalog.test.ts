@@ -45,8 +45,8 @@ describe('WorkflowCatalog', () => {
       { timeout: 5000 }
     );
 
-    const card = screen.getByText('Consensus Task').closest('.workflow-card') as HTMLElement;
-    const runButton = within(card).getByText('Run Workflow');
+    const row = screen.getByText('Consensus Task').closest('tr') as HTMLElement;
+    const runButton = within(row).getByText('Run Workflow');
     await fireEvent.click(runButton);
 
     await waitFor(

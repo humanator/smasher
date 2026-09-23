@@ -64,16 +64,20 @@ test('submit a gallery-gate pipeline, select a candidate, and complete via the r
   let runId: string | undefined;
 
   try {
-    await page.goto(baseURL || 'http://127.0.0.1:5173');
-    await page.waitForLoadState('networkidle');
+    const base = baseURL || 'http://127.0.0.1:5173';
 
-    const textarea = page.locator('textarea[placeholder*="digraph"]');
-    await textarea.fill(galleryGateDot);
-    await page.locator('button:has-text("Submit")').click();
-
-    await page.waitForURL(/\/runs\/[a-z0-9-]+/);
-    runId = page.url().split('/runs/')[1];
+    // Seed the run directly via the real POST /api/runs endpoint -- the
+    // catalog's "paste DOT source" panel has been removed from the UI, so
+    // this ad-hoc fixture graph (skipping the real render_capture nodes,
+    // per the module comment above) has no UI submission path left.
+    const submitResponse = await page.request.post(`${base}/api/runs`, {
+      data: { dot_source: galleryGateDot, variables: {} },
+    });
+    ({ run_id: runId } = await submitResponse.json());
     expect(runId).toBeTruthy();
+
+    await page.goto(`${base}/runs/${runId}`);
+    await page.waitForLoadState('networkidle');
 
     // The pipeline pauses at Gate1 almost immediately (no LLM nodes before
     // it) -- write the 3 real candidate fixtures the gate expects

@@ -121,7 +121,7 @@ describe('NewWorkflowPage', () => {
 
     // handleSave navigates via window.location.href on success -- stub it so
     // jsdom doesn't log a "not implemented: navigation" error, same pattern
-    // RunForm.test.ts already uses for the same reason.
+    // WorkflowCatalog.test.ts uses for the same reason.
     vi.stubGlobal('location', { href: '' });
 
     render(NewWorkflowPage);
