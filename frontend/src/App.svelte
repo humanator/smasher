@@ -133,7 +133,7 @@
         <h1 class="text-3xl font-bold">Smasher Pipelines</h1>
         <a
           href="/workflows/new"
-          class="rounded bg-blue-500 px-11 py-3 text-sm text-white hover:bg-blue-600"
+          class="rounded-sm bg-blue-500 px-11 py-3 text-sm text-white hover:bg-blue-600"
         >
           New Workflow
         </a>

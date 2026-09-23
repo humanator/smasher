@@ -419,7 +419,7 @@
         <MiniMap />
       </SvelteFlow>
     </div>
-    <button type="button" onclick={handleSave} disabled={saveDisabled} data-testid="save-button" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed">
+    <button type="button" onclick={handleSave} disabled={saveDisabled} data-testid="save-button" class="px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed">
       {saving ? 'Saving…' : 'Save'}
     </button>
     {#if saveError}

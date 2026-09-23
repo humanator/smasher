@@ -31,7 +31,7 @@
   }
 </script>
 
-<aside class="w-[200px] flex-shrink-0 overflow-y-auto border-r border-slate-200 p-2 text-xs" data-testid="palette">
+<aside class="w-[200px] shrink-0 overflow-y-auto border-r border-slate-200 p-2 text-xs" data-testid="palette">
   {#each PALETTE_GROUPS as group (group.id)}
     <section class="mb-3" data-testid={`palette-group-${group.id}`}>
       {#if group.collapsible}
@@ -54,7 +54,7 @@
           {#each group.kinds as nodeType (nodeType)}
             {@const config = NODE_KIND_CONFIG[nodeType]}
             <div
-              class="palette-entry flex items-center gap-2 p-1 rounded cursor-grab active:cursor-grabbing border"
+              class="palette-entry flex items-center gap-2 p-1 rounded-sm cursor-grab active:cursor-grabbing border"
               data-testid={`palette-entry-${nodeType}`}
               draggable="true"
               role="listitem"
@@ -62,7 +62,7 @@
               ondragstart={(event) => handleDragStart(event, nodeType)}
               style={`--palette-entry-color: ${THEME_COLORS[config.theme].border}; --palette-entry-bg: ${THEME_COLORS[config.theme].bg};`}
             >
-              <span class="inline-flex items-center justify-center min-w-7 h-6 px-1 rounded text-white text-xs font-bold" style={`background-color: var(--palette-entry-color, #94a3b8);`} aria-hidden="true">{config.icon}</span>
+              <span class="inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-sm text-white text-xs font-bold" style={`background-color: var(--palette-entry-color, #94a3b8);`} aria-hidden="true">{config.icon}</span>
               <span class="text-slate-900">{config.title}</span>
             </div>
           {/each}
