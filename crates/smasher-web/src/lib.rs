@@ -1,4 +1,4 @@
-// ABOUTME: Crate root for smasher-web, the HTMX pipeline dashboard.
+// ABOUTME: Crate root for smasher-web, the JSON+SSE pipeline API and static SPA server.
 // ABOUTME: Re-exports modules for the web server, SSE bridge, and API routes.
 
 pub mod backend;

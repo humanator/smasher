@@ -22,7 +22,6 @@ pub fn design_kit_dir() -> std::path::PathBuf {
 pub fn build_router(state: AppState) -> Router {
     let api_routes = crate::routes::api::router();
     let editor_api_routes = crate::routes::editor_api::router();
-    let page_routes = crate::routes::pages::router();
     let question_routes = crate::routes::questions::router();
     let gallery_routes = crate::routes::gallery::router();
     let static_files_routes = crate::routes::static_files::router();
@@ -49,15 +48,14 @@ pub fn build_router(state: AppState) -> Router {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("editor-ui/dist");
 
     Router::new()
-        .merge(page_routes)
         .merge(api_routes)
         .merge(editor_api_routes)
         .merge(question_routes)
         .merge(gallery_routes)
-        .nest(
-            "/spa",
-            static_files_routes.with_state(state.clone()),
-        )
+        // Merged (not nested under a prefix) so its fallback becomes the
+        // whole router's fallback: anything not matched by the routes above
+        // falls through to the SPA's serve-file-or-index.html handler at `/`.
+        .merge(static_files_routes.with_state(state.clone()))
         .nest_service("/static", ServeDir::new(static_dir))
         .nest_service(
             "/candidate-artifacts",
@@ -380,6 +378,39 @@ mod tests {
             .await
             .unwrap();
         assert!(!body.is_empty());
+    }
+
+    // Bare `#[serial]` (default, unnamed group) -- deliberately the *same*
+    // lock static_files.rs's own SMASHER_SPA_DIST tests use (both modules
+    // are compiled into one test binary), so this test can't race them for
+    // the env var.
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn root_serves_the_spa_not_the_old_dashboard() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let index_content = "<html><body>real SPA build</body></html>";
+        std::fs::write(temp_dir.path().join("index.html"), index_content).unwrap();
+
+        unsafe {
+            std::env::set_var("SMASHER_SPA_DIST", temp_dir.path());
+        }
+
+        let app = build_router(test_state());
+        let req = Request::builder()
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        unsafe {
+            std::env::remove_var("SMASHER_SPA_DIST");
+        }
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&body), index_content);
     }
 
     #[tokio::test]
