@@ -4,6 +4,7 @@
 
   import { onMount } from 'svelte';
   import * as workflowsApi from '../../lib/api/workflows';
+  import * as runsApi from '../../lib/api/runs';
 
   interface Workflow {
     id: string;
@@ -15,6 +16,8 @@
   let workflows: Workflow[] = $state([]);
   let loading = $state(true);
   let error: string | null = $state(null);
+  let runningWorkflowId: string | null = $state(null);
+  let runError: string | null = $state(null);
 
   onMount(async () => {
     try {
@@ -26,6 +29,25 @@
       loading = false;
     }
   });
+
+  // Launches a real run of the workflow's on-disk .dot file (server-side,
+  // via POST /api/workflows/{id}/run) and navigates straight to the new
+  // run's detail page -- no intermediate "confirm" page, matching the old
+  // HTMX dashboard's single-click "run this workflow" behavior. Previously
+  // this linked to `/runs/new?workflow={id}`, but nothing consumed that
+  // query param and "new" collided with App.svelte's /runs/{id} route
+  // regex (matched as a literal run id "new", 404ing every child fetch).
+  async function handleRunWorkflow(workflowId: string) {
+    runError = null;
+    runningWorkflowId = workflowId;
+    try {
+      const response = await runsApi.runWorkflow(workflowId);
+      window.location.href = `/runs/${response.run_id}`;
+    } catch (err) {
+      runError = err instanceof Error ? err.message : 'Failed to start run';
+      runningWorkflowId = null;
+    }
+  }
 
   function formatWorkflowName(name: string): string {
     // Convert "consensus_task.dot" to "Consensus Task"
@@ -52,6 +74,9 @@
   {:else if workflows.length === 0}
     <p class="empty-state">No workflows configured.</p>
   {:else}
+    {#if runError}
+      <p class="error" role="alert">{runError}</p>
+    {/if}
     <div class="workflow-list">
       {#each workflows as workflow (workflow.id)}
         <div class="workflow-card">
@@ -62,9 +87,14 @@
             <a href="/workflows/{workflow.id}/edit" class="btn btn-secondary btn-sm">
               Edit
             </a>
-            <a href="/runs/new?workflow={workflow.id}" class="btn btn-primary btn-sm">
-              Run Workflow
-            </a>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={runningWorkflowId === workflow.id}
+              onclick={() => handleRunWorkflow(workflow.id)}
+            >
+              {runningWorkflowId === workflow.id ? 'Starting…' : 'Run Workflow'}
+            </button>
           </div>
         </div>
       {/each}

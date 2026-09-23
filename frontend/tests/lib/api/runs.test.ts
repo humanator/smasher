@@ -3,6 +3,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as runs from '../../../src/lib/api/runs';
+import * as workflows from '../../../src/lib/api/workflows';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -123,5 +124,28 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
     expect(typeof tokens.output_tokens).toBe('number');
     expect(tokens.input_tokens).toBeGreaterThanOrEqual(0);
     expect(tokens.output_tokens).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should launch a real run from an on-disk workflow via runWorkflow, associated with that workflow', async () => {
+    const { workflows: available } = await workflows.listWorkflows();
+    const workflow = available.find((w) => w.name === 'consensus_task.dot');
+    expect(workflow).toBeTruthy();
+
+    const response = await runs.runWorkflow(workflow!.id, { variables: { test: 'run-workflow' } });
+    expect(response.run_id).toBeTruthy();
+    expect(response.status).toBe('Running');
+
+    const run = await runs.getRun(response.run_id);
+    expect(run.workflow_id).toBe(workflow!.id);
+  });
+
+  it('should return 404 from runWorkflow for an unknown workflow id', async () => {
+    try {
+      await runs.runWorkflow('no-such-workflow-id');
+      expect.fail('Should have thrown a 404 error');
+    } catch (error) {
+      const apiError = error as { status: number };
+      expect(apiError.status).toBe(404);
+    }
   });
 });

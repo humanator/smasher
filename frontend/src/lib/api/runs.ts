@@ -132,6 +132,28 @@ export async function listRuns(): Promise<ListRunsResponse> {
   return handleResponse<ListRunsResponse>(response);
 }
 
+export interface RunWorkflowRequest {
+  variables?: Record<string, string>;
+  model?: string;
+  node_overrides?: Record<string, unknown>;
+}
+
+// Launches a run of a workflow's current on-disk .dot file, read fresh
+// server-side -- no client-side copy of the DOT source involved, matching
+// this project's "server renders/validates/parses DOT, not client-side"
+// boundary.
+export async function runWorkflow(
+  workflowId: string,
+  req: RunWorkflowRequest = {}
+): Promise<SubmitRunResponse> {
+  const response = await fetch(getApiUrl(`/workflows/${encodeURIComponent(workflowId)}/run`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  return handleResponse<SubmitRunResponse>(response);
+}
+
 export async function getRun(id: string): Promise<RunSummary> {
   const response = await fetch(getApiUrl(`/runs/${id}`));
   return handleResponse<RunSummary>(response);

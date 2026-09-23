@@ -35,8 +35,14 @@
   function updatePath() {
     const path = window.location.pathname;
 
-    // Extract run ID if path is /runs/{id}
-    const runMatch = path.match(/^\/runs\/([a-z0-9-]+)$/);
+    // Extract run ID if path is /runs/{id} -- "new" is excluded since it's
+    // not a real run id (the catalog's "Run Workflow" used to link to
+    // /runs/new?workflow=..., which nothing consumed and which collided
+    // with this exact regex, 404ing every child fetch for a run literally
+    // named "new"; that flow now launches the run directly instead of
+    // navigating through this route at all, but the exclusion stays as a
+    // defensive guard against a stale bookmark/typed URL hitting the same bug).
+    const runMatch = path.match(/^\/runs\/(?!new$)([a-z0-9-]+)$/);
     if (runMatch) {
       runId = runMatch[1];
       workflowPageType = null;

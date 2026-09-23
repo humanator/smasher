@@ -143,6 +143,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/runs/{id}/decisions", get(list_decisions))
         .route("/api/graph/nodes", post(list_graph_nodes))
         .route("/api/workflows", get(list_workflows))
+        .route("/api/workflows/{id}/run", post(run_workflow))
 }
 
 // ---------------------------------------------------------------------------
@@ -196,20 +197,29 @@ async fn list_graph_nodes(
     Ok(Json(GraphNodesResponse { nodes }))
 }
 
-async fn submit_pipeline(
-    State(state): State<AppState>,
-    Json(req): Json<SubmitRequest>,
+/// Shared by `submit_pipeline` (raw pasted DOT, `workflow_id: None`) and
+/// `run_workflow` (an on-disk workflow's own `.dot`, `workflow_id: Some(id)`)
+/// -- parse/resolve/lint/launch/record is identical either way, only where
+/// `dot_source` came from and whether the run is associated with a workflow
+/// differ.
+async fn launch_and_record(
+    state: &AppState,
+    dot_source: String,
+    variables: HashMap<String, String>,
+    model: Option<String>,
+    node_overrides: HashMap<String, transforms::NodeOverride>,
+    workflow_id: Option<String>,
 ) -> Result<Json<SubmitResponse>, WebError> {
     // Parse and resolve the graph.
-    let dot_graph = parser::parse(&req.dot_source)?;
+    let dot_graph = parser::parse(&dot_source)?;
     let mut resolved = graph::resolve(&dot_graph)?;
 
-    let mut variables = req.variables.clone();
-    let model = req.model.unwrap_or_else(|| state.default_model.clone());
+    let mut variables = variables;
+    let model = model.unwrap_or_else(|| state.default_model.clone());
     let provider = state.default_provider.clone();
     variables.insert("model".into(), model.clone());
 
-    transforms::apply_node_overrides(&mut resolved, &req.node_overrides);
+    transforms::apply_node_overrides(&mut resolved, &node_overrides);
     transforms::apply_transforms(&mut resolved, &variables, None);
 
     // Lint the resolved graph and reject pipelines with errors.
@@ -227,15 +237,15 @@ async fn submit_pipeline(
     }
 
     let record = crate::run_launch::launch_pipeline(
-        &state,
+        state,
         crate::run_launch::LaunchConfig {
             graph: resolved,
-            dot_source: req.dot_source.clone(),
+            dot_source,
             variables,
             model,
             provider,
             resume_info: None,
-            workflow_id: None,
+            workflow_id,
             use_checkpointing: true,
         },
     )
@@ -260,6 +270,58 @@ async fn submit_pipeline(
         status: "Running".into(),
         run_working_dir: Some(relative_working_dir),
     }))
+}
+
+async fn submit_pipeline(
+    State(state): State<AppState>,
+    Json(req): Json<SubmitRequest>,
+) -> Result<Json<SubmitResponse>, WebError> {
+    launch_and_record(
+        &state,
+        req.dot_source,
+        req.variables,
+        req.model,
+        req.node_overrides,
+        None,
+    )
+    .await
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct RunWorkflowRequest {
+    #[serde(default)]
+    pub variables: HashMap<String, String>,
+    pub model: Option<String>,
+    #[serde(default)]
+    pub node_overrides: HashMap<String, transforms::NodeOverride>,
+}
+
+/// Launches a run of a workflow's current on-disk `.dot` file, read fresh
+/// (not a client-supplied copy -- the SPA has no reason to hold a stale/
+/// editable copy of a workflow just to run it, unlike the paste-a-DOT-file
+/// `/api/runs` form). Mirrors `routes::pages::workflow_run`'s HTMX
+/// equivalent, minus its HX-Redirect-to-workflow-detail-page behavior --
+/// the SPA has no workflow detail page, only a run detail page, so this
+/// returns the same `SubmitResponse` shape `POST /api/runs` does and lets
+/// the caller navigate to `/runs/{run_id}` itself.
+async fn run_workflow(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<RunWorkflowRequest>,
+) -> Result<Json<SubmitResponse>, WebError> {
+    let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
+        .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let dot_source = std::fs::read_to_string(&workflow.path)?;
+
+    launch_and_record(
+        &state,
+        dot_source,
+        req.variables,
+        req.model,
+        req.node_overrides,
+        Some(id),
+    )
+    .await
 }
 
 async fn list_runs(State(state): State<AppState>) -> Json<ListRunsResponse> {
@@ -726,6 +788,69 @@ mod tests {
         // Verify the run exists in state.
         let runs = state.runs.read().await;
         assert!(runs.contains_key(&parsed.run_id));
+    }
+
+    #[tokio::test]
+    async fn run_workflow_launches_a_real_run_from_the_on_disk_dot_file() {
+        let workflow_dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            workflow_dir.path().join("hello.dot"),
+            "digraph { start [shape=circle]; a [shape=box]; end [shape=doublecircle]; start -> a -> end }",
+        )
+        .unwrap();
+        let id = crate::workflows::scan_workflows(&[workflow_dir.path().display().to_string()])
+            .into_iter()
+            .next()
+            .unwrap()
+            .id;
+
+        let data_dir = tempfile::tempdir().unwrap();
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            data_dir.path().display().to_string(),
+            vec![workflow_dir.path().display().to_string()],
+        );
+        let app = router().with_state(state.clone());
+
+        let req = Request::builder()
+            .method("POST")
+            .uri(format!("/api/workflows/{id}/run"))
+            .header("content-type", "application/json")
+            .body(Body::from("{}"))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let parsed: SubmitResponse = serde_json::from_slice(&body).unwrap();
+        assert!(!parsed.run_id.is_empty());
+        assert_eq!(parsed.status, "Running");
+
+        // The run is associated with the workflow it was launched from --
+        // this is the whole point of this endpoint over POST /api/runs.
+        let runs = state.runs.read().await;
+        let record = runs.get(&parsed.run_id).unwrap();
+        assert_eq!(record.workflow_id, Some(id));
+    }
+
+    #[tokio::test]
+    async fn run_workflow_unknown_id_returns_404() {
+        let state = test_state();
+        let app = router().with_state(state);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/workflows/no-such-id/run")
+            .header("content-type", "application/json")
+            .body(Body::from("{}"))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

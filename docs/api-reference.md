@@ -675,6 +675,28 @@ Response body (200 OK):
 
 Empty array if no workflows are configured or found.
 
+### POST /api/workflows/{id}/run -- Run Workflow
+
+Launches a run of a workflow's current on-disk `.dot` file (read fresh at
+request time, not a client-supplied copy). Equivalent to `POST /api/runs`
+but for an existing workflow rather than pasted DOT source, and the
+resulting run is associated with the workflow (`workflow_id` on
+`GET /api/runs/{id}`/`GET /api/runs`).
+
+Request body (all fields optional):
+
+```json
+{
+  "variables": {"env": "production"},
+  "model": "claude-sonnet-4-20250514",
+  "node_overrides": {}
+}
+```
+
+Response body: same shape as `POST /api/runs` (`run_id`, `status`, `run_working_dir`).
+
+404 if `id` doesn't match a discovered workflow.
+
 ### POST /editor/workflows -- Create Workflow
 
 Create a new workflow file via the node-editor. Used by the editor UI to save newly-created pipelines.
