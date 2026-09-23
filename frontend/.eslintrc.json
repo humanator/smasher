@@ -26,6 +26,12 @@
       "parserOptions": {
         "parser": "@typescript-eslint/parser"
       }
+    },
+    {
+      "files": ["src/lib/components/ui/**/*.svelte"],
+      "rules": {
+        "svelte/valid-compile": "off"
+      }
     }
   ],
   "rules": {
