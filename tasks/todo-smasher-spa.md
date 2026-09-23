@@ -67,12 +67,12 @@ See `tasks/plan-smasher-spa.md` for full task descriptions, acceptance criteria,
 - [x] Task 19: Node-editor page routing (new/edit workflow) — 194/194 frontend tests, 212 cargo tests, clippy/lint/check clean, independently re-verified against a real running backend; added `available_target_dirs` to `GET /api/workflows` (small backend gap, same fold-in precedent as Tasks 6/6b/14/15/17b), docs updated; caught+fixed two real bugs (`createWorkflowGraph` never sent name/target_dir; `CreateGraphResponse.workflow_id` should be `.id`); took 3 rounds to get real Save-button-driven test coverage (first two rounds only smoke-tested page mount)
 
 ### Checkpoint: Node Editor Complete
-- [ ] Vitest clean (ported 783-line test suite coverage intact)
-- [ ] Manual: create/save/reload/edit round-trips through `/api/workflows/*`, no client-side DOT parsing as source of truth
+- [x] Vitest clean (ported 783-line test suite coverage intact — 48 tests in WorkflowCanvas.test.ts, Task 18)
+- [x] Manual: create/save/reload/edit round-trips through `/api/workflows/*`, no client-side DOT parsing as source of truth (verified Task 19: real .dot file created via UI, real graph loaded/re-saved for editing)
 
 ## Phase 6: Native shim + final E2E
 
-- [ ] Task 20: Wire `lib/native/` shim to real `window.__TAURI__` checks + browser fallbacks
+- [x] Task 20: Wire `lib/native/` shim to real `window.__TAURI__` checks + browser fallbacks — scoped down to pipeline-completion notifications only (confirmed with Jobsworth, see plan for rationale — no backend endpoint exists to export raw .dot for the file-dialog half); EventLog.svelte now calls showNotification() on terminal events, 197/197 tests, lint/check clean, independently re-verified
 - [ ] Task 21: Full Playwright E2E suite (all spec Success Criteria)
 
 ### Checkpoint: Complete
