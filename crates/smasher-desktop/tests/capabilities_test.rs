@@ -1,5 +1,5 @@
 // ABOUTME: Guards the Tauri capability manifests: IPC may only be granted to loopback origins.
-// ABOUTME: Also pins which plugin permissions a served (remote) origin is allowed to hold.
+// ABOUTME: Also pins which plugin and app-command permissions a served (remote) origin may hold.
 
 use std::path::PathBuf;
 
@@ -67,9 +67,18 @@ fn every_remote_url_is_loopback() {
     }
 }
 
+/// `allow-<command>` for each of the app's own settings-modal commands.
+fn app_command_permissions() -> Vec<String> {
+    smasher_desktop::commands::COMMANDS
+        .iter()
+        .map(|command| format!("allow-{}", command.replace('_', "-")))
+        .collect()
+}
+
 #[test]
 fn remote_capabilities_grant_only_native_shim_permissions() {
     const ALLOWED_PREFIXES: [&str; 3] = ["notification:", "dialog:", "fs:"];
+    let app_commands = app_command_permissions();
 
     for (path, cap) in capabilities() {
         if remote_urls(&cap).is_empty() {
@@ -77,7 +86,8 @@ fn remote_capabilities_grant_only_native_shim_permissions() {
         }
         for id in permission_ids(&cap) {
             assert!(
-                ALLOWED_PREFIXES.iter().any(|prefix| id.starts_with(prefix)),
+                ALLOWED_PREFIXES.iter().any(|prefix| id.starts_with(prefix))
+                    || app_commands.contains(&id),
                 "{} grants {id} to a remote origin",
                 path.display()
             );
@@ -108,5 +118,18 @@ fn served_origin_holds_the_permissions_the_native_shim_calls() {
             granted.iter().any(|g| g == id),
             "served origin is missing {id}"
         );
+    }
+}
+
+#[test]
+fn served_origin_may_invoke_every_settings_command() {
+    let granted: Vec<String> = capabilities()
+        .into_iter()
+        .filter(|(_, cap)| !remote_urls(cap).is_empty())
+        .flat_map(|(_, cap)| permission_ids(&cap))
+        .collect();
+
+    for id in app_command_permissions() {
+        assert!(granted.contains(&id), "served origin is missing {id}");
     }
 }

@@ -2,3 +2,5 @@
 // ABOUTME: Holds the window-free bootstrap logic so it can be tested without a webview.
 
 pub mod bootstrap;
+pub mod commands;
+pub mod settings;
