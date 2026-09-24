@@ -271,15 +271,15 @@ to `StoredSettings`. `env_vars` writes `SMASHER_CLAUDE_CLI` (resolved path) and
 `claude --version` output or "not found", and a Tauri command re-detects on demand.
 
 **Acceptance criteria:**
-- [ ] Default provider `claude-cli` with a saved path gives `SMASHER_PROVIDER=claude-cli`
+- [x] Default provider `claude-cli` with a saved path gives `SMASHER_PROVIDER=claude-cli`
       and `SMASHER_CLAUDE_CLI=<path>`, and no key vars.
-- [ ] Update validation accepts `claude-cli` as default provider without a key.
+- [x] Update validation accepts `claude-cli` as default provider without a key.
       Allowlist round-trips through `settings.json`.
-- [ ] The view reports the version from a fake binary, and "not found" for a
+- [x] The view reports the version from a fake binary, and "not found" for a
       missing one.
 
 **Verification:**
-- [ ] `cargo test -p smasher-desktop`
+- [x] `cargo test -p smasher-desktop`
 
 **Dependencies:** T9
 **Files likely touched:** `smasher-desktop/src/{settings.rs,commands.rs}`

@@ -16,6 +16,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+smasher-attractor.workspace = true
 smasher-llm.workspace = true
 smasher-web.workspace = true
 

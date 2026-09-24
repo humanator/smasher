@@ -4774,6 +4774,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "smasher-attractor",
  "smasher-llm",
  "smasher-web",
  "tauri",

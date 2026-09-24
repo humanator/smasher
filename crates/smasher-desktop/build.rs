@@ -7,6 +7,7 @@ fn main() {
     let manifest = tauri_build::AppManifest::new().commands(&[
         "get_llm_settings",
         "save_llm_settings",
+        "detect_claude_cli",
         "restart_app",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))

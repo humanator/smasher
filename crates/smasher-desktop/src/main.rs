@@ -38,6 +38,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_llm_settings,
             commands::save_llm_settings,
+            commands::detect_claude_cli,
             commands::restart_app
         ])
         .setup(move |app| {
