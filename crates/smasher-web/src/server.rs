@@ -162,7 +162,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
     #[error(
-        "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_API_KEY."
+        "no LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_API_KEY, or set SMASHER_CLAUDE_CLI=1 to use the local claude CLI."
     )]
     NoApiKeys,
 

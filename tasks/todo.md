@@ -233,17 +233,17 @@ naming another provider to `AgentCodergenBackend`. Use it in both the top-level 
 child registries. Update the `NoApiKeys` message to mention `SMASHER_CLAUDE_CLI`.
 
 **Acceptance criteria:**
-- [ ] Integration test: server started via `start()` with only
+- [x] Integration test: server started via `start()` with only
       `SMASHER_CLAUDE_CLI=<fake>` and `SMASHER_PROVIDER=claude-cli`. It boots,
       runs a codergen pipeline, and the SSE stream carries `AgentMessage` /
       `AgentToolCallStarted` from the fake NDJSON.
-- [ ] Routing: a node with `provider="openai"` reaches the agent backend. A node
+- [x] Routing: a node with `provider="openai"` reaches the agent backend. A node
       with no provider reaches the CLI backend (unit test with recording backends).
-- [ ] With any other provider, behaviour is unchanged (existing web tests pass).
+- [x] With any other provider, behaviour is unchanged (existing web tests pass).
 
 **Verification:**
-- [ ] `cargo test -p smasher-web`
-- [ ] Manual: `SMASHER_PROVIDER=claude-cli SMASHER_CLAUDE_CLI=1 cargo run -p smasher-cli -- serve`
+- [x] `cargo test -p smasher-web`
+- [ ] (deferred to Jobsworth) Manual: `SMASHER_PROVIDER=claude-cli SMASHER_CLAUDE_CLI=1 cargo run -p smasher-cli -- serve`
       with API keys unset, then run hello-world from the SPA
 
 **Dependencies:** T5, T7
