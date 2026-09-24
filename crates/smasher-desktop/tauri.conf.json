@@ -3,6 +3,13 @@
   "productName": "Smasher",
   "version": "0.1.0",
   "identifier": "com.smasher.desktop",
+  "build": {
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeDevCommand": {
+      "script": "npm run dev -- --strictPort",
+      "cwd": "../../frontend"
+    }
+  },
   "app": {
     "windows": [],
     "security": {

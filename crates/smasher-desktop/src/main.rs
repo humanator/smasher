@@ -30,7 +30,21 @@ fn main() {
             ));
             match started {
                 Ok(server) => {
-                    let url = format!("http://{}/", server.addr).parse()?;
+                    // `cargo tauri dev` points the window at Vite for HMR;
+                    // Vite proxies `/api` and `/events` to our fixed debug port.
+                    let dev_server = if tauri::is_dev() {
+                        app.config()
+                            .build
+                            .dev_url
+                            .as_ref()
+                            .and_then(|url| url.socket_addrs(|| None).ok())
+                            .and_then(|addrs| addrs.into_iter().next())
+                    } else {
+                        None
+                    };
+                    let url = bootstrap::window_url(dev_server, server.addr);
+                    tracing::info!(%url, "opening window");
+                    let url = url.parse()?;
                     WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                         .title("Smasher")
                         .inner_size(1440.0, 900.0)

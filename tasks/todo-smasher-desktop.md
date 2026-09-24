@@ -10,13 +10,13 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 
 ### Checkpoint A: Embedded server + window
 - [x] `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo fmt --all -- --check` clean
-- [ ] hello-world run completes with live events in the desktop window
+- [x] hello-world run completes with live events in the desktop window
 - [x] Loopback-only proven (Task 3)
-- [ ] Human review before Phase 2
+- [x] Human review before Phase 2
 
 ## Phase 2: Dev loop and native features
 
-- [ ] Task 4: `cargo tauri dev` with Vite HMR (`devUrl`, `beforeDevCommand`)
+- [x] Task 4: `cargo tauri dev` with Vite HMR (`devUrl`, `beforeDevCommand`)
 - [ ] Task 5: OS notification on completion: notification plugin, `withGlobalTauri`, loopback-only remote capability (**IPC risk probe: stop and re-plan if it fails**)
 - [ ] Task 6: Export .dot: `GET /api/workflows/{id}/dot` + editor button + dialog/fs plugins
 - [ ] Task 7: Import .dot: `POST /api/workflows/import` + catalog button

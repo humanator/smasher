@@ -1,7 +1,9 @@
 // ABOUTME: Builds the loopback-only server config and loads env for the embedded smasher-web server.
 // ABOUTME: Kept free of Tauri types so port, host, and env behaviour are unit-testable headlessly.
 
+use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
+use std::time::Duration;
 
 use smasher_web::server::{DEFAULT_PORT, ServerConfig, default_data_dir};
 
@@ -26,6 +28,19 @@ pub fn server_config() -> ServerConfig {
     }
 }
 
+/// The URL the window opens: the Vite dev server when one is configured and
+/// listening (`cargo tauri dev`, which waits for Vite before launching us),
+/// otherwise the embedded server's own SPA build, so a plain `cargo run`
+/// still works without Vite.
+pub fn window_url(dev_server: Option<SocketAddr>, server: SocketAddr) -> String {
+    match dev_server {
+        Some(dev) if TcpStream::connect_timeout(&dev, Duration::from_millis(250)).is_ok() => {
+            format!("http://{dev}/")
+        }
+        _ => format!("http://{server}/"),
+    }
+}
+
 /// Load `.env` from the cwd, then from the data dir (`~/.smasher/.env` by
 /// default). A Finder-launched app has cwd `/` and no shell env, so the data
 /// dir file is where its API keys come from. Earlier values win.
@@ -43,6 +58,7 @@ pub fn load_env_from_data_dir(data_dir: &Path) {
 mod tests {
     use super::*;
     use smasher_web::server::DEFAULT_PORT;
+    use std::net::SocketAddr;
     use tokio_util::sync::CancellationToken;
 
     #[test]
@@ -93,6 +109,33 @@ mod tests {
         let data_dir = tempfile::tempdir().unwrap();
 
         load_env_from_data_dir(data_dir.path());
+    }
+
+    #[test]
+    fn window_url_is_the_dev_server_when_it_is_listening() {
+        let vite = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let dev = vite.local_addr().unwrap();
+        let server: SocketAddr = "127.0.0.1:21541".parse().unwrap();
+
+        assert_eq!(window_url(Some(dev), server), format!("http://{dev}/"));
+    }
+
+    #[test]
+    fn window_url_falls_back_to_the_embedded_server_when_the_dev_server_is_down() {
+        let dev = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap();
+        let server: SocketAddr = "127.0.0.1:21541".parse().unwrap();
+
+        assert_eq!(window_url(Some(dev), server), "http://127.0.0.1:21541/");
+    }
+
+    #[test]
+    fn window_url_is_the_embedded_server_without_a_dev_server() {
+        let server: SocketAddr = "127.0.0.1:49152".parse().unwrap();
+
+        assert_eq!(window_url(None, server), "http://127.0.0.1:49152/");
     }
 
     #[tokio::test]
