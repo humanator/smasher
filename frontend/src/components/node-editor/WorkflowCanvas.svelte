@@ -11,10 +11,12 @@
     SvelteFlow,
     type Edge as FlowEdge,
     type Node as FlowNode,
+    type XYPosition,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { setContext, untrack, type Component } from 'svelte';
   import Palette from './Palette.svelte';
+  import FlowPositionBridge from './FlowPositionBridge.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, nodeStyleFor, type NodeKindConfig } from './nodeConfig';
   import {
     DEFAULT_RANKDIR,
@@ -137,16 +139,11 @@
   }
 
   // Task 6: dropping a Palette entry creates a new node of that NodeType.
-  // Position is computed by hand from the drop event's screen coordinates
-  // relative to the canvas container, rather than via @xyflow/svelte's
-  // useSvelteFlow()/screenToFlowPosition() -- that hook only works inside
-  // a component already rendered as a descendant of <SvelteFlow> (or
-  // wrapped in an explicit <SvelteFlowProvider>), and this component's own
-  // <script> runs before its <SvelteFlow> child mounts, so the context
-  // isn't available at the point this handler is defined. Screen-space
-  // (not pan/zoom-adjusted flow-space) is an accepted simplification for
-  // this task's "generic rendering only" scope -- correct at the default
-  // zoom/pan a freshly opened canvas starts at.
+  // The drop point is converted to flow coordinates (pan and zoom applied)
+  // with useSvelteFlow()'s screenToFlowPosition. That hook only works in a
+  // descendant of <SvelteFlow>, and this component's own <script> runs
+  // outside that context, so FlowPositionBridge.svelte (rendered inside
+  // <SvelteFlow> below) hands the function back up via `toFlowPosition`.
   let nodeIdCounter = 0;
 
   function nextNodeId(nodeType: string): string {
@@ -326,7 +323,7 @@
     });
   }
 
-  let canvasAreaEl: HTMLDivElement | undefined;
+  let toFlowPosition: ((screen: XYPosition) => XYPosition) | undefined;
 
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
@@ -336,9 +333,8 @@
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
-    if (!nodeType || !canvasAreaEl) return;
-    const rect = canvasAreaEl.getBoundingClientRect();
-    addNodeAtPosition(nodeType, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    if (!nodeType || !toFlowPosition) return;
+    addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
   }
 
   let saving = $state(false);
@@ -420,7 +416,6 @@
       class="flex-1 relative"
       role="region"
       aria-label="Workflow canvas drop zone"
-      bind:this={canvasAreaEl}
       ondragover={handleDragOver}
       ondrop={handleDrop}
     >
@@ -438,6 +433,7 @@
         onedgepointerenter={handleEdgePointerEnter}
         onedgepointerleave={handleEdgePointerLeave}
       >
+        <FlowPositionBridge onReady={(fn) => (toFlowPosition = fn)} />
         <Background />
         <Controls />
         <MiniMap />

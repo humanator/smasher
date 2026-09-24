@@ -21,18 +21,18 @@ Update the stale comment at `WorkflowCanvas.svelte:139-150`, and the matching on
 `WorkflowCanvas.test.ts:273-278`. `addNodeAtPosition` still takes flow coordinates.
 
 **Acceptance criteria:**
-- [ ] On a zoomed and panned canvas, a dropped node's top-left is within a few px of the drop point
+- [x] On a zoomed and panned canvas, a dropped node's top-left is within a few px of the drop point
       on screen
-- [ ] At the default viewport, dropping behaves the same as before, and the existing
+- [x] At the default viewport, dropping behaves the same as before, and the existing
       `node-editor.spec.ts` flow still passes
-- [ ] If the bridge hasn't mounted yet, the drop is ignored rather than throwing
+- [x] If the bridge hasn't mounted yet, the drop is ignored rather than throwing
 
 **Verification:**
-- [ ] Playwright (new case in `e2e/node-editor.spec.ts`): open a workflow, zoom in with the
+- [x] Playwright (new case in `e2e/node-editor.spec.ts`): open a workflow, zoom in with the
       Controls `+` button, pan by dragging the pane, drop Codergen at (x, y), then assert the new
       node's bounding box is near (x, y). Fails on `main`, passes after.
-- [ ] Vitest: `npx vitest run tests/components/node-editor`
-- [ ] `npx eslint .`, and `npm run check` has no new errors
+- [x] Vitest: `npx vitest run tests/components/node-editor`
+- [x] `npx eslint .`, and `npm run check` has no new errors
 
 **Dependencies:** None
 

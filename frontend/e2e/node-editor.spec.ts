@@ -7,7 +7,11 @@ import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 
-async function dragPaletteEntryOntoCanvas(page: import('@playwright/test').Page, nodeType: string) {
+async function dragPaletteEntryOntoCanvas(
+  page: import('@playwright/test').Page,
+  nodeType: string,
+  at: { x: number; y: number } = { x: 400, y: 300 }
+) {
   // Playwright's documented technique for native HTML5 drag-and-drop:
   // https://playwright.dev/docs/input#dragging-manually -- a real
   // DataTransfer only exists in a real browser context (unlike jsdom),
@@ -17,8 +21,8 @@ async function dragPaletteEntryOntoCanvas(page: import('@playwright/test').Page,
   const target = page.getByRole('region', { name: 'Workflow canvas drop zone' });
 
   await source.dispatchEvent('dragstart', { dataTransfer });
-  await target.dispatchEvent('dragover', { dataTransfer, clientX: 400, clientY: 300 });
-  await target.dispatchEvent('drop', { dataTransfer, clientX: 400, clientY: 300 });
+  await target.dispatchEvent('dragover', { dataTransfer, clientX: at.x, clientY: at.y });
+  await target.dispatchEvent('drop', { dataTransfer, clientX: at.x, clientY: at.y });
 }
 
 test('create a workflow via real drag-and-drop, save, reload, edit, and re-save', async ({
@@ -104,4 +108,40 @@ test('create a workflow via real drag-and-drop, save, reload, edit, and re-save'
       rmSync(join(repoRoot, targetDir, `${testName}.dot`), { force: true });
     }
   }
+});
+
+test('a dropped node lands under the pointer after zooming and panning', async ({ page, baseURL }) => {
+  await page.goto(`${baseURL || 'http://127.0.0.1:5173'}/workflows/new`);
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByTestId('create-name-input')).toBeVisible();
+
+  // An empty canvas holds its initial fitView until the first node exists,
+  // then refits around it. Drop one node first so that fit is spent
+  // before the drop being measured.
+  await dragPaletteEntryOntoCanvas(page, 'Start');
+  await expect(page.locator('.svelte-flow__node')).toHaveCount(1);
+
+  // That fit zooms to the maximum around one node, so zoom out once with
+  // the Controls' - button, then pan by dragging the empty pane. The
+  // viewport is then neither at zoom 1 nor at the origin.
+  await page.locator('.svelte-flow__controls-zoomout').click();
+  const pane = await page.locator('.svelte-flow__pane').boundingBox();
+  expect(pane).not.toBeNull();
+  const start = { x: pane!.x + pane!.width / 2, y: pane!.y + pane!.height / 2 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x - 120, start.y - 80, { steps: 8 });
+  await page.mouse.up();
+
+  const drop = { x: Math.round(pane!.x + 200), y: Math.round(pane!.y + 150) };
+  await dragPaletteEntryOntoCanvas(page, 'Codergen', drop);
+
+  await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
+  const node = page.locator('.svelte-flow__node[data-id^="codergen-"]');
+  const box = await node.boundingBox();
+  expect(box).not.toBeNull();
+  // The node's position is its top-left corner, so that's what should sit
+  // under the drop point.
+  expect(Math.abs(box!.x - drop.x)).toBeLessThan(4);
+  expect(Math.abs(box!.y - drop.y)).toBeLessThan(4);
 });

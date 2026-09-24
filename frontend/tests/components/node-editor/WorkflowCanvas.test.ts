@@ -270,12 +270,10 @@ describe('create mode (no workflowId)', () => {
   });
 });
 
-// Task 6: node-kind visual registry + palette sidebar. Palette.svelte
-// itself calls @xyflow/svelte's context-dependent bits only indirectly (it
-// has none of its own -- see WorkflowCanvas.svelte's comment on why
-// drop-position math is done by hand instead of via useSvelteFlow(), which
-// would have required wrapping Palette in a <SvelteFlowProvider> just to
-// render it standalone). Tested here, through the real integration point,
+// Task 6: node-kind visual registry + palette sidebar. Palette.svelte has
+// no @xyflow/svelte context-dependent bits of its own (the drop position
+// comes from FlowPositionBridge.svelte, inside <SvelteFlow>, not from
+// Palette), but it's tested here, through the real integration point,
 // rather than a throwaway Palette-only render harness.
 describe('palette', () => {
   it('renders the 3 documented groups with their entries', async () => {
@@ -347,9 +345,11 @@ describe('palette', () => {
 
 // The actual HTML5 drag-and-drop *gesture* isn't reliably simulatable in
 // jsdom (Task 4's own documented limitation -- no real pointer capture or
-// coordinates); per that same precedent, the drop *logic* is tested by
-// calling the underlying handler directly instead of firing a synthetic
-// `drop` DragEvent at a screen coordinate.
+// coordinates); per that same precedent, the drop *logic* is mostly tested
+// by calling the underlying handler directly. jsdom can't do real viewport
+// maths either, so whether a drop lands under the pointer at any pan/zoom
+// is proven by e2e/node-editor.spec.ts; the one synthetic `drop` test
+// below only covers the wiring through FlowPositionBridge.svelte.
 // Task 7: node-kind form components + the selected-node side panel that
 // swaps between them. `sampleGraph` above only has Start/Codergen; this
 // fixture adds one node per interesting kind so each form's testid can be
@@ -591,6 +591,21 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
 
     expect(() => component.addNodeAtPosition('FromTheFuture', { x: 0, y: 0 })).not.toThrow();
     expect(component.currentGraph().nodes).toHaveLength(2);
+  });
+
+  it('turns a drop event into a node via the flow-position bridge', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
+
+    await fireEvent.drop(screen.getByRole('region', { name: 'Workflow canvas drop zone' }), {
+      clientX: 50,
+      clientY: 60,
+      dataTransfer: { getData: (type: string) => (type === NODE_DRAG_DATA_TYPE ? 'Codergen' : '') },
+    });
+
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(3));
+    const created = component.currentGraph().nodes.find((n) => !['a', 'b'].includes(n.id));
+    expect(created?.node_type).toBe('Codergen');
   });
 
   it('assigns distinct ids when the same kind is dropped twice', async () => {

@@ -97,7 +97,7 @@ rendering.rs preamble merge ──► put_graph copies defaults (#5)
 ## Task List
 
 ### Phase 1: Independent fixes
-- [ ] T1: Dropped node lands under the pointer at any pan or zoom (#3)
+- [x] T1: Dropped node lands under the pointer at any pan or zoom (#3)
 - [ ] T2: `node [...]`/`edge [...]` defaults survive an editor save (#5)
 
 ### Checkpoint A
