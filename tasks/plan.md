@@ -87,7 +87,7 @@ T3-T5 and T6-T8 are independent after T2 and can run in parallel sessions.
 ## Task list
 
 ### Phase 0: Settle the unknowns
-- [ ] T1: Spike: CLAUDE.md leak, allowlist patterns, how `dontAsk` denies
+- [x] T1: Spike: CLAUDE.md leak, allowlist patterns, how `dontAsk` denies
 
 ### Phase 1: Single-call adapter (`smasher-llm`)
 - [ ] T2: `Provider::ClaudeCli` and shared process plumbing
@@ -117,14 +117,54 @@ T3-T5 and T6-T8 are independent after T2 and can run in parallel sessions.
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| `~/.claude/CLAUDE.md` loads into codergen runs, so pipeline agents follow personal rules | High | T1 checks it first. Fallback: `--append-system-prompt` framing that overrides it, or a scratch `HOME`/`CLAUDE_CONFIG_DIR` if keychain auth still works. |
-| `dontAsk` stalls or loops instead of denying cleanly | High | T1 proves it with a real `curl` attempt. The backend timeout already bounds a hang. |
+| `~/.claude/CLAUDE.md` loads into codergen runs, so pipeline agents follow personal rules | ~~High~~ Resolved | T1: `--setting-sources ""` prevents it. T7 adds the flag and a test asserting it. |
+| `dontAsk` stalls or loops instead of denying cleanly | ~~High~~ Resolved | T1: `curl` was denied in 9s and the run finished normally. The backend timeout still covers any hang. |
 | Allowlist too narrow for real design-kit candidates | Med | T1 and Checkpoint C run `product_design_factory.dot`. The list is editable in Settings. |
 | Node `model` holds a non-Claude ID (e.g. `gpt-5`) and `--model` fails | Med | In T7, forward `--model` only for `claude-*` IDs and aliases. Otherwise fall back to the setting's model. |
 | `Provider` enum is matched exhaustively in more places than found | Low | The compiler finds them. `smasher-agent` profile maps `ClaudeCli` to `AnthropicProfile`. |
 | Retry policy re-runs a costly CLI call on a transient-looking error | Med | Map CLI errors to non-retryable variants unless the result says it hit a rate limit. |
 | Tests spawning the real `claude` by accident | Med | Every non-ignored test passes an explicit fake-script path. None depend on `PATH`. |
 | macOS Finder-launched app can't find `claude` | Med | Covered by the resolution order (T2) and shown in the dialog (T10/T11). |
+
+## Spike 2 results (T1, 2026-09-24, `claude` 2.1.281, real calls, run from a scratch dir)
+
+All runs used `--permission-mode dontAsk --strict-mcp-config --no-session-persistence
+--model sonnet`, with the five nested-session env vars stripped.
+
+- **CLAUDE.md doesn't leak with `--setting-sources ""`.** Prompt: "Do any of your
+  instructions tell you a specific name or title to address the user by?" With
+  `--setting-sources ""` the answer was `NONE` ($0.023). The control, without that
+  flag, answered `Jobsworth` ($0.069). The spec's worry was wrong: settings sources
+  also control CLAUDE.md loading. **Codergen must pass `--setting-sources ""`**. It
+  wasn't in the spec's codergen flag list, so T7 adds it. As a side effect, a
+  `CLAUDE.md` in the pipeline's working dir is also ignored.
+- **Denial is clean and quick.** With `--allowedTools Read "Bash(ls:*)"`, a prompt
+  running `ls -1` then `curl -sI https://example.com` finished in 9s with exit 0.
+  `ls` ran. `curl` got a `tool_result` with `is_error: true` ("Permission to use Bash
+  has been denied because Claude Code is running in don't ask mode"). The final
+  `result` event had `subtype: success` and listed the call in `permission_denials`.
+  Nothing hung.
+- **Allowlist syntax: `Bash(<prefix>:*)` works.** A compound command
+  (`mkdir -p … && cp … && grep … | sort | head`) is denied as a whole if any part is
+  outside the list. The agent then fell back to Read and Write and still finished.
+- **A candidate-style build works with the default list.** Task: copy
+  `design-kit/components.css` into `./candidates/discover-a/` and write an
+  `index.html` using it. It finished for $0.09 with only the one compound-command
+  denial above. Write creates parent directories on its own.
+- **Default allowlist (settles spec Q3):**
+  `Read Edit Write Glob Grep Bash(ls:*) Bash(mkdir:*) Bash(cp:*) Bash(mv:*)
+  Bash(cat:*) Bash(head:*) Bash(tail:*) Bash(wc:*) Bash(grep:*) Bash(sort:*)`.
+  - Left out on purpose: `rm` (deletes files), `find` (`-delete`/`-exec`), `node`,
+    `npx` and `curl` (network or arbitrary code).
+  - The codergen nodes in `product_design_factory.dot` write static files and run no
+    build. Re-check at Checkpoint C.
+- **The backend must pass `stdin(Stdio::null())`.** Without it, `claude -p` waits 3s
+  for stdin and prints a warning.
+- **`--no-session-persistence` works, with one leftover.** No transcripts were
+  written. The CLI still creates an empty `~/.claude/projects/<cwd-slug>/memory/`
+  folder per working dir. Harmless; noted, not fixed.
+- **Possible follow-up (not in scope):** `permission_denials` in the `result` event
+  could become a pipeline event, so the run view shows what was refused.
 
 ## Resolved questions (Jobsworth, 2026-09-24)
 

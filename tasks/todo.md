@@ -14,20 +14,22 @@ questions 2 and 3, and prove denial doesn't hang. Record the findings in `plan.m
 under "Spike 2 results".
 
 **Acceptance criteria:**
-- [ ] Known: with `--setting-sources "" --strict-mcp-config`, does `~/.claude/CLAUDE.md`
+- [x] Known: with `--setting-sources "" --strict-mcp-config`, does `~/.claude/CLAUDE.md`
       reach the model? Test: a codergen-style prompt asking "what name should you
       address the user by?" With a leak, the chosen mitigation is shown to work.
-- [ ] Known: the exact `--allowedTools` syntax for Bash prefixes (e.g.
+      → No leak with `--setting-sources ""`. The control run without it leaks.
+- [x] Known: the exact `--allowedTools` syntax for Bash prefixes (e.g.
       `Bash(npm run build:*)`), and a proposed default list checked against one real
-      design-kit candidate build.
-- [ ] Known: a prompt forcing `curl https://example.com` under `--permission-mode
+      design-kit candidate build. → `Bash(<prefix>:*)`. Default list is in `plan.md`.
+- [x] Known: a prompt forcing `curl https://example.com` under `--permission-mode
       dontAsk` gets denied, the run ends, and the exit code and `result` event are
-      recorded.
+      recorded. → Exit 0, `subtype: success`, listed in `permission_denials`, 9s.
 
 **Verification:**
-- [ ] Commands and outputs pasted into `plan.md`
-- [ ] Manual check: no stray sessions in `~/.claude/projects` from
-      `--no-session-persistence` runs
+- [x] Commands and outputs recorded in `plan.md` ("Spike 2 results")
+- [x] Manual check: no stray sessions in `~/.claude/projects` from
+      `--no-session-persistence` runs → no transcripts. Only an empty `memory/` folder
+      per working dir (removed).
 
 **Dependencies:** None
 **Files likely touched:** `tasks/plan.md`
@@ -169,13 +171,14 @@ imports it. No flag changes.
 
 **Description:** Swap `--dangerously-skip-permissions` for `--permission-mode dontAsk
 --allowedTools <list>`, unless the config says skip. Add `--strict-mcp-config
---no-session-persistence`, and whatever T1 decided about CLAUDE.md. Forward the node
-`model` as `--model` when it's a Claude ID or alias; otherwise use `default_model`.
-Parse `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` and define the default list from T1.
+--no-session-persistence --setting-sources ""` (T1: the last one keeps
+`~/.claude/CLAUDE.md` out), and set stdin to null. Forward the node `model` as
+`--model` when it's a Claude ID or alias; otherwise use `default_model`. Parse
+`SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` and define the default list from T1 (in `plan.md`).
 
 **Acceptance criteria:**
 - [ ] Default config argv has `dontAsk`, the default allowlist,
-      `--strict-mcp-config`, `--no-session-persistence`, and no
+      `--strict-mcp-config`, `--no-session-persistence`, `--setting-sources ""`, and no
       `--dangerously-skip-permissions`. The skip config gives the reverse.
 - [ ] Node `model="claude-opus-5-5"` → `--model claude-opus-5-5`. `model="gpt-5"` →
       `--model <default_model>`. No model → `default_model`.
