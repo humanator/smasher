@@ -110,4 +110,4 @@ handlers are registered by the CLI/web binaries on top of that. See `docs/dot-re
 - [Handler reference](docs/handler-reference.md)
 - [CLI reference](docs/cli-reference.md)
 - [Config reference](docs/config-reference.md)
-- [Capability map](CAPABILITY_MAP.md)
+- [Backlog](tasks/BACKLOG.md) (open work; finished specs and plans are in `tasks/archive/`)

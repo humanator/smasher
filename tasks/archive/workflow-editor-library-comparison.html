@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>workflow-editor: canvas library comparison</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --surface-2: #f0f0ee;
+    --text: #1c1c1a;
+    --text-dim: #5a5a56;
+    --border: #e0e0dc;
+    --accent: #2f5d50;
+    --accent-soft: #e4efec;
+    --pro: #1f6b3a;
+    --pro-bg: #eaf5ee;
+    --con: #a03a2c;
+    --con-bg: #faeae7;
+    --badge-free: #2f5d50;
+    --badge-paid: #a06b1f;
+    --badge-risk: #a03a2c;
+    --radius: 10px;
+    --mono: "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a;
+      --surface: #1e2023;
+      --surface-2: #24272b;
+      --text: #eceeef;
+      --text-dim: #a2a6ab;
+      --border: #33363a;
+      --accent: #7fc9b3;
+      --accent-soft: #1e3530;
+      --pro: #7fd19a;
+      --pro-bg: #1c3327;
+      --con: #e2897a;
+      --con-bg: #3a2320;
+      --badge-free: #7fc9b3;
+      --badge-paid: #e0b878;
+      --badge-risk: #e2897a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+  .table-scroll { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  .table-scroll table.summary { border: none; border-radius: 0; min-width: 1080px; }
+  header.page { margin-bottom: 40px; }
+  header.page h1 {
+    font-size: 28px;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  header.page p.lede {
+    color: var(--text-dim);
+    font-size: 15px;
+    max-width: 720px;
+    margin: 0 0 4px;
+  }
+  header.page p.criteria {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+  h2.section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 56px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.summary {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  table.summary th, table.summary td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.summary th {
+    background: var(--surface-2);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-dim);
+  }
+  table.summary tr:last-child td { border-bottom: none; }
+  table.summary td.name { font-weight: 600; }
+  table.summary a { color: var(--accent); text-decoration: none; }
+  table.summary a:hover { text-decoration: underline; }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge.free { color: var(--badge-free); background: var(--accent-soft); }
+  .badge.paid { color: var(--badge-paid); background: color-mix(in srgb, var(--badge-paid) 15%, transparent); }
+  .badge.risk { color: var(--badge-risk); background: var(--con-bg); }
+
+  .tier-label {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 40px 0 -2px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin-bottom: 20px;
+  }
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .card-head h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .card-head h3 a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--accent); }
+  .card-head h3 a:hover { color: var(--accent); }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin: 10px 0 14px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .meta-row .stat { background: var(--surface-2); padding: 3px 9px; border-radius: 6px; }
+  .meta-row .stat b { color: var(--text); font-weight: 600; }
+
+  .summary-line {
+    font-size: 14.5px;
+    color: var(--text-dim);
+    margin: 0 0 14px;
+  }
+
+  .custom-line {
+    font-size: 13.5px;
+    color: var(--text);
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 0 0 14px;
+  }
+  .custom-line b.label { color: var(--accent); }
+
+  .pc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 640px) { .pc-grid { grid-template-columns: 1fr; } }
+  .pc-col h4 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pc-col.pros h4 { color: var(--pro); }
+  .pc-col.cons h4 { color: var(--con); }
+  .pc-col ul { margin: 0; padding-left: 18px; font-size: 13.5px; }
+  .pc-col li { margin-bottom: 6px; }
+
+  .fit-note {
+    font-size: 13.5px;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin-top: 4px;
+  }
+  .fit-note b { color: var(--accent); }
+
+  .links-line {
+    font-size: 12.5px;
+    margin-top: 12px;
+    color: var(--text-dim);
+  }
+  .links-line a { color: var(--accent); margin-right: 14px; text-decoration: none; }
+  .links-line a:hover { text-decoration: underline; }
+
+  .recommend {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-top: 48px;
+  }
+  .recommend h2 {
+    margin: 0 0 10px;
+    font-size: 17px;
+    color: var(--accent);
+  }
+  .recommend p { font-size: 14.5px; margin: 0 0 10px; }
+  .recommend p:last-child { margin-bottom: 0; }
+
+  footer.note {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <h1>Canvas library options for <code style="font-family:var(--mono)">workflow-editor</code></h1>
+    <p class="lede">Comparing libraries that could power the DOT pipeline node/edge editor at the polish level of
+      <a href="https://reactflow.dev/" style="color:var(--accent)">React Flow</a>, without requiring React.</p>
+    <p class="criteria">Evaluated against this project's actual shape: 6+ distinct node kinds
+      (Codergen, Interviewer/gallery-gate, Tool, Manager, Conditional, SubPipeline) each needing a
+      kind-specific attribute form, typed edges (condition/priority/loop_restart), and a save path that
+      round-trips through a Rust/axum JSON API. Time estimates are rough engineering judgment for reaching
+      a <em>functional</em> prototype (drag, connect, per-kind forms, save/load) in this codebase — not
+      vendor claims. Each entry now also covers <b>how the default look is customized</b> — the mechanism
+      (CSS variables vs. programmatic style APIs vs. bring-your-own-markup) and how far a redesign has to
+      go before it stops looking like the library's own demo.</p>
+  </header>
+
+  <h2 class="section-title">At a glance</h2>
+  <div class="table-scroll">
+  <table class="summary">
+    <thead>
+      <tr>
+        <th>Library</th>
+        <th>Requires</th>
+        <th>License</th>
+        <th>Est. to functional prototype</th>
+        <th>Out-of-box polish</th>
+        <th>Customizing the look</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="name"><a href="https://svelteflow.dev/">Svelte Flow</a></td><td>Svelte</td><td><span class="badge free">MIT</span></td><td>3–5 days</td><td>Very high</td><td>Excellent — CSS variables for tokens, full custom Svelte components as first-class escape hatch</td></tr>
+      <tr><td class="name"><a href="https://vueflow.dev/">Vue Flow</a></td><td>Vue 3</td><td><span class="badge free">MIT</span></td><td>3–5 days</td><td>Very high</td><td>Excellent — same CSS-variable system, custom Vue components for nodes/edges</td></tr>
+      <tr><td class="name"><a href="https://github.com/xyflow/xyflow">@xyflow/system</a></td><td>None (build your own layer)</td><td><span class="badge free">MIT</span></td><td>3–4 weeks</td><td>DIY (engine only)</td><td>No theming system included — 100% your own CSS/markup, nothing to override</td></tr>
+      <tr><td class="name"><a href="https://x6.antv.antgroup.com/en">AntV X6</a></td><td>None</td><td><span class="badge free">MIT</span></td><td>1–1.5 weeks</td><td>High</td><td>Very good — markup/attrs config for quick reskins, full HTML/React/Vue node override for total control</td></tr>
+      <tr><td class="name"><a href="https://retejs.org/">Rete.js</a></td><td>Lit (lightest official option) or Vue/Svelte/Angular</td><td><span class="badge free">MIT</span></td><td>1.5–2 weeks</td><td>Medium (you build the chrome)</td><td>Total control, no default to fight — but also no free good-looking starting point</td></tr>
+      <tr><td class="name"><a href="https://maxgraph.github.io/maxGraph/">maxGraph</a></td><td>None</td><td><span class="badge free">Apache-2.0</span></td><td>2–3 weeks</td><td>Low–Medium (model only)</td><td>Capable but programmatic (Stylesheet/CellStyle objects) — no CSS shortcut, more verbose than the others</td></tr>
+      <tr><td class="name"><a href="https://github.com/Comfy-Org/litegraph.js">litegraph.js</a></td><td>None (Canvas2D)</td><td><span class="badge free">MIT</span> <span class="badge risk">archived</span></td><td>1.5–2 weeks</td><td>High (proven via ComfyUI)</td><td>Easy at the global-color-token level (JSON theme file); node-internals redesign means custom canvas draw code, not CSS</td></tr>
+      <tr><td class="name"><a href="https://github.com/jerosoler/Drawflow">Drawflow</a></td><td>None</td><td><span class="badge free">MIT</span></td><td>2–3 days</td><td>Low–Medium</td><td>Good — plain CSS classes + arbitrary HTML per node, plus a dedicated theme generator tool</td></tr>
+      <tr><td class="name"><a href="https://www.jointjs.com/">JointJS</a> / <a href="https://www.jointjs.com/jointjs-plus">JointJS+</a></td><td>None</td><td><span class="badge free">MPL-2.0</span> core, <span class="badge paid">commercial</span> for polish tier</td><td>1–1.5 wk core / 2–3 days on +</td><td>Medium (core) / Very high (+)</td><td>Excellent — real SVG in the DOM styleable via CSS/presentation attrs; JointJS+ ships switchable built-in theme packs</td></tr>
+      <tr><td class="name"><a href="https://jsplumbtoolkit.com/">jsPlumb</a> / <a href="https://jsplumbtoolkit.com/">Toolkit</a></td><td>None</td><td><span class="badge free">MIT</span> community, <span class="badge paid">commercial</span> Toolkit</td><td>1–1.5 wk community / 3–5 days Toolkit</td><td>Medium (community) / Very high (Toolkit)</td><td>Very good — client-side templating (bring your own node HTML) plus an extensive documented CSS-class surface for every UI part</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- ===================== TIER 1 ===================== -->
+  <p class="tier-label">Same lineage as React Flow — built by the xyflow team or on their shared engine</p>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://svelteflow.dev/">Svelte Flow</a></h3>
+      <span class="badge free">MIT</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>Svelte</b> + Vite</span>
+      <span class="stat">Maintainer: <b>xyflow</b> (same team as React Flow)</span>
+      <span class="stat">Est: <b>3–5 days</b> to functional</span>
+    </div>
+    <p class="summary-line">Not a clone chasing feature parity with React Flow — a sibling product from the
+      same team, sharing the same underlying engine. Ships drag, zoom/pan, minimap, controls, background,
+      and multi-select out of the box.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> restyle via CSS custom properties
+      (e.g. <code style="font-family:var(--mono)">--xy-node-background-color-default</code>) scoped under
+      <code style="font-family:var(--mono)">.svelte-flow</code> for quick token-level tweaks, or swap in
+      fully custom Svelte components for node/edge types when a redesign needs to go further — both paths
+      are first-class documented patterns, not workarounds. Built-in light/dark/system color modes out of
+      the box.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Closest thing to "React Flow, no React" that exists — same authors, same design decisions, same polish.</li>
+          <li>Excellent docs, including a documented pattern for custom node types with arbitrary form content.</li>
+          <li>Small, fast-compiling framework — Svelte components compile away, minimal runtime overhead in a canvas-heavy UI.</li>
+          <li>Active, officially maintained, MIT licensed, no paywall for any feature used here.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Introduces a second frontend framework choice (Svelte) that's new to this codebase and this team.</li>
+          <li>Smaller ecosystem/hiring pool than React or Vue if this ever needs another contributor.</li>
+          <li>Needs its own build pipeline (Vite + svelte-preprocess) distinct from anything else in the repo.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> if adopting one new framework for this single surface is acceptable, this is the lowest-risk way to hit the "as polished as React Flow" bar exactly.</div>
+    <p class="custom-line"><b class="label">Porting to a Web Component:</b> low–medium effort, and unusually
+      clean compared to most frameworks — Svelte's compiler has <em>first-party</em> custom-element output
+      (<code style="font-family:var(--mono)">&lt;svelte:options customElement="workflow-canvas" /&gt;</code>,
+      no third-party wrapper library needed). Write one thin wrapper component around
+      <code style="font-family:var(--mono)">&lt;SvelteFlow&gt;</code>, compile it to a single
+      <code style="font-family:var(--mono)">&lt;workflow-canvas&gt;</code> tag, and drop that tag straight
+      into an otherwise-plain askama template — satisfying Assumption 1's "confined to the editor screens
+      only" requirement more cleanly than mounting a separate SPA shell would. Two real snags, neither
+      blocking: (1) complex data (the graph itself) has to cross the boundary as a JS property set
+      imperatively from host-page JS, not an HTML attribute string — normal for any Web Component, not
+      Svelte-specific; (2) Svelte 5's custom-element support is still maturing (there's an
+      <a href="https://github.com/sveltejs/svelte/issues/12114">open enhancement issue</a> on rough edges) —
+      budget some slack for surprises. One genuine advantage: the compiler option
+      <code style="font-family:var(--mono)">shadow: "none"</code> lets the element render in light DOM
+      instead of a Shadow Root, sidestepping the usual "inject the library's CSS into the shadow root"
+      headache entirely, since xyflow's CSS is already namespaced (<code style="font-family:var(--mono)">.svelte-flow</code>,
+      <code style="font-family:var(--mono)">--xy-*</code> variables) and unlikely to collide with the rest of
+      the page. Important framing: this changes <em>how the editor is embedded</em>, not whether Svelte is a
+      dependency — you're still writing and building Svelte code, just distributing the output as one custom
+      element instead of a mounted app.</p>
+    <div class="links-line">
+      <a href="https://svelteflow.dev/examples">Examples</a>
+      <a href="https://svelteflow.dev/api-reference">API reference</a>
+      <a href="https://svelte.dev/docs/svelte/custom-elements">Svelte custom elements docs</a>
+      <a href="https://github.com/xyflow/xyflow">GitHub</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://vueflow.dev/">Vue Flow</a></h3>
+      <span class="badge free">MIT</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>Vue 3</b> + Vite</span>
+      <span class="stat">Maintainer: community (bcakmakoglu), core now built on <b>@xyflow/system</b></span>
+      <span class="stat">Est: <b>3–5 days</b> to functional</span>
+    </div>
+    <p class="summary-line">v2 was rebuilt on top of <code style="font-family:var(--mono)">@xyflow/system</code>
+      — the same framework-agnostic core engine that now powers React Flow and Svelte Flow internally. Real
+      engine parity, not a look-alike reimplementation.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> same CSS-custom-property theming
+      system as Svelte Flow (inherited from the shared <code style="font-family:var(--mono)">@xyflow/system</code>
+      core), plus fully custom Vue components for node/edge rendering when needed.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Genuine shared-engine parity with React Flow, inherited automatically as xyflow's core improves.</li>
+          <li>Vue's template syntax maps very naturally onto per-node-kind forms (v-if/v-for over your attrs map).</li>
+          <li>Large, mainstream framework — easier to find future contributors than Svelte.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Community-maintained, not an official xyflow product — roadmap and release cadence depend on one maintainer.</li>
+          <li>Still a new framework dependency for this codebase, same trade-off as Svelte Flow.</li>
+          <li>Docs are good but noticeably thinner than React Flow's/Svelte Flow's official docs.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> same case as Svelte Flow, but if Vue's larger ecosystem/mainstream familiarity matters more than having the framework's own creators behind the library.</div>
+    <div class="links-line">
+      <a href="https://vueflow.dev/examples/">Examples</a>
+      <a href="https://vueflow.dev/guide/">Docs</a>
+      <a href="https://github.com/bcakmakoglu/vue-flow">GitHub</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://github.com/xyflow/xyflow">@xyflow/system (raw engine)</a></h3>
+      <span class="badge free">MIT</span> <span class="badge risk">undocumented as public API</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — you write the rendering layer</span>
+      <span class="stat">Est: <b>3–4 weeks</b> to functional</span>
+    </div>
+    <p class="summary-line">The shared low-level engine (drag/zoom/pan math, connection logic, viewport) that
+      React Flow, Svelte Flow, and Vue Flow all sit on top of. In principle this is literally "React Flow's
+      engine, no framework at all."</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> no theming system ships with this
+      package at all — the CSS variables and default component styles that make xyflow's other products easy
+      to restyle live in the React/Svelte/Vue packages, not here. Every pixel is your own CSS/markup from
+      day one.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>The actual battle-tested interaction logic behind React Flow, with zero framework tax.</li>
+          <li>Total control over rendering — could integrate directly with a minimal DOM/HTMX-friendly layer.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Not published as a documented public API — a <a href="https://github.com/xyflow/xyflow/discussions/4232">2026 GitHub discussion</a> shows users explicitly asking the xyflow team for an official framework-agnostic/Web Components release, unanswered as of this research. Building on it means depending on internals that could shift across versions with no migration guide.</li>
+          <li>You still have to build every bit of UI chrome (minimap, controls, node/edge rendering, selection UX) yourself — the "polish" that makes React Flow React Flow lives in the framework-specific packages, not this core.</li>
+          <li>Highest-effort, highest-risk option on this list for the least amount of ready-made polish.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> not recommended for v1. Worth revisiting only if xyflow ever ships an official vanilla/Web Components package.</div>
+    <div class="links-line">
+      <a href="https://github.com/xyflow/xyflow/discussions/4232">Web Components discussion</a>
+      <a href="https://github.com/xyflow/xyflow">GitHub</a>
+    </div>
+  </div>
+
+  <!-- ===================== TIER 2 ===================== -->
+  <p class="tier-label">General diagramming engines — framework-agnostic, very polished out of the box</p>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://x6.antv.antgroup.com/en">AntV X6</a></h3>
+      <span class="badge free">MIT</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — vanilla JS/TS core</span>
+      <span class="stat">Maintainer: <b>Ant Group</b>, actively released (v3.1.7, updated within the last month)</span>
+      <span class="stat">Est: <b>1–1.5 weeks</b> to functional</span>
+    </div>
+    <p class="summary-line">A production-grade graph-editing engine used internally at Alibaba/Ant scale for
+      DAG, ER, flowchart, and data-lineage diagrams. Ships built-in extensions React Flow itself needs
+      plugins for: lasso selection, alignment/snap lines, minimap, undo/redo history, a stencil (node
+      palette) panel — consolidated into the core <code style="font-family:var(--mono)">@antv/x6</code>
+      package as of v3.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> two tiers of control — quick reskins
+      via each shape's <code style="font-family:var(--mono)">markup</code>/<code style="font-family:var(--mono)">attrs</code>
+      config (SVG presentation attributes, similar to editing a template's style object), or a complete
+      break from the defaults via HTML/React/Vue-rendered nodes (SVG <code style="font-family:var(--mono)">foreignObject</code>)
+      for total bring-your-own-design control. No CSS-custom-property shortcut like xyflow's, but the ceiling
+      is just as high.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Probably the single most feature-complete <em>vanilla</em> option — no framework decision needed at all.</li>
+          <li>Built-in snap lines, minimap, history (undo/redo), stencil panel, selection — less assembly than most alternatives.</li>
+          <li>Nodes can be plain HTML/DOM ("html-shape") — a per-node-kind form is just a DOM template, no framework required to build it.</li>
+          <li>Actively developed by a large team with production users; low abandonment risk.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>General diagramming API (nodes/edges/ports as generic shapes), not dataflow-editor-specific — you define the node-kind/socket/attribute conventions yourself rather than inheriting them.</li>
+          <li>Docs are solid but translated-from-Chinese in places; some examples and community discussion are easier to find in Chinese-language sources.</li>
+          <li>v3's plugin consolidation is recent — some older blog posts/examples still reference the pre-v3 separate <code style="font-family:var(--mono)">@antv/x6-plugin-*</code> packages.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> the strongest choice if staying fully framework-agnostic (no Svelte/Vue/React anywhere) matters more than out-of-box dataflow-editor conventions.</div>
+    <p class="custom-line"><b class="label">Starting-point example — "Agent Flow":</b> X6's own showcase
+      ships <a href="https://x6.antv.antgroup.com/en/examples/showcase/practices/#agentFlow">an Agent Flow demo</a>
+      that maps unusually closely onto this project's shape. Pulled straight from its source
+      (<code style="font-family:var(--mono)">site/examples/showcase/practices/demo/agentFlow.ts</code> in the
+      <a href="https://github.com/antvis/X6">antvis/X6</a> repo) it has: a left-hand <b>Stencil</b> palette
+      with two collapsible groups — "Business Logic" (llm / code / branch / loop node types) and "Knowledge
+      Base &amp; Data" (kb / mcp / db node types) — dedicated Start/End flow cards, and draggable node
+      "cards" rendered as real React components (<code style="font-family:var(--mono)">@antv/x6-react-shape</code>)
+      with a themed header (icon, title, delete action) and either a description or an input field depending
+      on kind, color-coded per node type. Ports stay hidden until you hover a node, turning blue once
+      connected; edges get a hover-revealed delete button; node-kind definitions (icon/title/description/theme/
+      input) are loaded from a small JSON config rather than hardcoded. That's close to a direct template for
+      this module's own node kinds — llm ≈ Codergen, branch ≈ Conditional, kb/mcp/db ≈ Tool, with Interviewer/
+      gallery-gate and Manager needing their own new card variants alongside it. Note it uses X6's
+      <code style="font-family:var(--mono)">@antv/x6-react-shape</code> integration for the card rendering —
+      real React function components, though only for node content, not the whole graph engine — so adopting
+      this exact starting point still means a (small, scoped) React dependency for node rendering, unless
+      those cards are rewritten as plain HTML nodes instead.</p>
+    <div class="links-line">
+      <a href="https://x6.antv.antgroup.com/en/examples/showcase/practices/#agentFlow">Agent Flow example</a>
+      <a href="https://x6.antv.antgroup.com/en/examples/">Examples gallery</a>
+      <a href="https://x6.antv.antgroup.com/en/tutorial/about">Docs</a>
+      <a href="https://github.com/antvis/X6">GitHub</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://maxgraph.github.io/maxGraph/">maxGraph</a></h3>
+      <span class="badge free">Apache-2.0</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — vanilla TS</span>
+      <span class="stat">Lineage: successor to <b>mxGraph</b>, the engine that powers <b>draw.io</b></span>
+      <span class="stat">Est: <b>2–3 weeks</b> to functional</span>
+    </div>
+    <p class="summary-line">An extremely mature diagramming <em>model</em> (draw.io's own engine, rewritten in
+      TypeScript), but it hands you the graph data structure and renderer, not ready-made UI chrome.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> a programmatic <code style="font-family:var(--mono)">Stylesheet</code>/<code style="font-family:var(--mono)">CellStyle</code>
+      object model (properties instead of CSS strings, e.g. fill color/stroke/font as object keys) rather
+      than CSS. Powerful and precise, but every visual decision is written in TypeScript, not CSS — no quick
+      designer-friendly override path.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Proven at draw.io's scale and complexity — one of the most battle-tested diagram engines that exists.</li>
+          <li>No third-party runtime dependencies; fully vanilla TypeScript.</li>
+          <li>Extremely configurable/extensible for unusual diagram needs.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>The project itself describes it as "under active development, still catching up to mxGraph's exact behavior" — younger and less stable than the code it replaces.</li>
+          <li>No built-in minimap/palette/inspector chrome — every bit of "React-Flow-grade" polish has to be built by hand on top of the model.</li>
+          <li>Steeper learning curve; mxGraph's API is famously dense.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> only if this editor is expected to grow into draw.io-level diagram complexity later — otherwise it's more engine than this module needs, for more effort than X6.</div>
+    <div class="links-line">
+      <a href="https://maxgraph.github.io/maxGraph/docs/tutorials/Overview.html">Docs</a>
+      <a href="https://github.com/maxGraph/maxGraph">GitHub</a>
+    </div>
+  </div>
+
+  <!-- ===================== TIER 3 ===================== -->
+  <p class="tier-label">Purpose-built for node/dataflow editors — closest conceptual match to this pipeline's shape</p>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://retejs.org/">Rete.js</a></h3>
+      <span class="badge free">MIT</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Renderer: <b>Lit</b> (lightest), or Vue/React/Angular/Svelte</span>
+      <span class="stat">Est: <b>1.5–2 weeks</b> to functional</span>
+    </div>
+    <p class="summary-line">A TypeScript framework built specifically for visual-programming node editors —
+      sockets, typed connections, controls, dataflow and control-flow execution engines. Conceptually this
+      is the closest match to "nodes with per-kind attribute forms and typed connections," which is exactly
+      what a Codergen/Interviewer/Tool/Manager DOT node is.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> since node/socket/connection
+      components are ones you write yourself (Lit custom elements, or a Vue/React/Svelte/Angular component
+      per the chosen renderer), there's no default theme to fight — full control from the first line of
+      code, styled with ordinary CSS custom properties/Shadow DOM scoping. The trade-off: there's also no
+      free "looks good already" starting point the way there is with xyflow or X6 — the visual design work
+      is entirely yours.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Domain model (nodes, sockets, controls, connections) maps almost one-to-one onto this project's <code style="font-family:var(--mono)">NodeType</code>/attrs shape.</li>
+          <li>The <a href="https://retejs.org/docs/guides/renderers/lit/">Lit renderer</a> is Web-Components-based — much lighter than adopting a full SPA framework, closer in spirit to staying framework-neutral.</li>
+          <li>Can mix renderers per node if ever useful (not needed here, but shows how decoupled the core is).</li>
+          <li>Has both dataflow and control-flow execution engines built in, if the editor ever needs live preview/simulation beyond static editing.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Less visual polish out of the box than xyflow/X6 — minimap, snap lines, selection marquee, etc. are not bundled; you assemble more of the "React Flow feel" yourself via the <code style="font-family:var(--mono)">area-plugin</code>/<code style="font-family:var(--mono)">connection-plugin</code> ecosystem.</li>
+          <li>Smaller community than xyflow or X6; fewer third-party examples to copy from for polish-level UI.</li>
+          <li>Plugin-composition API (core + area + connection + render + history, each a separate package) is more moving parts to wire up initially.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> if the editing/authoring experience (correct sockets, per-kind controls, connection validation) matters more than the canvas looking exactly like React Flow's default theme.</div>
+    <div class="links-line">
+      <a href="https://retejs.org/examples">Examples</a>
+      <a href="https://retejs.org/docs/">Docs</a>
+      <a href="https://github.com/retejs/rete">GitHub</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://github.com/Comfy-Org/litegraph.js">litegraph.js</a></h3>
+      <span class="badge free">MIT</span> <span class="badge risk">archived / folded into ComfyUI</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — Canvas2D, zero runtime deps</span>
+      <span class="stat">Est: <b>1.5–2 weeks</b> to functional</span>
+    </div>
+    <p class="summary-line">The node-editor engine <b>ComfyUI</b> is built on — arguably the single best
+      real-world proof that "AI-pipeline node graph with human-configurable nodes" can feel excellent to use
+      at scale.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> two very different tiers again — a
+      global JSON theme file (colors, node-slot colors, canvas background) is a quick, designer-friendly
+      override, and ComfyUI itself ships a <code style="font-family:var(--mono)">user.css</code> layer for
+      the surrounding DOM chrome. But because nodes are drawn on Canvas2D, redesigning what a node itself
+      looks like internally (shapes, gradients, custom widgets) means writing custom draw functions, not
+      CSS — noticeably more work than xyflow's or X6's "swap the component/template" model.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>ComfyUI is the strongest existing proof point for exactly this project's use case (nodes = AI pipeline steps, humans configuring parameters, connecting a graph).</li>
+          <li>Canvas2D rendering handles hundreds of nodes smoothly; no DOM-per-node overhead.</li>
+          <li>Zero runtime dependencies, small footprint.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>The standalone public repo (<code style="font-family:var(--mono)">Comfy-Org/litegraph.js</code>) is archived — as of August 2025 its development moved <em>inside</em> the ComfyUI frontend monorepo, with the import path changed to an internal path. Adopting it now means either an older frozen npm snapshot or forking, not an actively-versioned standalone library.</li>
+          <li>Rich per-node forms (the polish ComfyUI itself has) require building a custom widget system on Canvas2D, or overlaying real DOM forms positioned over canvas nodes — noticeably more manual work than xyflow's/X6's "just render a component/HTML template" model.</li>
+          <li>Real maintenance risk: no guarantee the frozen version keeps working as browsers/tooling evolve, since active development no longer targets it as a reusable package.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> compelling as a proof-of-concept reference to study (how does ComfyUI structure its node widgets?), risky as an actual dependency given the archival status.</div>
+    <div class="links-line">
+      <a href="https://github.com/Comfy-Org/litegraph.js">Archived repo (reference)</a>
+      <a href="https://github.com/Comfy-Org/ComfyUI_frontend">ComfyUI frontend (active home)</a>
+    </div>
+  </div>
+
+  <!-- ===================== TIER 4 ===================== -->
+  <p class="tier-label">Lighter-weight or free-tier-limited — mention for completeness, not the recommended path</p>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://github.com/jerosoler/Drawflow">Drawflow</a></h3>
+      <span class="badge free">MIT</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — vanilla JS</span>
+      <span class="stat">Est: <b>2–3 days</b> to functional</span>
+    </div>
+    <p class="summary-line">Small, dependency-free flow-chart library — genuinely the fastest to a rough
+      working prototype on this list, but visibly below React Flow's polish tier without significant custom
+      CSS/UX work.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> straightforward — every node accepts
+      arbitrary HTML content plus a custom CSS class, and there's a dedicated visual Theme Generator tool for
+      producing a full reskin. Simple mental model, but the default aesthetic ceiling is lower than the other
+      options, so "matching React Flow's polish" means doing noticeably more of that CSS work by hand.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Fastest initial setup of anything on this list; minimal API surface.</li>
+          <li>Zero dependencies, tiny bundle.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Default visuals and interactions are noticeably rougher than React Flow's — reaching the requested polish bar means a lot of custom CSS/JS on top.</li>
+          <li>Smaller contributor base; slower historical issue resolution than the other options here.</li>
+          <li>No built-in minimap, snap lines, or history — all DIY.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> a throwaway spike to validate the JSON API contract quickly, not the library to ship v1 on given the explicit polish requirement.</div>
+    <div class="links-line">
+      <a href="https://github.com/jerosoler/Drawflow#demo">Demo</a>
+      <a href="https://github.com/jerosoler/Drawflow">GitHub</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://www.jointjs.com/">JointJS</a> <span style="font-weight:400;color:var(--text-dim);font-size:15px">/ <a href="https://www.jointjs.com/jointjs-plus">JointJS+</a></span></h3>
+      <span class="badge free">MPL-2.0 core</span> <span class="badge paid">commercial +</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — vanilla JS/TS, optional React/Vue/Angular bindings</span>
+      <span class="stat">JointJS+: <b>$2,990</b>/license first year (<b>$1,490</b>/yr renewal), per developer</span>
+      <span class="stat">Est: <b>1–1.5 wk</b> on free core, <b>2–3 days</b> on JointJS+</span>
+    </div>
+    <p class="summary-line">Splits cleanly into a capable free open-source diagramming core and a paid
+      "+" tier that adds the inspectors, stencils, toolbars, and advanced layouts that actually get you to
+      React-Flow-grade polish quickly.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> the free core's shapes are real SVG
+      in the DOM, styleable with ordinary CSS (all SVG presentation attributes work as CSS properties) or
+      per-subelement <code style="font-family:var(--mono)">attrs</code> config — genuinely easy, no
+      proprietary styling language to learn. JointJS+ goes further and ships several complete built-in
+      themes switchable at runtime via <code style="font-family:var(--mono)">setTheme()</code> — the fastest
+      "looks professionally designed" path of anything evaluated, if the paid tier is on the table.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Mature, long-established library (predates most alternatives here) with a large diagram-type gallery.</li>
+          <li>JointJS+ ships a production-ready inspector/stencil/toolbar UI kit — if budget allows, this is probably the fastest path to a genuinely polished, form-driven node editor of anything on this list.</li>
+          <li>Free core is MPL-2.0 (real open source), not a crippled trial.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Reaching the requested polish level specifically routes through the paid tier — a real budget line (~$3k first year per developer) this codebase's other dependencies don't have.</li>
+          <li>Free core alone is general diagramming, not dataflow-editor-specific — similar assembly burden to X6, without X6's built-in minimap/snapline/history.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> worth a look only if a commercial license is acceptable — otherwise the free core doesn't clearly beat X6 for this project.</div>
+    <div class="links-line">
+      <a href="https://www.jointjs.com/demos">Demos</a>
+      <a href="https://www.jointjs.com/pricing">Pricing</a>
+      <a href="https://github.com/clientio/joint">GitHub (core)</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><a href="https://jsplumbtoolkit.com/">jsPlumb</a> <span style="font-weight:400;color:var(--text-dim);font-size:15px">/ Toolkit</span></h3>
+      <span class="badge free">MIT community</span> <span class="badge paid">commercial Toolkit</span>
+    </div>
+    <div class="meta-row">
+      <span class="stat">Requires <b>nothing</b> — vanilla JS, also ships a Web Component build</span>
+      <span class="stat">Toolkit pricing: not publicly listed, per-developer + hosting tier, contact vendor</span>
+      <span class="stat">Est: <b>1–1.5 wk</b> community, <b>3–5 days</b> Toolkit</span>
+    </div>
+    <p class="summary-line">Same free/commercial split as JointJS. The commercial "Toolkit" product is
+      explicitly marketed as a <a href="https://jsplumbtoolkit.com/reactflow-alternative">React Flow
+      alternative</a> and ships as a genuine Web Component — meaning it can be dropped into any stack,
+      including this one, with no framework at all.</p>
+    <p class="custom-line"><b class="label">Customizing the look:</b> built around explicit client-side
+      templating — you supply the HTML template for each node/group/port type and the Toolkit renders it,
+      which is a natural fit for per-node-kind forms. Every UI part (connectors, endpoints, overlays,
+      selection) publishes a documented, extensive CSS class list specifically meant for overriding the
+      shipped defaults, rather than the smaller ad-hoc class sets some competitors expose.</p>
+    <div class="pc-grid">
+      <div class="pc-col pros">
+        <h4>Pros</h4>
+        <ul>
+          <li>Toolkit is literally positioned and built for this exact ask — "React Flow's capability, any framework or none."</li>
+          <li>Web Component packaging fits cleanly alongside an HTMX/askama app with zero build-tool entanglement.</li>
+        </ul>
+      </div>
+      <div class="pc-col cons">
+        <h4>Cons</h4>
+        <ul>
+          <li>Pricing isn't public — requires a sales conversation before knowing the real cost, unlike JointJS+'s published numbers.</li>
+          <li>Free community jsPlumb (connection-drawing only) is a much thinner base than the Toolkit; most of the "editor" experience is the paid product.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="fit-note"><b>Best fit:</b> the one commercial option genuinely worth a sales call if the team decides a paid product is on the table — its Web Component packaging is the best technical fit for this stack of anything on this list, free or paid.</div>
+    <div class="links-line">
+      <a href="https://jsplumbtoolkit.com/demos/">Demos</a>
+      <a href="https://jsplumbtoolkit.com/reactflow-alternative">"React Flow alternative" positioning</a>
+      <a href="https://github.com/jsplumb/jsplumb">GitHub (community)</a>
+    </div>
+  </div>
+
+  <div class="recommend" style="margin-top:48px;">
+    <h2>Head-to-head: Svelte Flow vs. AntV X6</h2>
+    <p>Both now have a concrete embedding story. Svelte Flow can compile to a single
+      <code style="font-family:var(--mono)">&lt;workflow-canvas&gt;</code> custom element via Svelte's own
+      compiler (no third-party wrapper) and mount into an askama template with one tag — see the Svelte Flow
+      card above for the real mechanics and the two known snags. X6 needs no such step at all, since it was
+      never React-only to begin with; its own React-shape node rendering (used in the Agent Flow example
+      below) is an opt-in choice for node content, not a requirement of the engine.</p>
+    <p><b>If the Agent Flow example is genuinely a strong starting point</b> (worth opening the link and
+      judging the visual quality directly, not just this summary), X6 has a real time-to-first-good-prototype
+      edge: cloning and re-theming an existing, working stencil+card+edge implementation is faster than
+      building the equivalent from a blank Svelte Flow canvas, even with Svelte Flow's easier long-run
+      re-theming story. That said, its node cards use <code style="font-family:var(--mono)">@antv/x6-react-shape</code>
+      — so starting from it as-is brings a small React dependency in for node rendering specifically, which
+      is worth weighing against the original "no React" preference even though the rest of the graph engine
+      stays vanilla.</p>
+    <p><b>If long-run visual iteration matters more than initial velocity,</b> Svelte Flow's CSS-custom-property
+      theming and first-class custom-component escape hatch (from the earlier customization research) make
+      it cheaper to keep reskinning over time; X6's per-node markup/attrs config gets more verbose as the
+      number of distinct node kinds grows past the ~7 this project needs.</p>
+  </div>
+
+  <div class="recommend">
+    <h2>Bottom line</h2>
+    <p><b>Free, staying framework-agnostic:</b> AntV X6 is the strongest out-of-box match — it's the only
+      option here that's both fully vanilla and ships minimap/snapline/history/selection built in, so the
+      1–1.5 week estimate goes almost entirely toward this project's own node-kind forms and save logic, not
+      canvas plumbing. Its two-tier styling (quick <code style="font-family:var(--mono)">attrs</code> tweaks,
+      or full HTML/React/Vue node override) also means "the default doesn't look good" has a real, documented
+      escape hatch rather than a fight against the library.</p>
+    <p><b>Free, willing to adopt one small framework for this surface:</b> Svelte Flow (or Vue Flow) is the
+      lowest-risk way to get literally React-Flow-grade polish <em>and</em> the easiest re-theming of
+      anything evaluated — CSS custom properties cover most restyling without touching a component, and
+      swapping in fully custom node components is a first-class, documented pattern rather than a workaround.</p>
+    <p><b>Willing to spend money for speed and polish:</b> jsPlumb Toolkit's Web Component packaging is the
+      best technical fit for an HTMX/askama codebase of anything evaluated, and JointJS+ has transparent,
+      published pricing (~$3k/developer year one) if that's preferred over a sales conversation — its
+      switchable built-in theme packs are the fastest way to look professionally designed without doing the
+      design work yourself.</p>
+    <p><b>Best conceptual fit for the actual editing model</b> (typed node kinds, sockets, per-kind
+      controls) if visual chrome can be assembled over a few extra days: Rete.js, especially via its
+      lightweight Lit renderer — full styling control from day one, but budget real design time since there's
+      no polished default to start from.</p>
+    <p><b>Worth flagging:</b> maxGraph and litegraph.js are the two options where "if the default doesn't
+      look good" turns into real extra work — both push node-internals restyling into code (a programmatic
+      style-object API for maxGraph, custom Canvas2D draw functions for litegraph.js) rather than CSS, so
+      budget more time for visual iteration if either is chosen.</p>
+  </div>
+
+  <footer class="note">
+    Compiled from public docs, GitHub repos, and vendor pricing pages as of September 2026 for the
+    <code style="font-family:var(--mono)">workflow-editor</code> module spec
+    (<code style="font-family:var(--mono)">design-factory/SPEC-workflow-editor.md</code>). Time-to-functional
+    estimates are engineering judgment scoped to this project, not vendor-published benchmarks — treat them
+    as relative ordering more than precise durations.
+  </footer>
+
+</div>
+</body>
+</html>
