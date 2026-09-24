@@ -17,8 +17,8 @@ into `main`. `feat/claude-cli-provider` is still open, built on `main`, and hold
 only `SPEC-claude-cli-provider.md`, **awaiting Jobsworth's review**. No code yet.
 Until it merges, that spec exists only on that branch.
 
-**Agreed order.** #2, then the editor batch (#3 + #4 + #5, built on
-`feat/editor-save-batch` and awaiting review before merge), then #6. The Claude CLI provider was
+**Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
+2026-09-24), then #6. The Claude CLI provider was
 added mid-session and runs alongside. Its spec review comes first.
 
 **Waiting on Jobsworth:**
@@ -63,7 +63,7 @@ smasher-cli -- serve` from the branch under test first.
    before running Vitest.
 
 3. ~~**Fix where dropped nodes land after pan or zoom in the node editor.**~~
-   **Done 2026-09-24** on `feat/editor-save-batch` (not merged yet). A small
+   **Done 2026-09-24** (merged to `main`). A small
    `FlowPositionBridge.svelte` inside `<SvelteFlow>` hands
    `screenToFlowPosition()` to the canvas, so no `<SvelteFlowProvider>` split was
    needed. A dropped node is centred under the pointer, as it was while being
@@ -94,7 +94,7 @@ smasher-cli -- serve` from the branch under test first.
 ## P2: Robustness (can lose data or grow without limit)
 
 4. ~~**Detect conflicting edits when saving a workflow.**~~ **Done 2026-09-24**
-   on `feat/editor-save-batch` (not merged yet). The graph API sends an `ETag`
+   (merged to `main`). The graph API sends an `ETag`
    (SHA-256 of the file), and a `PUT` with a stale `If-Match` gets 409. The editor
    shows a warning toast (shadcn sonner, now mounted in `App.svelte`) with Reload
    and Save anyway, and keeps unsaved edits. Other save errors show inline instead
@@ -106,7 +106,7 @@ smasher-cli -- serve` from the branch under test first.
      real route is `POST /api/workflows/new` with `{name, target_dir, graph}`.
 
 5. ~~**Keep `node [...]` / `edge [...]` default-attribute blocks when saving.**~~
-   **Done 2026-09-24** on `feat/editor-save-batch` (not merged yet).
+   **Done 2026-09-24** (merged to `main`).
    `render_to_dot` merges a graph's defaults over its font defaults, and
    `put_graph` copies them from the file it overwrites. No current workflow has a
    hand-written `node [...]` block, so this only guards future ones.
