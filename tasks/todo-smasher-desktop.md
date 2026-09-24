@@ -6,12 +6,12 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 
 - [x] Task 1: Split `smasher-web` startup into bind-then-serve (`server::start()` → bound `SocketAddr` + cancellable serve; `run_with_config` unchanged behaviour)
 - [x] Task 2: New `smasher-desktop` Tauri 2 crate: bootstrap (127.0.0.1 hard-coded, port 0 release / 21541 debug, `~/.smasher/.env`), window opened only after bind, error dialog on failure, CI webkit deps
-- [ ] Task 3: `tests/bootstrap_test.rs`: headless boot, health + SPA index, loopback-only, shutdown
+- [x] Task 3: `tests/bootstrap_test.rs`: headless boot, health + SPA index, loopback-only, shutdown
 
 ### Checkpoint A: Embedded server + window
-- [ ] `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo fmt --all -- --check` clean
+- [x] `cargo test --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo fmt --all -- --check` clean
 - [ ] hello-world run completes with live events in the desktop window
-- [ ] Loopback-only proven (Task 3)
+- [x] Loopback-only proven (Task 3)
 - [ ] Human review before Phase 2
 
 ## Phase 2: Dev loop and native features

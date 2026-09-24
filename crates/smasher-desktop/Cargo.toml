@@ -31,3 +31,4 @@ tracing-subscriber.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 serial_test = "3.0"
+reqwest.workspace = true

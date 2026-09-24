@@ -4439,6 +4439,7 @@ name = "smasher-desktop"
 version = "0.1.0"
 dependencies = [
  "dotenvy",
+ "reqwest 0.12.28",
  "serial_test",
  "smasher-llm",
  "smasher-web",
