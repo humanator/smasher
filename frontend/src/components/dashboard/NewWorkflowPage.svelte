@@ -40,14 +40,19 @@
   }
 </script>
 
-<div class="new-workflow-page">
-  <div class="header">
-    <a href="/" class="back-link">← Back to Catalog</a>
-    <h1>Create New Workflow</h1>
+<div class="new-workflow-page flex flex-col gap-8 p-8">
+  <div class="flex flex-col gap-4">
+    <a href="/" class="text-sm text-primary hover:underline">← Back to Catalog</a>
+    <h1 class="m-0 text-3xl font-bold text-foreground">Create New Workflow</h1>
   </div>
 
   {#if error}
-    <p class="error" role="alert">{error}</p>
+    <p
+      class="rounded border border-destructive/40 bg-destructive/10 p-4 text-destructive"
+      role="alert"
+    >
+      {error}
+    </p>
   {/if}
 
   <WorkflowCanvas
@@ -57,42 +62,3 @@
     onSave={handleSave}
   />
 </div>
-
-<style>
-  .new-workflow-page {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    padding: 2rem;
-  }
-
-  .header {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .back-link {
-    color: #3b82f6;
-    text-decoration: none;
-    font-size: 0.875rem;
-  }
-
-  .back-link:hover {
-    text-decoration: underline;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: 2rem;
-    color: #1e293b;
-  }
-
-  .error {
-    color: #dc2626;
-    background-color: #fee2e2;
-    border: 1px solid #fca5a5;
-    border-radius: 4px;
-    padding: 1rem;
-  }
-</style>

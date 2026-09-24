@@ -5,6 +5,8 @@
   import { onMount } from 'svelte';
   import * as workflowsApi from '../../lib/api/workflows';
   import * as runsApi from '../../lib/api/runs';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import * as Table from '$lib/components/ui/table/index.js';
 
   interface Workflow {
     id: string;
@@ -59,166 +61,56 @@
   }
 </script>
 
-<div class="workflow-catalog">
-  <div class="catalog-header">
-    <h1>Workflows</h1>
+<div class="workflow-catalog p-8">
+  <div class="mb-8 flex items-center justify-between">
+    <h1 class="m-0 text-3xl font-bold text-foreground">Workflows</h1>
   </div>
 
   {#if loading}
-    <p class="loading">Loading workflows...</p>
+    <p class="p-8 text-center text-lg text-muted-foreground">Loading workflows...</p>
   {:else if error}
-    <p class="error" role="alert">Error: {error}</p>
+    <p class="p-8 text-center text-lg text-destructive" role="alert">Error: {error}</p>
   {:else if workflows.length === 0}
-    <p class="empty-state">No workflows configured.</p>
+    <p class="p-8 text-center text-lg text-muted-foreground">No workflows configured.</p>
   {:else}
     {#if runError}
-      <p class="error" role="alert">{runError}</p>
+      <p class="p-8 text-center text-lg text-destructive" role="alert">{runError}</p>
     {/if}
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Source</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each workflows as workflow (workflow.id)}
-          <tr>
-            <td>
-              <div class="workflow-name">{formatWorkflowName(workflow.name)}</div>
-              <div class="workflow-path">{workflow.name}</div>
-            </td>
-            <td>{workflow.source_dir}</td>
-            <td>
-              <div class="workflow-actions">
-                <a href="/workflows/{workflow.id}/edit" class="btn btn-secondary btn-sm">
-                  Edit
-                </a>
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  disabled={runningWorkflowId === workflow.id}
-                  onclick={() => handleRunWorkflow(workflow.id)}
-                >
-                  {runningWorkflowId === workflow.id ? 'Starting…' : 'Run Workflow'}
-                </button>
-              </div>
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+    <div class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <Table.Root>
+        <Table.Header class="bg-muted/50">
+          <Table.Row>
+            <Table.Head class="text-muted-foreground">Name</Table.Head>
+            <Table.Head class="text-muted-foreground">Source</Table.Head>
+            <Table.Head class="text-muted-foreground">Actions</Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {#each workflows as workflow (workflow.id)}
+            <Table.Row>
+              <Table.Cell>
+                <div class="font-semibold text-foreground">{formatWorkflowName(workflow.name)}</div>
+                <div class="mt-0.5 font-mono text-xs text-muted-foreground">{workflow.name}</div>
+              </Table.Cell>
+              <Table.Cell>{workflow.source_dir}</Table.Cell>
+              <Table.Cell>
+                <div class="flex gap-2">
+                  <Button href="/workflows/{workflow.id}/edit" variant="secondary" size="sm">
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={runningWorkflowId === workflow.id}
+                    onclick={() => handleRunWorkflow(workflow.id)}
+                  >
+                    {runningWorkflowId === workflow.id ? 'Starting…' : 'Run Workflow'}
+                  </Button>
+                </div>
+              </Table.Cell>
+            </Table.Row>
+          {/each}
+        </Table.Body>
+      </Table.Root>
+    </div>
   {/if}
 </div>
-
-<style>
-  .workflow-catalog {
-    padding: 2rem;
-  }
-
-  .catalog-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-  }
-
-  h1 {
-    font-size: 2rem;
-    margin: 0;
-    color: #1e293b;
-  }
-
-  .loading,
-  .error,
-  .empty-state {
-    font-size: 1.125rem;
-    color: #64748b;
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .error {
-    color: #dc2626;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-
-  th,
-  td {
-    text-align: left;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  th {
-    background: #f8fafc;
-    color: #475569;
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-
-  td {
-    font-size: 0.875rem;
-    color: #1e293b;
-  }
-
-  .workflow-name {
-    font-weight: 600;
-    color: #1e293b;
-  }
-
-  .workflow-path {
-    margin-top: 0.125rem;
-    font-size: 0.8125rem;
-    color: #64748b;
-    font-family: monospace;
-  }
-
-  .workflow-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .btn {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 0.875rem;
-    transition: all 0.2s;
-    border: none;
-    cursor: pointer;
-  }
-
-  .btn-primary {
-    background-color: #3b82f6;
-    color: white;
-  }
-
-  .btn-primary:hover {
-    background-color: #2563eb;
-  }
-
-  .btn-secondary {
-    background-color: #6b7280;
-    color: white;
-  }
-
-  .btn-secondary:hover {
-    background-color: #4b5563;
-  }
-
-  .btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-  }
-</style>

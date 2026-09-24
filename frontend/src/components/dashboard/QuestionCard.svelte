@@ -5,6 +5,8 @@
   import { onMount } from 'svelte';
   import { questionStore } from '../../stores/questions.svelte';
   import * as questionsApi from '../../lib/api/questions';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import { Input } from '$lib/components/ui/input/index.js';
 
   interface Props {
     runId: string;
@@ -40,16 +42,16 @@
   }
 </script>
 
-<div class="questions">
+<div class="questions rounded-lg border border-border bg-card p-4 text-card-foreground">
   {#if questionStore.pending.length > 0}
-    <h3>Pending Questions</h3>
+    <h3 class="mb-4 text-base font-semibold text-foreground">Pending Questions</h3>
     {#each questionStore.pending as question (question.id)}
-      <div class="question-card">
-        <p class="question-text">{question.question}</p>
+      <div class="question-card mb-4 rounded border-l-4 border-primary bg-primary/5 p-4">
+        <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
 
         {#if question.kind === 'free_form'}
           <div class="answer-form">
-            <input
+            <Input
               type="text"
               placeholder="Enter your answer"
               onkeydown={(e) => {
@@ -62,20 +64,27 @@
             />
           </div>
         {:else if question.kind === 'approval'}
-          <div class="button-group">
-            <button onclick={() => handleAnswer(question.id, 'yes')} class="btn btn-success">
+          <div class="button-group flex flex-wrap gap-2">
+            <!-- Yes/No colors carry semantic meaning (approve/reject). -->
+            <Button
+              onclick={() => handleAnswer(question.id, 'yes')}
+              class="bg-green-600 text-white hover:bg-green-700"
+            >
               Yes
-            </button>
-            <button onclick={() => handleAnswer(question.id, 'no')} class="btn btn-danger">
+            </Button>
+            <Button
+              onclick={() => handleAnswer(question.id, 'no')}
+              class="bg-destructive text-white hover:bg-destructive/90"
+            >
               No
-            </button>
+            </Button>
           </div>
         {:else if question.kind === 'multiple_choice'}
-          <div class="choices">
+          <div class="choices flex flex-wrap gap-2">
             {#each question.choices as choice}
-              <button onclick={() => handleAnswer(question.id, choice)} class="btn btn-secondary">
+              <Button onclick={() => handleAnswer(question.id, choice)} variant="secondary">
                 {choice}
-              </button>
+              </Button>
             {/each}
           </div>
         {/if}
@@ -84,106 +93,12 @@
   {/if}
 
   {#if questionStore.answered.length > 0}
-    <h3>Answered Questions</h3>
+    <h3 class="mb-4 text-base font-semibold text-foreground">Answered Questions</h3>
     {#each questionStore.answered as question (question.id)}
-      <div class="answered-card">
-        <p class="question-text">{question.question}</p>
-        <p class="answer-text">Answer: {question.answer}</p>
+      <div class="answered-card mb-4 rounded border-l-4 border-green-600 bg-green-50 p-4">
+        <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
+        <p class="answer-text mt-2 italic text-green-700">Answer: {question.answer}</p>
       </div>
     {/each}
   {/if}
 </div>
-
-<style>
-  .questions {
-    padding: 1rem;
-    background: white;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-  }
-
-  h3 {
-    margin: 0 0 1rem 0;
-    color: #1e293b;
-    font-size: 1rem;
-  }
-
-  .question-card {
-    background: #f0f9ff;
-    border-left: 4px solid #0284c7;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 4px;
-  }
-
-  .question-text {
-    margin: 0 0 1rem 0;
-    color: #1e293b;
-    font-weight: 500;
-  }
-
-  .answer-form input {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    font-size: 0.875rem;
-  }
-
-  .button-group,
-  .choices {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .btn {
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .btn-success {
-    background-color: #16a34a;
-    color: white;
-  }
-
-  .btn-success:hover {
-    background-color: #15803d;
-  }
-
-  .btn-danger {
-    background-color: #dc2626;
-    color: white;
-  }
-
-  .btn-danger:hover {
-    background-color: #b91c1c;
-  }
-
-  .btn-secondary {
-    background-color: #6b7280;
-    color: white;
-  }
-
-  .btn-secondary:hover {
-    background-color: #4b5563;
-  }
-
-  .answered-card {
-    background: #f0fdf4;
-    border-left: 4px solid #16a34a;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 4px;
-  }
-
-  .answer-text {
-    margin: 0.5rem 0 0 0;
-    color: #15803d;
-    font-style: italic;
-  }
-</style>

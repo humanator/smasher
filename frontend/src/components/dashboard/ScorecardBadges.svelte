@@ -14,6 +14,8 @@
     synthesis?: { recommendation: string; reasons: string[] } | null;
   }
 
+  import { Badge } from '$lib/components/ui/badge/index.js';
+
   let { scorecard }: { scorecard: Scorecard } = $props();
 
   const lintChecks = $derived(scorecard.lint?.checks ?? []);
@@ -25,74 +27,43 @@
   const synthesisReasons = $derived(scorecard.synthesis?.reasons ?? []);
 </script>
 
-<div class="scorecard">
+<!-- Pass/fail colors carry semantic meaning, so they stay as explicit hues. -->
+<div class="scorecard flex flex-wrap gap-1.5">
   {#if lintPassed !== null}
-    <span class="scorecard-badge {lintPassed ? 'scorecard-badge-pass' : 'scorecard-badge-fail'}">
+    <Badge
+      class="scorecard-badge rounded font-semibold {lintPassed
+        ? 'scorecard-badge-pass bg-green-100 text-green-700'
+        : 'scorecard-badge-fail bg-red-100 text-red-700'}"
+    >
       lint: {lintPassed ? 'pass' : 'fail'}
-    </span>
+    </Badge>
     {#each lintViolations as violation (violation)}
-      <span class="scorecard-violation">{violation}</span>
+      <span class="scorecard-violation w-full text-xs text-muted-foreground">{violation}</span>
     {/each}
   {/if}
 
   {#if criticSuccess !== null}
-    <span class="scorecard-badge {criticSuccess ? 'scorecard-badge-pass' : 'scorecard-badge-fail'}">
+    <Badge
+      class="scorecard-badge rounded font-semibold {criticSuccess
+        ? 'scorecard-badge-pass bg-green-100 text-green-700'
+        : 'scorecard-badge-fail bg-red-100 text-red-700'}"
+    >
       critic: {criticSuccess ? 'success' : 'friction'}
-    </span>
+    </Badge>
     {#each criticFriction as friction (friction)}
-      <span class="scorecard-violation">{friction}</span>
+      <span class="scorecard-violation w-full text-xs text-muted-foreground">{friction}</span>
     {/each}
   {/if}
 
   {#if synthesisLabel}
-    <span class="scorecard-recommendation scorecard-recommendation-{synthesisLabel}">
+    <Badge
+      variant="secondary"
+      class="scorecard-recommendation scorecard-recommendation-{synthesisLabel} rounded font-semibold"
+    >
       synthesis: {synthesisLabel}
-    </span>
+    </Badge>
     {#each synthesisReasons as reason (reason)}
-      <span class="scorecard-reason">{reason}</span>
+      <span class="scorecard-reason w-full text-xs text-muted-foreground">{reason}</span>
     {/each}
   {/if}
 </div>
-
-<style>
-  .scorecard {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-  }
-
-  .scorecard-badge {
-    display: inline-block;
-    padding: 0.0625rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-  }
-
-  .scorecard-badge-pass {
-    background: #dcfce7;
-    color: #15803d;
-  }
-
-  .scorecard-badge-fail {
-    background: #fee2e2;
-    color: #b91c1c;
-  }
-
-  .scorecard-recommendation {
-    display: inline-block;
-    padding: 0.0625rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    background: #f1f5f9;
-    color: #475569;
-  }
-
-  .scorecard-violation,
-  .scorecard-reason {
-    font-size: 0.6875rem;
-    color: #64748b;
-    width: 100%;
-  }
-</style>

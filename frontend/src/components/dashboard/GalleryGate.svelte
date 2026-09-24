@@ -7,6 +7,10 @@
   import * as galleryApi from '../../lib/api/gallery';
   import type { GalleryGateInfo } from '../../lib/api/questions';
   import ScorecardBadges, { type Scorecard } from './ScorecardBadges.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import * as Card from '$lib/components/ui/card/index.js';
+  import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
 
   let { runId }: { runId: string } = $props();
 
@@ -93,195 +97,82 @@
 </script>
 
 {#if done}
-  <p class="gate-done">Decision recorded — resuming…</p>
+  <p class="gate-done font-medium text-green-700">Decision recorded — resuming…</p>
 {:else if gate}
-  <div class="gate-card">
+  <div class="gate-card flex flex-col gap-4">
     {#if gate.expected_count !== null}
-      <p class="gate-hint">Expected {gate.expected_count}, found {gate.candidates.length}</p>
+      <p class="m-0 text-sm text-muted-foreground">
+        Expected {gate.expected_count}, found {gate.candidates.length}
+      </p>
     {:else}
-      <p class="gate-hint">Found {gate.candidates.length} candidate(s)</p>
+      <p class="m-0 text-sm text-muted-foreground">Found {gate.candidates.length} candidate(s)</p>
     {/if}
 
-    <div class="candidate-grid">
+    <div class="candidate-grid grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-5">
       {#each gate.candidates as candidate (candidate.candidate_id)}
         {#if isFailed(candidate)}
-          <div class="candidate-card candidate-card-failed">
-            <div class="candidate-id">{candidate.candidate_id}</div>
+          <Card.Root
+            size="sm"
+            class="candidate-card candidate-card-failed gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 shadow-none ring-0"
+          >
+            <div class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</div>
             {#if failureReason(candidate)}
-              <p class="candidate-failure-reason">{failureReason(candidate)}</p>
+              <p class="text-sm text-destructive">{failureReason(candidate)}</p>
             {/if}
-          </div>
+          </Card.Root>
         {:else}
-          <label class="candidate-card">
-            <input
-              type="checkbox"
+          <!-- Native label kept as the card container: the whole card toggles the checkbox. -->
+          <label
+            class="candidate-card flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground"
+          >
+            <Checkbox
               checked={selected[candidate.candidate_id] ?? false}
-              onchange={(e) =>
-                (selected[candidate.candidate_id] = (e.target as HTMLInputElement).checked)}
+              onCheckedChange={(checked) => (selected[candidate.candidate_id] = checked)}
               aria-label={candidate.candidate_id}
             />
-            <div class="candidate-embed">
+            <div class="candidate-embed aspect-[4/3] overflow-hidden rounded bg-muted">
               {#if candidate.bundle_url}
                 <iframe
                   src={candidate.bundle_url}
                   title="Candidate {candidate.candidate_id}"
                   sandbox="allow-scripts"
-                  class="candidate-thumbnail"
+                  class="candidate-thumbnail size-full border-none object-cover"
                 ></iframe>
               {:else}
                 <img
                   src={candidate.screenshot_url}
                   alt="Candidate {candidate.candidate_id}"
-                  class="candidate-thumbnail"
+                  class="candidate-thumbnail size-full border-none object-cover"
                 />
               {/if}
             </div>
-            <span class="candidate-id">{candidate.candidate_id}</span>
+            <span class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</span>
             <ScorecardBadges scorecard={(candidate.scorecard ?? {}) as Scorecard} />
-            <textarea
-              class="candidate-comment"
+            <Textarea
+              class="candidate-comment min-h-12 resize-y rounded-md px-2 py-2 text-xs md:text-xs"
               aria-label="Comment for {candidate.candidate_id}"
               placeholder="Notes to drive the next iteration (optional)"
               value={comments[candidate.candidate_id] ?? ''}
               oninput={(e) =>
                 (comments[candidate.candidate_id] = (e.target as HTMLTextAreaElement).value)}
-            ></textarea>
+            />
           </label>
         {/if}
       {/each}
     </div>
 
-    <div class="gate-decision-bar">
+    <div class="gate-decision-bar flex gap-2">
       {#each gate.outgoing_edges as edge (edge)}
-        <button
-          type="button"
-          class="btn btn-primary"
-          disabled={submitting}
-          onclick={() => handleDecision(edge)}
-        >
+        <Button disabled={submitting} onclick={() => handleDecision(edge)}>
           {edge}
-        </button>
+        </Button>
       {/each}
     </div>
-    <p class="gate-note">No boxes checked + an iterate edge = reject-all and re-roll.</p>
+    <p class="m-0 text-xs text-muted-foreground">
+      No boxes checked + an iterate edge = reject-all and re-roll.
+    </p>
     {#if error}
-      <p class="gate-error" role="alert">{error}</p>
+      <p class="gate-error text-sm text-destructive" role="alert">{error}</p>
     {/if}
   </div>
 {/if}
-
-<style>
-  .gate-done {
-    color: #15803d;
-    font-weight: 500;
-  }
-
-  .gate-card {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .gate-hint {
-    color: #64748b;
-    font-size: 0.875rem;
-    margin: 0;
-  }
-
-  .candidate-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 1.25rem;
-  }
-
-  .candidate-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    cursor: pointer;
-  }
-
-  .candidate-card-failed {
-    background: #fef2f2;
-    border-color: #fecaca;
-    cursor: default;
-  }
-
-  .candidate-embed {
-    aspect-ratio: 4 / 3;
-    overflow: hidden;
-    border-radius: 4px;
-    background: #f1f5f9;
-  }
-
-  .candidate-thumbnail {
-    width: 100%;
-    height: 100%;
-    border: none;
-    object-fit: cover;
-  }
-
-  .candidate-id {
-    font-family: monospace;
-    font-size: 0.8125rem;
-    color: #1e293b;
-  }
-
-  .candidate-failure-reason {
-    color: #b91c1c;
-    font-size: 0.875rem;
-  }
-
-  .candidate-comment {
-    width: 100%;
-    min-height: 3rem;
-    padding: 0.5rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 4px;
-    font-size: 0.8125rem;
-    resize: vertical;
-  }
-
-  .gate-decision-bar {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-
-  .btn-primary {
-    background-color: #3b82f6;
-    color: white;
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background-color: #2563eb;
-  }
-
-  .btn-primary:disabled {
-    background-color: #94a3b8;
-    cursor: not-allowed;
-  }
-
-  .gate-note {
-    color: #94a3b8;
-    font-size: 0.75rem;
-    margin: 0;
-  }
-
-  .gate-error {
-    color: #dc2626;
-    font-size: 0.875rem;
-  }
-</style>

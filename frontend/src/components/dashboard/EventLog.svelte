@@ -82,85 +82,24 @@
   }
 </script>
 
-<div class="event-log">
-  <h3>Events</h3>
+<div class="event-log max-h-[500px] overflow-y-auto rounded-lg border border-border bg-muted/50 p-4">
+  <h3 class="mb-4 text-base font-semibold text-foreground">Events</h3>
 
   {#if eventStore.events.length === 0}
-    <p class="empty">Waiting for events...</p>
+    <p class="py-8 text-center text-muted-foreground">Waiting for events...</p>
   {:else}
-    <div class="events-list">
+    <div class="flex flex-col gap-3">
       {#each eventStore.events as event (event.kind + event.timestamp)}
-        <div class="event-item">
-          <div class="event-kind">{event.kind}</div>
-          <div class="event-desc">{eventDescription(event)}</div>
-          <div class="event-time">{new Date(event.timestamp).toLocaleTimeString()}</div>
+        <div class="event-item rounded border-l-4 border-primary bg-card p-3 text-sm">
+          <div class="text-xs font-semibold uppercase text-primary">{event.kind}</div>
+          <div class="my-1 text-foreground">{eventDescription(event)}</div>
+          <div class="text-xs text-muted-foreground">{new Date(event.timestamp).toLocaleTimeString()}</div>
         </div>
       {/each}
     </div>
   {/if}
 
   {#if eventStore.isComplete}
-    <p class="complete" role="status">Pipeline complete</p>
+    <p class="mt-4 text-center font-medium text-green-600" role="status">Pipeline complete</p>
   {/if}
 </div>
-
-<style>
-  .event-log {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
-    background: #f8fafc;
-    max-height: 500px;
-    overflow-y: auto;
-  }
-
-  h3 {
-    margin: 0 0 1rem 0;
-    color: #1e293b;
-    font-size: 1rem;
-  }
-
-  .empty {
-    color: #94a3b8;
-    text-align: center;
-    padding: 2rem 0;
-  }
-
-  .events-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .event-item {
-    background: white;
-    border-left: 4px solid #3b82f6;
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.875rem;
-  }
-
-  .event-kind {
-    font-weight: 600;
-    color: #3b82f6;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-  }
-
-  .event-desc {
-    color: #1e293b;
-    margin: 0.25rem 0;
-  }
-
-  .event-time {
-    color: #94a3b8;
-    font-size: 0.75rem;
-  }
-
-  .complete {
-    color: #16a34a;
-    font-weight: 500;
-    text-align: center;
-    margin-top: 1rem;
-  }
-</style>

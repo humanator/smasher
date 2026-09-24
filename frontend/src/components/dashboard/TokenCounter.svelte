@@ -35,24 +35,11 @@
   });
 </script>
 
-<div class="token-counter">
+<div class="token-counter flex gap-6 text-sm text-muted-foreground">
   {#if error}
-    <span class="error" role="alert">Error: {error}</span>
+    <span class="text-destructive" role="alert">Error: {error}</span>
   {:else}
     <span class="token">Input tokens: {inputTokens}</span>
     <span class="token">Output tokens: {outputTokens}</span>
   {/if}
 </div>
-
-<style>
-  .token-counter {
-    display: flex;
-    gap: 1.5rem;
-    font-size: 0.875rem;
-    color: #475569;
-  }
-
-  .error {
-    color: #dc2626;
-  }
-</style>

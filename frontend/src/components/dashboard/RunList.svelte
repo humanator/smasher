@@ -5,6 +5,8 @@
   import { onMount, onDestroy } from 'svelte';
   import * as runsApi from '../../lib/api/runs';
   import type { RunSummary } from '../../lib/api/runs';
+  import * as Table from '$lib/components/ui/table/index.js';
+  import StatusBadge from './StatusBadge.svelte';
 
   const POLL_INTERVAL_MS = 5000;
 
@@ -35,130 +37,39 @@
   });
 </script>
 
-<div class="run-list">
-  <h1>Runs</h1>
+<div class="run-list p-8">
+  <h1 class="mb-8 text-3xl font-bold text-foreground">Runs</h1>
 
   {#if loading}
-    <p class="loading">Loading runs...</p>
+    <p class="p-8 text-center text-lg text-muted-foreground">Loading runs...</p>
   {:else if error}
-    <p class="error" role="alert">Error: {error}</p>
+    <p class="p-8 text-center text-lg text-destructive" role="alert">Error: {error}</p>
   {:else if runs.length === 0}
-    <p class="empty-state">No runs yet.</p>
+    <p class="p-8 text-center text-lg text-muted-foreground">No runs yet.</p>
   {:else}
-    <table>
-      <thead>
-        <tr>
-          <th>Run</th>
-          <th>Workflow</th>
-          <th>Status</th>
-          <th>Started</th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each runs as run (run.id)}
-          <tr>
-            <td>
-              <a href="/runs/{run.id}">{run.id}</a>
-            </td>
-            <td>{run.graph_name}</td>
-            <td><span class="status status-{run.status.toLowerCase()}">{run.status}</span></td>
-            <td>{new Date(run.started_at).toLocaleString()}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+    <div class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <Table.Root>
+        <Table.Header class="bg-muted/50">
+          <Table.Row>
+            <Table.Head class="text-muted-foreground">Run</Table.Head>
+            <Table.Head class="text-muted-foreground">Workflow</Table.Head>
+            <Table.Head class="text-muted-foreground">Status</Table.Head>
+            <Table.Head class="text-muted-foreground">Started</Table.Head>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {#each runs as run (run.id)}
+            <Table.Row>
+              <Table.Cell>
+                <a href="/runs/{run.id}" class="font-mono text-primary hover:underline">{run.id}</a>
+              </Table.Cell>
+              <Table.Cell>{run.graph_name}</Table.Cell>
+              <Table.Cell><StatusBadge status={run.status} /></Table.Cell>
+              <Table.Cell>{new Date(run.started_at).toLocaleString()}</Table.Cell>
+            </Table.Row>
+          {/each}
+        </Table.Body>
+      </Table.Root>
+    </div>
   {/if}
 </div>
-
-<style>
-  .run-list {
-    padding: 2rem;
-  }
-
-  h1 {
-    font-size: 2rem;
-    margin-bottom: 2rem;
-    color: #1e293b;
-  }
-
-  .loading,
-  .error,
-  .empty-state {
-    font-size: 1.125rem;
-    color: #64748b;
-    text-align: center;
-    padding: 2rem;
-  }
-
-  .error {
-    color: #dc2626;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #fff;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-
-  th,
-  td {
-    text-align: left;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  th {
-    background: #f8fafc;
-    color: #475569;
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-
-  td {
-    font-size: 0.875rem;
-    color: #1e293b;
-  }
-
-  a {
-    color: #3b82f6;
-    text-decoration: none;
-    font-family: monospace;
-  }
-
-  a:hover {
-    text-decoration: underline;
-  }
-
-  .status {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .status-running {
-    background: #dbeafe;
-    color: #1d4ed8;
-  }
-
-  .status-completed {
-    background: #dcfce7;
-    color: #15803d;
-  }
-
-  .status-failed {
-    background: #fee2e2;
-    color: #b91c1c;
-  }
-
-  .status-aborted,
-  .status-cancelled {
-    background: #f1f5f9;
-    color: #475569;
-  }
-</style>

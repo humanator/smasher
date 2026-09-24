@@ -4,6 +4,7 @@
 
   import type { CandidateResponse } from '../../lib/api/runs';
   import ScorecardBadges, { type Scorecard } from './ScorecardBadges.svelte';
+  import * as Card from '$lib/components/ui/card/index.js';
 
   let { candidate }: { candidate: CandidateResponse } = $props();
 
@@ -19,83 +20,42 @@
 </script>
 
 {#if failed}
-  <div class="candidate-card candidate-card-failed">
-    <div class="candidate-id">{candidate.candidate_id}</div>
+  <Card.Root
+    size="sm"
+    class="candidate-card candidate-card-failed gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 shadow-none ring-0"
+  >
+    <div class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</div>
     {#if exitStatus?.reason}
-      <p class="candidate-failure-reason">{exitStatus.reason}</p>
+      <p class="candidate-failure-reason text-sm text-destructive">{exitStatus.reason}</p>
     {/if}
-  </div>
+  </Card.Root>
 {:else}
-  <div class="candidate-card">
-    <div class="candidate-embed">
+  <Card.Root
+    size="sm"
+    class="candidate-card gap-2 rounded-lg border border-border p-4 shadow-none ring-0"
+  >
+    <div class="candidate-embed aspect-[4/3] overflow-hidden rounded bg-muted">
       {#if candidate.bundle_url}
         <iframe
           src={candidate.bundle_url}
           title="Candidate {candidate.candidate_id}"
           sandbox="allow-scripts"
-          class="candidate-thumbnail"
+          class="candidate-thumbnail size-full border-none object-cover"
         ></iframe>
       {:else}
         <img
           src={candidate.screenshot_url}
           alt="Candidate {candidate.candidate_id}"
-          class="candidate-thumbnail"
+          class="candidate-thumbnail size-full border-none object-cover"
         />
       {/if}
     </div>
 
-    <div class="candidate-id">{candidate.candidate_id}</div>
+    <div class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</div>
     {#if capturedAt}
-      <div class="candidate-captured-at">{capturedAt}</div>
+      <div class="candidate-captured-at text-xs text-muted-foreground">{capturedAt}</div>
     {/if}
 
     <ScorecardBadges {scorecard} />
-  </div>
+  </Card.Root>
 {/if}
-
-<style>
-  .candidate-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .candidate-card-failed {
-    background: #fef2f2;
-    border-color: #fecaca;
-  }
-
-  .candidate-embed {
-    aspect-ratio: 4 / 3;
-    overflow: hidden;
-    border-radius: 4px;
-    background: #f1f5f9;
-  }
-
-  .candidate-thumbnail {
-    width: 100%;
-    height: 100%;
-    border: none;
-    object-fit: cover;
-  }
-
-  .candidate-id {
-    font-family: monospace;
-    font-size: 0.8125rem;
-    color: #1e293b;
-  }
-
-  .candidate-captured-at {
-    font-size: 0.75rem;
-    color: #94a3b8;
-  }
-
-  .candidate-failure-reason {
-    color: #b91c1c;
-    font-size: 0.875rem;
-  }
-</style>

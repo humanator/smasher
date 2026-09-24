@@ -14,6 +14,7 @@
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import NewWorkflowPage from './components/dashboard/NewWorkflowPage.svelte';
   import WorkflowEditorPage from './components/dashboard/WorkflowEditorPage.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
 
   let runId = $state<string | null>(null);
   let workflowPageType = $state<'new' | 'edit' | null>(null);
@@ -75,7 +76,7 @@
   }
 </script>
 
-<main class="min-h-screen bg-gray-50">
+<main class="min-h-screen bg-muted/40 text-foreground">
   {#if workflowPageType === 'new'}
     <!-- New Workflow Page -->
     <div class="max-w-7xl mx-auto">
@@ -90,7 +91,7 @@
     <!-- Run Detail View: EventLog + QuestionCard -->
     <div class="max-w-6xl mx-auto p-8">
       <div class="mb-8">
-        <a href="/" class="text-blue-600 hover:underline">← Back to Catalog</a>
+        <a href="/" class="text-primary hover:underline">← Back to Catalog</a>
         <h1 class="text-3xl font-bold mt-4">Pipeline Run: {runId}</h1>
       </div>
 
@@ -131,12 +132,7 @@
     <div class="min-h-screen">
       <header class="flex items-center justify-between gap-4 px-5 py-3">
         <h1 class="text-3xl font-bold">Smasher Pipelines</h1>
-        <a
-          href="/workflows/new"
-          class="rounded-sm bg-blue-500 px-11 py-3 text-sm text-white hover:bg-blue-600"
-        >
-          New Workflow
-        </a>
+        <Button href="/workflows/new" size="lg" class="px-11">New Workflow</Button>
       </header>
 
       <div class="mx-auto max-w-6xl px-4 sm:px-8">

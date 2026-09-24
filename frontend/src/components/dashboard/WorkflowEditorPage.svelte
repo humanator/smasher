@@ -33,16 +33,21 @@
   }
 </script>
 
-<div class="workflow-editor-page">
-  <div class="header">
-    <a href="/" class="back-link">← Back to Catalog</a>
-    <h1>Edit Workflow</h1>
+<div class="workflow-editor-page flex flex-col gap-8 p-8">
+  <div class="flex flex-col gap-4">
+    <a href="/" class="text-sm text-primary hover:underline">← Back to Catalog</a>
+    <h1 class="m-0 text-3xl font-bold text-foreground">Edit Workflow</h1>
   </div>
 
   {#if loading}
-    <p class="loading">Loading workflow...</p>
+    <p class="rounded bg-muted p-4 text-muted-foreground">Loading workflow...</p>
   {:else if error}
-    <p class="error" role="alert">{error}</p>
+    <p
+      class="rounded border border-destructive/40 bg-destructive/10 p-4 text-destructive"
+      role="alert"
+    >
+      {error}
+    </p>
   {:else if graph}
     <WorkflowCanvas
       {graph}
@@ -52,51 +57,3 @@
     />
   {/if}
 </div>
-
-<style>
-  .workflow-editor-page {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    padding: 2rem;
-  }
-
-  .header {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .back-link {
-    color: #3b82f6;
-    text-decoration: none;
-    font-size: 0.875rem;
-  }
-
-  .back-link:hover {
-    text-decoration: underline;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: 2rem;
-    color: #1e293b;
-  }
-
-  .loading,
-  .error {
-    padding: 1rem;
-    border-radius: 4px;
-  }
-
-  .loading {
-    color: #64748b;
-    background-color: #f1f5f9;
-  }
-
-  .error {
-    color: #dc2626;
-    background-color: #fee2e2;
-    border: 1px solid #fca5a5;
-  }
-</style>

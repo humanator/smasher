@@ -8,6 +8,7 @@
   import StatusBadge from './StatusBadge.svelte';
   import TokenCounter from './TokenCounter.svelte';
   import { sanitizeSvg } from '../../lib/sanitizeSvg';
+  import { Button } from '$lib/components/ui/button/index.js';
 
   let { runId }: { runId: string } = $props();
 
@@ -67,77 +68,34 @@
   });
 </script>
 
-<div class="run-detail">
+<div class="run-detail flex flex-col gap-4">
   {#if error}
-    <p class="error" role="alert">Error: {error}</p>
+    <p class="text-destructive" role="alert">Error: {error}</p>
   {/if}
 
   {#if run}
-    <div class="header">
+    <div class="flex items-center gap-4">
       <StatusBadge status={run.status} />
       {#if !TERMINAL_STATUSES.has(run.status)}
-        <button class="btn btn-abort" onclick={handleAbort} disabled={aborting}>
+        <Button
+          variant="destructive"
+          size="sm"
+          class="bg-destructive text-white hover:bg-destructive/90 dark:bg-destructive"
+          onclick={handleAbort}
+          disabled={aborting}
+        >
           {aborting ? 'Aborting...' : 'Abort'}
-        </button>
+        </Button>
       {/if}
     </div>
 
     <TokenCounter {runId} />
 
     {#if graphSvg}
-      <div class="graph">
+      <div class="graph overflow-auto rounded-lg border border-border bg-card p-4">
         <!-- eslint-disable-next-line svelte/no-at-html-tags -- graphSvg is passed through sanitizeSvg() above, which strips <script>, on* handlers, and javascript: hrefs -->
         {@html graphSvg}
       </div>
     {/if}
   {/if}
 </div>
-
-<style>
-  .run-detail {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .error {
-    color: #dc2626;
-  }
-
-  .btn {
-    padding: 0.375rem 0.875rem;
-    border-radius: 4px;
-    border: none;
-    cursor: pointer;
-    font-size: 0.8125rem;
-    font-weight: 500;
-  }
-
-  .btn-abort {
-    background-color: #dc2626;
-    color: white;
-  }
-
-  .btn-abort:hover:not(:disabled) {
-    background-color: #b91c1c;
-  }
-
-  .btn-abort:disabled {
-    background-color: #94a3b8;
-    cursor: not-allowed;
-  }
-
-  .graph {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 1rem;
-    background: #fff;
-    overflow: auto;
-  }
-</style>
