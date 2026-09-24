@@ -10,12 +10,14 @@ Every planned module is done: the design-factory modules (`component-kit` throug
 are in [`archive/`](archive/). What's left is follow-up work, known gaps, and
 deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
-## Where things stand (2026-09-24)
+## Where things stand (2026-09-25)
 
-**Branches.** `chore/tasks-triage` and `fix/default-model` (item #1) are merged
-into `main`. `feat/claude-cli-provider` is still open, built on `main`. The provider is
-implemented there (T2-T12 in `todo.md`), **waiting on Jobsworth's manual
-checkpoint runs and review** before it merges.
+**Branches.** `chore/tasks-triage`, `fix/default-model` (item #1) and the editor
+batch are merged into `main`. `feat/claude-cli-provider` is still open. It was
+rebased onto `main` (`47a8759`) on 2026-09-25. The provider is implemented there
+(T2-T12 in `todo.md`), plus two fixes from the first real desktop run (see In
+progress). It's **waiting on Jobsworth's manual checkpoint runs and review**
+before it merges.
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
@@ -24,7 +26,9 @@ added mid-session and runs alongside. Its manual checkpoints and merge come firs
 **Waiting on Jobsworth:**
 - Claude CLI provider: the manual checkpoint runs listed in `todo.md` (real-CLI
   `#[ignore]` tests, `product_design_factory.dot` with no keys, the desktop app),
-  then review and merge.
+  then review and merge. Restart the desktop app from the branch first, since
+  the fixes below need a rebuild. Then rerun the product design factory to
+  finish Checkpoint C.
 - #2: whether CI installs Chromium (for Playwright and `render-capture`'s
   integration test).
 - #6: the default artifact retention policy.
@@ -85,16 +89,66 @@ if the directories differ. To serve without API keys or spending anything, point
      off both edges. Probably `fitView` stopping at Svelte Flow's default
      `minZoom` of 0.5. Setting a lower `minZoom` on the canvas would likely fix it.
 
+9. **Show candidates as thumbnails that open a full-size, interactive lightbox.**
+   *Raised by Jobsworth 2026-09-25 from a real run, so moved up from P3.* Each card
+   in the gallery grid (`CandidateCard.svelte`) is a live iframe at 4:3 in a column
+   at least 260px wide. Candidates are designed at desktop size (render-capture
+   shoots 1280×800), so at that size they're too small to judge. Instead, show the
+   screenshot as a thumbnail, and open the live bundle (`bundle_url`) in a lightbox
+   at full size so it can be clicked through. Keep the scorecard badges and the
+   gallery gate's selection controls on the card.
+
+20. **Model selection everywhere, and per node.** *Raised by Jobsworth
+    2026-09-25.* Bigger than the rest of P1, so write a spec first. Today:
+    - The model and provider are set once for the whole server, from
+      `SMASHER_MODEL`/`SMASHER_PROVIDER` (env or repo `.env`) or the desktop
+      settings dialog. That dialog only renders in the desktop app
+      (`App.svelte`, `isTauri()`), because it saves through Tauri commands and
+      the macOS Keychain. The web app has no settings UI and no settings API.
+    - The node editor's codergen form has a free-text `model` field and no
+      `provider` field. Tool nodes that call an LLM (`task_critic`, `synthesis`)
+      have no model control at all.
+    - Model and provider are set separately, so they can drift apart. On
+      2026-09-25, switching the desktop provider to Claude CLI kept the repo
+      `.env`'s `SMASHER_MODEL=gemma4:31b-cloud`, and `task_critic` sent it to
+      `claude -p`. (The claude-cli paths now ignore non-Claude names, in
+      `944c09c`, but that only hides the mismatch.)
+
+    Wanted:
+    - Provider and model settings in both the desktop and web apps. The web app
+      needs a settings API and somewhere other than the Keychain to keep keys.
+    - When editing an LLM node, pick its model from a list of the configured
+      providers' models (including Claude CLI), not free text.
+    - Choosing a provider also sets a valid model for it.
+
 ## In progress
 
 - **Claude CLI provider.** Run every pipeline LLM call through `claude -p` from
   the web and desktop apps, with no API key. Spec, plan and todo are on branch
   `feat/claude-cli-provider`. The code is done. Still to do: the manual checkpoint
   runs (real CLI, product design factory with no keys, desktop app), then review
-  and merge. Things to watch in those runs:
-  - `design-kit` is a symlink out of the run dir. Check that `Read` under
-    `dontAsk` isn't denied when it follows the link.
-  - Check that the default allowlist is enough for a real candidate build.
+  and merge.
+
+  First real desktop run (`01m39tb2qn0b4msk4cgdr94fry`, 2026-09-24, product
+  design factory):
+  - `Read` through the `design-kit` symlink works under `dontAsk`.
+  - The allowlist is enough to **build** candidates (4 Discover candidates plus
+    the Define build), but not to **check** them. The codergen agents reported
+    shell access denied, so they couldn't run the design-kit token linter or
+    open their pages. Decide whether to allow the linter command, or leave the
+    checks to the pipeline's own `system_lint`/`render` nodes.
+  - Fixed: run token totals were always 0, and the CLI's streamed usage was
+    misread (`5308541`). Usage now comes from the result line, with cost.
+    Input excludes cache tokens, as with the Anthropic API adapter, so for
+    claude-cli runs the cost figure is the useful number.
+  - Fixed: `TaskCritic` failed with "issue with the selected model
+    (gemma4:31b-cloud)". A server-wide Ollama model reached `claude -p --model`
+    through the single-call adapter (`944c09c`). This took `CritiqueJoin` and
+    `Synthesis` down with it, so Checkpoint C still needs a clean rerun. The
+    underlying problem is item #20.
+  - The gallery stays empty until every render node has run. `IAOptions`
+    writes all four candidates in one ~5 minute node, so nothing shows for a
+    while. That's how the pipeline is built, not a bug.
 
   Possible follow-ups:
   - Show `permission_denials` from the CLI's result event in the run view.
@@ -145,8 +199,7 @@ decides the `candidate_id` convention, and the lint override lives in the same
    hand. This is the most likely one to be needed first.
 8. **Let a failing lint force `synthesis` to recommend `iterate`**, whatever the
    model says. Decide once more real runs exist.
-9. **Add an expand or full-size view to the candidate card** (`CandidateCard.svelte`
-   is a fixed-size iframe).
+9. *Moved to P1 (thumbnails with a lightbox).*
 10. **Support two gallery gates pending on one run at the same time.** This needs a
     mapping from node id to question in the engine first.
 11. **Document where `candidate_id` values come from** as a convention for
