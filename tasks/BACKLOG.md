@@ -10,12 +10,47 @@ Every planned module is done: the design-factory modules (`component-kit` throug
 are in [`archive/`](archive/). What's left is follow-up work, known gaps, and
 deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
+## Where things stand (2026-09-24)
+
+**Branches.** `chore/tasks-triage` and `fix/default-model` (item #1) are merged
+into `main`. `feat/claude-cli-provider` is still open, built on `main`, and holds
+only `SPEC-claude-cli-provider.md`, **awaiting Jobsworth's review**. No code yet.
+Until it merges, that spec exists only on that branch.
+
+**Agreed order.** #2, then the editor batch (#3 + #4 + #5 on one branch, since
+they share the save path and the canvas), then #6. The Claude CLI provider was
+added mid-session and runs alongside. Its spec review comes first.
+
+**Waiting on Jobsworth:**
+- Review of `SPEC-claude-cli-provider.md`, and answers to its three Open
+  questions.
+- #2: whether CI installs Chromium (for Playwright and `render-capture`'s
+  integration test).
+- #6: the default artifact retention policy.
+
+**Frontend test gotcha.** The Vitest suite's "real API" tests (gallery, gate,
+decision history, new-workflow) call whatever server is listening on
+`127.0.0.1:21541`. They don't start one themselves. If the desktop app is running
+there, it stores data in `~/Documents/smasher` instead of the repo, and about 50
+tests fail for reasons unrelated to the code. Quit the app and run `cargo run -p
+smasher-cli -- serve` from the branch under test first.
+
 ## P1: Do next (small, and each one fixes something real)
 
 1. ~~**Replace the stale default model ID and define it once.**~~ **Done
-   2026-09-24** on `fix/default-model`. `smasher_llm::types::DEFAULT_MODEL` is
+   2026-09-24** (merged to `main`). `smasher_llm::types::DEFAULT_MODEL` is
    `claude-sonnet-5`, and the Anthropic adapter now sends adaptive thinking and no
-   sampling params to models that reject them.
+   sampling params to models that reject them
+   (`provider/anthropic/types.rs`, `is_adaptive_only_model`).
+   Loose ends:
+   - **Not tested against the live API.** Tests use mocks, so run one real
+     pipeline on Sonnet 5 before relying on it.
+   - **Stale catalog aliases.** In `smasher-llm/src/types/catalog.rs`, the
+     `claude-sonnet`/`claude-opus` aliases and `get_latest_model()` still point at
+     the 4.6 models. The catalog also has no Opus 5, Opus 5.5 or Fable entries.
+     Unknown models fall back to conservative limits (8k max output, no thinking).
+   - Test fixtures still use `claude-sonnet-4-20250514` on purpose, as sample
+     data. Leave them.
 
 2. **Run the frontend in CI.** `.github/workflows/ci.yml` runs only cargo. The
    SPA's ~197 Vitest tests, `svelte-check`, lint, and the 4 Playwright specs never
@@ -24,6 +59,8 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
    Playwright and `render-capture`'s integration test. That Chromium question has
    never been decided on purpose. *Source: DEFERRED `render-capture`, desktop
    Checkpoint C waiver.*
+   Because of the gotcha above, the CI job has to build and start `smasher serve`
+   before running Vitest.
 
 3. **Fix where dropped nodes land after pan or zoom in the node editor.** When you
    drag a node in from the palette, its position is calculated in screen space
@@ -37,8 +74,16 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
 - **Claude CLI provider.** Run every pipeline LLM call through `claude -p` from
   the web and desktop apps, with no API key. Spec:
-  [`SPEC-claude-cli-provider.md`](SPEC-claude-cli-provider.md) (draft, pending
-  review).
+  `SPEC-claude-cli-provider.md` on branch `feat/claude-cli-provider` (draft,
+  pending review; it includes spike results and cost measurements). Next steps once
+  approved:
+  1. Write `plan-claude-cli-provider.md` and `todo-claude-cli-provider.md`.
+  2. Check spec Open question 2 first (does `~/.claude/CLAUDE.md` leak into
+     codergen runs?).
+  3. Build.
+
+  `smasher run` already has a codergen-only version (`ClaudeCliBackend`,
+  `crates/smasher-cli/src/run.rs:197`), which gets moved and shared.
 
 ## P2: Robustness (can lose data or grow without limit)
 
@@ -62,6 +107,10 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
+When these come up, batch #7 + #8 + #11 together: several-candidate critique
+decides the `candidate_id` convention, and the lint override lives in the same
+`synthesis` code.
+
 7. **Critique several candidates from one node.** Today, giving N Discover
    candidates their own `task_critic`/`synthesis` call means writing N nodes by
    hand. This is the most likely one to be needed first.
@@ -82,6 +131,9 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
     graph out again with Graphviz each time.
 
 ## P4: Distribution and remote access (bigger, strategic)
+
+#17 and #18 are both work on the Tauri app's setup, so batch them if either
+comes up.
 
 16. **Serve the app remotely over HTTP.** This was the "(later)" goal in the
     desktop capability map. It needs an auth layer first, because the API has none
