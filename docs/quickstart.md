@@ -445,17 +445,29 @@ open target/release/bundle/macos/Smasher.app
 The bundle is machine-local: it serves the SPA build, examples, and design
 kit from this checkout, so keep the repo where it was built.
 
-**API keys:** an app launched from Finder or the Dock has no shell environment
-and a working directory of `/`, so it can't see your shell exports or the
-repo's `.env`. Put your keys in `~/.smasher/.env` (or `$SMASHER_DATA_DIR/.env`):
+**Data dir:** the app keeps runs, workflows, and settings in
+`~/Documents/smasher` so they're easy to browse in Finder. Set
+`SMASHER_DATA_DIR` to use another location. The CLI still defaults to
+`~/.smasher`.
 
-```bash
-# ~/.smasher/.env
-ANTHROPIC_API_KEY=sk-ant-...
-```
+**LLM settings:** click the gear in the page header. There you set the
+default model and provider, plus each provider's API key and base URL
+(Anthropic, OpenAI, Gemini, Ollama). API keys are stored in the macOS
+Keychain (service `com.smasher.desktop`). Everything else goes in
+`~/Documents/smasher/settings.json`. Settings take effect when the app
+restarts, and the modal has a **Restart now** button for that. For a local
+Ollama, set its base URL to `http://localhost:11434` and leave the key
+empty.
 
-Without a key, the app shows a "Smasher couldn't start" dialog and exits. It
-also shows that dialog if the server can't bind its port.
+Saved settings override env vars. An app launched from Finder or the Dock
+has no shell environment and a working directory of `/`, so it can't see
+your shell exports or the repo's `.env`. It does still read
+`~/Documents/smasher/.env` (or `$SMASHER_DATA_DIR/.env`) for anything the
+modal doesn't set.
+
+With no provider configured, the app still opens so you can reach Settings.
+Runs fail until a provider is added. If the server can't bind its port, the
+app shows a "Smasher couldn't start" dialog and exits.
 
 **Loopback only:** the embedded server always binds `127.0.0.1`. It ignores
 `SMASHER_WEB_HOST` and `SMASHER_WEB_PORT`. Release builds take an OS-assigned

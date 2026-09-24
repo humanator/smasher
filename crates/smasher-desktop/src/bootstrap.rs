@@ -2,10 +2,10 @@
 // ABOUTME: Kept free of Tauri types so port, host, and env behaviour are unit-testable headlessly.
 
 use std::net::{SocketAddr, TcpStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use smasher_web::server::{DEFAULT_PORT, ServerConfig, default_data_dir};
+use smasher_web::server::{DEFAULT_PORT, ServerConfig};
 
 /// The only address the embedded server may bind: a security boundary
 /// (local-only, no auth), so it's hard-coded rather than read from
@@ -18,8 +18,27 @@ pub fn port_for(debug: bool) -> u16 {
     if debug { DEFAULT_PORT } else { 0 }
 }
 
+/// The desktop app's data dir: `~/Documents/smasher`, so runs and workflows are
+/// easy to reach from Finder. `SMASHER_DATA_DIR` still overrides it. The CLI
+/// keeps `~/.smasher` (see `smasher_web::server::default_data_dir`).
+pub fn desktop_data_dir() -> String {
+    data_dir_from(std::env::var("SMASHER_DATA_DIR").ok(), dirs::document_dir())
+}
+
+/// Pure core of [`desktop_data_dir`], taking the env override and the
+/// Documents dir as arguments so it's testable without global state.
+pub fn data_dir_from(env_override: Option<String>, documents: Option<PathBuf>) -> String {
+    if let Some(dir) = env_override {
+        return dir;
+    }
+    documents
+        .map(|docs| docs.join("smasher").display().to_string())
+        .unwrap_or_else(|| "smasher".into())
+}
+
 /// The desktop's server config: the usual env-driven defaults for model,
-/// provider, and directories, but always loopback and never an env-chosen port.
+/// provider, and workflow dirs, but the desktop data dir, always loopback,
+/// and never an env-chosen port.
 /// Workflow dirs are made absolute against the workspace root, because a
 /// Finder-launched app has cwd `/` and `"examples"` would find nothing.
 pub fn server_config() -> ServerConfig {
@@ -29,6 +48,7 @@ pub fn server_config() -> ServerConfig {
         host: LOOPBACK,
         port: port_for(cfg!(debug_assertions)),
         workflow_dirs: absolute_workflow_dirs(&defaults.workflow_dirs, &workspace_root),
+        data_dir: desktop_data_dir(),
         ..defaults
     }
 }
@@ -53,12 +73,12 @@ pub fn window_url(dev_server: Option<SocketAddr>, server: SocketAddr) -> String 
     }
 }
 
-/// Load `.env` from the cwd, then from the data dir (`~/.smasher/.env` by
-/// default). A Finder-launched app has cwd `/` and no shell env, so the data
+/// Load `.env` from the cwd, then from the data dir
+/// (`~/Documents/smasher/.env` by default). A Finder-launched app has cwd `/` and no shell env, so the data
 /// dir file is where its API keys come from. Earlier values win.
 pub fn load_env() {
     let _ = dotenvy::dotenv();
-    load_env_from_data_dir(Path::new(&default_data_dir()));
+    load_env_from_data_dir(Path::new(&desktop_data_dir()));
 }
 
 /// Load `{data_dir}/.env` if it exists, without overriding vars already set.
@@ -72,6 +92,37 @@ mod tests {
     use smasher_web::server::DEFAULT_PORT;
     use std::net::SocketAddr;
     use tokio_util::sync::CancellationToken;
+
+    #[test]
+    fn desktop_data_dir_is_smasher_under_documents() {
+        let documents = Path::new("/Users/me/Documents");
+
+        assert_eq!(
+            data_dir_from(None, Some(documents.to_path_buf())),
+            "/Users/me/Documents/smasher"
+        );
+    }
+
+    #[test]
+    fn smasher_data_dir_env_overrides_the_desktop_default() {
+        let documents = Path::new("/Users/me/Documents");
+
+        assert_eq!(
+            data_dir_from(Some("/custom".into()), Some(documents.to_path_buf())),
+            "/custom"
+        );
+    }
+
+    #[test]
+    fn desktop_data_dir_without_a_documents_dir_is_relative() {
+        assert_eq!(data_dir_from(None, None), "smasher");
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn server_config_uses_the_desktop_data_dir() {
+        assert_eq!(server_config().data_dir, desktop_data_dir());
+    }
 
     #[test]
     fn port_is_os_assigned_in_release_builds() {

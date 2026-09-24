@@ -1,8 +1,11 @@
 // ABOUTME: Native shim for Tauri integration
-// ABOUTME: File dialogs, save/load, notifications with browser fallbacks
+// ABOUTME: File dialogs, save/load, notifications with browser fallbacks; desktop-only LLM settings
 
 // Type definitions for Tauri window object
 interface TauriApi {
+  core?: {
+    invoke?: <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
+  };
   dialog?: {
     save?: (options?: unknown) => Promise<string | null>;
     open?: (options?: unknown) => Promise<string | string[] | null>;
@@ -145,4 +148,60 @@ export async function showNotification(title: string, options?: NotificationOpti
   if (Notification.permission === 'granted') {
     new Notification(title, options);
   }
+}
+
+/** One provider as the desktop settings modal shows it. Keys never leave the Keychain. */
+export interface ProviderSettings {
+  id: string;
+  label: string;
+  base_url: string;
+  has_key: boolean;
+}
+
+/** The desktop app's LLM settings, as `get_llm_settings` returns them. */
+export interface LlmSettings {
+  default_model: string;
+  default_provider: string;
+  providers: ProviderSettings[];
+  settings_path: string;
+}
+
+/**
+ * A provider as the settings modal saves it. `api_key`: omitted leaves the
+ * stored key alone, `''` removes it, anything else replaces it.
+ */
+export interface ProviderSettingsUpdate {
+  id: string;
+  base_url: string;
+  api_key?: string;
+}
+
+export interface LlmSettingsUpdate {
+  default_model: string;
+  default_provider: string;
+  providers: ProviderSettingsUpdate[];
+}
+
+/** Invoke one of smasher-desktop's own commands; throws outside the desktop app. */
+function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const invokeFn = window.__TAURI__?.core?.invoke;
+  if (!invokeFn) {
+    return Promise.reject(new Error('LLM settings are only available in the desktop app'));
+  }
+  return invokeFn<T>(command, args);
+}
+
+/** Read the desktop app's LLM settings. */
+export function getLlmSettings(): Promise<LlmSettings> {
+  return invoke<LlmSettings>('get_llm_settings');
+}
+
+/** Save the desktop app's LLM settings; they take effect after a restart. */
+export function saveLlmSettings(update: LlmSettingsUpdate): Promise<LlmSettings> {
+  return invoke<LlmSettings>('save_llm_settings', { update });
+}
+
+/** Relaunch the desktop app so saved settings take effect. */
+export function restartApp(): Promise<void> {
+  return invoke<void>('restart_app');
 }

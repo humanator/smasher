@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "served-origin",
-  "description": "Native shim permissions for the SPA served by the embedded server (or Vite in dev). Loopback origins only.",
+  "description": "Native shim and settings-modal permissions for the SPA served by the embedded server (or Vite in dev). Loopback origins only.",
   "windows": ["main"],
   "remote": {
     "urls": ["http://127.0.0.1:*"]
@@ -11,6 +11,9 @@
     "dialog:allow-save",
     "fs:allow-write-text-file",
     "dialog:allow-open",
-    "fs:allow-read-text-file"
+    "fs:allow-read-text-file",
+    "allow-get-llm-settings",
+    "allow-save-llm-settings",
+    "allow-restart-app"
   ]
 }
