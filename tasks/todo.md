@@ -73,17 +73,17 @@ build a `Response` with text and usage from `modelUsage`. `stream()` wraps
 `complete()`.
 
 **Acceptance criteria:**
-- [ ] A fake script records argv and stdin. The test asserts the exact flags, the
+- [x] A fake script records argv and stdin. The test asserts the exact flags, the
       system prompt (given, or the default when it's `None`) and the model.
-- [ ] Response text and usage (input, output, cache read, cache creation) come from
+- [x] Response text and usage (input, output, cache read, cache creation) come from
       the `result` event.
-- [ ] Errors: missing binary → spawn error; non-zero exit → error carrying stderr;
+- [x] Errors: missing binary → spawn error; non-zero exit → error carrying stderr;
       `is_error: true` → error; "not logged in" text → `Error::Authentication`;
       request with `tools` → `Error::InvalidRequest`. None are retryable.
 
 **Verification:**
-- [ ] `cargo test -p smasher-llm claude_cli`
-- [ ] Zero warnings in test output
+- [x] `cargo test -p smasher-llm claude_cli`
+- [x] Zero warnings in test output
 
 **Dependencies:** T2
 **Files likely touched:** `smasher-llm/src/provider/claude_cli/{mod.rs,adapter.rs}`,
