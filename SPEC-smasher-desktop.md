@@ -74,7 +74,11 @@ async fn save_dot_file(contents: String) -> Result<(), String> {
 - [ ] Native-only features (save/load DOT file dialog, OS notification on pipeline completion) work end-to-end.
 - [ ] Embedded server verified bound to `127.0.0.1` only, never externally reachable.
 
-## Open Questions
+## Resolved Questions (2026-09-24)
 
-- Which OS target(s) to build/test first — macOS only initially, given the dev environment, or cross-platform from the start?
-- Whether to invest in `tauri-driver` e2e now or defer until manual QA proves insufficient.
+- OS target: macOS only for now.
+- `tauri-driver` e2e: deferred (it has no macOS support). Rely on manual QA plus `smasher-spa`'s Playwright coverage.
+- Dev port: fixed `21541` in debug builds to match the Vite proxy, OS-assigned in release builds.
+- Bundle: machine-local `.app` is fine. Portability deferred.
+- Tray: deferred.
+- Save/load DOT: adds `GET /api/workflows/{id}/dot` and `POST /api/workflows/import` to `smasher-web`, plus SPA buttons.
