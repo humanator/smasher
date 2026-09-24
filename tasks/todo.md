@@ -121,15 +121,15 @@ user message.
 `#[ignore]` integration tests that hit the real CLI.
 
 **Acceptance criteria:**
-- [ ] `SMASHER_CLAUDE_CLI=/path/to/fake` → `registered_providers()` includes
+- [x] `SMASHER_CLAUDE_CLI=/path/to/fake` → `registered_providers()` includes
       `ClaudeCli`. Unset → it doesn't. (Env mutation serialised the same way other
       `from_env` tests are.)
-- [ ] Ignored tests cover: a text answer, an image described correctly, a schema
+- [x] Ignored tests cover: a text answer, an image described correctly, a schema
       object returned, and `cache_creation` under 2,000 tokens (success criterion 4).
 
 **Verification:**
-- [ ] `cargo test -p smasher-llm`
-- [ ] `cargo test -p smasher-llm --test claude_cli_real -- --ignored` (by hand)
+- [x] `cargo test -p smasher-llm`
+- [ ] `cargo test -p smasher-llm --test claude_cli_real -- --ignored` (by hand, deferred to Jobsworth)
 
 **Dependencies:** T4
 **Files likely touched:** `smasher-llm/src/client/mod.rs`,
