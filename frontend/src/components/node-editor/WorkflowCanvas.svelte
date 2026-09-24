@@ -11,10 +11,12 @@
     SvelteFlow,
     type Edge as FlowEdge,
     type Node as FlowNode,
+    type XYPosition,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { setContext, untrack, type Component } from 'svelte';
+  import { setContext, untrack, type Component, type Snippet } from 'svelte';
   import Palette from './Palette.svelte';
+  import FlowPositionBridge from './FlowPositionBridge.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, nodeStyleFor, type NodeKindConfig } from './nodeConfig';
   import {
     DEFAULT_RANKDIR,
@@ -87,11 +89,15 @@
   // instead, and `onSave` is called with a second `meta` argument so the
   // host shell can call `createGraph` (POST, a new file) rather than
   // `saveGraph` (PUT, an existing one).
-  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave }: {
+  //
+  // `extraActions` (e.g. the edit page's Export .dot) render next to Save,
+  // in the page header when there is one.
+  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, extraActions }: {
     graph?: EditorGraph;
     workflowId?: string;
     availableTargetDirs?: string[];
     onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | Promise<void>;
+    extraActions?: Snippet;
   } = $props();
 
   const uid = $props.id();
@@ -137,16 +143,11 @@
   }
 
   // Task 6: dropping a Palette entry creates a new node of that NodeType.
-  // Position is computed by hand from the drop event's screen coordinates
-  // relative to the canvas container, rather than via @xyflow/svelte's
-  // useSvelteFlow()/screenToFlowPosition() -- that hook only works inside
-  // a component already rendered as a descendant of <SvelteFlow> (or
-  // wrapped in an explicit <SvelteFlowProvider>), and this component's own
-  // <script> runs before its <SvelteFlow> child mounts, so the context
-  // isn't available at the point this handler is defined. Screen-space
-  // (not pan/zoom-adjusted flow-space) is an accepted simplification for
-  // this task's "generic rendering only" scope -- correct at the default
-  // zoom/pan a freshly opened canvas starts at.
+  // The drop point is converted to flow coordinates (pan and zoom applied)
+  // with useSvelteFlow()'s screenToFlowPosition. That hook only works in a
+  // descendant of <SvelteFlow>, and this component's own <script> runs
+  // outside that context, so FlowPositionBridge.svelte (rendered inside
+  // <SvelteFlow> below) hands the function back up via `toFlowPosition`.
   let nodeIdCounter = 0;
 
   function nextNodeId(nodeType: string): string {
@@ -159,9 +160,12 @@
     return id;
   }
 
-  export function addNodeAtPosition(nodeType: string, position: { x: number; y: number }) {
+  export function addNodeAtPosition(
+    nodeType: string,
+    position: { x: number; y: number }
+  ): string | undefined {
     const config = (NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[nodeType];
-    if (!config) return;
+    if (!config) return undefined;
     const newNode: FlowNode<WorkflowNodeData> = {
       id: nextNodeId(nodeType),
       type: 'workflow',
@@ -170,6 +174,7 @@
       data: { label: config.title, nodeType, attrs: {} },
     };
     nodes = [...nodes, newNode];
+    return newNode.id;
   }
 
   // Task 7: selected-node side panel. Svelte Flow's own `onnodeclick`/
@@ -326,7 +331,35 @@
     });
   }
 
-  let canvasAreaEl: HTMLDivElement | undefined;
+  let toFlowPosition: ((screen: XYPosition) => XYPosition) | undefined;
+
+  // A node's size is only known once Svelte Flow has rendered and measured
+  // it, so a dropped node is placed with its top-left at the drop point and
+  // then moved up and left by half its size here, which centres it under
+  // the pointer (where it sat while being dragged). It stays hidden until
+  // then, so it never shows in the wrong place for a frame.
+  let nodeToCentre = $state<string | null>(null);
+
+  $effect(() => {
+    if (!nodeToCentre) return;
+    const node = nodes.find((n) => n.id === nodeToCentre);
+    if (!node) {
+      nodeToCentre = null;
+      return;
+    }
+    const { width, height } = node.measured ?? {};
+    if (!width || !height) return;
+    nodeToCentre = null;
+    nodes = nodes.map((n) =>
+      n.id === node.id
+        ? {
+            ...n,
+            style: nodeStyleFor(n.data.nodeType),
+            position: { x: n.position.x - width / 2, y: n.position.y - height / 2 },
+          }
+        : n
+    );
+  });
 
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
@@ -336,9 +369,11 @@
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
-    if (!nodeType || !canvasAreaEl) return;
-    const rect = canvasAreaEl.getBoundingClientRect();
-    addNodeAtPosition(nodeType, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    if (!nodeType || !toFlowPosition) return;
+    const id = addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
+    if (!id) return;
+    nodes = nodes.map((n) => (n.id === id ? { ...n, style: `${n.style ?? ''} visibility: hidden;` } : n));
+    nodeToCentre = id;
   }
 
   let saving = $state(false);
@@ -382,16 +417,17 @@
 </script>
 
 {#snippet saveAction()}
+  {@render extraActions?.()}
   <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
     {saving ? 'Saving…' : 'Save'}
   </Button>
 {/snippet}
 
-<div class="w-full h-full min-h-[480px] flex flex-row">
+<div class="w-full h-full flex-1 min-h-[480px] flex flex-row">
   <Palette />
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
-      <div class="flex gap-3 items-end pb-2">
+      <div class="flex gap-3 items-end px-3 py-2">
         <div class="flex flex-col gap-1.5">
           <Label for="{uid}-create-name">Name</Label>
           <Input
@@ -420,7 +456,6 @@
       class="flex-1 relative"
       role="region"
       aria-label="Workflow canvas drop zone"
-      bind:this={canvasAreaEl}
       ondragover={handleDragOver}
       ondrop={handleDrop}
     >
@@ -438,6 +473,7 @@
         onedgepointerenter={handleEdgePointerEnter}
         onedgepointerleave={handleEdgePointerLeave}
       >
+        <FlowPositionBridge onReady={(fn) => (toFlowPosition = fn)} />
         <Background />
         <Controls />
         <MiniMap />
@@ -447,7 +483,7 @@
       {@render saveAction()}
     {/if}
     {#if saveError}
-      <p role="alert" data-testid="save-error" class="text-destructive text-sm mt-2">{saveError}</p>
+      <p role="alert" data-testid="save-error" class="text-destructive text-sm px-3 py-2">{saveError}</p>
     {/if}
   </div>
   {#if selectedNode}

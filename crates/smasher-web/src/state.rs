@@ -27,6 +27,9 @@ pub struct AppState {
     pub default_provider: Option<String>,
     pub data_dir: String,
     pub workflow_dirs: Vec<String>,
+    /// Held by `PUT /api/workflows/{id}/graph` across its If-Match check and
+    /// the write, so two saves in this process can't both pass the check.
+    pub graph_save_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl AppState {
@@ -44,6 +47,7 @@ impl AppState {
             default_provider,
             data_dir,
             workflow_dirs,
+            graph_save_lock: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 }

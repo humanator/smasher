@@ -247,6 +247,28 @@ fn render_edge(edge: &GraphEdge) -> String {
     }
 }
 
+/// Render a `node [...]`/`edge [...]` default block: the renderer's own
+/// Helvetica font defaults, overridden by the graph's hand-written defaults
+/// (colours, `model`, ...), keys sorted. A re-parse gives back the same map,
+/// so rendering it again is byte-identical.
+fn render_default_block(
+    keyword: &str,
+    fontsize: f64,
+    defaults: &HashMap<String, NodeAttrValue>,
+) -> String {
+    let mut attrs = HashMap::from([
+        (
+            "fontname".to_string(),
+            NodeAttrValue::String("Helvetica".to_string()),
+        ),
+        ("fontsize".to_string(), NodeAttrValue::Number(fontsize)),
+    ]);
+    attrs.extend(defaults.iter().map(|(k, v)| (k.clone(), v.clone())));
+    let mut fields = Vec::new();
+    write_extra_attrs(&mut fields, &attrs, &[]);
+    format!("    {keyword} [{}];", fields.join(" "))
+}
+
 /// Build the graph-level preamble lines shared by both DOT writers:
 /// layout defaults (rankdir/bgcolor/node&edge fontname) overridden by any
 /// matching key already present in `graph.graph_attrs`, plus any other
@@ -272,8 +294,16 @@ fn render_graph_preamble(graph: &Graph) -> Vec<String> {
         .unwrap_or_else(|| dot_escape("#FAFAFA"));
     lines.push(format!("    rankdir={rankdir};"));
     lines.push(format!("    bgcolor={bgcolor};"));
-    lines.push("    node [fontname=\"Helvetica\" fontsize=12];".to_string());
-    lines.push("    edge [fontname=\"Helvetica\" fontsize=10];".to_string());
+    lines.push(render_default_block(
+        "node",
+        12.0,
+        &graph.default_node_attrs,
+    ));
+    lines.push(render_default_block(
+        "edge",
+        10.0,
+        &graph.default_edge_attrs,
+    ));
 
     let mut extra_graph_attrs = Vec::new();
     write_extra_attrs(
@@ -2062,11 +2092,10 @@ mod tests {
     /// never set them will gain them on re-parse — an accepted side effect
     /// of the renderer supplying sane visual defaults, not data loss.
     ///
-    /// Deliberately excludes `default_node_attrs`/`default_edge_attrs`:
-    /// `render_to_dot` always emits its own hardcoded `node [...]`/
-    /// `edge [...]` layout defaults, which re-parse into those two maps
-    /// regardless of the source graph's originals — a known, explicitly
-    /// out-of-scope gap for this task, not a regression introduced by it.
+    /// Excludes `default_node_attrs`/`default_edge_attrs`: `render_to_dot`
+    /// merges its own Helvetica font defaults into both, so a re-parse has
+    /// extra keys the source graph never set. They have their own test,
+    /// `default_node_and_edge_blocks_survive_render`.
     fn assert_round_trips(g: &Graph, g2: &Graph) {
         assert_eq!(g.name, g2.name);
         assert_eq!(g.nodes, g2.nodes);
@@ -2119,6 +2148,57 @@ digraph {
         let rendered = render_to_dot(&g);
         let g2 = parse_resolve(&rendered);
         assert_round_trips(&g, &g2);
+    }
+
+    #[test]
+    fn default_node_and_edge_blocks_survive_render() {
+        let g = parse_resolve(
+            r#"
+digraph {
+    node [color="red", model="x", fontsize=14];
+    edge [style=dashed];
+    start [shape=Mdiamond];
+    done [shape=doublecircle];
+    start -> done;
+}
+"#,
+        );
+        let rendered = render_to_dot(&g);
+
+        // The file's own defaults win over the renderer's font defaults, and
+        // keys come out sorted.
+        assert!(
+            rendered.contains(
+                "    node [color=\"red\" fontname=\"Helvetica\" fontsize=14 model=\"x\"];"
+            ),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("    edge [fontname=\"Helvetica\" fontsize=10 style=\"dashed\"];"),
+            "{rendered}"
+        );
+
+        let g2 = parse_resolve(&rendered);
+        for (key, value) in &g.default_node_attrs {
+            assert_eq!(
+                g2.default_node_attrs.get(key),
+                Some(value),
+                "node default {key}"
+            );
+        }
+        for (key, value) in &g.default_edge_attrs {
+            assert_eq!(
+                g2.default_edge_attrs.get(key),
+                Some(value),
+                "edge default {key}"
+            );
+        }
+
+        // Once rendered, re-parsing and rendering again gives the same bytes.
+        // (Compared from the second render on: a graph that never set
+        // `rankdir` gets a bare `rankdir=TB` first, then a quoted one.)
+        let second = render_to_dot(&g2);
+        assert_eq!(render_to_dot(&parse_resolve(&second)), second);
     }
 
     #[test]

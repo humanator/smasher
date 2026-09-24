@@ -1,12 +1,14 @@
 // ABOUTME: Tests for WorkflowEditorPage component
 // ABOUTME: Renders against real GET /api/workflows/{id}/graph and PUT endpoints
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/svelte/svelte5';
 import { fireEvent } from '@testing-library/svelte/svelte5';
-import { rmSync, readdirSync, readFileSync } from 'fs';
+import { appendFileSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import WorkflowEditorPage from '../../../src/components/dashboard/WorkflowEditorPage.svelte';
+import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
+import { toast } from 'svelte-sonner';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
 
@@ -79,7 +81,7 @@ describe('WorkflowEditorPage', () => {
     const workflowId = 'examples__consensus_task';
 
     // Verify the API can fetch the graph first
-    const graph = await workflowsApi.getWorkflowGraph(workflowId);
+    const { graph } = await workflowsApi.getWorkflowGraph(workflowId);
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(graph.edges.length).toBeGreaterThan(0);
 
@@ -139,10 +141,116 @@ describe('WorkflowEditorPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Verify the save was successful by re-fetching the graph
-    const updatedGraph = await workflowsApi.getWorkflowGraph(workflowId);
+    const { graph: updatedGraph } = await workflowsApi.getWorkflowGraph(workflowId);
     expect(updatedGraph).toBeTruthy();
     expect(updatedGraph.nodes.length).toBe(2); // Start and End nodes
     expect(updatedGraph.edges.length).toBe(1); // Start -> End
+  });
+
+  describe('saving over a file that changed on disk', () => {
+    const scratchDot = 'digraph { start [shape=Mdiamond, label="Start"]; done [shape=doublecircle, label="Done"]; start -> done; }';
+    let workflowId: string;
+    let path: string;
+
+    beforeEach(async () => {
+      const name = `_test_editor_conflict_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      ({ id: workflowId } = await workflowsApi.importWorkflowDot(name, scratchDot));
+      const { workflows } = await workflowsApi.listWorkflows();
+      path = workflows.find((w) => w.id === workflowId)!.path;
+    });
+
+    // Sonner's toast list is global. Close every toast while this test's
+    // <Toaster> is still mounted (this hook runs before testing-library's
+    // cleanup) so none carries over into the next test.
+    afterEach(async () => {
+      rmSync(path, { force: true });
+      toast.dismiss();
+      await waitFor(() => expect(document.querySelector('[data-sonner-toast]')).toBeNull());
+    });
+
+    // The conflict shows as a toast, which App.svelte's <Toaster> renders.
+    async function renderLoaded() {
+      render(Toaster);
+      render(WorkflowEditorPage, { props: { workflowId } });
+      await screen.findByTestId('save-button', {}, { timeout: 5000 });
+    }
+
+    const canvasMounted = () => document.querySelector('.svelte-flow') !== null;
+
+    const conflictToast = () => screen.queryByText(/changed on disk/);
+    const toastButton = (name: string) =>
+      screen.findByRole('button', { name }, { timeout: 5000 });
+
+    it('toasts the conflict with Reload and Save anyway, keeps the canvas, and leaves the file alone', async () => {
+      await renderLoaded();
+      appendFileSync(path, '// edited elsewhere\n');
+      const changed = readFileSync(path, 'utf-8');
+
+      await fireEvent.click(screen.getByTestId('save-button'));
+
+      const message = await screen.findByText(/changed on disk/, {}, { timeout: 5000 });
+      const toast = message.closest('[data-sonner-toast]') as HTMLElement | null;
+      expect(toast).not.toBeNull();
+      expect(within(toast!).getByRole('button', { name: 'Reload' })).toBeTruthy();
+      expect(within(toast!).getByRole('button', { name: 'Save anyway' })).toBeTruthy();
+      expect(canvasMounted()).toBe(true);
+      expect(readFileSync(path, 'utf-8')).toBe(changed);
+    });
+
+    it('Save anyway writes the editor version over the changed file', async () => {
+      await renderLoaded();
+      appendFileSync(path, '// edited elsewhere\n');
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await fireEvent.click(await toastButton('Save anyway'));
+
+      await waitFor(() => expect(conflictToast()).toBeNull(), { timeout: 5000 });
+      expect(readFileSync(path, 'utf-8')).not.toContain('edited elsewhere');
+
+      // The page now holds the new ETag, so a plain Save works again.
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(conflictToast()).toBeNull();
+      expect(screen.queryByTestId('save-error')).toBeNull();
+    });
+
+    it('Reload shows the version on disk and clears the conflict', async () => {
+      await renderLoaded();
+      writeFileSync(path, scratchDot.replace('label="Done"', 'label="Done elsewhere"'));
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await fireEvent.click(await toastButton('Reload'));
+
+      await screen.findByText('Done elsewhere', {}, { timeout: 5000 });
+      await waitFor(() => expect(conflictToast()).toBeNull(), { timeout: 5000 });
+
+      // The reloaded ETag is current, so saving now succeeds.
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(conflictToast()).toBeNull();
+      expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
+    });
+
+    it('saves twice in a row with no outside change', async () => {
+      await renderLoaded();
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await waitFor(() => expect(screen.getByTestId('save-button').textContent).toMatch(/^\s*Save\s*$/));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      expect(conflictToast()).toBeNull();
+      expect(screen.queryByTestId('save-error')).toBeNull();
+    });
+
+    it('shows any other save failure inline and keeps the canvas', async () => {
+      await renderLoaded();
+      rmSync(path);
+
+      await fireEvent.click(screen.getByTestId('save-button'));
+
+      const saveError = await screen.findByTestId('save-error', {}, { timeout: 5000 });
+      expect(saveError.textContent).toMatch(/workflow/);
+      expect(canvasMounted()).toBe(true);
+    });
   });
 
   describe('Export .dot', () => {

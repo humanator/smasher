@@ -98,28 +98,6 @@ resolution evidence for a specific past question.
 
 ## `workflow-editor`
 
-- `default_node_attrs`/`default_edge_attrs` (a `node [...]`/`edge [...]`
-  default-attribute block in a hand-authored `.dot` file) don't round-trip
-  through the editor — `render_to_dot` always emits its own hardcoded
-  `node [fontname=... fontsize=...]`/`edge [...]` layout defaults rather than
-  preserving a file's originals. Explicitly scoped out during Task 2 (unlike
-  `graph_attrs`, which *was* fixed in the same task after being confirmed as
-  a real data-loss risk) — no cited fixture relies on `default_node_attrs`/
-  `default_edge_attrs`, so there's no evidence of the same risk, but it's a
-  known gap if one ever does. (Source: `tasks/archive/todo-workflow-editor.md`
-  Task 2.)
-- Dropped-node/edge position math (palette drag-to-create, Task 6) is
-  screen-space relative to the canvas container, not pan/zoom-adjusted
-  flow-space — `useSvelteFlow()`'s `screenToFlowPosition()` wasn't usable
-  because `WorkflowCanvasInner`'s own script runs before its `<SvelteFlow>`
-  child mounts, so the needed context isn't available where the drop handler
-  is defined. Correct at the default zoom/pan a freshly opened canvas starts
-  at; a node dropped after panning/zooming lands at the wrong flow position.
-  (Source: `tasks/archive/todo-workflow-editor.md` Tasks 6 and 8.)
-- Concurrent/stale-file edit conflicts (two browser tabs open on the same
-  workflow, or a human hand-editing the `.dot` file while a browser tab has
-  it open) — last-write-wins for v1, no locking/optimistic-concurrency
-  mechanism exists. (Source: `SPEC-workflow-editor.md` Open Questions.)
 - Whether the raw-DOT-paste fallback form (`/workflows/new/raw`) stays
   permanently as a power-user escape hatch or is retired once the visual
   editor is proven out — left for a later cleanup pass, not decided.

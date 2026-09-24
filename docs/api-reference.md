@@ -395,7 +395,8 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/workflows/{id}/dot` | Return a workflow's raw on-disk DOT source (used by the editor's "Export .dot"). |
 | `POST` | `/api/workflows/import` | Save raw DOT as a new workflow under `{data_dir}/workflows` (used by the catalog's "Import .dot"). |
 | `POST` | `/editor/workflows` | Save a new workflow (used by node-editor). |
-| `PUT` | `/editor/workflows/{id}/graph` | Update an existing workflow's graph (used by node-editor). |
+| `GET` | `/api/workflows/{id}/graph` | Return a workflow's graph as editor JSON, with an `ETag` (used by node-editor). |
+| `PUT` | `/api/workflows/{id}/graph` | Update an existing workflow's graph; `If-Match` refuses a stale save with 409 (used by node-editor). |
 | `POST` | `/api/runs/{id}/gallery/{qid}/decision` | Submit a gallery-gate decision (used by gallery-gate component). |
 | `GET` | `/` (and any unmatched non-`/api`/`/questions`/`/gallery` path) | Serve the `smasher-spa` static bundle, with SPA-style fallback to `index.html` for unmatched paths. |
 
@@ -762,19 +763,35 @@ Response body (200 OK):
 }
 ```
 
-### PUT /editor/workflows/{id}/graph -- Update Workflow
+### GET /api/workflows/{id}/graph -- Load Workflow Graph
 
-Update an existing workflow's graph definition (used by the node-editor's save/update flow).
+Returns the workflow's graph as editor JSON (`name`, `nodes`, `edges`,
+`graph_attrs`), plus an `ETag` header: the quoted SHA-256 of the file's bytes,
+e.g. `ETag: "3f9a..."`. Send it back as `If-Match` when saving.
 
-Request body:
+404 if `id` doesn't match a discovered workflow.
 
-```json
-{
-  "dot_source": "digraph { ... }"
-}
-```
+### PUT /api/workflows/{id}/graph -- Update Workflow Graph
 
-Response body (200 OK): Same shape as Create Workflow above.
+Overwrites the workflow file with the given graph (same JSON shape as the GET
+above), rendered to DOT. The file's own `node [...]`/`edge [...]` default
+blocks are kept, since the editor doesn't carry them.
+
+Headers:
+
+| Header | Meaning |
+|---|---|
+| `If-Match` (optional) | The `ETag` from when the editor loaded the graph. The save goes ahead only if the file still has that ETag (`*` matches any). Leave it out to overwrite regardless, which is what the editor's "Save anyway" does. |
+
+Response (200 OK): the saved graph as JSON, with an `ETag` header for the new
+file contents, good for the next save's `If-Match`.
+
+| Status | When |
+|---|---|
+| 400 | The graph has an unknown `node_type` or an unsupported attribute value. |
+| 404 | `id` doesn't match a discovered workflow. |
+| 409 | `If-Match` doesn't match: the file changed on disk since it was loaded. The file is untouched. |
+| 422 | The rendered graph doesn't re-parse or resolve (e.g. duplicate node ids). The file is untouched. |
 
 ### POST /api/runs/{id}/gallery/{qid}/decision -- Gallery-Gate Decision
 

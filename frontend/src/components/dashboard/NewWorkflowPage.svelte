@@ -40,7 +40,7 @@
   }
 </script>
 
-<div class="new-workflow-page flex flex-col gap-8 p-8">
+<div class="new-workflow-page flex h-full flex-col">
   {#if error}
     <p
       class="rounded border border-destructive/40 bg-destructive/10 p-4 text-destructive"

@@ -17,6 +17,7 @@
   import PageHeader from './components/dashboard/PageHeader.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Toaster } from '$lib/components/ui/sonner/index.js';
   import { providePageHeader } from '$lib/page-header.svelte';
   import { isTauri } from '$lib/native';
 
@@ -120,13 +121,13 @@
 
   <main>
     {#if workflowPageType === 'new'}
-      <!-- New Workflow Page -->
-      <div class="max-w-7xl mx-auto">
+      <!-- New Workflow Page: the canvas fills everything below the 3.5rem header -->
+      <div class="h-[calc(100dvh-3.5rem)]">
         <NewWorkflowPage />
       </div>
     {:else if workflowPageType === 'edit' && workflowId}
-      <!-- Edit Workflow Page -->
-      <div class="max-w-7xl mx-auto">
+      <!-- Edit Workflow Page: the canvas fills everything below the 3.5rem header -->
+      <div class="h-[calc(100dvh-3.5rem)]">
         <WorkflowEditorPage {workflowId} />
       </div>
     {:else if runId}
@@ -173,6 +174,8 @@
     {/if}
   </main>
 </div>
+
+<Toaster />
 
 <style>
   :global(body) {
