@@ -43,7 +43,8 @@ pub(crate) struct EditorGraph {
     /// Graph-level attrs (e.g. `goal`, `default_max_retry`) — carried
     /// through so a save doesn't drop them, the same data-loss risk fixed
     /// for `render_to_dot` itself. `default_node_attrs`/`default_edge_attrs`
-    /// are deliberately not exposed here, matching that same fix's scope.
+    /// aren't exposed here (the editor can't edit them); `put_graph` keeps
+    /// them by copying them from the file it overwrites.
     #[serde(default)]
     graph_attrs: HashMap<String, serde_json::Value>,
 }
@@ -187,8 +188,7 @@ impl From<&GraphEdge> for EditorEdge {
 impl EditorGraph {
     /// Convert back to a `Graph` for validation/rendering. `default_node_attrs`/
     /// `default_edge_attrs` are always empty on the result — this DTO never
-    /// carries them, matching the same explicitly-out-of-scope gap in
-    /// `render_to_dot` itself.
+    /// carries them (see `put_graph` for how a save keeps a file's own).
     fn into_graph(self) -> Result<Graph, WebError> {
         let nodes = self
             .nodes
@@ -237,8 +237,7 @@ impl EditorGraph {
 /// the generated source re-parses and re-resolves cleanly before returning
 /// it — callers must not write to disk until this succeeds, so a rejected
 /// save never touches the existing file.
-fn validate_and_render(editor_graph: EditorGraph) -> Result<(String, Graph), WebError> {
-    let graph = editor_graph.into_graph()?;
+fn validate_and_render(graph: Graph) -> Result<(String, Graph), WebError> {
     let dot_source = render_to_dot(&graph);
 
     let ast = parser::parse(&dot_source)?;
@@ -286,7 +285,20 @@ async fn put_graph(
     let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
         .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
 
-    let (dot_source, resolved) = validate_and_render(editor_graph)?;
+    // Keep the file's hand-written `node [...]`/`edge [...]` defaults, which
+    // the editor never sees. If the file on disk doesn't parse any more,
+    // there's nothing to keep and the save goes ahead.
+    let existing = std::fs::read_to_string(&workflow.path)?;
+    let mut graph = editor_graph.into_graph()?;
+    if let Some(old) = parser::parse(&existing)
+        .ok()
+        .and_then(|ast| graph::resolve(&ast).ok())
+    {
+        graph.default_node_attrs = old.default_node_attrs;
+        graph.default_edge_attrs = old.default_edge_attrs;
+    }
+
+    let (dot_source, resolved) = validate_and_render(graph)?;
     std::fs::write(&workflow.path, &dot_source)?;
 
     Ok(Json(EditorGraph::from(&resolved)))
@@ -337,7 +349,7 @@ async fn create_graph(
         )));
     }
 
-    let (dot_source, _resolved) = validate_and_render(req.graph)?;
+    let (dot_source, _resolved) = validate_and_render(req.graph.into_graph()?)?;
 
     let target_dir = std::path::Path::new(&req.target_dir);
     std::fs::create_dir_all(target_dir)?;
@@ -635,6 +647,69 @@ digraph {
                 .iter()
                 .any(|e| e.from == "ask" && e.to == "exit")
         );
+    }
+
+    async fn put_graph_json(app: &Router, id: &str, graph: &EditorGraph) -> StatusCode {
+        let req = Request::builder()
+            .method("PUT")
+            .uri(format!("/api/workflows/{id}/graph"))
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_string(graph).unwrap()))
+            .unwrap();
+        app.clone().oneshot(req).await.unwrap().status()
+    }
+
+    #[tokio::test]
+    async fn put_graph_keeps_the_files_node_and_edge_default_blocks() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_fixture(
+            tmp.path(),
+            "defaults.dot",
+            r#"
+digraph {
+    node [color="red", model="x"];
+    edge [style=dashed];
+    start [shape=Mdiamond];
+    done [shape=doublecircle];
+    start -> done;
+}
+"#,
+        );
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let id = crate::workflows::scan_workflows(&[tmp.path().display().to_string()])
+            .into_iter()
+            .next()
+            .unwrap()
+            .id;
+        let get_req = Request::builder()
+            .uri(format!("/api/workflows/{id}/graph"))
+            .body(Body::empty())
+            .unwrap();
+        let graph: EditorGraph = body_json(app.clone().oneshot(get_req).await.unwrap()).await;
+
+        assert_eq!(put_graph_json(&app, &id, &graph).await, StatusCode::OK);
+        let first = std::fs::read_to_string(tmp.path().join("defaults.dot")).unwrap();
+        let resolved = graph::resolve(&parser::parse(&first).unwrap()).unwrap();
+        assert_eq!(
+            resolved.default_node_attrs.get("color"),
+            Some(&NodeAttrValue::String("red".into())),
+            "{first}"
+        );
+        assert_eq!(
+            resolved.default_node_attrs.get("model"),
+            Some(&NodeAttrValue::String("x".into())),
+            "{first}"
+        );
+        assert_eq!(
+            resolved.default_edge_attrs.get("style"),
+            Some(&NodeAttrValue::String("dashed".into())),
+            "{first}"
+        );
+
+        // Saving the same graph again leaves the file byte-identical.
+        assert_eq!(put_graph_json(&app, &id, &graph).await, StatusCode::OK);
+        let second = std::fs::read_to_string(tmp.path().join("defaults.dot")).unwrap();
+        assert_eq!(first, second);
     }
 
     #[tokio::test]

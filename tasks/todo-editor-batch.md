@@ -56,18 +56,18 @@ file doesn't parse, it copies nothing. Update the doc comments that call this an
 gap": `editor_api.rs:43-46,188-191` and `rendering.rs:2065-2069`.
 
 **Acceptance criteria:**
-- [ ] A file with `node [color="red" model="x"]; edge [style=dashed];` still has those keys in
+- [x] A file with `node [color="red" model="x"]; edge [style=dashed];` still has those keys in
       its `node [...]`/`edge [...]` lines after a `PUT /api/workflows/{id}/graph`
-- [ ] Saving twice gives byte-identical output (the merge is idempotent)
-- [ ] A graph with no defaults renders exactly as it does today, so existing rendering tests are
+- [x] Saving twice gives byte-identical output (the merge is idempotent)
+- [x] A graph with no defaults renders exactly as it does today, so existing rendering tests are
       unchanged
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor rendering`: new test that a graph with defaults renders a
+- [x] `cargo test -p smasher-attractor rendering`: new test that a graph with defaults renders a
       merged preamble which re-parses into the same default maps (plus the font keys)
-- [ ] `cargo test -p smasher-web editor_api`: new test covering fixture with default blocks →
+- [x] `cargo test -p smasher-web editor_api`: new test covering fixture with default blocks →
       PUT → file contains them, then PUT again → identical bytes
-- [ ] `cargo clippy --workspace -- -D warnings`
+- [x] `cargo clippy --workspace -- -D warnings`
 
 **Dependencies:** None
 
