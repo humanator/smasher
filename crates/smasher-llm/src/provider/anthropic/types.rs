@@ -1816,7 +1816,10 @@ mod tests {
             "claude-fable-5-1",
             "claude-mythos-5-1",
         ] {
-            assert!(is_adaptive_only_model(model), "{model} should be adaptive-only");
+            assert!(
+                is_adaptive_only_model(model),
+                "{model} should be adaptive-only"
+            );
         }
         for model in [
             "claude-sonnet-4-6",
@@ -1824,7 +1827,10 @@ mod tests {
             "claude-sonnet-4-20250514",
             "claude-haiku-4-5",
         ] {
-            assert!(!is_adaptive_only_model(model), "{model} should accept budget_tokens");
+            assert!(
+                !is_adaptive_only_model(model),
+                "{model} should accept budget_tokens"
+            );
         }
     }
 

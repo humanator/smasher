@@ -56,7 +56,7 @@ smasher complete [OPTIONS] <PROMPT>
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--file <PATH>` | Read prompt from a file instead of the argument | |
-| `--model <MODEL>` | LLM model identifier | `claude-sonnet-4-20250514` |
+| `--model <MODEL>` | LLM model identifier | `claude-sonnet-5` |
 | `--max-tokens <N>` | Maximum tokens in the response | |
 | `--temperature <FLOAT>` | Sampling temperature (0.0 to 2.0) | |
 | `--system <TEXT>` | System prompt to prepend | |
@@ -91,7 +91,7 @@ smasher chat [OPTIONS]
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--model <MODEL>` | LLM model identifier | `claude-sonnet-4-20250514` |
+| `--model <MODEL>` | LLM model identifier | `claude-sonnet-5` |
 | `--max-turns <N>` | Maximum conversation turns | `100` |
 | `--system <TEXT>` | System prompt for the agent | |
 | `--working-dir <PATH>` | Working directory for tool execution | |
@@ -129,7 +129,7 @@ smasher run [OPTIONS] <PIPELINE>
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--var <KEY=VALUE>` | Set a pipeline variable (repeatable) | |
-| `--model <MODEL>` | LLM model identifier | `claude-sonnet-4-20250514` |
+| `--model <MODEL>` | LLM model identifier | `claude-sonnet-5` |
 | `--max-steps <N>` | Maximum engine execution steps | `1000` |
 | `--stylesheet <PATH>` | Path to a stylesheet file for node configuration | |
 
@@ -146,7 +146,7 @@ smasher run --var input="hello world" --var mode=fast pipeline.dot
 smasher run --stylesheet style.ss --max-steps 500 pipeline.dot
 
 # Verbose output with a specific model
-smasher -v run --model claude-sonnet-4-20250514 pipeline.dot
+smasher -v run --model claude-sonnet-5 pipeline.dot
 ```
 
 ## Exit Codes

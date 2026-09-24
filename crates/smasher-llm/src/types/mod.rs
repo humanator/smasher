@@ -13,8 +13,8 @@ pub mod stream;
 pub mod tool;
 
 pub use catalog::{
-    ModelInfo, Provider, get_latest_model, infer_provider, lookup_model, lookup_model_or_default,
-    models_for_provider,
+    DEFAULT_MODEL, ModelInfo, Provider, get_latest_model, infer_provider, lookup_model,
+    lookup_model_or_default, models_for_provider,
 };
 pub use content::{
     AudioData, ContentPart, DocumentData, DocumentSourceType, ImageData, ImageSourceType,

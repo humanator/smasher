@@ -677,7 +677,7 @@ pub struct RunArgs {
     pub vars: Vec<String>,
 
     /// Model identifier for codergen nodes.
-    #[arg(long, default_value = "claude-sonnet-4-20250514")]
+    #[arg(long, default_value = smasher_llm::types::DEFAULT_MODEL)]
     pub model: String,
 
     /// Maximum pipeline steps before forced stop.

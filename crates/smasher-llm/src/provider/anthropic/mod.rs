@@ -564,12 +564,11 @@ mod tests {
 
     #[test]
     fn build_beta_header_omits_thinking_beta_for_adaptive_models() {
-        let request = Request::new("claude-sonnet-5", vec![Message::user("Hi")]).thinking(
-            ThinkingConfig {
+        let request =
+            Request::new("claude-sonnet-5", vec![Message::user("Hi")]).thinking(ThinkingConfig {
                 enabled: true,
                 budget_tokens: Some(10000),
-            },
-        );
+            });
 
         let adapter = AnthropicAdapter::new("key".into());
         assert!(adapter.build_beta_header(&request).is_none());

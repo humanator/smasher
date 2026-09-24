@@ -19,7 +19,7 @@ use crate::error::CliError;
 #[derive(Debug, Args)]
 pub struct ChatArgs {
     /// Model identifier.
-    #[arg(long, default_value = "claude-sonnet-4-20250514")]
+    #[arg(long, default_value = smasher_llm::types::DEFAULT_MODEL)]
     pub model: String,
 
     /// Maximum agentic turns before the session ends.

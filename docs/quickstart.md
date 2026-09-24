@@ -93,8 +93,8 @@ The response streams to your terminal in real time. When it finishes, a trailing
 ### Complete Options
 
 ```bash
-# Choose a specific model (default: claude-sonnet-4-20250514)
-smasher complete "Hello world" --model claude-sonnet-4-20250514
+# Choose a specific model (default: claude-sonnet-5)
+smasher complete "Hello world" --model claude-sonnet-5
 
 # Set a system prompt
 smasher complete "Write a haiku" --system "You are a poetry expert."
@@ -113,7 +113,7 @@ smasher complete "Hello" --max-tokens 100 --temperature 0.5
 |------------------------|-------------------------------------------------------|
 | `<PROMPT>`             | Positional prompt text. Omit if using `--file`.       |
 | `--file <PATH>`        | Read the prompt from a file instead.                  |
-| `--model <MODEL>`      | Model identifier (default: `claude-sonnet-4-20250514`). |
+| `--model <MODEL>`      | Model identifier (default: `claude-sonnet-5`). |
 | `--max-tokens <N>`     | Maximum tokens to generate.                           |
 | `--temperature <FLOAT>`| Sampling temperature (0.0 - 2.0).                    |
 | `--system <TEXT>`      | System prompt to prepend.                             |
@@ -140,7 +140,7 @@ and output tokens.
 
 ```bash
 # Specify a model
-smasher chat --model claude-sonnet-4-20250514
+smasher chat --model claude-sonnet-5
 
 # Set a custom working directory for tool operations
 smasher chat --working-dir ./my-project
@@ -154,7 +154,7 @@ smasher chat --system "You are a Rust expert. Only give Rust examples."
 
 | Flag                    | Description                                            |
 |-------------------------|--------------------------------------------------------|
-| `--model <MODEL>`       | Model identifier (default: `claude-sonnet-4-20250514`). |
+| `--model <MODEL>`       | Model identifier (default: `claude-sonnet-5`). |
 | `--max-turns <N>`       | Maximum agentic turns (default: 100).                  |
 | `--system <TEXT>`       | System prompt override.                                |
 | `--working-dir <PATH>` | Working directory for tool operations.                 |
@@ -214,7 +214,7 @@ The engine determines each node's role from its `shape` attribute:
 |-----------------------|--------------------------------------------------------------|
 | `<PIPELINE>`          | Path to the DOT pipeline file (positional, required).        |
 | `--var KEY=VALUE`     | Set a context variable (repeatable).                         |
-| `--model <MODEL>`     | Model for codergen nodes (default: `claude-sonnet-4-20250514`). |
+| `--model <MODEL>`     | Model for codergen nodes (default: `claude-sonnet-5`). |
 | `--max-steps <N>`     | Max node visits before forced stop (default: 1000).          |
 | `--stylesheet <PATH>` | Apply a stylesheet for graph transforms.                    |
 
@@ -278,7 +278,7 @@ The `--model` flag is automatically injected as a `model` variable in the pipeli
 codergen nodes can reference it:
 
 ```bash
-smasher run examples/old-examples/codergen.dot --var task="implement fibonacci" --model claude-sonnet-4-20250514
+smasher run examples/old-examples/codergen.dot --var task="implement fibonacci" --model claude-sonnet-5
 ```
 
 ## Human Input

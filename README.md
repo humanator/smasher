@@ -60,7 +60,7 @@ The chat REPL gives the agent all six tools (read, write, edit, shell, grep, glo
 ```bash
 smasher run examples/old-examples/hello-world.dot
 smasher run examples/old-examples/conditional.dot --var route=yes
-smasher run examples/old-examples/multi-step.dot --var model=claude-sonnet-4-20250514
+smasher run examples/old-examples/multi-step.dot --var model=claude-sonnet-5
 ```
 
 Pipelines are standard DOT digraphs. Node shapes tell the engine what each node does:

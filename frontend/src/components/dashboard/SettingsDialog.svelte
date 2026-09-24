@@ -137,7 +137,7 @@
             <Input
               id="settings-default-model"
               bind:value={defaultModel}
-              placeholder="claude-sonnet-4-20250514"
+              placeholder="claude-sonnet-5"
               autocomplete="off"
               spellcheck={false}
             />

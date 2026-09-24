@@ -20,7 +20,7 @@ pub struct IngestArgs {
     pub output: Option<String>,
 
     /// Model identifier for the LLM.
-    #[arg(long, default_value = "claude-sonnet-4-20250514")]
+    #[arg(long, default_value = smasher_llm::types::DEFAULT_MODEL)]
     pub model: String,
 
     /// Path to a custom skill file. Uses the built-in skill if omitted.
@@ -449,7 +449,7 @@ Let me know if you need changes!"#;
         let cli = TestCli::parse_from(["test", "Build a game"]);
         assert_eq!(cli.args.requirements, "Build a game");
         assert!(cli.args.output.is_none());
-        assert_eq!(cli.args.model, "claude-sonnet-4-20250514");
+        assert_eq!(cli.args.model, smasher_llm::types::DEFAULT_MODEL);
         assert!(cli.args.skill.is_none());
     }
 

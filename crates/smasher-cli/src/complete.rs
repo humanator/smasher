@@ -19,8 +19,8 @@ pub struct CompleteArgs {
     #[arg(long)]
     pub file: Option<String>,
 
-    /// Model identifier (e.g. "claude-sonnet-4-20250514", "gpt-4o").
-    #[arg(long, default_value = "claude-sonnet-4-20250514")]
+    /// Model identifier (e.g. "claude-sonnet-5", "gpt-4o").
+    #[arg(long, default_value = smasher_llm::types::DEFAULT_MODEL)]
     pub model: String,
 
     /// Maximum tokens to generate.
