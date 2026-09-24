@@ -84,3 +84,26 @@ fn remote_capabilities_grant_only_native_shim_permissions() {
         }
     }
 }
+
+#[test]
+fn served_origin_holds_the_permissions_the_native_shim_calls() {
+    // frontend/src/lib/native/index.ts: saveFile -> dialog.save + fs.writeTextFile,
+    // showNotification -> notification.sendNotification.
+    const NEEDED: [&str; 3] = [
+        "dialog:allow-save",
+        "fs:allow-write-text-file",
+        "notification:default",
+    ];
+    let granted: Vec<String> = capabilities()
+        .into_iter()
+        .filter(|(_, cap)| !remote_urls(cap).is_empty())
+        .flat_map(|(_, cap)| permission_ids(&cap))
+        .collect();
+
+    for id in NEEDED {
+        assert!(
+            granted.iter().any(|g| g == id),
+            "served origin is missing {id}"
+        );
+    }
+}

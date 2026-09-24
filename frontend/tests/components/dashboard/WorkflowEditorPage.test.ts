@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import { fireEvent } from '@testing-library/svelte/svelte5';
-import { rmSync, readdirSync } from 'fs';
+import { rmSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import WorkflowEditorPage from '../../../src/components/dashboard/WorkflowEditorPage.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
@@ -143,5 +143,61 @@ describe('WorkflowEditorPage', () => {
     expect(updatedGraph).toBeTruthy();
     expect(updatedGraph.nodes.length).toBe(2); // Start and End nodes
     expect(updatedGraph.edges.length).toBe(1); // Start -> End
+  });
+
+  describe('Export .dot', () => {
+    const workflowId = 'examples__human_gate_showcase';
+    const onDisk = () =>
+      readFileSync(join(process.cwd(), '..', 'examples', 'human_gate_showcase.dot'), 'utf-8');
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+
+    afterEach(() => {
+      delete window.__TAURI__;
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    });
+
+    async function renderLoaded() {
+      render(WorkflowEditorPage, { props: { workflowId } });
+      return await screen.findByTestId('export-dot-button', {}, { timeout: 5000 });
+    }
+
+    it('writes the exact workflow source to the path chosen in the native save dialog', async () => {
+      // jsdom has no Tauri runtime: stand in for the dialog/fs plugins at the
+      // shim boundary and record what the page asks them to do.
+      const written: { path: string; contents: string }[] = [];
+      window.__TAURI__ = {
+        dialog: { save: async () => '/Users/test/exported.dot' },
+        fs: {
+          writeTextFile: async (path: string, contents: string) => {
+            written.push({ path, contents });
+          },
+        },
+      };
+
+      await fireEvent.click(await renderLoaded());
+
+      await waitFor(() => expect(written).toHaveLength(1));
+      expect(written[0].path).toBe('/Users/test/exported.dot');
+      expect(written[0].contents).toBe(onDisk());
+    });
+
+    it('falls back to a browser download of the same source outside Tauri', async () => {
+      // jsdom doesn't implement object URLs; capture the blob the shim hands over.
+      const blobs: Blob[] = [];
+      URL.createObjectURL = (blob: Blob) => {
+        blobs.push(blob);
+        // A hash URL, so the shim's link click doesn't hit jsdom's
+        // unimplemented navigation.
+        return '#download';
+      };
+      URL.revokeObjectURL = () => {};
+
+      await fireEvent.click(await renderLoaded());
+
+      await waitFor(() => expect(blobs).toHaveLength(1));
+      expect(await blobs[0].text()).toBe(onDisk());
+    });
   });
 });

@@ -6,5 +6,5 @@
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },
-  "permissions": ["notification:default"]
+  "permissions": ["notification:default", "dialog:allow-save", "fs:allow-write-text-file"]
 }

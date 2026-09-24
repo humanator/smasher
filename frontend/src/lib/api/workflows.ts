@@ -73,6 +73,17 @@ export async function getWorkflowGraph(id: string): Promise<EditorGraph> {
   return handleResponse<EditorGraph>(response);
 }
 
+/** The workflow's DOT source exactly as it is on disk. */
+export async function getWorkflowDot(id: string): Promise<string> {
+  const response = await fetch(getApiUrl(`/workflows/${id}/dot`));
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
+    error.status = response.status;
+    throw error;
+  }
+  return response.text();
+}
+
 export async function updateWorkflowGraph(id: string, graph: EditorGraph): Promise<void> {
   const response = await fetch(getApiUrl(`/workflows/${id}/graph`), {
     method: 'PUT',

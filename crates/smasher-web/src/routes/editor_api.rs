@@ -1,9 +1,11 @@
 // ABOUTME: JSON graph API for the visual workflow editor: read/write a workflow's Graph as JSON.
-// ABOUTME: Provides GET/PUT /api/workflows/{id}/graph and POST /api/workflows/new.
+// ABOUTME: Provides GET/PUT /api/workflows/{id}/graph, GET .../dot, and POST /api/workflows/new.
 
 use std::collections::HashMap;
 
 use axum::extract::{Path, State};
+use axum::http::header;
+use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -18,6 +20,7 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/workflows/{id}/graph", get(get_graph).put(put_graph))
+        .route("/api/workflows/{id}/dot", get(get_dot))
         .route("/api/workflows/new", post(create_graph))
 }
 
@@ -259,6 +262,21 @@ async fn get_graph(
     Ok(Json(EditorGraph::from(&resolved)))
 }
 
+/// The workflow's DOT source exactly as it sits on disk (comments and
+/// formatting included), for "Export .dot".
+async fn get_dot(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, WebError> {
+    let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
+        .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let dot_source = std::fs::read_to_string(&workflow.path)?;
+    Ok((
+        [(header::CONTENT_TYPE, "text/vnd.graphviz; charset=utf-8")],
+        dot_source,
+    ))
+}
+
 async fn put_graph(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -421,6 +439,72 @@ digraph {
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    async fn body_text(resp: axum::response::Response) -> String {
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn get_dot_returns_the_exact_on_disk_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Comments and odd spacing survive only if we return the file's
+        // bytes rather than re-rendering the parsed graph.
+        let source = format!("// hand-written comment\n{FIXTURE_DOT}\n\n");
+        write_fixture(tmp.path(), "hello.dot", &source);
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let id = crate::workflows::scan_workflows(&[tmp.path().display().to_string()])
+            .into_iter()
+            .next()
+            .unwrap()
+            .id;
+
+        let req = Request::builder()
+            .uri(format!("/api/workflows/{id}/dot"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/vnd.graphviz; charset=utf-8"
+        );
+        assert_eq!(body_text(resp).await, source);
+    }
+
+    #[tokio::test]
+    async fn get_dot_unknown_id_returns_404() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let req = Request::builder()
+            .uri("/api/workflows/no-such-id/dot")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn get_dot_rejects_a_traversal_id_to_a_file_outside_workflow_dirs() {
+        let root = tempfile::tempdir().unwrap();
+        let workflows = root.path().join("workflows");
+        std::fs::create_dir(&workflows).unwrap();
+        write_fixture(root.path(), "secret.dot", FIXTURE_DOT);
+        let app = router().with_state(state_with_workflow_dir(&workflows));
+
+        let req = Request::builder()
+            .uri("/api/workflows/..%2Fsecret/dot")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 

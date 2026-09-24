@@ -21,6 +21,7 @@ fn main() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .setup(move |app| {
             // Bind before any window exists: the window's URL needs the real

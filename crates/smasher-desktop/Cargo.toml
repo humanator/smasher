@@ -21,6 +21,7 @@ smasher-web.workspace = true
 
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 tauri-plugin-notification = "2"
 
 tokio.workspace = true
