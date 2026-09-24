@@ -1,136 +1,120 @@
 // ABOUTME: Tests for EventLog component
-// ABOUTME: Verifies real-time event display and Task 6b replay
+// ABOUTME: Streams real runs' SSE events (incl. Task 6b replay) from the real smasher-web API
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/svelte/svelte5';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
+import { render, screen, waitFor, cleanup } from '@testing-library/svelte/svelte5';
 import EventLog from '../../../src/components/dashboard/EventLog.svelte';
 import { eventStore } from '../../../src/stores/events.svelte';
 import * as native from '../../../src/lib/native/index';
+import * as runsApi from '../../../src/lib/api/runs';
+import * as questionsApi from '../../../src/lib/api/questions';
+import { setApiBaseUrl } from '../../../src/lib/api/client-config';
+
+// One interviewer gate and no LLM nodes: the run parks on a real question
+// until a test answers (-> pipeline_completed) or cancels (-> pipeline_aborted).
+const GATED_DOT = `digraph EventLogGated {
+  start [shape=circle];
+  gate [shape=oval, label="Proceed?"];
+  done [shape=doublecircle];
+  start -> gate -> done;
+}`;
+
+let runIds: string[] = [];
+
+async function startGatedRun(): Promise<string> {
+  const { run_id } = await runsApi.submitRun({ dot_source: GATED_DOT, variables: {} });
+  runIds.push(run_id);
+  return run_id;
+}
+
+async function answerGate(runId: string): Promise<void> {
+  let questionId: string | undefined;
+  await waitFor(
+    async () => {
+      questionId = (await questionsApi.listQuestions(runId)).questions[0]?.id;
+      expect(questionId).toBeTruthy();
+    },
+    { timeout: 5000, interval: 100 }
+  );
+  await questionsApi.answerQuestion(runId, questionId!, 'go');
+}
 
 describe('EventLog', () => {
-  beforeEach(() => {
-    eventStore.clear();
+  // The OS notification is the one boundary jsdom can't provide (no Tauri,
+  // no Notification API), so the shim is spied rather than exercised.
+  let notifySpy: MockInstance<
+    Parameters<typeof native.showNotification>,
+    ReturnType<typeof native.showNotification>
+  >;
+
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
-  it('renders empty state initially', () => {
-    render(EventLog, { props: { runId: 'run-123' } });
+  beforeEach(() => {
+    eventStore.clear();
+    notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
+  });
+
+  afterEach(async () => {
+    // Unmount first, so cancelling a parked run below can't notify after the
+    // spy is restored.
+    cleanup();
+    // Don't leave runs parked on the gate in the shared dev server.
+    await Promise.all(runIds.map((id) => runsApi.cancelRun(id).catch(() => undefined)));
+    runIds = [];
+    notifySpy.mockRestore();
+  });
+
+  it('renders empty state initially', async () => {
+    const runId = await startGatedRun();
+    render(EventLog, { props: { runId } });
     expect(screen.getByText('Waiting for events...')).toBeTruthy();
   });
 
-  it('displays accumulated events', async () => {
-    const { container } = render(EventLog, { props: { runId: 'run-123' } });
+  it('displays the real run events replayed from the start, formatted', async () => {
+    const runId = await startGatedRun();
+    const { container } = render(EventLog, { props: { runId } });
 
-    // Simulate events arriving
-    eventStore.add({
-      kind: 'pipeline_started',
-      timestamp: '2026-09-22T10:00:00Z',
-      graph_name: 'test',
-    });
-
-    eventStore.add({
-      kind: 'node_started',
-      timestamp: '2026-09-22T10:00:01Z',
-      node_id: 'node1',
-      node_type: 'task',
-    });
-
-    // Wait for updates
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    const items = container.querySelectorAll('.event-item');
-    expect(items.length).toBe(2);
+    // The run parks on the gate right after this event.
+    await screen.findByText('Node started: gate (Interviewer)', {}, { timeout: 5000 });
+    expect(screen.getByText('Pipeline started: EventLogGated')).toBeTruthy();
+    expect(screen.getByText('Edge: start → gate')).toBeTruthy();
+    expect(container.querySelectorAll('.event-item').length).toBe(eventStore.events.length);
   });
 
-  it('shows completion status when pipeline completes', async () => {
-    render(EventLog, { props: { runId: 'run-123' } });
+  it('shows completion status and a native notification when the pipeline completes', async () => {
+    const runId = await startGatedRun();
+    render(EventLog, { props: { runId } });
 
-    eventStore.add({
-      kind: 'pipeline_completed',
-      timestamp: '2026-09-22T10:00:10Z',
-      outcome: { type: 'success' },
-      total_nodes: 5,
-      duration_ms: 10000,
-    });
+    await answerGate(runId);
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(screen.getByText('Pipeline complete')).toBeTruthy();
-  });
-
-  it('formats event descriptions correctly', async () => {
-    render(EventLog, { props: { runId: 'run-123' } });
-
-    eventStore.add({
-      kind: 'human_prompt_issued',
-      timestamp: '2026-09-22T10:00:05Z',
-      node_id: 'gate1',
-      question: 'Is this acceptable?',
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(screen.getByText('Question: Is this acceptable?')).toBeTruthy();
-  });
-
-  it('shows a native notification via the lib/native shim when the pipeline completes', async () => {
-    const notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
-
-    render(EventLog, { props: { runId: 'run-123' } });
-
-    eventStore.add({
-      kind: 'pipeline_completed',
-      timestamp: '2026-09-22T10:00:10Z',
-      outcome: { type: 'success' },
-      total_nodes: 5,
-      duration_ms: 10000,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
+    await screen.findByText('Pipeline complete', {}, { timeout: 5000 });
     expect(notifySpy).toHaveBeenCalledTimes(1);
     expect(notifySpy.mock.calls[0][0]).toMatch(/complete/i);
-
-    notifySpy.mockRestore();
   });
 
-  it('shows a native notification via the lib/native shim when the pipeline aborts', async () => {
-    const notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
+  it('shows a native notification when the pipeline aborts', async () => {
+    const runId = await startGatedRun();
+    render(EventLog, { props: { runId } });
+    await screen.findByText('Node started: gate (Interviewer)', {}, { timeout: 5000 });
 
-    render(EventLog, { props: { runId: 'run-123' } });
+    await runsApi.cancelRun(runId);
 
-    eventStore.add({
-      kind: 'pipeline_aborted',
-      timestamp: '2026-09-22T10:00:10Z',
-      reason: 'cancelled by user',
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    expect(notifySpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(1), { timeout: 5000 });
     expect(notifySpy.mock.calls[0][0]).toMatch(/abort/i);
-
-    notifySpy.mockRestore();
   });
 
   it('does not notify twice if the component re-renders after completion', async () => {
-    const notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
+    const runId = await startGatedRun();
+    const { rerender } = render(EventLog, { props: { runId } });
 
-    const { rerender } = render(EventLog, { props: { runId: 'run-123' } });
-
-    eventStore.add({
-      kind: 'pipeline_completed',
-      timestamp: '2026-09-22T10:00:10Z',
-      outcome: { type: 'success' },
-      total_nodes: 5,
-      duration_ms: 10000,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await rerender({ runId: 'run-123' });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await answerGate(runId);
+    await screen.findByText('Pipeline complete', {}, { timeout: 5000 });
+    await rerender({ runId });
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
     expect(notifySpy).toHaveBeenCalledTimes(1);
-
-    notifySpy.mockRestore();
   });
 });

@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the native shim module
 // ABOUTME: Tests browser fallback behavior (Tauri doesn't exist in test environment)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as native from '../../../src/lib/native/index';
 
 describe('native shim', () => {
@@ -61,10 +61,16 @@ describe('native shim', () => {
       expect(typeof native.showNotification).toBe('function');
     });
 
-    it('should handle showing notifications', async () => {
-      // Browser Notification API check - just verify function exists and returns promise
-      const result = native.showNotification('Test title', { body: 'Test body' });
-      expect(result instanceof Promise).toBe(true);
+    it('warns and resolves when neither Tauri nor the Notification API exists', async () => {
+      // jsdom has no Notification API, so this exercises the last fallback.
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await expect(
+        native.showNotification('Test title', { body: 'Test body' })
+      ).resolves.toBeUndefined();
+      expect(warn).toHaveBeenCalledWith('Notifications not supported');
+
+      warn.mockRestore();
     });
   });
 });
