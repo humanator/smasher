@@ -1,10 +1,10 @@
 // ABOUTME: Tests for WorkflowEditorPage component
 // ABOUTME: Renders against real GET /api/workflows/{id}/graph and PUT endpoints
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import { fireEvent } from '@testing-library/svelte/svelte5';
-import { rmSync, readdirSync, readFileSync } from 'fs';
+import { appendFileSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import WorkflowEditorPage from '../../../src/components/dashboard/WorkflowEditorPage.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
@@ -79,7 +79,7 @@ describe('WorkflowEditorPage', () => {
     const workflowId = 'examples__consensus_task';
 
     // Verify the API can fetch the graph first
-    const graph = await workflowsApi.getWorkflowGraph(workflowId);
+    const { graph } = await workflowsApi.getWorkflowGraph(workflowId);
     expect(graph.nodes.length).toBeGreaterThan(0);
     expect(graph.edges.length).toBeGreaterThan(0);
 
@@ -139,10 +139,104 @@ describe('WorkflowEditorPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Verify the save was successful by re-fetching the graph
-    const updatedGraph = await workflowsApi.getWorkflowGraph(workflowId);
+    const { graph: updatedGraph } = await workflowsApi.getWorkflowGraph(workflowId);
     expect(updatedGraph).toBeTruthy();
     expect(updatedGraph.nodes.length).toBe(2); // Start and End nodes
     expect(updatedGraph.edges.length).toBe(1); // Start -> End
+  });
+
+  describe('saving over a file that changed on disk', () => {
+    const scratchDot = 'digraph { start [shape=Mdiamond, label="Start"]; done [shape=doublecircle, label="Done"]; start -> done; }';
+    let workflowId: string;
+    let path: string;
+
+    beforeEach(async () => {
+      const name = `_test_editor_conflict_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      ({ id: workflowId } = await workflowsApi.importWorkflowDot(name, scratchDot));
+      const { workflows } = await workflowsApi.listWorkflows();
+      path = workflows.find((w) => w.id === workflowId)!.path;
+    });
+
+    afterEach(() => {
+      rmSync(path, { force: true });
+    });
+
+    async function renderLoaded() {
+      render(WorkflowEditorPage, { props: { workflowId } });
+      await screen.findByTestId('save-button', {}, { timeout: 5000 });
+    }
+
+    const canvasMounted = () => document.querySelector('.svelte-flow') !== null;
+
+    it('shows the conflict with Reload and Save anyway, keeps the canvas, and leaves the file alone', async () => {
+      await renderLoaded();
+      appendFileSync(path, '// edited elsewhere\n');
+      const changed = readFileSync(path, 'utf-8');
+
+      await fireEvent.click(screen.getByTestId('save-button'));
+
+      const conflict = await screen.findByTestId('save-conflict', {}, { timeout: 5000 });
+      expect(conflict.textContent).toMatch(/changed on disk/);
+      expect(screen.getByTestId('conflict-reload')).toBeTruthy();
+      expect(screen.getByTestId('conflict-save-anyway')).toBeTruthy();
+      expect(canvasMounted()).toBe(true);
+      expect(readFileSync(path, 'utf-8')).toBe(changed);
+    });
+
+    it('Save anyway writes the editor version over the changed file', async () => {
+      await renderLoaded();
+      appendFileSync(path, '// edited elsewhere\n');
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await fireEvent.click(await screen.findByTestId('conflict-save-anyway', {}, { timeout: 5000 }));
+
+      await waitFor(() => expect(screen.queryByTestId('save-conflict')).toBeNull(), { timeout: 5000 });
+      expect(readFileSync(path, 'utf-8')).not.toContain('edited elsewhere');
+
+      // The page now holds the new ETag, so a plain Save works again.
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      expect(screen.queryByTestId('save-error')).toBeNull();
+    });
+
+    it('Reload shows the version on disk and clears the conflict', async () => {
+      await renderLoaded();
+      writeFileSync(path, scratchDot.replace('label="Done"', 'label="Done elsewhere"'));
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await fireEvent.click(await screen.findByTestId('conflict-reload', {}, { timeout: 5000 }));
+
+      await screen.findByText('Done elsewhere', {}, { timeout: 5000 });
+      expect(screen.queryByTestId('save-conflict')).toBeNull();
+
+      // The reloaded ETag is current, so saving now succeeds.
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
+    });
+
+    it('saves twice in a row with no outside change', async () => {
+      await renderLoaded();
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await waitFor(() => expect(screen.getByTestId('save-button').textContent).toMatch(/^\s*Save\s*$/));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await fireEvent.click(screen.getByTestId('save-button'));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      expect(screen.queryByTestId('save-error')).toBeNull();
+    });
+
+    it('shows any other save failure inline and keeps the canvas', async () => {
+      await renderLoaded();
+      rmSync(path);
+
+      await fireEvent.click(screen.getByTestId('save-button'));
+
+      const saveError = await screen.findByTestId('save-error', {}, { timeout: 5000 });
+      expect(saveError.textContent).toMatch(/workflow/);
+      expect(canvasMounted()).toBe(true);
+    });
   });
 
   describe('Export .dot', () => {

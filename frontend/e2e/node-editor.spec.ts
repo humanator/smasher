@@ -4,7 +4,7 @@
 // ABOUTME: other test drives addNodeAtPosition() directly instead. This is the real thing.
 
 import { test, expect } from '@playwright/test';
-import { existsSync, readFileSync, rmSync } from 'fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 async function dragPaletteEntryOntoCanvas(
@@ -144,4 +144,43 @@ test('a dropped node lands under the pointer after zooming and panning', async (
   // under the drop point.
   expect(Math.abs(box!.x - drop.x)).toBeLessThan(4);
   expect(Math.abs(box!.y - drop.y)).toBeLessThan(4);
+});
+
+test('saving over a file changed on disk shows the conflict, and Save anyway writes the editor version', async ({
+  page,
+  baseURL,
+}) => {
+  const base = baseURL || 'http://127.0.0.1:5173';
+  const name = `_test_node_editor_conflict_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const dot = 'digraph { start [shape=Mdiamond, label="Start"]; done [shape=doublecircle, label="Done"]; start -> done; }';
+  const imported = await page.request.post(`${base}/api/workflows/import`, { data: { name, dot } });
+  expect(imported.ok()).toBe(true);
+  const { id } = await imported.json();
+  const listed = await (await page.request.get(`${base}/api/workflows`)).json();
+  const path: string = listed.workflows.find((w: { id: string }) => w.id === id).path;
+
+  try {
+    await page.goto(`${base}/workflows/${id}/edit`);
+    await expect(page.locator('.svelte-flow__node')).toHaveCount(2, { timeout: 10000 });
+
+    // Edit in the browser...
+    await page.locator('.svelte-flow__node[data-id="done"]').click();
+    await page.getByTestId('node-inspector-label').fill('Done in editor');
+
+    // ...while someone else rewrites the file.
+    writeFileSync(path, dot.replace('label="Done"', 'label="Done elsewhere"'));
+
+    await page.getByTestId('save-button').click();
+    await expect(page.getByTestId('save-conflict')).toContainText('changed on disk');
+    await expect(page.locator('.svelte-flow__node[data-id="done"]')).toContainText('Done in editor');
+    expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
+
+    await page.getByTestId('conflict-save-anyway').click();
+    await expect(page.getByTestId('save-conflict')).toHaveCount(0);
+    const saved = readFileSync(path, 'utf-8');
+    expect(saved).toContain('Done in editor');
+    expect(saved).not.toContain('Done elsewhere');
+  } finally {
+    rmSync(path, { force: true });
+  }
 });

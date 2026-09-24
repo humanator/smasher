@@ -1,5 +1,5 @@
 // ABOUTME: REST client for workflow routes
-// ABOUTME: Get workflows list, create new, update existing, export/import raw DOT
+// ABOUTME: Get workflows list, create new, update existing (ETag-checked), export/import raw DOT
 
 import { getApiUrl } from './client-config';
 
@@ -48,6 +48,22 @@ interface ApiError {
   message: string;
 }
 
+/** An error carrying the response's status and its JSON `error` message, if any. */
+async function errorFromResponse(response: Response): Promise<ApiError> {
+  let message = `HTTP ${response.status}`;
+  try {
+    const body = await response.json();
+    if (typeof body?.error === 'string') {
+      message = body.error;
+    }
+  } catch {
+    // Non-JSON error body; keep the status-only message.
+  }
+  const error = new Error(message) as unknown as ApiError;
+  error.status = response.status;
+  return error;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
@@ -68,9 +84,16 @@ export async function listWorkflows(): Promise<WorkflowsListResponse> {
   return handleResponse<WorkflowsListResponse>(response);
 }
 
-export async function getWorkflowGraph(id: string): Promise<EditorGraph> {
+/**
+ * A workflow's graph plus the ETag of the file it came from. Pass the etag
+ * to `updateWorkflowGraph` so a save over a file changed since is refused.
+ */
+export async function getWorkflowGraph(
+  id: string
+): Promise<{ graph: EditorGraph; etag: string | null }> {
   const response = await fetch(getApiUrl(`/workflows/${id}/graph`));
-  return handleResponse<EditorGraph>(response);
+  const graph = await handleResponse<EditorGraph>(response);
+  return { graph, etag: response.headers.get('ETag') };
 }
 
 /** The workflow's DOT source exactly as it is on disk. */
@@ -84,17 +107,26 @@ export async function getWorkflowDot(id: string): Promise<string> {
   return response.text();
 }
 
-export async function updateWorkflowGraph(id: string, graph: EditorGraph): Promise<void> {
+/**
+ * Save a workflow's graph and return the saved file's new ETag. With `etag`,
+ * the server refuses the save (status 409) if the file changed on disk since
+ * that etag was read; without it, the save overwrites whatever is there.
+ * Rejects with the server's message and HTTP status on failure.
+ */
+export async function updateWorkflowGraph(
+  id: string,
+  graph: EditorGraph,
+  etag?: string
+): Promise<string | null> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (etag) headers['If-Match'] = etag;
   const response = await fetch(getApiUrl(`/workflows/${id}/graph`), {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(graph),
   });
-  if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
+  return response.headers.get('ETag');
 }
 
 export async function createWorkflowGraph(
@@ -125,19 +157,6 @@ export async function importWorkflowDot(name: string, dot: string): Promise<Crea
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, dot }),
   });
-  if (!response.ok) {
-    let message = `HTTP ${response.status}`;
-    try {
-      const body = await response.json();
-      if (typeof body?.error === 'string') {
-        message = body.error;
-      }
-    } catch {
-      // Non-JSON error body; keep the status-only message.
-    }
-    const error = new Error(message) as unknown as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
   return handleResponse<CreateGraphResponse>(response);
 }

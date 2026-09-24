@@ -142,22 +142,22 @@ Save anyway re-sends without `If-Match`. Update any other `getWorkflowGraph` cal
 return shape.
 
 **Acceptance criteria:**
-- [ ] Load the editor, change the file on disk, click Save. You see the conflict message and both
+- [x] Load the editor, change the file on disk, click Save. You see the conflict message and both
       buttons, the canvas still shows your unsaved edits, and the file on disk is unchanged.
-- [ ] Save anyway writes your version. Reload shows the on-disk version.
-- [ ] Two saves in a row with no outside change both succeed, because the etag updates after each
+- [x] Save anyway writes your version. Reload shows the on-disk version.
+- [x] Two saves in a row with no outside change both succeed, because the etag updates after each
       save
-- [ ] Any other save failure (e.g. 400) shows inline and leaves the canvas mounted
+- [x] Any other save failure (e.g. 400) shows inline and leaves the canvas mounted
 
 **Verification:**
-- [ ] Vitest (real API, `tests/lib/api/workflows.test.ts`): GET gives an etag, a matching PUT
+- [x] Vitest (real API, `tests/lib/api/workflows.test.ts`): GET gives an etag, a matching PUT
       succeeds, and a stale PUT rejects with `status === 409`
-- [ ] Vitest (`tests/components/dashboard/WorkflowEditorPage.test.ts`): real server, fixture file
+- [x] Vitest (`tests/components/dashboard/WorkflowEditorPage.test.ts`): real server, fixture file
       changed between load and save → conflict UI shown, canvas still mounted, Save anyway
       succeeds
-- [ ] Playwright (new case in `e2e/node-editor.spec.ts`): edit, rewrite the file from the test,
+- [x] Playwright (new case in `e2e/node-editor.spec.ts`): edit, rewrite the file from the test,
       save → conflict, Save anyway → the file holds the editor's version
-- [ ] `npx eslint .`, and `npm run check` has no new errors
+- [x] `npx eslint .`, and `npm run check` has no new errors
 
 **Dependencies:** T3
 

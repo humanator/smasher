@@ -1,8 +1,8 @@
-// ABOUTME: Tests for the workflows REST client's raw-DOT export and import
+// ABOUTME: Tests for the workflows REST client's raw-DOT export/import and ETag-checked graph saves
 // ABOUTME: Calls the REAL smasher-web-api instance and compares against files on disk
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { readFileSync, rmSync } from 'fs';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { appendFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import * as workflows from '../../../src/lib/api/workflows';
 import * as runs from '../../../src/lib/api/runs';
@@ -80,5 +80,64 @@ describe('workflows API client - raw DOT import', () => {
     await expect(workflows.importWorkflowDot(name, helloWorld)).rejects.toMatchObject({
       status: 409,
     });
+  });
+});
+
+describe('workflows API client - graph load and save with ETag', () => {
+  const helloWorld = readFileSync(
+    join(process.cwd(), '..', 'examples', 'old-examples', 'hello-world.dot'),
+    'utf-8'
+  );
+  let path: string;
+  let id: string;
+
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  beforeEach(async () => {
+    const name = `_test_etag_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    ({ id } = await workflows.importWorkflowDot(name, helloWorld));
+    const { workflows: all } = await workflows.listWorkflows();
+    path = all.find((w) => w.id === id)!.path;
+  });
+
+  afterEach(() => {
+    rmSync(path, { force: true });
+  });
+
+  it('returns the graph together with a quoted ETag', async () => {
+    const { graph, etag } = await workflows.getWorkflowGraph(id);
+    expect(graph.nodes.length).toBeGreaterThan(0);
+    expect(etag).toMatch(/^"[0-9a-f]{64}"$/);
+  });
+
+  it('saves with a matching If-Match and hands back a new ETag good for the next save', async () => {
+    const { graph, etag } = await workflows.getWorkflowGraph(id);
+    const next = await workflows.updateWorkflowGraph(id, graph, etag ?? undefined);
+    expect(next).toMatch(/^"[0-9a-f]{64}"$/);
+    expect(next).not.toBe(etag);
+
+    await expect(workflows.updateWorkflowGraph(id, graph, next ?? undefined)).resolves.toBeTruthy();
+  });
+
+  it('rejects a stale save with status 409 and the server message, leaving the file alone', async () => {
+    const { graph, etag } = await workflows.getWorkflowGraph(id);
+    appendFileSync(path, '// edited elsewhere\n');
+    const changed = readFileSync(path, 'utf-8');
+
+    await expect(workflows.updateWorkflowGraph(id, graph, etag ?? undefined)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining('changed on disk'),
+    });
+    expect(readFileSync(path, 'utf-8')).toBe(changed);
+  });
+
+  it('overwrites a changed file when no ETag is sent', async () => {
+    const { graph } = await workflows.getWorkflowGraph(id);
+    appendFileSync(path, '// edited elsewhere\n');
+
+    await workflows.updateWorkflowGraph(id, graph);
+    expect(readFileSync(path, 'utf-8')).not.toContain('edited elsewhere');
   });
 });
