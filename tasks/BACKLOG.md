@@ -90,13 +90,25 @@ if the directories differ. To serve without API keys or spending anything, point
      `minZoom` of 0.5. Setting a lower `minZoom` on the canvas would likely fix it.
 
 9. **Show candidates as thumbnails that open a full-size, interactive lightbox.**
-   *Raised by Jobsworth 2026-09-25 from a real run, so moved up from P3.* Each card
-   in the gallery grid (`CandidateCard.svelte`) is a live iframe at 4:3 in a column
-   at least 260px wide. Candidates are designed at desktop size (render-capture
-   shoots 1280×800), so at that size they're too small to judge. Instead, show the
-   screenshot as a thumbnail, and open the live bundle (`bundle_url`) in a lightbox
-   at full size so it can be clicked through. Keep the scorecard badges and the
-   gallery gate's selection controls on the card.
+   *Raised by Jobsworth 2026-09-25 from a real run, so moved up from P3.* This is
+   partly a regression from the SPA port (see #21). The HTMX card
+   (`_candidate_card.html`, `style.css:1279-1300` at `0e5647c^`) was 375px wide
+   with a 667px-tall live iframe (a phone-sized screen), plus:
+   - a ⟲ button that reloaded the preview to its start state (script in
+     `base.html`),
+   - a collapsible "params" section listing `generation_params`,
+   - on the gallery gate, a link around the preview that opened the live bundle
+     in a new tab (`gallery_gate.html:17`, `primary_url()`).
+
+   The SPA's `CandidateCard.svelte` and `GalleryGate.svelte` have none of these.
+   Both show a 4:3 iframe in a column at least 260px wide, too small to judge a
+   candidate designed at desktop size (render-capture shoots 1280×800).
+   Wanted, in both the gallery and the gate:
+   - Show the screenshot as a thumbnail. Clicking it opens the live bundle
+     (`bundle_url`) in a lightbox, full size and clickable, with the reset
+     button.
+   - Bring back the params section, and the captured-at time on failed cards.
+   - Keep the scorecard badges, checkbox and comment box on the card.
 
 20. **Model selection everywhere, and per node.** *Raised by Jobsworth
     2026-09-25.* Bigger than the rest of P1, so write a spec first. Today:
@@ -120,6 +132,58 @@ if the directories differ. To serve without API keys or spending anything, point
     - When editing an LLM node, pick its model from a list of the configured
       providers' models (including Claude CLI), not free text.
     - Choosing a provider also sets a valid model for it.
+
+21. **Restore what the HTMX → SPA port dropped.** *Found 2026-09-25 by comparing
+    the templates deleted in `0e5647c` (read them with `git show
+    0e5647c^:crates/smasher-web/templates/<file>`) against the SPA.* The SPA plan
+    only required parity for submitting runs, live events and questions
+    (`archive/SPEC-smasher-spa.md:99`), and none of these are recorded as
+    deliberate cuts. Candidate cards are #9. The rest, most serious first:
+    - **No run form.** The old `workflow_run_form.html` had Model, Variables,
+      Brief and Node Overrides fields. The catalog's Run button now sends an
+      empty request (`WorkflowCatalog.svelte:48`), although the API accepts all
+      of them (`lib/api/runs.ts`). So you can't give a run a brief or a model.
+      The model field overlaps #20.
+    - **No workflow detail page.** `/workflows/{id}` showed the workflow's
+      source, an Edit button, the run form, the active run, and that workflow's
+      run history. The SPA has no such route. The catalog links only to Edit,
+      and the only run history is the global list.
+    - **A failed run shows no reason.** The old Telemetry drawer showed
+      Completed, Working Directory and **Error** (`run_detail_body.html:98-118`).
+      `RunDetail.svelte` shows none of them, though `RunSummary` has the fields.
+    - **The pipeline graph doesn't update.** The old one re-fetched every 3s, so
+      node colours followed the run. `RunDetail.svelte:64` loads it once. It
+      also swallows errors (`:43`), such as the old "Graphviz isn't installed"
+      message, and no longer scales the graph to fit the width.
+    - **Silent errors.** `base.html` showed a toast with the server's error for
+      any failed request. Now a failed answer to a question only goes to
+      `console.error` (`QuestionCard.svelte:40`), and gallery-gate poll failures
+      are dropped. The sonner toaster is mounted but only the editor uses it.
+    - **Questions:**
+      - The card no longer shows the question type or id.
+      - Free-text answers have no Submit button (Enter only).
+      - Multiple choice submits on the first click, with no radio buttons.
+      - The first question fetch waits 2s.
+      - The "No pending questions." empty state is gone.
+    - **Event log:**
+      - It used to be newest-first and colour-coded by type, with agent events
+        indented and noisy ones faded (`style.css:754-832`). Now it's
+        oldest-first, all one style, and doesn't scroll to follow new events.
+      - Only 9 of the 17 event types get a readable line (`EventLog.svelte:59-82`).
+        The SPA plan's acceptance criteria required all 17
+        (`archive/plan-smasher-spa.md:504`).
+    - **Token counter:** there's no longer a total, and it polls every 5s
+      instead of 3s.
+    - **Run list:** a run with no graph name shows a blank cell, where the old
+      page showed "unnamed".
+    - **Page title and favicon:** the title is always `smasher-spa` and the
+      favicon is `/vite.svg` (`frontend/index.html`). The old pages had their
+      own titles and a ⚡ icon.
+
+    Deliberate, so leave them: the raw-DOT paste form (see Dropped), and the
+    Telemetry drawer being replaced by an inline layout
+    (`archive/plan-smasher-spa.md:492`). The lint badge now always lists its
+    violations, where the old one needed a click. That's arguably better.
 
 ## In progress
 
