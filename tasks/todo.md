@@ -177,17 +177,17 @@ imports it. No flag changes.
 `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` and define the default list from T1 (in `plan.md`).
 
 **Acceptance criteria:**
-- [ ] Default config argv has `dontAsk`, the default allowlist,
+- [x] Default config argv has `dontAsk`, the default allowlist,
       `--strict-mcp-config`, `--no-session-persistence`, `--setting-sources ""`, and no
       `--dangerously-skip-permissions`. The skip config gives the reverse.
-- [ ] Node `model="claude-opus-5-5"` → `--model claude-opus-5-5`. `model="gpt-5"` →
+- [x] Node `model="claude-opus-5-5"` → `--model claude-opus-5-5`. `model="gpt-5"` →
       `--model <default_model>`. No model → `default_model`.
-- [ ] Env allowlist parsing: comma-separated, trimmed, empty entries dropped. Unset
+- [x] Env allowlist parsing: comma-separated, trimmed, empty entries dropped. Unset
       uses the default.
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor claude_cli`
-- [ ] Real-CLI `#[ignore]` test: a `curl` prompt is denied and the node ends
+- [x] `cargo test -p smasher-attractor claude_cli`
+- [ ] (written; run by hand, deferred to Jobsworth) Real-CLI `#[ignore]` test: a `curl` prompt is denied and the node ends
       (success or failure) inside the timeout
 
 **Dependencies:** T6, T1

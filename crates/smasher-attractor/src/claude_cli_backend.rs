@@ -12,11 +12,81 @@ use crate::events::{PipelineEvent, PipelineEventEmitter};
 use crate::handler::{CodergenBackend, HandlerError};
 use crate::state::{Context, Outcome};
 
+/// Tools a codergen run may use without asking: file tools, plus Bash limited to
+/// inspecting and copying files. Left out on purpose: `rm`, `find` (`-delete`,
+/// `-exec`), and anything that runs code or reaches the network (`node`, `npx`,
+/// `curl`). Settled by a real candidate build (see `tasks/plan.md`, Spike 2).
+pub const DEFAULT_ALLOWED_TOOLS: [&str; 15] = [
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "Bash(ls:*)",
+    "Bash(mkdir:*)",
+    "Bash(cp:*)",
+    "Bash(mv:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(tail:*)",
+    "Bash(wc:*)",
+    "Bash(grep:*)",
+    "Bash(sort:*)",
+];
+
+/// Env var holding a comma-separated allowlist that replaces [`DEFAULT_ALLOWED_TOOLS`].
+pub const ALLOWED_TOOLS_ENV: &str = "SMASHER_CLAUDE_CLI_ALLOWED_TOOLS";
+
+/// Parse a comma-separated allowlist. Entries are trimmed and empty ones dropped;
+/// unset or blank gives [`DEFAULT_ALLOWED_TOOLS`].
+pub fn parse_allowed_tools(value: Option<&str>) -> Vec<String> {
+    let tools: Vec<String> = value
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(String::from)
+        .collect();
+    if tools.is_empty() {
+        DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec()
+    } else {
+        tools
+    }
+}
+
+/// The allowlist from [`ALLOWED_TOOLS_ENV`], or the default.
+pub fn allowed_tools_from_env() -> Vec<String> {
+    parse_allowed_tools(std::env::var(ALLOWED_TOOLS_ENV).ok().as_deref())
+}
+
+/// How a codergen run's tool use is permitted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClaudeCliPermissions {
+    /// `--permission-mode dontAsk`: these tools run, anything else is denied
+    /// without prompting and the run carries on.
+    Allowlist(Vec<String>),
+    /// `--dangerously-skip-permissions`: every tool runs. The `smasher run` escape hatch.
+    SkipPermissions,
+}
+
+impl Default for ClaudeCliPermissions {
+    fn default() -> Self {
+        Self::Allowlist(DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec())
+    }
+}
+
+/// True for model names the `claude` CLI accepts: full `claude-*` IDs and the
+/// family aliases.
+fn is_claude_model(model: &str) -> bool {
+    model.starts_with("claude-") || matches!(model, "sonnet" | "opus" | "haiku")
+}
+
 /// CodergenBackend that spawns `claude` CLI as a subprocess.
 ///
 /// Builds a combined prompt from pipeline context and the node prompt, then
-/// runs `claude --dangerously-skip-permissions --print -p <prompt>` with a
-/// wall-clock timeout. Captures stdout as the outcome text.
+/// runs `claude --permission-mode dontAsk --allowedTools <list> ... -p <prompt>`
+/// with a wall-clock timeout, keeping the user's MCP servers, settings and
+/// CLAUDE.md out. Captures stdout as the outcome text.
 pub struct ClaudeCliBackend {
     working_dir: String,
     timeout: Duration,
@@ -30,6 +100,9 @@ pub struct ClaudeCliBackend {
     /// `max_consecutive_timeouts`, the backend aborts the pipeline.
     consecutive_timeouts: Arc<AtomicU32>,
     max_consecutive_timeouts: u32,
+    /// Model used when the node names none (or names a non-Claude model).
+    default_model: Option<String>,
+    permissions: ClaudeCliPermissions,
 }
 
 #[async_trait::async_trait]
@@ -37,10 +110,9 @@ impl CodergenBackend for ClaudeCliBackend {
     async fn generate(
         &self,
         prompt: &str,
-        // The model/provider parameters are intentionally not forwarded to the
-        // claude CLI — the CLI uses its own model selection. Per-node
-        // model/provider overrides only apply to the agent backend.
-        _model: Option<&str>,
+        // A Claude model is passed as `--model`; anything else (e.g. `gpt-5`) falls
+        // back to `default_model`. The provider is ignored: this backend is the CLI.
+        model: Option<&str>,
         _provider: Option<&str>,
         context: &Context,
     ) -> Result<Outcome, HandlerError> {
@@ -68,7 +140,30 @@ impl CodergenBackend for ClaudeCliBackend {
         // detect a nested session and refuse to launch. The outer Claude Code
         // session sets these.
         let mut cmd = base_command(Path::new(claude_bin));
-        cmd.arg("--dangerously-skip-permissions");
+        match &self.permissions {
+            ClaudeCliPermissions::Allowlist(tools) => {
+                cmd.args(["--permission-mode", "dontAsk", "--allowedTools"])
+                    .args(tools);
+            }
+            ClaudeCliPermissions::SkipPermissions => {
+                cmd.arg("--dangerously-skip-permissions");
+            }
+        }
+        // `--setting-sources ""` also keeps `~/.claude/CLAUDE.md` out, so pipeline
+        // agents don't follow the user's personal instructions.
+        cmd.args([
+            "--strict-mcp-config",
+            "--setting-sources",
+            "",
+            "--no-session-persistence",
+        ]);
+
+        if let Some(model) = model
+            .filter(|m| is_claude_model(m))
+            .or(self.default_model.as_deref().filter(|m| is_claude_model(m)))
+        {
+            cmd.arg("--model").arg(model);
+        }
 
         if self.streaming {
             // Stream JSON mode: read NDJSON events line-by-line and emit PipelineEvents.
@@ -84,6 +179,8 @@ impl CodergenBackend for ClaudeCliBackend {
         cmd.arg("-p")
             .arg(&combined_prompt)
             .current_dir(&self.working_dir)
+            // Without this, `claude -p` waits for stdin before starting.
+            .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
 
@@ -347,7 +444,7 @@ impl CodergenBackend for ClaudeCliBackend {
 
 impl ClaudeCliBackend {
     /// A backend running `claude` from `PATH` in `working_dir`, in print mode, with
-    /// no emitter and aborting after 3 consecutive timeouts.
+    /// the default allowlist, no emitter, and aborting after 3 consecutive timeouts.
     pub fn new(working_dir: impl Into<String>, timeout: Duration) -> Self {
         Self {
             working_dir: working_dir.into(),
@@ -357,7 +454,21 @@ impl ClaudeCliBackend {
             emitter: None,
             consecutive_timeouts: Arc::new(AtomicU32::new(0)),
             max_consecutive_timeouts: 3,
+            default_model: None,
+            permissions: ClaudeCliPermissions::default(),
         }
+    }
+
+    /// Model for nodes that don't name a Claude model. `None` leaves it to the CLI.
+    pub fn with_default_model(mut self, model: Option<String>) -> Self {
+        self.default_model = model;
+        self
+    }
+
+    /// Replace the default allowlist.
+    pub fn with_permissions(mut self, permissions: ClaudeCliPermissions) -> Self {
+        self.permissions = permissions;
+        self
     }
 
     /// Use this `claude` binary instead of the one on `PATH`.
@@ -694,8 +805,8 @@ mod tests {
 
         let captured = std::fs::read_to_string(&args_file).unwrap();
         assert!(
-            captured.contains("--dangerously-skip-permissions"),
-            "should pass --dangerously-skip-permissions, got: {captured}"
+            captured.contains("--permission-mode dontAsk"),
+            "should pass --permission-mode dontAsk, got: {captured}"
         );
         assert!(
             captured.contains("--print"),
@@ -922,40 +1033,209 @@ mod tests {
             .collect()
     }
 
+    /// Flags every run gets, whatever the permissions: keep the user's MCP servers,
+    /// settings and CLAUDE.md out, and don't write session transcripts.
+    const ISOLATION: [&str; 4] = [
+        "--strict-mcp-config",
+        "--setting-sources",
+        "",
+        "--no-session-persistence",
+    ];
+
+    fn backend_in(tmp: &std::path::Path, script: &std::path::Path) -> ClaudeCliBackend {
+        ClaudeCliBackend::new(
+            tmp.display().to_string(),
+            std::time::Duration::from_secs(10),
+        )
+        .with_claude_path(script.display().to_string())
+    }
+
+    fn default_allowlist() -> Vec<String> {
+        DEFAULT_ALLOWED_TOOLS
+            .iter()
+            .map(|t| t.to_string())
+            .collect()
+    }
+
     #[tokio::test]
     async fn claude_cli_backend_exact_argv_in_both_modes() {
         let tmp = tempfile::tempdir().unwrap();
         let script = argv_recording_claude(tmp.path());
         let ctx = crate::state::Context::new();
 
-        let streaming = ClaudeCliBackend::new(
+        let mut expected_prefix: Vec<String> = vec!["--permission-mode".into(), "dontAsk".into()];
+        expected_prefix.push("--allowedTools".into());
+        expected_prefix.extend(default_allowlist());
+        expected_prefix.extend(ISOLATION.iter().map(|s| s.to_string()));
+
+        backend_in(tmp.path(), &script)
+            .with_streaming(true)
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+        let mut expected = expected_prefix.clone();
+        expected.extend(
+            ["--verbose", "--output-format", "stream-json", "-p", "do it"].map(String::from),
+        );
+        assert_eq!(recorded_argv(tmp.path()), expected);
+
+        backend_in(tmp.path(), &script)
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+        let mut expected = expected_prefix;
+        expected.extend(["--print", "-p", "do it"].map(String::from));
+        assert_eq!(recorded_argv(tmp.path()), expected);
+    }
+
+    #[tokio::test]
+    async fn skip_permissions_replaces_dont_ask_and_keeps_isolation() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = argv_recording_claude(tmp.path());
+        let ctx = crate::state::Context::new();
+
+        backend_in(tmp.path(), &script)
+            .with_permissions(ClaudeCliPermissions::SkipPermissions)
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+
+        let mut expected: Vec<String> = vec!["--dangerously-skip-permissions".into()];
+        expected.extend(ISOLATION.iter().map(|s| s.to_string()));
+        expected.extend(["--print", "-p", "do it"].map(String::from));
+        assert_eq!(recorded_argv(tmp.path()), expected);
+    }
+
+    #[tokio::test]
+    async fn custom_allowlist_is_passed_through() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = argv_recording_claude(tmp.path());
+        let ctx = crate::state::Context::new();
+
+        backend_in(tmp.path(), &script)
+            .with_permissions(ClaudeCliPermissions::Allowlist(vec![
+                "Read".into(),
+                "Bash(npm run build:*)".into(),
+            ]))
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+
+        let argv = recorded_argv(tmp.path());
+        let at = argv.iter().position(|a| a == "--allowedTools").unwrap();
+        assert_eq!(argv[at + 1..at + 3], ["Read", "Bash(npm run build:*)"]);
+        assert_eq!(argv[at + 3], "--strict-mcp-config");
+    }
+
+    fn model_arg(argv: &[String]) -> Option<String> {
+        argv.iter()
+            .position(|a| a == "--model")
+            .map(|i| argv[i + 1].clone())
+    }
+
+    #[tokio::test]
+    async fn node_model_and_default_model_choose_the_model_flag() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = argv_recording_claude(tmp.path());
+        let ctx = crate::state::Context::new();
+        let with_default =
+            || backend_in(tmp.path(), &script).with_default_model(Some("claude-sonnet-5".into()));
+
+        let cases: [(Option<&str>, Option<&str>); 4] = [
+            (Some("claude-opus-5-5"), Some("claude-opus-5-5")),
+            (Some("opus"), Some("opus")),
+            (Some("gpt-5"), Some("claude-sonnet-5")),
+            (None, Some("claude-sonnet-5")),
+        ];
+        for (node_model, expected) in cases {
+            with_default()
+                .generate("do it", node_model, None, &ctx)
+                .await
+                .unwrap();
+            assert_eq!(
+                model_arg(&recorded_argv(tmp.path())).as_deref(),
+                expected,
+                "node model {node_model:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn no_model_flag_without_a_claude_model() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = argv_recording_claude(tmp.path());
+        let ctx = crate::state::Context::new();
+
+        backend_in(tmp.path(), &script)
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+        assert_eq!(model_arg(&recorded_argv(tmp.path())), None);
+
+        backend_in(tmp.path(), &script)
+            .with_default_model(Some("gpt-5".into()))
+            .generate("do it", Some("gemini-2.5-pro"), None, &ctx)
+            .await
+            .unwrap();
+        assert_eq!(model_arg(&recorded_argv(tmp.path())), None);
+    }
+
+    #[tokio::test]
+    async fn stdin_is_closed_so_claude_does_not_wait_for_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let script = tmp.path().join("claude");
+        // `cat` returns only when stdin hits EOF.
+        std::fs::write(&script, "#!/bin/sh\ncat > /dev/null\necho done\n").unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let outcome = ClaudeCliBackend::new(
             tmp.path().display().to_string(),
-            std::time::Duration::from_secs(10),
+            std::time::Duration::from_secs(5),
         )
         .with_claude_path(script.display().to_string())
-        .with_streaming(true);
-        streaming.generate("do it", None, None, &ctx).await.unwrap();
-        assert_eq!(
-            recorded_argv(tmp.path()),
-            vec![
-                "--dangerously-skip-permissions",
-                "--verbose",
-                "--output-format",
-                "stream-json",
-                "-p",
-                "do it",
-            ]
-        );
+        .generate("do it", None, None, &crate::state::Context::new())
+        .await
+        .unwrap();
 
-        let print = ClaudeCliBackend::new(
-            tmp.path().display().to_string(),
-            std::time::Duration::from_secs(10),
-        )
-        .with_claude_path(script.display().to_string());
-        print.generate("do it", None, None, &ctx).await.unwrap();
+        assert!(!outcome.is_failure(), "{outcome:?}");
+    }
+
+    #[test]
+    fn allowed_tools_parse_trims_and_drops_empty_entries() {
         assert_eq!(
-            recorded_argv(tmp.path()),
-            vec!["--dangerously-skip-permissions", "--print", "-p", "do it"]
+            parse_allowed_tools(Some(" Read, Bash(ls:*) ,,Write ")),
+            vec!["Read", "Bash(ls:*)", "Write"]
+        );
+    }
+
+    #[test]
+    fn allowed_tools_unset_or_blank_uses_the_default() {
+        assert_eq!(parse_allowed_tools(None), default_allowlist());
+        assert_eq!(parse_allowed_tools(Some(" , ")), default_allowlist());
+    }
+
+    #[test]
+    fn default_allowlist_matches_the_spike() {
+        assert_eq!(
+            DEFAULT_ALLOWED_TOOLS,
+            [
+                "Read",
+                "Edit",
+                "Write",
+                "Glob",
+                "Grep",
+                "Bash(ls:*)",
+                "Bash(mkdir:*)",
+                "Bash(cp:*)",
+                "Bash(mv:*)",
+                "Bash(cat:*)",
+                "Bash(head:*)",
+                "Bash(tail:*)",
+                "Bash(wc:*)",
+                "Bash(grep:*)",
+                "Bash(sort:*)",
+            ]
         );
     }
 }
