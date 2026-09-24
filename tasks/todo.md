@@ -312,13 +312,13 @@ default provider.
 done.
 
 **Acceptance criteria:**
-- [ ] `docs/config-reference.md`: `SMASHER_CLAUDE_CLI`, `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS`,
+- [x] `docs/config-reference.md`: `SMASHER_CLAUDE_CLI`, `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS`,
       `claude-cli` as a `SMASHER_PROVIDER` value
-- [ ] `docs/cli-reference.md`: `--claude-skip-permissions` and the permission change
-- [ ] `tasks/BACKLOG.md` updated, and the spec's status set to done
+- [x] `docs/cli-reference.md`: `--claude-skip-permissions` and the permission change
+- [x] `tasks/BACKLOG.md` updated, and the spec's status set to done
 
 **Verification:**
-- [ ] Docs match the flags in code (grep)
+- [x] Docs match the flags in code (grep)
 
 **Dependencies:** T11
 **Files likely touched:** `docs/config-reference.md`, `docs/cli-reference.md`,

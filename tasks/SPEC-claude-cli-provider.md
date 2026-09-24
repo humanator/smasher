@@ -1,6 +1,8 @@
 # Spec: `claude-cli-provider` — Run Pipelines Through `claude -p`
 
-Status: **Draft, pending review** (2026-09-24). Depends on `smasher-desktop` (done)
+Status: **Implemented** (2026-09-24) on `feat/claude-cli-provider`. Manual checkpoint
+runs (real CLI, desktop app, product design factory) are still to do; see `todo.md`.
+Was: draft, pending review (2026-09-24). Depends on `smasher-desktop` (done)
 and the `DEFAULT_MODEL` change on `fix/default-model`.
 
 ## Objective

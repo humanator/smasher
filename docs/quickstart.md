@@ -33,6 +33,10 @@ Smasher talks to LLM providers. You need at least one of the following environme
 | `OPENAI_API_KEY`    | OpenAI     |
 | `GEMINI_API_KEY`    | Google Gemini |
 
+No API key? If Claude Code is installed and logged in, `SMASHER_CLAUDE_CLI=1
+SMASHER_PROVIDER=claude-cli` runs everything through `claude -p` instead (see the
+[config reference](config-reference.md#claude-cli-provider)).
+
 You can export them directly:
 
 ```bash

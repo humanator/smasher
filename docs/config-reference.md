@@ -3,6 +3,25 @@
 
 # Configuration Reference
 
+## Claude CLI Provider
+
+Runs LLM work through the local Claude Code CLI (`claude -p`) with whatever account
+`claude` is logged into, so no provider API key is needed. Codergen nodes run as
+Claude Code agent sessions. Single-call work (`task_critic`, `synthesis`, manager
+and tool nodes) runs as trimmed, tool-less `claude -p` calls.
+
+| Variable | Description |
+|----------|-------------|
+| `SMASHER_CLAUDE_CLI` | Registers the `claude-cli` provider. `1` finds the binary (in `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `PATH`); any other value is the path to it. |
+| `SMASHER_PROVIDER=claude-cli` | Makes it the default provider. The web server then sends codergen nodes to `claude -p` too, except nodes with an explicit `provider="<other>"`, which use that provider's API agent. |
+| `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` | Comma-separated tools codergen runs may use, replacing the default `Read,Edit,Write,Glob,Grep` plus `Bash(ls:*)`, `Bash(mkdir:*)`, `Bash(cp:*)`, `Bash(mv:*)`, `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(grep:*)`, `Bash(sort:*)`. Anything not listed is denied without prompting. |
+
+Every run passes `--strict-mcp-config`, `--setting-sources ""` and
+`--no-session-persistence`, so your MCP servers, settings and `~/.claude/CLAUDE.md`
+don't reach pipeline runs. A node's `model` is passed as `--model` when it names a
+Claude model (`claude-*`, `sonnet`, `opus`, `haiku`). Otherwise the default model is
+used. In the desktop app, all of this is set from **Settings → Claude CLI**.
+
 ## Stylesheets
 
 Stylesheets provide a CSS-like mechanism for configuring pipeline node attributes

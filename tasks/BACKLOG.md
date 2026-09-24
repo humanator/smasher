@@ -13,17 +13,18 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 ## Where things stand (2026-09-24)
 
 **Branches.** `chore/tasks-triage` and `fix/default-model` (item #1) are merged
-into `main`. `feat/claude-cli-provider` is still open, built on `main`, and holds
-only `SPEC-claude-cli-provider.md`, **awaiting Jobsworth's review**. No code yet.
-Until it merges, that spec exists only on that branch.
+into `main`. `feat/claude-cli-provider` is still open, built on `main`. The provider is
+implemented there (T2-T12 in `todo.md`), **waiting on Jobsworth's manual
+checkpoint runs and review** before it merges.
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
 added mid-session and runs alongside. Its spec review comes first.
 
 **Waiting on Jobsworth:**
-- Review of `SPEC-claude-cli-provider.md`, and answers to its three Open
-  questions.
+- Claude CLI provider: the manual checkpoint runs listed in `todo.md` (real-CLI
+  `#[ignore]` tests, `product_design_factory.dot` with no keys, the desktop app),
+  then review and merge.
 - #2: whether CI installs Chromium (for Playwright and `render-capture`'s
   integration test).
 - #6: the default artifact retention policy.
@@ -79,17 +80,11 @@ smasher-cli -- serve` from the branch under test first.
 ## In progress
 
 - **Claude CLI provider.** Run every pipeline LLM call through `claude -p` from
-  the web and desktop apps, with no API key. Spec:
-  `SPEC-claude-cli-provider.md` on branch `feat/claude-cli-provider` (draft,
-  pending review; it includes spike results and cost measurements). Next steps once
-  approved:
-  1. Write `plan-claude-cli-provider.md` and `todo-claude-cli-provider.md`.
-  2. Check spec Open question 2 first (does `~/.claude/CLAUDE.md` leak into
-     codergen runs?).
-  3. Build.
-
-  `smasher run` already has a codergen-only version (`ClaudeCliBackend`,
-  `crates/smasher-cli/src/run.rs:197`), which gets moved and shared.
+  the web and desktop apps, with no API key. Spec, plan and todo are on branch
+  `feat/claude-cli-provider`. The code is done. Still to do: the manual checkpoint
+  runs (real CLI, product design factory with no keys, desktop app), then review
+  and merge. Possible follow-up: show `permission_denials` from the CLI's result
+  event in the run view.
 
 ## P2: Robustness (can lose data or grow without limit)
 
