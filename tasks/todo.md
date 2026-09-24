@@ -53,4 +53,4 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 - [x] `cargo clippy -p smasher-web` clean
 - [x] `smasher serve` still binds `127.0.0.1:21541`, now serving the real SPA at `/`
 - [x] Zero server-rendered HTML remains in the crate
-- [ ] Human review before merge
+- [x] Human review before merge
