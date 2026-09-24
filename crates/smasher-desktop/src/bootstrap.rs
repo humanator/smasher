@@ -20,12 +20,24 @@ pub fn port_for(debug: bool) -> u16 {
 
 /// The desktop's server config: the usual env-driven defaults for model,
 /// provider, and directories, but always loopback and never an env-chosen port.
+/// Workflow dirs are made absolute against the workspace root, because a
+/// Finder-launched app has cwd `/` and `"examples"` would find nothing.
 pub fn server_config() -> ServerConfig {
+    let defaults = ServerConfig::default();
+    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     ServerConfig {
         host: LOOPBACK,
         port: port_for(cfg!(debug_assertions)),
-        ..ServerConfig::default()
+        workflow_dirs: absolute_workflow_dirs(&defaults.workflow_dirs, &workspace_root),
+        ..defaults
     }
+}
+
+/// Join each relative dir onto `base`, leaving absolute dirs untouched.
+pub fn absolute_workflow_dirs(dirs: &[String], base: &Path) -> Vec<String> {
+    dirs.iter()
+        .map(|dir| base.join(dir).display().to_string())
+        .collect()
 }
 
 /// The URL the window opens: the Vite dev server when one is configured and
@@ -109,6 +121,36 @@ mod tests {
         let data_dir = tempfile::tempdir().unwrap();
 
         load_env_from_data_dir(data_dir.path());
+    }
+
+    #[test]
+    fn relative_workflow_dirs_resolve_against_the_base_dir() {
+        let base = Path::new("/repo");
+        let dirs = vec!["examples".to_string(), "/abs/flows".to_string()];
+
+        assert_eq!(
+            absolute_workflow_dirs(&dirs, base),
+            vec!["/repo/examples".to_string(), "/abs/flows".to_string()]
+        );
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn server_config_workflow_dirs_are_absolute_so_a_finder_launch_finds_examples() {
+        let config = server_config();
+
+        assert!(!config.workflow_dirs.is_empty());
+        for dir in &config.workflow_dirs {
+            assert!(Path::new(dir).is_absolute(), "{dir} is relative");
+        }
+        assert!(
+            config
+                .workflow_dirs
+                .iter()
+                .any(|d| Path::new(d).join("old-examples/hello-world.dot").is_file()),
+            "the repo's examples dir should be among {:?}",
+            config.workflow_dirs
+        );
     }
 
     #[test]

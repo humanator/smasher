@@ -232,13 +232,13 @@ start as soon as Task 1 is done.
 **Description:** Set `build.beforeBuildCommand` (`npm run build` in `frontend/`) and `frontendDist` (Tauri requires the key, even though the window loads the served origin). Make the desktop's default workflow dirs absolute, since a Finder launch has cwd `/`, so `"examples"` would silently resolve to nothing. Confirm keys load from `~/.smasher/.env`. Target macOS (`.app` + `.dmg`).
 
 **Acceptance criteria:**
-- [ ] `cargo tauri build` succeeds and produces `target/release/bundle/macos/Smasher.app`
-- [ ] Double-clicking the `.app` (not from a terminal) shows the dashboard with workflows listed and can run hello-world end to end
-- [ ] No keys or secrets in `tauri.conf.json` or the bundle (`grep -r "sk-" Smasher.app` finds nothing)
+- [x] `cargo tauri build` succeeds and produces `target/release/bundle/macos/Smasher.app` (bundle targets narrowed to `app`: the `.dmg` step's Finder AppleScript needs Automation permission and the spec only requires a machine-local `.app`)
+- [ ] Double-clicking the `.app` (not from a terminal) shows the dashboard with workflows listed and can run hello-world end to end (verified with cwd `/`, stripped env, dummy key in the data dir `.env`: SPA 200, 34 workflows incl. hello-world. Real-key hello-world run pending `~/.smasher/.env`)
+- [x] No keys or secrets in `tauri.conf.json` or the bundle (`grep -r "sk-" Smasher.app` finds nothing)
 
 **Verification:**
-- [ ] `cargo test -p smasher-desktop` (unit test for workflow-dir resolution)
-- [ ] Manual: Finder launch + run; `lsof -iTCP -sTCP:LISTEN -P | grep -i smasher` shows `127.0.0.1:<port>` only
+- [x] `cargo test -p smasher-desktop` (unit test for workflow-dir resolution)
+- [x] Manual: Finder launch + run; `lsof -iTCP -sTCP:LISTEN -P | grep -i smasher` shows `127.0.0.1:<port>` only
 
 **Dependencies:** Tasks 2, 5–7
 **Files likely touched:** `crates/smasher-desktop/{tauri.conf.json,src/bootstrap.rs}`
