@@ -332,7 +332,8 @@
   // A node's size is only known once Svelte Flow has rendered and measured
   // it, so a dropped node is placed with its top-left at the drop point and
   // then moved up and left by half its size here, which centres it under
-  // the pointer (where it sat while being dragged).
+  // the pointer (where it sat while being dragged). It stays hidden until
+  // then, so it never shows in the wrong place for a frame.
   let nodeToCentre = $state<string | null>(null);
 
   $effect(() => {
@@ -347,7 +348,11 @@
     nodeToCentre = null;
     nodes = nodes.map((n) =>
       n.id === node.id
-        ? { ...n, position: { x: n.position.x - width / 2, y: n.position.y - height / 2 } }
+        ? {
+            ...n,
+            style: nodeStyleFor(n.data.nodeType),
+            position: { x: n.position.x - width / 2, y: n.position.y - height / 2 },
+          }
         : n
     );
   });
@@ -361,8 +366,10 @@
     event.preventDefault();
     const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
     if (!nodeType || !toFlowPosition) return;
-    nodeToCentre =
-      addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY })) ?? null;
+    const id = addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
+    if (!id) return;
+    nodes = nodes.map((n) => (n.id === id ? { ...n, style: `${n.style ?? ''} visibility: hidden;` } : n));
+    nodeToCentre = id;
   }
 
   let saving = $state(false);

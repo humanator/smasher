@@ -138,6 +138,8 @@ test('a dropped node lands under the pointer after zooming and panning', async (
 
   await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
   const node = page.locator('.svelte-flow__node[data-id^="codergen-"]');
+  // The node stays hidden until it has been measured and centred.
+  await expect(node).toBeVisible();
   const box = await node.boundingBox();
   expect(box).not.toBeNull();
   // The node is centred under the drop point, the same way it sat under
