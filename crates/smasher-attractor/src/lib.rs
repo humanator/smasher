@@ -2,6 +2,7 @@
 // ABOUTME: Parses DOT graphs, traverses nodes with handlers, and manages pipeline state.
 
 pub mod artifact;
+pub mod claude_cli_backend;
 pub mod composition;
 pub mod condition;
 pub mod dot;

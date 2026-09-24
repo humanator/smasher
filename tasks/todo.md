@@ -153,14 +153,14 @@ user message.
 imports it. No flag changes.
 
 **Acceptance criteria:**
-- [ ] `run.rs` no longer defines `ClaudeCliBackend`. The same tests pass in the new
+- [x] `run.rs` no longer defines `ClaudeCliBackend`. The same tests pass in the new
       home, including the `--dangerously-skip-permissions` assertion for now.
-- [ ] `smasher run --backend claude-cli` argv is byte-for-byte the same as before
+- [x] `smasher run --backend claude-cli` argv is byte-for-byte the same as before
       (the fake-script test captures it).
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor claude_cli` and `cargo test -p smasher-cli`
-- [ ] `git diff --stat` shows a move, not a rewrite
+- [x] `cargo test -p smasher-attractor claude_cli` and `cargo test -p smasher-cli`
+- [x] `git diff --stat` shows a move, not a rewrite
 
 **Dependencies:** T2
 **Files likely touched:** `smasher-attractor/src/{lib.rs,claude_cli_backend.rs}`,
