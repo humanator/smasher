@@ -129,3 +129,29 @@ describe('App page header on other routes', () => {
     }
   });
 });
+
+describe('App settings button', () => {
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(() => {
+    delete window.__TAURI__;
+    visit('/');
+  });
+
+  it('has no Settings button in a plain browser, where there are no desktop settings', () => {
+    visit('/');
+    render(App);
+    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull();
+  });
+
+  it('puts a Settings button in the page header in the desktop app', () => {
+    window.__TAURI__ = { core: { invoke: async () => undefined as never } };
+    visit('/');
+    render(App);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('button', { name: 'Settings' })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'New Workflow' })).toBeTruthy();
+  });
+});
