@@ -17,6 +17,7 @@
   import PageHeader from './components/dashboard/PageHeader.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Toaster } from '$lib/components/ui/sonner/index.js';
   import { providePageHeader } from '$lib/page-header.svelte';
   import { isTauri } from '$lib/native';
 
@@ -173,6 +174,8 @@
     {/if}
   </main>
 </div>
+
+<Toaster />
 
 <style>
   :global(body) {

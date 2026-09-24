@@ -148,7 +148,7 @@ test('a dropped node lands under the pointer after zooming and panning', async (
   expect(Math.abs(box!.y + box!.height / 2 - drop.y)).toBeLessThan(4);
 });
 
-test('saving over a file changed on disk shows the conflict, and Save anyway writes the editor version', async ({
+test('saving over a file changed on disk toasts the conflict, and Save anyway writes the editor version', async ({
   page,
   baseURL,
 }) => {
@@ -173,12 +173,13 @@ test('saving over a file changed on disk shows the conflict, and Save anyway wri
     writeFileSync(path, dot.replace('label="Done"', 'label="Done elsewhere"'));
 
     await page.getByTestId('save-button').click();
-    await expect(page.getByTestId('save-conflict')).toContainText('changed on disk');
+    const toast = page.locator('[data-sonner-toast]', { hasText: 'changed on disk' });
+    await expect(toast).toBeVisible();
     await expect(page.locator('.svelte-flow__node[data-id="done"]')).toContainText('Done in editor');
     expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
 
-    await page.getByTestId('conflict-save-anyway').click();
-    await expect(page.getByTestId('save-conflict')).toHaveCount(0);
+    await toast.getByRole('button', { name: 'Save anyway' }).click();
+    await expect(toast).toHaveCount(0);
     const saved = readFileSync(path, 'utf-8');
     expect(saved).toContain('Done in editor');
     expect(saved).not.toContain('Done elsewhere');

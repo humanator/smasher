@@ -2,11 +2,13 @@
 // ABOUTME: Renders against real GET /api/workflows/{id}/graph and PUT endpoints
 
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
+import { render, screen, waitFor, within } from '@testing-library/svelte/svelte5';
 import { fireEvent } from '@testing-library/svelte/svelte5';
 import { appendFileSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import WorkflowEditorPage from '../../../src/components/dashboard/WorkflowEditorPage.svelte';
+import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
+import { toast } from 'svelte-sonner';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
 
@@ -157,28 +159,40 @@ describe('WorkflowEditorPage', () => {
       path = workflows.find((w) => w.id === workflowId)!.path;
     });
 
-    afterEach(() => {
+    // Sonner's toast list is global. Close every toast while this test's
+    // <Toaster> is still mounted (this hook runs before testing-library's
+    // cleanup) so none carries over into the next test.
+    afterEach(async () => {
       rmSync(path, { force: true });
+      toast.dismiss();
+      await waitFor(() => expect(document.querySelector('[data-sonner-toast]')).toBeNull());
     });
 
+    // The conflict shows as a toast, which App.svelte's <Toaster> renders.
     async function renderLoaded() {
+      render(Toaster);
       render(WorkflowEditorPage, { props: { workflowId } });
       await screen.findByTestId('save-button', {}, { timeout: 5000 });
     }
 
     const canvasMounted = () => document.querySelector('.svelte-flow') !== null;
 
-    it('shows the conflict with Reload and Save anyway, keeps the canvas, and leaves the file alone', async () => {
+    const conflictToast = () => screen.queryByText(/changed on disk/);
+    const toastButton = (name: string) =>
+      screen.findByRole('button', { name }, { timeout: 5000 });
+
+    it('toasts the conflict with Reload and Save anyway, keeps the canvas, and leaves the file alone', async () => {
       await renderLoaded();
       appendFileSync(path, '// edited elsewhere\n');
       const changed = readFileSync(path, 'utf-8');
 
       await fireEvent.click(screen.getByTestId('save-button'));
 
-      const conflict = await screen.findByTestId('save-conflict', {}, { timeout: 5000 });
-      expect(conflict.textContent).toMatch(/changed on disk/);
-      expect(screen.getByTestId('conflict-reload')).toBeTruthy();
-      expect(screen.getByTestId('conflict-save-anyway')).toBeTruthy();
+      const message = await screen.findByText(/changed on disk/, {}, { timeout: 5000 });
+      const toast = message.closest('[data-sonner-toast]') as HTMLElement | null;
+      expect(toast).not.toBeNull();
+      expect(within(toast!).getByRole('button', { name: 'Reload' })).toBeTruthy();
+      expect(within(toast!).getByRole('button', { name: 'Save anyway' })).toBeTruthy();
       expect(canvasMounted()).toBe(true);
       expect(readFileSync(path, 'utf-8')).toBe(changed);
     });
@@ -187,15 +201,15 @@ describe('WorkflowEditorPage', () => {
       await renderLoaded();
       appendFileSync(path, '// edited elsewhere\n');
       await fireEvent.click(screen.getByTestId('save-button'));
-      await fireEvent.click(await screen.findByTestId('conflict-save-anyway', {}, { timeout: 5000 }));
+      await fireEvent.click(await toastButton('Save anyway'));
 
-      await waitFor(() => expect(screen.queryByTestId('save-conflict')).toBeNull(), { timeout: 5000 });
+      await waitFor(() => expect(conflictToast()).toBeNull(), { timeout: 5000 });
       expect(readFileSync(path, 'utf-8')).not.toContain('edited elsewhere');
 
       // The page now holds the new ETag, so a plain Save works again.
       await fireEvent.click(screen.getByTestId('save-button'));
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      expect(conflictToast()).toBeNull();
       expect(screen.queryByTestId('save-error')).toBeNull();
     });
 
@@ -203,15 +217,15 @@ describe('WorkflowEditorPage', () => {
       await renderLoaded();
       writeFileSync(path, scratchDot.replace('label="Done"', 'label="Done elsewhere"'));
       await fireEvent.click(screen.getByTestId('save-button'));
-      await fireEvent.click(await screen.findByTestId('conflict-reload', {}, { timeout: 5000 }));
+      await fireEvent.click(await toastButton('Reload'));
 
       await screen.findByText('Done elsewhere', {}, { timeout: 5000 });
-      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      await waitFor(() => expect(conflictToast()).toBeNull(), { timeout: 5000 });
 
       // The reloaded ETag is current, so saving now succeeds.
       await fireEvent.click(screen.getByTestId('save-button'));
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      expect(conflictToast()).toBeNull();
       expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
     });
 
@@ -223,7 +237,7 @@ describe('WorkflowEditorPage', () => {
       await fireEvent.click(screen.getByTestId('save-button'));
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      expect(screen.queryByTestId('save-conflict')).toBeNull();
+      expect(conflictToast()).toBeNull();
       expect(screen.queryByTestId('save-error')).toBeNull();
     });
 

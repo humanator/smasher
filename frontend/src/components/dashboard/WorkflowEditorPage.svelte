@@ -1,8 +1,9 @@
 <script lang="ts">
   // ABOUTME: Edit existing workflow page - fetches graph and mounts canvas in edit mode
-  // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (409 -> Reload / Save anyway), Export .dot to the native save shim
+  // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (409 -> toast with Reload / Save anyway), Export .dot to the native save shim
 
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
+  import { toast } from 'svelte-sonner';
   import * as workflowsApi from '../../lib/api/workflows';
   import type { EditorGraph } from '../../lib/api/workflows';
   import WorkflowCanvas from '../node-editor/WorkflowCanvas.svelte';
@@ -17,8 +18,25 @@
   let canvas: ReturnType<typeof WorkflowCanvas> | undefined = $state();
   // ETag of the file as last loaded or saved; sent as If-Match on save.
   let etag: string | null = null;
-  // Set when a save was refused because the file changed on disk.
-  let conflict: string | null = $state(null);
+  // The toast shown while a save is refused because the file changed on disk.
+  let conflictToast: string | number | undefined;
+
+  function showConflict() {
+    conflictToast = toast.warning('This workflow changed on disk since you opened it', {
+      id: conflictToast,
+      description: 'Reload to see the version on disk, or save yours over it.',
+      duration: Number.POSITIVE_INFINITY,
+      action: { label: 'Save anyway', onClick: handleSaveAnyway },
+      cancel: { label: 'Reload', onClick: handleReload },
+    });
+  }
+
+  function clearConflict() {
+    if (conflictToast !== undefined) toast.dismiss(conflictToast);
+    conflictToast = undefined;
+  }
+
+  onDestroy(clearConflict);
 
   async function loadGraph() {
     ({ graph, etag } = await workflowsApi.getWorkflowGraph(workflowId));
@@ -37,34 +55,35 @@
   // Other save errors are rethrown so the canvas shows them in its own
   // save-error slot and stays mounted with the unsaved edits.
   async function handleSave(updatedGraph: EditorGraph) {
-    conflict = null;
+    clearConflict();
     try {
       etag = await workflowsApi.updateWorkflowGraph(workflowId, updatedGraph, etag ?? undefined);
     } catch (err) {
       if ((err as { status?: number }).status === 409) {
-        conflict = (err as Error).message;
+        showConflict();
         return;
       }
       throw err;
     }
   }
 
+  // The toast's buttons close it themselves.
   async function handleReload() {
+    conflictToast = undefined;
     try {
       await loadGraph();
-      conflict = null;
     } catch (err) {
-      conflict = err instanceof Error ? err.message : 'Failed to reload workflow';
+      toast.error(err instanceof Error ? err.message : 'Failed to reload workflow');
     }
   }
 
   async function handleSaveAnyway() {
+    conflictToast = undefined;
     if (!canvas) return;
     try {
       etag = await workflowsApi.updateWorkflowGraph(workflowId, canvas.currentGraph());
-      conflict = null;
     } catch (err) {
-      conflict = err instanceof Error ? err.message : 'Failed to save workflow';
+      toast.error(err instanceof Error ? err.message : 'Failed to save workflow');
     }
   }
 
@@ -94,19 +113,6 @@
         Export .dot
       </Button>
     </div>
-    {#if conflict}
-      <div
-        class="flex items-center gap-3 rounded border border-destructive/40 bg-destructive/10 p-4 text-destructive"
-        role="alert"
-        data-testid="save-conflict"
-      >
-        <p class="flex-1">{conflict}. Reload to see the version on disk, or save yours over it.</p>
-        <Button variant="secondary" onclick={handleReload} data-testid="conflict-reload">Reload</Button>
-        <Button variant="destructive" onclick={handleSaveAnyway} data-testid="conflict-save-anyway">
-          Save anyway
-        </Button>
-      </div>
-    {/if}
     <WorkflowCanvas
       bind:this={canvas}
       {graph}
