@@ -19,7 +19,7 @@ checkpoint runs and review** before it merges.
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
-added mid-session and runs alongside. Its spec review comes first.
+added mid-session and runs alongside. Its manual checkpoints and merge come first.
 
 **Waiting on Jobsworth:**
 - Claude CLI provider: the manual checkpoint runs listed in `todo.md` (real-CLI
@@ -34,7 +34,12 @@ decision history, new-workflow) call whatever server is listening on
 `127.0.0.1:21541`. They don't start one themselves. If the desktop app is running
 there, it stores data in `~/Documents/smasher` instead of the repo, and about 50
 tests fail for reasons unrelated to the code. Quit the app and run `cargo run -p
-smasher-cli -- serve` from the branch under test first.
+smasher-cli -- serve` from the branch under test first. If the server uses a custom
+`SMASHER_DATA_DIR`, export the same value for Vitest. The gallery tests write
+candidate manifests there directly, and fail with "gallery gate never appeared"
+if the directories differ. To serve without API keys or spending anything, point
+`SMASHER_CLAUDE_CLI` at a fake `claude` script and set
+`SMASHER_PROVIDER=claude-cli`.
 
 ## P1: Do next (small, and each one fixes something real)
 
@@ -62,6 +67,9 @@ smasher-cli -- serve` from the branch under test first.
    Checkpoint C waiver.*
    Because of the gotcha above, the CI job has to build and start `smasher serve`
    before running Vitest.
+   `svelte-check --threshold error` already fails with 6 errors on `main`, so fix
+   those first or the new job starts red. They're in `e2e/gallery-gate.spec.ts` (3),
+   `EventLog.svelte`, `WorkflowCanvas.svelte` and `tests/setup.ts`.
 
 3. ~~**Fix where dropped nodes land after pan or zoom in the node editor.**~~
    **Done 2026-09-24** (merged to `main`). A small
@@ -83,8 +91,17 @@ smasher-cli -- serve` from the branch under test first.
   the web and desktop apps, with no API key. Spec, plan and todo are on branch
   `feat/claude-cli-provider`. The code is done. Still to do: the manual checkpoint
   runs (real CLI, product design factory with no keys, desktop app), then review
-  and merge. Possible follow-up: show `permission_denials` from the CLI's result
-  event in the run view.
+  and merge. Things to watch in those runs:
+  - `design-kit` is a symlink out of the run dir. Check that `Read` under
+    `dontAsk` isn't denied when it follows the link.
+  - Check that the default allowlist is enough for a real candidate build.
+
+  Possible follow-ups:
+  - Show `permission_denials` from the CLI's result event in the run view.
+  - Make the web server's claude-cli codergen timeout configurable. It's fixed at
+    600s (`smasher-web/src/run_launch.rs`).
+  - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path. Today it runs `claude`
+    from `PATH`.
 
 ## P2: Robustness (can lose data or grow without limit)
 
