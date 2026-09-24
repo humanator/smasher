@@ -22,7 +22,7 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 - [x] Task 7: Import .dot: `POST /api/workflows/import` + catalog button
 
 ### Checkpoint B: Native features
-- [ ] Workspace + frontend (`vitest`, `check`, `test:e2e`) clean, browser target unregressed
+- [x] Workspace + frontend (`vitest`, `check`, `test:e2e`) clean, browser target unregressed
 - [ ] Success Criteria 1 and 3 verified by hand in the desktop app
 - [ ] Human review before Phase 3
 
