@@ -10,7 +10,10 @@ use tokio::io::AsyncWriteExt;
 
 use super::process::base_command;
 use crate::provider::{ProviderAdapter, StreamResponse};
-use crate::types::{ContentPart, Error, FinishReason, Request, Response, Role, StreamEvent, Usage};
+use crate::types::{
+    ContentPart, Error, FinishReason, ImageSourceType, Message, Request, Response, ResponseFormat,
+    Role, StreamEvent, Usage,
+};
 
 const PROVIDER: &str = "claude-cli";
 
@@ -145,6 +148,11 @@ fn build_args(request: &Request) -> Vec<String> {
         args.push("--model".into());
         args.push(request.model.clone());
     }
+
+    if let Some(ResponseFormat::JsonSchema { schema, .. }) = &request.response_format {
+        args.push("--json-schema".into());
+        args.push(schema.to_string());
+    }
     args
 }
 
@@ -170,24 +178,65 @@ fn system_prompt(request: &Request) -> String {
     }
 }
 
-/// One stream-json user message carrying the conversation's content.
+/// One stream-json user message carrying the conversation's content. The CLI takes
+/// a single turn, so a multi-turn history is flattened into role-labelled text.
 fn build_input(request: &Request) -> Value {
-    let content: Vec<Value> = request
+    let turns: Vec<&Message> = request
         .messages
         .iter()
         .filter(|m| !matches!(m.role, Role::System | Role::Developer))
-        .flat_map(|m| m.content.iter())
-        .filter_map(content_block)
         .collect();
+
+    let content: Vec<Value> = if turns.len() == 1 {
+        turns[0].content.iter().filter_map(content_block).collect()
+    } else {
+        turns.iter().flat_map(|m| labelled_blocks(m)).collect()
+    };
+
     json!({
         "type": "user",
         "message": {"role": "user", "content": content}
     })
 }
 
+/// A message's text as one `"<Role>: <text>"` block, followed by its images.
+fn labelled_blocks(message: &Message) -> Vec<Value> {
+    let label = match message.role {
+        Role::Assistant => "Assistant",
+        Role::Tool => "Tool",
+        _ => "User",
+    };
+    let mut blocks = Vec::new();
+    if let Some(text) = message.text() {
+        blocks.push(json!({"type": "text", "text": format!("{label}: {text}")}));
+    }
+    blocks.extend(
+        message
+            .content
+            .iter()
+            .filter(|p| !matches!(p, ContentPart::Text { .. }))
+            .filter_map(content_block),
+    );
+    blocks
+}
+
 fn content_block(part: &ContentPart) -> Option<Value> {
     match part {
         ContentPart::Text { text } => Some(json!({"type": "text", "text": text})),
+        ContentPart::Image(image) => Some(match image.source_type {
+            ImageSourceType::Base64 => json!({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": image.media_type.as_deref().unwrap_or("image/png"),
+                    "data": image.data,
+                }
+            }),
+            ImageSourceType::Url => json!({
+                "type": "image",
+                "source": {"type": "url", "url": image.data}
+            }),
+        }),
         _ => None,
     }
 }
@@ -202,7 +251,12 @@ fn find_result_event(stdout: &str) -> Option<Value> {
 }
 
 fn build_response(request: &Request, result: Value) -> Response {
-    let text = result["result"].as_str().unwrap_or_default().to_string();
+    // With `--json-schema` the parsed object is in `structured_output`; the raw text
+    // stays in `result`.
+    let text = match &result["structured_output"] {
+        Value::Null => result["result"].as_str().unwrap_or_default().to_string(),
+        structured => structured.to_string(),
+    };
     let model = result["modelUsage"]
         .as_object()
         .and_then(|m| m.keys().next().cloned())
@@ -266,7 +320,7 @@ fn cli_error(message: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Message, ToolDefinition};
+    use crate::types::{Message, ResponseFormat, ToolDefinition};
     use futures::StreamExt;
     use serde_json::json;
     use std::os::unix::fs::PermissionsExt;
@@ -596,5 +650,198 @@ mod tests {
         assert_eq!(text, "pong");
         let end = events.last().unwrap();
         assert_eq!(end.usage.as_ref().map(|u| u.output_tokens), Some(5));
+    }
+    fn image_part(data: &str) -> ContentPart {
+        ContentPart::Image(crate::types::ImageData {
+            source_type: crate::types::ImageSourceType::Base64,
+            media_type: Some("image/png".into()),
+            data: data.into(),
+        })
+    }
+
+    #[tokio::test]
+    async fn base64_image_goes_to_stdin_next_to_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = fake_claude(dir.path(), &ok_stdout("a red square"), "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let msg = Message {
+            role: Role::User,
+            content: vec![ContentPart::text("Describe this."), image_part("iVBORw0K")],
+            name: None,
+            tool_call_id: None,
+        };
+        let req = Request::new("claude-sonnet-5", vec![msg]);
+
+        adapter.complete(&req).await.unwrap();
+
+        assert_eq!(
+            stdin_json(dir.path())["message"]["content"],
+            json!([
+                {"type": "text", "text": "Describe this."},
+                {"type": "image", "source": {
+                    "type": "base64", "media_type": "image/png", "data": "iVBORw0K"
+                }}
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn url_image_goes_to_stdin_as_url_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = fake_claude(dir.path(), &ok_stdout("ok"), "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let msg = Message {
+            role: Role::User,
+            content: vec![ContentPart::Image(crate::types::ImageData {
+                source_type: crate::types::ImageSourceType::Url,
+                media_type: None,
+                data: "https://example.com/a.png".into(),
+            })],
+            name: None,
+            tool_call_id: None,
+        };
+        let req = Request::new("claude-sonnet-5", vec![msg]);
+
+        adapter.complete(&req).await.unwrap();
+
+        assert_eq!(
+            stdin_json(dir.path())["message"]["content"],
+            json!([{"type": "image", "source": {
+                "type": "url", "url": "https://example.com/a.png"
+            }}])
+        );
+    }
+
+    fn schema() -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {"verdict": {"type": "string"}},
+            "required": ["verdict"]
+        })
+    }
+
+    fn structured_stdout(structured: Option<serde_json::Value>, result: &str) -> String {
+        let mut line = json!({
+            "type": "result", "subtype": "success", "is_error": false, "result": result,
+            "modelUsage": {"claude-sonnet-5": {"inputTokens": 1, "outputTokens": 1}}
+        });
+        if let Some(obj) = structured {
+            line["structured_output"] = obj;
+        }
+        format!("{line}\n")
+    }
+
+    #[tokio::test]
+    async fn json_schema_is_passed_and_structured_output_returned() {
+        let dir = tempfile::tempdir().unwrap();
+        let stdout = structured_stdout(Some(json!({"verdict": "ship"})), "Here you go.");
+        let bin = fake_claude(dir.path(), &stdout, "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let req = Request::new("claude-sonnet-5", vec![Message::user("judge")]).response_format(
+            ResponseFormat::JsonSchema {
+                name: "verdict".into(),
+                schema: schema(),
+                strict: true,
+            },
+        );
+
+        let resp = adapter.complete(&req).await.unwrap();
+
+        let args = argv(dir.path());
+        let passed: serde_json::Value =
+            serde_json::from_str(arg_after(&args, "--json-schema").unwrap()).unwrap();
+        assert_eq!(passed, schema());
+        let text: serde_json::Value = serde_json::from_str(&resp.text().unwrap()).unwrap();
+        assert_eq!(text, json!({"verdict": "ship"}));
+    }
+
+    #[tokio::test]
+    async fn missing_structured_output_falls_back_to_result_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let stdout = structured_stdout(None, "{\"verdict\":\"hold\"}");
+        let bin = fake_claude(dir.path(), &stdout, "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let req = Request::new("claude-sonnet-5", vec![Message::user("judge")]).response_format(
+            ResponseFormat::JsonSchema {
+                name: "verdict".into(),
+                schema: schema(),
+                strict: true,
+            },
+        );
+
+        let resp = adapter.complete(&req).await.unwrap();
+
+        assert_eq!(resp.text().as_deref(), Some("{\"verdict\":\"hold\"}"));
+    }
+
+    #[tokio::test]
+    async fn no_json_schema_flag_without_schema_format() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = fake_claude(dir.path(), &ok_stdout("pong"), "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let req = Request::new("claude-sonnet-5", vec![Message::user("ping")]);
+
+        adapter.complete(&req).await.unwrap();
+
+        assert!(!argv(dir.path()).iter().any(|a| a == "--json-schema"));
+    }
+
+    #[tokio::test]
+    async fn multi_turn_history_is_flattened_with_role_labels() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = fake_claude(dir.path(), &ok_stdout("ok"), "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let req = Request::new(
+            "claude-sonnet-5",
+            vec![
+                Message::system("sys"),
+                Message::user("hi"),
+                Message::assistant("hello"),
+                Message::user("again"),
+            ],
+        );
+
+        adapter.complete(&req).await.unwrap();
+
+        let input = stdin_json(dir.path());
+        assert_eq!(input["type"], "user");
+        assert_eq!(input["message"]["role"], "user");
+        assert_eq!(
+            input["message"]["content"],
+            json!([
+                {"type": "text", "text": "User: hi"},
+                {"type": "text", "text": "Assistant: hello"},
+                {"type": "text", "text": "User: again"}
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn generate_object_works_through_the_adapter() {
+        #[derive(serde::Deserialize, Debug, PartialEq)]
+        struct Verdict {
+            verdict: String,
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let stdout = structured_stdout(Some(json!({"verdict": "ship"})), "Here you go.");
+        let bin = fake_claude(dir.path(), &stdout, "", 0);
+        let mut client = crate::client::Client::new();
+        client.register_provider(
+            crate::types::Provider::ClaudeCli,
+            std::sync::Arc::new(ClaudeCliAdapter::new(&bin)),
+        );
+        let req =
+            Request::new("claude-sonnet-5", vec![Message::user("judge")]).provider("claude-cli");
+
+        let result = crate::api::generate_object::<Verdict>(&client, req, "verdict", schema())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result.object,
+            Verdict {
+                verdict: "ship".into()
+            }
+        );
     }
 }

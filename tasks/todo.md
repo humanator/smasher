@@ -98,17 +98,17 @@ Map `ResponseFormat::JsonSchema` to `--json-schema` and return the serialised
 user message.
 
 **Acceptance criteria:**
-- [ ] Image bytes arrive in stdin as `{"type":"image","source":{"type":"base64",...}}`
+- [x] Image bytes arrive in stdin as `{"type":"image","source":{"type":"base64",...}}`
       alongside the text parts.
-- [ ] `JsonSchema` request passes the schema to `--json-schema`. The response text
+- [x] `JsonSchema` request passes the schema to `--json-schema`. The response text
       parses back to the fake's `structured_output`. A missing `structured_output`
       falls back to `result` text.
-- [ ] A 3-message history arrives as one user message with `User:` / `Assistant:`
+- [x] A 3-message history arrives as one user message with `User:` / `Assistant:`
       labels, in order.
 
 **Verification:**
-- [ ] `cargo test -p smasher-llm claude_cli`
-- [ ] `generate_object` test against the adapter with the fake script
+- [x] `cargo test -p smasher-llm claude_cli`
+- [x] `generate_object` test against the adapter with the fake script
 
 **Dependencies:** T3
 **Files likely touched:** `smasher-llm/src/provider/claude_cli/adapter.rs`
