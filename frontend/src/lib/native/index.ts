@@ -24,7 +24,7 @@ declare global {
 
 /**
  * Check if running inside Tauri webview.
- * Always returns false for now (smasher-desktop doesn't exist yet).
+ * True in the smasher-desktop window, where `withGlobalTauri` injects `window.__TAURI__`.
  */
 export function isTauri(): boolean {
   return typeof window !== 'undefined' && Boolean(window.__TAURI__);

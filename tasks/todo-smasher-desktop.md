@@ -17,7 +17,7 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 ## Phase 2: Dev loop and native features
 
 - [x] Task 4: `cargo tauri dev` with Vite HMR (`devUrl`, `beforeDevCommand`)
-- [ ] Task 5: OS notification on completion: notification plugin, `withGlobalTauri`, loopback-only remote capability (**IPC risk probe: stop and re-plan if it fails**)
+- [x] Task 5: OS notification on completion: notification plugin, `withGlobalTauri`, loopback-only remote capability (**IPC risk probe: stop and re-plan if it fails**) — probe passed: served origin gets __TAURI__ + notification IPC, core IPC denied
 - [ ] Task 6: Export .dot: `GET /api/workflows/{id}/dot` + editor button + dialog/fs plugins
 - [ ] Task 7: Import .dot: `POST /api/workflows/import` + catalog button
 

@@ -21,6 +21,7 @@ smasher-web.workspace = true
 
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
 
 tokio.workspace = true
 tokio-util.workspace = true
@@ -32,3 +33,4 @@ tracing-subscriber.workspace = true
 tempfile.workspace = true
 serial_test = "3.0"
 reqwest.workspace = true
+serde_json.workspace = true
