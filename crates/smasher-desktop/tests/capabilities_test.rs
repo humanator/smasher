@@ -88,10 +88,13 @@ fn remote_capabilities_grant_only_native_shim_permissions() {
 #[test]
 fn served_origin_holds_the_permissions_the_native_shim_calls() {
     // frontend/src/lib/native/index.ts: saveFile -> dialog.save + fs.writeTextFile,
+    // loadFile -> dialog.open + fs.readTextFile,
     // showNotification -> notification.sendNotification.
-    const NEEDED: [&str; 3] = [
+    const NEEDED: [&str; 5] = [
         "dialog:allow-save",
         "fs:allow-write-text-file",
+        "dialog:allow-open",
+        "fs:allow-read-text-file",
         "notification:default",
     ];
     let granted: Vec<String> = capabilities()

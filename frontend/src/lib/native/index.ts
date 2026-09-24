@@ -75,7 +75,10 @@ export async function loadFile(): Promise<Blob | null> {
       const path = await window.__TAURI__.dialog.open();
       if (path && typeof path === 'string') {
         const text = await window.__TAURI__.fs.readTextFile(path);
-        return new Blob([text], { type: 'text/plain' });
+        // A File (still a Blob) so callers get the chosen name, as they do
+        // from the browser's file input below.
+        const name = path.split(/[\\/]/).pop() || 'file';
+        return new File([text], name, { type: 'text/plain' });
       }
     } catch (error) {
       console.error('Tauri load failed, falling back to browser:', error);

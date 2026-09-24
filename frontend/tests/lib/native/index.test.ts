@@ -37,6 +37,23 @@ describe('native shim', () => {
       const result = native.loadFile();
       expect(result instanceof Promise).toBe(true);
     });
+
+    it('names the Tauri-loaded file after the chosen path so callers get its stem', async () => {
+      // jsdom has no Tauri runtime: stand in for the dialog/fs plugins.
+      window.__TAURI__ = {
+        dialog: { open: async () => '/Users/test/flows/my-flow.dot' },
+        fs: { readTextFile: async () => 'digraph { a -> b }' },
+      };
+      try {
+        const file = await native.loadFile();
+
+        expect(file).toBeInstanceOf(File);
+        expect((file as File).name).toBe('my-flow.dot');
+        expect(await file!.text()).toBe('digraph { a -> b }');
+      } finally {
+        delete window.__TAURI__;
+      }
+    });
   });
 
   describe('notifications', () => {

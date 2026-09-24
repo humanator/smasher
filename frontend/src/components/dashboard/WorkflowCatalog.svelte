@@ -1,12 +1,13 @@
 <script lang="ts">
   // ABOUTME: Workflow catalog page listing discovered workflows
-  // ABOUTME: Fetches from GET /api/workflows, links to run submission
+  // ABOUTME: Fetches from GET /api/workflows, links to run submission, imports .dot files
 
   import { onMount } from 'svelte';
   import * as workflowsApi from '../../lib/api/workflows';
   import * as runsApi from '../../lib/api/runs';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Table from '$lib/components/ui/table/index.js';
+  import { loadFile } from '../../lib/native';
 
   interface Workflow {
     id: string;
@@ -20,6 +21,7 @@
   let error: string | null = $state(null);
   let runningWorkflowId: string | null = $state(null);
   let runError: string | null = $state(null);
+  let importError: string | null = $state(null);
 
   onMount(async () => {
     try {
@@ -51,6 +53,21 @@
     }
   }
 
+  // Native open dialog in the desktop app, file input in the browser. The
+  // workflow is named after the file's stem, then opened in the editor.
+  async function handleImport() {
+    importError = null;
+    try {
+      const file = await loadFile();
+      if (!file) return;
+      const name = file instanceof File ? file.name.replace(/\.(dot|gv)$/i, '') : 'imported';
+      const { id } = await workflowsApi.importWorkflowDot(name, await file.text());
+      window.location.href = `/workflows/${id}/edit`;
+    } catch (err) {
+      importError = err instanceof Error ? err.message : 'Failed to import workflow';
+    }
+  }
+
   function formatWorkflowName(name: string): string {
     // Convert "consensus_task.dot" to "Consensus Task"
     return name
@@ -62,7 +79,16 @@
 </script>
 
 <div class="workflow-catalog p-8">
-  <h2 class="mb-4 text-xl font-semibold text-foreground">Workflows</h2>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-xl font-semibold text-foreground">Workflows</h2>
+    <Button variant="secondary" size="sm" onclick={handleImport} data-testid="import-dot-button">
+      Import .dot
+    </Button>
+  </div>
+
+  {#if importError}
+    <p class="p-8 text-center text-lg text-destructive" role="alert">{importError}</p>
+  {/if}
 
   {#if loading}
     <p class="p-8 text-center text-lg text-muted-foreground">Loading workflows...</p>

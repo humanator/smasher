@@ -1,5 +1,5 @@
 // ABOUTME: REST client for workflow routes
-// ABOUTME: Get workflows list, create new, update existing
+// ABOUTME: Get workflows list, create new, update existing, export/import raw DOT
 
 import { getApiUrl } from './client-config';
 
@@ -112,5 +112,32 @@ export async function createWorkflowGraph(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   });
+  return handleResponse<CreateGraphResponse>(response);
+}
+
+/**
+ * Import raw DOT as a new workflow named `name`. Rejects with the server's
+ * message (e.g. the DOT parse error) and HTTP status on failure.
+ */
+export async function importWorkflowDot(name: string, dot: string): Promise<CreateGraphResponse> {
+  const response = await fetch(getApiUrl('/workflows/import'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, dot }),
+  });
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+    try {
+      const body = await response.json();
+      if (typeof body?.error === 'string') {
+        message = body.error;
+      }
+    } catch {
+      // Non-JSON error body; keep the status-only message.
+    }
+    const error = new Error(message) as unknown as ApiError;
+    error.status = response.status;
+    throw error;
+  }
   return handleResponse<CreateGraphResponse>(response);
 }
