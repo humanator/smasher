@@ -158,6 +158,14 @@ impl CodergenBackend for ClaudeCliBackend {
             "--no-session-persistence",
         ]);
 
+        // The same design-kit rules the API agent gets (absolute `/design-kit/` URLs,
+        // `index.html` entry points), when the run has the kit linked in.
+        let conventions =
+            smasher_agent::prompt::design_factory_conventions(&self.working_dir).trim();
+        if !conventions.is_empty() {
+            cmd.arg("--append-system-prompt").arg(conventions);
+        }
+
         if let Some(model) = model
             .filter(|m| is_claude_model(m))
             .or(self.default_model.as_deref().filter(|m| is_claude_model(m)))
@@ -1236,6 +1244,35 @@ mod tests {
                 "Bash(grep:*)",
                 "Bash(sort:*)",
             ]
+        );
+    }
+
+    fn append_arg(argv: &[String]) -> Option<String> {
+        argv.iter()
+            .position(|a| a == "--append-system-prompt")
+            .map(|i| argv[i + 1].clone())
+    }
+
+    #[tokio::test]
+    async fn design_kit_conventions_are_appended_when_the_kit_is_present() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = argv_recording_claude(tmp.path());
+        let ctx = crate::state::Context::new();
+
+        backend_in(tmp.path(), &script)
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+        assert_eq!(append_arg(&recorded_argv(tmp.path())), None);
+
+        std::fs::create_dir(tmp.path().join("design-kit")).unwrap();
+        backend_in(tmp.path(), &script)
+            .generate("do it", None, None, &ctx)
+            .await
+            .unwrap();
+        assert_eq!(
+            append_arg(&recorded_argv(tmp.path())).as_deref(),
+            Some(smasher_agent::prompt::DESIGN_FACTORY_CONVENTIONS.trim())
         );
     }
 }
