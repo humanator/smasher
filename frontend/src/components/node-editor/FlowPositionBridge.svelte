@@ -7,5 +7,8 @@
   let { onReady }: { onReady: (toFlow: (screen: XYPosition) => XYPosition) => void } = $props();
 
   const { screenToFlowPosition } = useSvelteFlow();
-  $effect(() => onReady(screenToFlowPosition));
+  // Braces matter: a function returned from an effect is its teardown.
+  $effect(() => {
+    onReady(screenToFlowPosition);
+  });
 </script>
