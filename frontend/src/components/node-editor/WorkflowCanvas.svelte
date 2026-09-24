@@ -156,9 +156,12 @@
     return id;
   }
 
-  export function addNodeAtPosition(nodeType: string, position: { x: number; y: number }) {
+  export function addNodeAtPosition(
+    nodeType: string,
+    position: { x: number; y: number }
+  ): string | undefined {
     const config = (NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[nodeType];
-    if (!config) return;
+    if (!config) return undefined;
     const newNode: FlowNode<WorkflowNodeData> = {
       id: nextNodeId(nodeType),
       type: 'workflow',
@@ -167,6 +170,7 @@
       data: { label: config.title, nodeType, attrs: {} },
     };
     nodes = [...nodes, newNode];
+    return newNode.id;
   }
 
   // Task 7: selected-node side panel. Svelte Flow's own `onnodeclick`/
@@ -325,6 +329,29 @@
 
   let toFlowPosition: ((screen: XYPosition) => XYPosition) | undefined;
 
+  // A node's size is only known once Svelte Flow has rendered and measured
+  // it, so a dropped node is placed with its top-left at the drop point and
+  // then moved up and left by half its size here, which centres it under
+  // the pointer (where it sat while being dragged).
+  let nodeToCentre = $state<string | null>(null);
+
+  $effect(() => {
+    if (!nodeToCentre) return;
+    const node = nodes.find((n) => n.id === nodeToCentre);
+    if (!node) {
+      nodeToCentre = null;
+      return;
+    }
+    const { width, height } = node.measured ?? {};
+    if (!width || !height) return;
+    nodeToCentre = null;
+    nodes = nodes.map((n) =>
+      n.id === node.id
+        ? { ...n, position: { x: n.position.x - width / 2, y: n.position.y - height / 2 } }
+        : n
+    );
+  });
+
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
@@ -334,7 +361,8 @@
     event.preventDefault();
     const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
     if (!nodeType || !toFlowPosition) return;
-    addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
+    nodeToCentre =
+      addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY })) ?? null;
   }
 
   let saving = $state(false);

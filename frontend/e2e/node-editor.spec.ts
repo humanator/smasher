@@ -140,10 +140,10 @@ test('a dropped node lands under the pointer after zooming and panning', async (
   const node = page.locator('.svelte-flow__node[data-id^="codergen-"]');
   const box = await node.boundingBox();
   expect(box).not.toBeNull();
-  // The node's position is its top-left corner, so that's what should sit
-  // under the drop point.
-  expect(Math.abs(box!.x - drop.x)).toBeLessThan(4);
-  expect(Math.abs(box!.y - drop.y)).toBeLessThan(4);
+  // The node is centred under the drop point, the same way it sat under
+  // the pointer while being dragged.
+  expect(Math.abs(box!.x + box!.width / 2 - drop.x)).toBeLessThan(4);
+  expect(Math.abs(box!.y + box!.height / 2 - drop.y)).toBeLessThan(4);
 });
 
 test('saving over a file changed on disk shows the conflict, and Save anyway writes the editor version', async ({
