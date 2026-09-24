@@ -293,13 +293,13 @@ The key field is hidden for it, and no "add an API key" prompt appears when it's
 default provider.
 
 **Acceptance criteria:**
-- [ ] Component tests: the Claude CLI row has path, version and allowlist fields and
+- [x] Component tests: the Claude CLI row has path, version and allowlist fields and
       no key field. Saving sends the path and list.
-- [ ] No API-key prompt when the default provider is `claude-cli`.
+- [x] No API-key prompt when the default provider is `claude-cli`.
 
 **Verification:**
-- [ ] Frontend tests pass (`frontend/tests/components/dashboard/SettingsDialog.test.ts`)
-- [ ] Manual: `make desktop-dev`, pick Claude CLI, restart, run hello-world
+- [x] Frontend tests pass (`frontend/tests/components/dashboard/SettingsDialog.test.ts`)
+- [ ] (deferred to Jobsworth) Manual: `make desktop-dev`, pick Claude CLI, restart, run hello-world
 
 **Dependencies:** T10
 **Files likely touched:** `frontend/src/components/dashboard/SettingsDialog.svelte`,

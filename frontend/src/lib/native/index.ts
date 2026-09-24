@@ -158,11 +158,26 @@ export interface ProviderSettings {
   has_key: boolean;
 }
 
+/** The local Claude Code CLI settings. `path` empty means "search the usual locations". */
+export interface ClaudeCliSettings {
+  path: string;
+  /** The allowlist in effect: the saved one, or the default. */
+  allowed_tools: string[];
+  default_allowed_tools: string[];
+}
+
+/** Which `claude` binary the app would use and its version; both null when not found. */
+export interface ClaudeCliDetection {
+  path: string | null;
+  version: string | null;
+}
+
 /** The desktop app's LLM settings, as `get_llm_settings` returns them. */
 export interface LlmSettings {
   default_model: string;
   default_provider: string;
   providers: ProviderSettings[];
+  claude_cli: ClaudeCliSettings;
   settings_path: string;
 }
 
@@ -180,6 +195,8 @@ export interface LlmSettingsUpdate {
   default_model: string;
   default_provider: string;
   providers: ProviderSettingsUpdate[];
+  claude_cli_path: string;
+  claude_cli_allowed_tools: string[];
 }
 
 /** Invoke one of smasher-desktop's own commands; throws outside the desktop app. */
@@ -199,6 +216,11 @@ export function getLlmSettings(): Promise<LlmSettings> {
 /** Save the desktop app's LLM settings; they take effect after a restart. */
 export function saveLlmSettings(update: LlmSettingsUpdate): Promise<LlmSettings> {
   return invoke<LlmSettings>('save_llm_settings', { update });
+}
+
+/** Find the `claude` binary (`path` first; empty searches) and report its version. */
+export function detectClaudeCli(path: string): Promise<ClaudeCliDetection> {
+  return invoke<ClaudeCliDetection>('detect_claude_cli', { path });
 }
 
 /** Relaunch the desktop app so saved settings take effect. */

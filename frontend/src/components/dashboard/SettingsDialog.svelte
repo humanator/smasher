@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ABOUTME: Desktop-only LLM settings modal: default model/provider plus each provider's API key and base URL
+  // ABOUTME: Desktop-only LLM settings modal: default model/provider, each provider's API key and base URL, and the Claude CLI
   // ABOUTME: Reads/writes via smasher-desktop's Tauri commands; keys go to the Keychain and never come back
 
   import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -8,10 +8,13 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import { Textarea } from '$lib/components/ui/textarea/index.js';
   import {
     getLlmSettings,
     saveLlmSettings,
+    detectClaudeCli,
     restartApp,
+    type ClaudeCliDetection,
     type LlmSettings,
     type ProviderSettingsUpdate,
   } from '$lib/native';
@@ -39,6 +42,10 @@
   let defaultModel = $state('');
   let defaultProvider = $state('');
   let providers = $state<ProviderForm[]>([]);
+  let claudeCliPath = $state('');
+  let allowedTools = $state('');
+  let defaultAllowedTools = $state<string[]>([]);
+  let detection = $state<ClaudeCliDetection | null>(null);
 
   function fill(settings: LlmSettings) {
     defaultModel = settings.default_model;
@@ -52,6 +59,17 @@
       newKey: '',
       removeKey: false,
     }));
+    claudeCliPath = settings.claude_cli.path;
+    allowedTools = settings.claude_cli.allowed_tools.join('\n');
+    defaultAllowedTools = settings.claude_cli.default_allowed_tools;
+  }
+
+  async function detect() {
+    try {
+      detection = await detectClaudeCli(claudeCliPath);
+    } catch (e) {
+      error = message(e);
+    }
   }
 
   function message(e: unknown): string {
@@ -64,6 +82,7 @@
     error = null;
     try {
       fill(await getLlmSettings());
+      detect();
     } catch (e) {
       error = message(e);
     } finally {
@@ -87,6 +106,11 @@
           default_model: defaultModel,
           default_provider: defaultProvider,
           providers: providers.map((p) => ({ id: p.id, base_url: p.baseUrl, ...keyUpdate(p) })),
+          claude_cli_path: claudeCliPath,
+          claude_cli_allowed_tools: allowedTools
+            .split('\n')
+            .map((t) => t.trim())
+            .filter(Boolean),
         })
       );
       saved = true;
@@ -149,6 +173,7 @@
               {#each providers as p (p.id)}
                 <NativeSelect.Option value={p.id}>{p.label}</NativeSelect.Option>
               {/each}
+              <NativeSelect.Option value="claude-cli">Claude CLI</NativeSelect.Option>
             </NativeSelect.Root>
           </div>
         </div>
@@ -194,6 +219,58 @@
             </div>
           </fieldset>
         {/each}
+
+        <fieldset class="grid gap-3 border-t border-border pt-4">
+          <legend class="text-sm font-semibold">Claude CLI</legend>
+          <p class="text-xs text-muted-foreground">
+            Runs every LLM node through the local <code>claude</code> command with the account it's
+            logged into. No API key needed.
+          </p>
+          <div class="grid gap-2">
+            <Label for="settings-claude-cli-path">Binary path</Label>
+            <div class="flex gap-2">
+              <Input
+                id="settings-claude-cli-path"
+                aria-label="Claude CLI binary path"
+                bind:value={claudeCliPath}
+                placeholder={detection?.path ? `Auto-detect (${detection.path})` : 'Auto-detect'}
+                autocomplete="off"
+                spellcheck={false}
+              />
+              <Button variant="outline" aria-label="Detect Claude CLI" onclick={detect}>Detect</Button>
+            </div>
+            {#if detection}
+              <p class="text-xs text-muted-foreground">
+                {detection.version ? `Found: ${detection.version}` : 'claude not found'}
+              </p>
+            {/if}
+          </div>
+          <div class="grid gap-2">
+            <div class="flex items-center justify-between">
+              <Label for="settings-claude-cli-tools">Allowed tools</Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Reset allowed tools to default"
+                onclick={() => (allowedTools = defaultAllowedTools.join('\n'))}
+              >
+                Reset
+              </Button>
+            </div>
+            <Textarea
+              id="settings-claude-cli-tools"
+              aria-label="Claude CLI allowed tools"
+              bind:value={allowedTools}
+              rows={6}
+              spellcheck={false}
+              class="font-mono text-xs"
+            />
+            <p class="text-xs text-muted-foreground">
+              One per line, e.g. <code>Bash(npm run build:*)</code>. Codergen nodes may use only
+              these; anything else is denied.
+            </p>
+          </div>
+        </fieldset>
 
         {#if error}
           <p role="alert" class="text-sm text-destructive">{error}</p>
