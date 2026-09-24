@@ -41,11 +41,6 @@
 </script>
 
 <div class="new-workflow-page flex flex-col gap-8 p-8">
-  <div class="flex flex-col gap-4">
-    <a href="/" class="text-sm text-primary hover:underline">← Back to Catalog</a>
-    <h1 class="m-0 text-3xl font-bold text-foreground">Create New Workflow</h1>
-  </div>
-
   {#if error}
     <p
       class="rounded border border-destructive/40 bg-destructive/10 p-4 text-destructive"

@@ -57,3 +57,4 @@ All backend calls go through `src/lib/api/`. Base URL is runtime-configurable vi
 - TypeScript is strict mode, no implicit `any`
 - Build UI from `$lib/components/ui` primitives and theme tokens (`bg-primary`, `text-muted-foreground`, …); Tailwind utilities for layout; minimal CSS in component `<style>` blocks
 - Tests run against a real running `smasher-web-api` instance, not mocked fetch
+- Page title and page-level controls live in the shared `PageHeader` bar (set per route in `App.svelte`). A component that owns a page control registers it with `usePageActions(snippet)` from `$lib/page-header.svelte` and renders it inline only when that returns `false` (i.e. rendered standalone)

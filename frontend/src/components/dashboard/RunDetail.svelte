@@ -9,6 +9,8 @@
   import TokenCounter from './TokenCounter.svelte';
   import { sanitizeSvg } from '../../lib/sanitizeSvg';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Separator } from '$lib/components/ui/separator/index.js';
+  import { usePageActions } from '$lib/page-header.svelte';
 
   let { runId }: { runId: string } = $props();
 
@@ -66,17 +68,17 @@
   onDestroy(() => {
     if (pollHandle) clearInterval(pollHandle);
   });
+
+  // Status + Abort live in the page header when there is one.
+  const actionsInHeader = usePageActions(runActions);
 </script>
 
-<div class="run-detail flex flex-col gap-4">
-  {#if error}
-    <p class="text-destructive" role="alert">Error: {error}</p>
-  {/if}
-
+{#snippet runActions()}
   {#if run}
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-3">
       <StatusBadge status={run.status} />
       {#if !TERMINAL_STATUSES.has(run.status)}
+        <Separator orientation="vertical" class="h-5" />
         <Button
           variant="destructive"
           size="sm"
@@ -88,6 +90,18 @@
         </Button>
       {/if}
     </div>
+  {/if}
+{/snippet}
+
+<div class="run-detail flex flex-col gap-4">
+  {#if error}
+    <p class="text-destructive" role="alert">Error: {error}</p>
+  {/if}
+
+  {#if run}
+    {#if !actionsInHeader}
+      {@render runActions()}
+    {/if}
 
     <TokenCounter {runId} />
 

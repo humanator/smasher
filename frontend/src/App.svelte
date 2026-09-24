@@ -14,11 +14,27 @@
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import NewWorkflowPage from './components/dashboard/NewWorkflowPage.svelte';
   import WorkflowEditorPage from './components/dashboard/WorkflowEditorPage.svelte';
+  import PageHeader from './components/dashboard/PageHeader.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { providePageHeader } from '$lib/page-header.svelte';
 
   let runId = $state<string | null>(null);
   let workflowPageType = $state<'new' | 'edit' | null>(null);
   let workflowId = $state<string | null>(null);
+
+  // Pages below register their own controls (Save, Abort) into this header.
+  const pageHeader = providePageHeader();
+  const catalogCrumbs = [{ label: 'Smasher Pipelines', href: '/' }];
+  const isCatalog = $derived(!runId && !workflowPageType);
+  const pageTitle = $derived(
+    workflowPageType === 'new'
+      ? 'Create New Workflow'
+      : workflowPageType === 'edit'
+        ? 'Edit Workflow'
+        : runId
+          ? `Run ${runId}`
+          : 'Smasher Pipelines'
+  );
 
   onMount(() => {
     // Set initial path from window.location
@@ -76,72 +92,72 @@
   }
 </script>
 
-<main class="min-h-screen bg-muted/40 text-foreground">
-  {#if workflowPageType === 'new'}
-    <!-- New Workflow Page -->
-    <div class="max-w-7xl mx-auto">
-      <NewWorkflowPage />
-    </div>
-  {:else if workflowPageType === 'edit' && workflowId}
-    <!-- Edit Workflow Page -->
-    <div class="max-w-7xl mx-auto">
-      <WorkflowEditorPage {workflowId} />
-    </div>
-  {:else if runId}
-    <!-- Run Detail View: EventLog + QuestionCard -->
-    <div class="max-w-6xl mx-auto p-8">
-      <div class="mb-8">
-        <a href="/" class="text-primary hover:underline">← Back to Catalog</a>
-        <h1 class="text-3xl font-bold mt-4">Pipeline Run: {runId}</h1>
-      </div>
+{#snippet newWorkflowAction()}
+  <Button href="/workflows/new">New Workflow</Button>
+{/snippet}
 
-      <div class="mb-8">
-        <RunDetail {runId} />
-      </div>
+<div class="min-h-screen bg-muted/40 text-foreground">
+  <PageHeader
+    title={pageTitle}
+    crumbs={isCatalog ? [] : catalogCrumbs}
+    actions={isCatalog ? newWorkflowAction : pageHeader.actions}
+  />
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Event Log on the left -->
-        <div>
-          <h2 class="text-xl font-semibold mb-4">Events</h2>
-          <EventLog {runId} />
+  <main>
+    {#if workflowPageType === 'new'}
+      <!-- New Workflow Page -->
+      <div class="max-w-7xl mx-auto">
+        <NewWorkflowPage />
+      </div>
+    {:else if workflowPageType === 'edit' && workflowId}
+      <!-- Edit Workflow Page -->
+      <div class="max-w-7xl mx-auto">
+        <WorkflowEditorPage {workflowId} />
+      </div>
+    {:else if runId}
+      <!-- Run Detail View: EventLog + QuestionCard -->
+      <div class="max-w-6xl mx-auto p-8">
+        <div class="mb-8">
+          <RunDetail {runId} />
         </div>
 
-        <!-- Questions on the right -->
-        <div>
-          <h2 class="text-xl font-semibold mb-4">Questions</h2>
-          <QuestionCard {runId} />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <!-- Event Log on the left -->
+          <div>
+            <h2 class="text-xl font-semibold mb-4">Events</h2>
+            <EventLog {runId} />
+          </div>
+
+          <!-- Questions on the right -->
+          <div>
+            <h2 class="text-xl font-semibold mb-4">Questions</h2>
+            <QuestionCard {runId} />
+          </div>
+        </div>
+
+        <div class="mt-8">
+          <GalleryGate {runId} />
+        </div>
+
+        <div class="mt-8">
+          <h2 class="text-xl font-semibold mb-4">Candidates</h2>
+          <CandidateGallery {runId} />
+        </div>
+
+        <div class="mt-8">
+          <h2 class="text-xl font-semibold mb-4">Decision History</h2>
+          <DecisionHistory {runId} />
         </div>
       </div>
-
-      <div class="mt-8">
-        <GalleryGate {runId} />
-      </div>
-
-      <div class="mt-8">
-        <h2 class="text-xl font-semibold mb-4">Candidates</h2>
-        <CandidateGallery {runId} />
-      </div>
-
-      <div class="mt-8">
-        <h2 class="text-xl font-semibold mb-4">Decision History</h2>
-        <DecisionHistory {runId} />
-      </div>
-    </div>
-  {:else}
-    <!-- Catalog View: header, then Workflows and Runs stacked in the main column -->
-    <div class="min-h-screen">
-      <header class="flex items-center justify-between gap-4 px-5 py-3">
-        <h1 class="text-3xl font-bold">Smasher Pipelines</h1>
-        <Button href="/workflows/new" size="lg" class="px-11">New Workflow</Button>
-      </header>
-
+    {:else}
+      <!-- Catalog View: Workflows and Runs stacked in the main column -->
       <div class="mx-auto max-w-6xl px-4 sm:px-8">
         <WorkflowCatalog />
         <RunList />
       </div>
-    </div>
-  {/if}
-</main>
+    {/if}
+  </main>
+</div>
 
 <style>
   :global(body) {

@@ -62,9 +62,7 @@
 </script>
 
 <div class="workflow-catalog p-8">
-  <div class="mb-8 flex items-center justify-between">
-    <h1 class="m-0 text-3xl font-bold text-foreground">Workflows</h1>
-  </div>
+  <h2 class="mb-4 text-xl font-semibold text-foreground">Workflows</h2>
 
   {#if loading}
     <p class="p-8 text-center text-lg text-muted-foreground">Loading workflows...</p>

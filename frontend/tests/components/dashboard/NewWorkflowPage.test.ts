@@ -30,11 +30,12 @@ describe('NewWorkflowPage', () => {
     }
   });
 
-  it('renders page header and mounts canvas in create mode', () => {
+  it('mounts canvas in create mode, leaving title and navigation to the page header', () => {
     render(NewWorkflowPage);
-    expect(screen.getByText('Create New Workflow')).toBeTruthy();
-    // Back link should exist
-    expect(screen.getByText('← Back to Catalog')).toBeTruthy();
+    // Title + breadcrumb back to the catalog are owned by App's PageHeader
+    // (covered in AppLayout.test.ts); the page itself no longer duplicates them.
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.getByTestId('create-name-input')).toBeTruthy();
   });
 
   it('fetches available_target_dirs from API on mount', async () => {

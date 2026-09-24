@@ -38,7 +38,7 @@
 </script>
 
 <div class="run-list p-8">
-  <h1 class="mb-8 text-3xl font-bold text-foreground">Runs</h1>
+  <h2 class="mb-4 text-xl font-semibold text-foreground">Runs</h2>
 
   {#if loading}
     <p class="p-8 text-center text-lg text-muted-foreground">Loading runs...</p>

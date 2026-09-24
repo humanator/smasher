@@ -37,6 +37,7 @@
   import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
   import StructuralForm from './nodeForms/StructuralForm.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { usePageActions } from '$lib/page-header.svelte';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
@@ -373,9 +374,18 @@
 
   const saveDisabled = $derived(saving || (isCreateMode && !createName.trim()));
 
+  // Save lives in the page header when there is one.
+  const saveInHeader = usePageActions(saveAction);
+
   // Shared by the node and edge inspector <aside>s (one side-panel slot).
   const inspectorClass = 'w-[260px] flex-[0_0_260px] overflow-y-auto border-l border-border p-2.5 box-border';
 </script>
+
+{#snippet saveAction()}
+  <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
+    {saving ? 'Saving…' : 'Save'}
+  </Button>
+{/snippet}
 
 <div class="w-full h-full min-h-[480px] flex flex-row">
   <Palette />
@@ -433,9 +443,9 @@
         <MiniMap />
       </SvelteFlow>
     </div>
-    <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
-      {saving ? 'Saving…' : 'Save'}
-    </Button>
+    {#if !saveInHeader}
+      {@render saveAction()}
+    {/if}
     {#if saveError}
       <p role="alert" data-testid="save-error" class="text-destructive text-sm mt-2">{saveError}</p>
     {/if}
