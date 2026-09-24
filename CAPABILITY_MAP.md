@@ -20,13 +20,25 @@ three independently shippable modules.
 `smasher-web-api` finished all 9 tasks in `tasks/plan.md`, including the
 final-cutover task (askama/HTMX deleted, `smasher-spa` mounted at `/`) once
 `smasher-spa` shipped and confirmed parity. `smasher-spa` finished all 21
-tasks in `tasks/plan-smasher-spa.md`; see that plan's own todo for two pieces
-of flagged-but-not-fixed test debt (mocked API tests in `RunForm.test.ts`/
-`QuestionCard.test.ts`, non-pristine `EventLog.test.ts` stderr output). `smasher-desktop` finished all
+tasks in `tasks/plan-smasher-spa.md`. Its two pieces of flagged test debt
+(mocked API tests, non-pristine `EventLog.test.ts` stderr) were paid off on
+2026-09-24. `smasher-desktop` finished all
 9 tasks in `tasks/plan-smasher-desktop.md`. It ships a machine-local macOS
 `.app` (no `.dmg`). The native features are the official Tauri
 dialog/fs/notification plugins rather than custom commands, and the tray was
 deferred.
+
+## Deferred
+
+Out of scope for this map, and not delivered by it:
+
+- **Remote serving over plain HTTP** (the Objective's "(later)" target). It
+  needs an auth layer first, since the API has none and binds `127.0.0.1` only.
+- **Desktop tray icon.** Deferred in `SPEC-smasher-desktop.md`.
+- **`.dmg` / portable desktop bundle.** The `.app` is machine-local, because
+  the SPA, examples, and design kit are served from the source checkout.
+- **`tauri-driver` desktop e2e.** It has no macOS support. The desktop is
+  covered by manual QA plus the SPA's Playwright suite.
 
 ## Build order
 

@@ -9,7 +9,7 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 ### Checkpoint: Foundation
 - [x] `cargo test -p smasher-web` clean
 - [x] `cargo clippy -p smasher-web` clean
-- [ ] Manual: dashboard submit + `POST /api/runs` both still launch runs correctly
+- [x] ~~Manual: dashboard submit + `POST /api/runs` both still launch runs correctly~~ Superseded (2026-09-24): the HTMX dashboard was deleted at cutover; the SPA's submit path is covered by `e2e/critical-path.spec.ts`
 
 ## Phase 2: JSON/SSE Contract Completion
 
@@ -21,7 +21,7 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 ### Checkpoint: JSON/SSE Contract Complete
 - [x] `cargo test -p smasher-web` clean
 - [x] `cargo clippy -p smasher-web` clean
-- [ ] Manual: curl-only end-to-end — submit, watch JSON SSE events, answer human-gate, see completion
+- [x] Manual: curl-only end-to-end — submit, watch JSON SSE events, answer human-gate, see completion (verified 2026-09-24: one-gate pipeline, 13 JSON SSE events through `pipeline_completed`, free_form answer accepted, status `Completed`)
 - [x] Confirmed: dashboard live-event feed + human-gate form regression is expected, not accidental (accepted at plan approval)
 
 ## Phase 3: Static SPA Serving
@@ -31,7 +31,7 @@ See `tasks/plan.md` for full task descriptions, acceptance criteria, and rationa
 ### Checkpoint: Static Serving Ready
 - [x] `cargo test -p smasher-web` clean
 - [x] `cargo clippy -p smasher-web` clean
-- [ ] Manual: fallback + real-asset serving verified against a scratch fixture dir (covered by automated temp-dir-fixture unit tests, not a manual curl check)
+- [x] Manual: fallback + real-asset serving verified against a scratch fixture dir (covered by automated temp-dir-fixture unit tests, not a manual curl check)
 
 ## Phase 4: Integration Test Coverage
 
