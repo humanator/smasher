@@ -33,5 +33,5 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 
 ### Checkpoint C: Complete
 - [x] All four SPEC-smasher-desktop.md Success Criteria satisfied
-- [ ] `make ci` clean, and CI green (incl. Linux webkit deps) — `make ci` clean locally; CI not yet run (branch not pushed)
-- [ ] Human review before merge
+- [x] `make ci` clean, and CI green (incl. Linux webkit deps) — `make ci` clean locally; GitHub CI not set up, so waived by Simon 2026-09-24
+- [x] Human review before merge (approved 2026-09-24)

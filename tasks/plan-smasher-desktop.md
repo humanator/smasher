@@ -263,8 +263,8 @@ start as soon as Task 1 is done.
 
 ### Checkpoint C: Complete
 - [x] All four SPEC-smasher-desktop.md Success Criteria satisfied
-- [ ] `make ci` clean, and CI green on the branch (including the Linux webkit deps step)
-- [ ] Human review before merge
+- [x] `make ci` clean, and CI green on the branch (including the Linux webkit deps step) — GitHub CI not set up; waived 2026-09-24
+- [x] Human review before merge
 
 ## Risks and Mitigations
 
