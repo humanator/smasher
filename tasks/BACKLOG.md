@@ -22,6 +22,8 @@ before it merges.
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
 added mid-session and runs alongside. Its manual checkpoints and merge come first.
+Straight after that merge: the SPA port repairs, #9 (candidate thumbnails and
+lightbox) + #21 (the rest of what the port dropped), as one frontend batch.
 
 **Waiting on Jobsworth:**
 - Claude CLI provider: the manual checkpoint runs listed in `todo.md` (real-CLI
