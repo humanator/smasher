@@ -132,6 +132,26 @@ smasher run [OPTIONS] <PIPELINE>
 | `--model <MODEL>` | LLM model identifier | `claude-sonnet-5` |
 | `--max-steps <N>` | Maximum engine execution steps | `1000` |
 | `--stylesheet <PATH>` | Path to a stylesheet file for node configuration | |
+| `--backend <NAME>` | Codergen backend: `claude-cli`, `agent`, or `shell` | `claude-cli` |
+| `--claude-skip-permissions` | Let `claude-cli` codergen nodes use any tool (`--dangerously-skip-permissions`) | off |
+
+### Codergen through `claude -p`
+
+With `--backend claude-cli`, each codergen node runs the local `claude` CLI. The node's
+`model` is passed as `--model` when it's a Claude model (`claude-*`, `sonnet`, `opus`,
+`haiku`); otherwise `--model` from the command line is used.
+
+Tools are restricted: the CLI runs with `--permission-mode dontAsk`, so tools on the
+allowlist run and anything else is denied without prompting. The run carries on after
+a denial. The default allowlist is `Read Edit Write Glob Grep` plus `Bash` for `ls`,
+`mkdir`, `cp`, `mv`, `cat`, `head`, `tail`, `wc`, `grep` and `sort`. Set
+`SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` to a comma-separated list to replace it, e.g.
+`Read,Write,Bash(npm run build:*)`. `--claude-skip-permissions` turns the restriction
+off.
+
+Each run also passes `--strict-mcp-config`, `--setting-sources ""` and
+`--no-session-persistence`, so your MCP servers, settings and `~/.claude/CLAUDE.md`
+stay out of pipeline runs and no session transcripts are saved.
 
 ### Examples
 

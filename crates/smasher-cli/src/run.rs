@@ -15,7 +15,9 @@ use smasher_agent::tools::shared::register_shared_tools;
 use smasher_agent::types::SessionConfig;
 
 use smasher_attractor::artifact::ArtifactStore;
-use smasher_attractor::claude_cli_backend::ClaudeCliBackend;
+use smasher_attractor::claude_cli_backend::{
+    ClaudeCliBackend, ClaudeCliPermissions, allowed_tools_from_env,
+};
 use smasher_attractor::dot::parser;
 use smasher_attractor::engine::{Engine, EngineConfig};
 use smasher_attractor::events::PipelineEventEmitter;
@@ -378,6 +380,22 @@ pub struct RunArgs {
     /// to disable (never abort on timeouts alone). Default: 3.
     #[arg(long, default_value = "3")]
     pub max_timeouts: u32,
+
+    /// Let claude-cli codergen nodes use any tool (`--dangerously-skip-permissions`).
+    /// By default they may only use the allowlist in SMASHER_CLAUDE_CLI_ALLOWED_TOOLS,
+    /// or the built-in default list, and anything else is denied.
+    #[arg(long)]
+    pub claude_skip_permissions: bool,
+}
+
+/// Tool permissions for the claude-cli backend: the allowlist, unless
+/// `--claude-skip-permissions` was given.
+fn claude_permissions(args: &RunArgs) -> ClaudeCliPermissions {
+    if args.claude_skip_permissions {
+        ClaudeCliPermissions::SkipPermissions
+    } else {
+        ClaudeCliPermissions::Allowlist(allowed_tools_from_env())
+    }
 }
 
 fn should_enable_tui(args: &RunArgs) -> bool {
@@ -644,7 +662,9 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
                 )
                 .with_streaming(tui_enabled)
                 .with_emitter(pipeline_emitter.clone())
-                .with_max_consecutive_timeouts(args.max_timeouts),
+                .with_max_consecutive_timeouts(args.max_timeouts)
+                .with_default_model(Some(args.model.clone()))
+                .with_permissions(claude_permissions(&args)),
             );
             let agent_backend: Arc<dyn CodergenBackend> = Arc::new(AgentCodergenBackend::new(
                 Arc::clone(client),
@@ -1214,6 +1234,36 @@ mod tests {
     fn skip_lint_flag_parsed_when_present() {
         let cli = TestCli::parse_from(["test", "--skip-lint", "pipeline.dot"]);
         assert!(cli.run.skip_lint);
+    }
+
+    #[test]
+    fn claude_skip_permissions_defaults_to_false() {
+        let cli = TestCli::parse_from(["test", "pipeline.dot"]);
+        assert!(!cli.run.claude_skip_permissions);
+    }
+
+    #[test]
+    fn claude_skip_permissions_parsed_when_present() {
+        let cli = TestCli::parse_from(["test", "pipeline.dot", "--claude-skip-permissions"]);
+        assert!(cli.run.claude_skip_permissions);
+    }
+
+    #[test]
+    fn claude_permissions_use_the_allowlist_by_default() {
+        let cli = TestCli::parse_from(["test", "pipeline.dot"]);
+        assert_eq!(
+            claude_permissions(&cli.run),
+            ClaudeCliPermissions::Allowlist(allowed_tools_from_env())
+        );
+    }
+
+    #[test]
+    fn claude_permissions_skip_only_with_the_flag() {
+        let cli = TestCli::parse_from(["test", "pipeline.dot", "--claude-skip-permissions"]);
+        assert_eq!(
+            claude_permissions(&cli.run),
+            ClaudeCliPermissions::SkipPermissions
+        );
     }
 
     #[test]

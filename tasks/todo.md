@@ -201,13 +201,13 @@ imports it. No flag changes.
 `default_model`.
 
 **Acceptance criteria:**
-- [ ] `--claude-skip-permissions` parses and defaults to false (clap tests like the
+- [x] `--claude-skip-permissions` parses and defaults to false (clap tests like the
       existing ones).
-- [ ] The backend gets `SkipPermissions` only with the flag.
+- [x] The backend gets `SkipPermissions` only with the flag.
 
 **Verification:**
-- [ ] `cargo test -p smasher-cli`
-- [ ] Manual: `cargo run -p smasher-cli -- run examples/old-examples/hello-world.dot`
+- [x] `cargo test -p smasher-cli`
+- [ ] (deferred to Jobsworth) Manual: `cargo run -p smasher-cli -- run examples/old-examples/hello-world.dot`
       completes
 
 **Dependencies:** T7
