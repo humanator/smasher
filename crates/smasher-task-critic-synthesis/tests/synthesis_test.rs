@@ -48,9 +48,15 @@ async fn live_call_on_agreeing_fixtures_recommends_proceed() {
     let client = Client::from_env();
     let args = json!({ "candidate_id": "agreeing-candidate" });
 
-    let report = run_synthesis(&client, "claude-3-5-haiku-20241022", None, candidate_dir, &args)
-        .await
-        .expect("live synthesis call should succeed with a real API key");
+    let report = run_synthesis(
+        &client,
+        "claude-3-5-haiku-20241022",
+        None,
+        candidate_dir,
+        &args,
+    )
+    .await
+    .expect("live synthesis call should succeed with a real API key");
 
     assert_eq!(report.recommendation, Recommendation::Proceed);
     assert!(!report.reasons.is_empty());
@@ -66,9 +72,15 @@ async fn live_call_on_conflicting_fixtures_picks_a_side_citing_both_inputs() {
     let client = Client::from_env();
     let args = json!({ "candidate_id": "conflicting-candidate" });
 
-    let report = run_synthesis(&client, "claude-3-5-haiku-20241022", None, candidate_dir, &args)
-        .await
-        .expect("live synthesis call should succeed with a real API key");
+    let report = run_synthesis(
+        &client,
+        "claude-3-5-haiku-20241022",
+        None,
+        candidate_dir,
+        &args,
+    )
+    .await
+    .expect("live synthesis call should succeed with a real API key");
 
     // Lint is clean but the critic found real friction: a defensible synthesis
     // picks a side rather than refusing to decide, with reasons citing both inputs.

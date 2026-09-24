@@ -17,7 +17,11 @@ fn create_backdated_run(data_dir: &Path, run_id: &str, created_at: DateTime<Utc>
     let mut value: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
     value["created_at"] = serde_json::Value::String(created_at.to_rfc3339());
-    std::fs::write(&manifest_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
+    std::fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&value).unwrap(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -52,8 +56,16 @@ fn prune_artifacts_dry_run_leaves_real_run_directories_untouched() {
     std::fs::create_dir_all(&artifacts_base).unwrap();
 
     let now = Utc::now();
-    create_backdated_run(&artifacts_base, "old-run-a", now - chrono::Duration::days(10));
-    create_backdated_run(&artifacts_base, "old-run-b", now - chrono::Duration::days(9));
+    create_backdated_run(
+        &artifacts_base,
+        "old-run-a",
+        now - chrono::Duration::days(10),
+    );
+    create_backdated_run(
+        &artifacts_base,
+        "old-run-b",
+        now - chrono::Duration::days(9),
+    );
 
     let policy = ArtifactRetentionPolicy {
         max_age: Some(chrono::Duration::days(1)),

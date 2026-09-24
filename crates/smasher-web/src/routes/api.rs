@@ -25,17 +25,17 @@ use crate::state::{AppState, RunSummary};
 
 // Test-only imports
 #[cfg(test)]
-use std::sync::Arc;
-#[cfg(test)]
 use chrono::Utc;
-#[cfg(test)]
-use tokio_util::sync::CancellationToken;
-#[cfg(test)]
-use std::sync::atomic::AtomicU64;
 #[cfg(test)]
 use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
 #[cfg(test)]
 use smasher_attractor::http_interviewer::HttpInterviewer;
+#[cfg(test)]
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::atomic::AtomicU64;
+#[cfg(test)]
+use tokio_util::sync::CancellationToken;
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -404,8 +404,7 @@ async fn events_stream(
         }
     };
 
-    Ok(axum::response::sse::Sse::new(stream)
-        .keep_alive(axum::response::sse::KeepAlive::default()))
+    Ok(axum::response::sse::Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default()))
 }
 
 async fn cancel_run(
@@ -598,15 +597,15 @@ async fn list_candidates(
     let candidates = summaries
         .into_iter()
         .map(|summary| {
-            let scorecard = crate::candidates::read_scorecard(&artifacts_base, &id, &summary.candidate_id);
+            let scorecard =
+                crate::candidates::read_scorecard(&artifacts_base, &id, &summary.candidate_id);
             CandidateResponse {
                 candidate_id: summary.candidate_id,
                 screenshot_url: summary.screenshot_url,
                 bundle_url: summary.bundle_url,
                 manifest: serde_json::to_value(&summary.manifest)
                     .unwrap_or(serde_json::Value::Null),
-                scorecard: serde_json::to_value(&scorecard)
-                    .unwrap_or(serde_json::Value::Null),
+                scorecard: serde_json::to_value(&scorecard).unwrap_or(serde_json::Value::Null),
             }
         })
         .collect();
@@ -1201,7 +1200,11 @@ mod tests {
             run_working_dir: None,
             workflow_id: None,
         };
-        state.runs.write().await.insert("run-with-decisions".into(), record);
+        state
+            .runs
+            .write()
+            .await
+            .insert("run-with-decisions".into(), record);
 
         let app = router().with_state(state);
         let req = Request::builder()
@@ -1218,7 +1221,10 @@ mod tests {
 
         assert_eq!(parsed.decisions.len(), 2);
         assert_eq!(parsed.decisions[0].decision, "proceed");
-        assert_eq!(parsed.decisions[0].selected, vec!["candidate-a".to_string()]);
+        assert_eq!(
+            parsed.decisions[0].selected,
+            vec!["candidate-a".to_string()]
+        );
         assert_eq!(
             parsed.decisions[0].comments.get("candidate-b"),
             Some(&"needs contrast".to_string())

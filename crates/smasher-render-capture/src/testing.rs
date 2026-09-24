@@ -13,6 +13,7 @@ use std::fs::File;
 pub fn acquire_browser_test_lock() -> File {
     let path = std::env::temp_dir().join("smasher-render-capture-browser-test.lock");
     let file = File::create(&path).expect("should be able to create the browser test lock file");
-    file.lock().expect("should be able to acquire the browser test lock");
+    file.lock()
+        .expect("should be able to acquire the browser test lock");
     file
 }

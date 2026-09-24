@@ -430,7 +430,9 @@ async fn product_design_factory_gate2_answers_route_to_the_named_edge() {
 
     for decision in ["iterate", "proceed"] {
         let queue = Arc::new(QueueInterviewer::new());
-        queue.push_response(format!(r#"{{"selected":["define"],"decision":"{decision}"}}"#));
+        queue.push_response(format!(
+            r#"{{"selected":["define"],"decision":"{decision}"}}"#
+        ));
 
         let mut registry = HandlerRegistry::new();
         registry.register(Arc::new(InterviewerHandler::new(queue)));
@@ -483,7 +485,11 @@ async fn product_design_factory_critique_parallel_dispatches_both_branches() {
             "recording"
         }
 
-        async fn execute(&self, node: &GraphNode, _context: &Context) -> Result<Outcome, HandlerError> {
+        async fn execute(
+            &self,
+            node: &GraphNode,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
             self.calls.lock().unwrap().push(node.id.clone());
             Ok(Outcome::success())
         }
@@ -555,7 +561,11 @@ async fn product_design_factory_critique_parallel_dispatches_both_branches() {
         result.node_outcomes.get("TaskCritic"),
         Some(Outcome::Success { .. })
     ));
-    assert!(result.visited_nodes.contains(&"CritiqueParallel".to_string()));
+    assert!(
+        result
+            .visited_nodes
+            .contains(&"CritiqueParallel".to_string())
+    );
     assert!(result.visited_nodes.contains(&"CritiqueJoin".to_string()));
 }
 

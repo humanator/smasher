@@ -150,7 +150,11 @@ impl CandidateScorecard {
 /// exist under `<artifacts_base>/<run_id>/artifacts/<candidate_id>/`. Callers pass
 /// already-validated ids (e.g. from `scan_candidates`); this never touches disk
 /// outside that directory since it only ever joins path segments, never parses them.
-pub fn read_scorecard(artifacts_base: &Path, run_id: &str, candidate_id: &str) -> CandidateScorecard {
+pub fn read_scorecard(
+    artifacts_base: &Path,
+    run_id: &str,
+    candidate_id: &str,
+) -> CandidateScorecard {
     let dir = artifacts_base
         .join(run_id)
         .join("artifacts")
@@ -244,7 +248,10 @@ mod tests {
 
         assert_eq!(candidates.len(), 2);
 
-        let a = candidates.iter().find(|c| c.candidate_id == "candidate-a").unwrap();
+        let a = candidates
+            .iter()
+            .find(|c| c.candidate_id == "candidate-a")
+            .unwrap();
         assert!(!a.failed());
         assert_eq!(a.failure_reason(), None);
         assert_eq!(
@@ -252,7 +259,10 @@ mod tests {
             "/candidate-artifacts/run-1/artifacts/candidate-a/screenshot.png"
         );
 
-        let b = candidates.iter().find(|c| c.candidate_id == "candidate-b").unwrap();
+        let b = candidates
+            .iter()
+            .find(|c| c.candidate_id == "candidate-b")
+            .unwrap();
         assert!(b.failed());
         assert_eq!(b.failure_reason(), Some("boom"));
     }
@@ -355,10 +365,7 @@ mod tests {
     }
 
     fn candidate_dir(base: &Path, run_id: &str, candidate_id: &str) -> PathBuf {
-        let dir = base
-            .join(run_id)
-            .join("artifacts")
-            .join(candidate_id);
+        let dir = base.join(run_id).join("artifacts").join(candidate_id);
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

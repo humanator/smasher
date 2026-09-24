@@ -29,7 +29,11 @@ impl HybridToolBackend {
     /// `working_dir` is the run's own working directory (e.g. `run.rs`'s
     /// `effective_working_dir`) — a relative `candidate_dir` resolves against this,
     /// not the `smasher` process's own CWD.
-    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf, working_dir: PathBuf) -> Self {
+    pub fn new(
+        fallback: Arc<dyn ToolBackend>,
+        artifacts_base: PathBuf,
+        working_dir: PathBuf,
+    ) -> Self {
         Self {
             fallback,
             artifacts_base,
@@ -175,7 +179,10 @@ mod tests {
             PathBuf::from("/tmp/unused"),
         );
 
-        assert_eq!(backend.available_tools(), vec!["render_capture".to_string()]);
+        assert_eq!(
+            backend.available_tools(),
+            vec!["render_capture".to_string()]
+        );
     }
 
     #[tokio::test]
@@ -308,8 +315,9 @@ mod tests {
 
     #[test]
     fn outcome_for_capture_error_marks_missing_entry_point_non_retryable() {
-        let outcome =
-            outcome_for_capture_error(crate::capture::CaptureError::MissingEntryPoint("dir".into()));
+        let outcome = outcome_for_capture_error(crate::capture::CaptureError::MissingEntryPoint(
+            "dir".into(),
+        ));
         match outcome {
             Outcome::Failure { retryable, .. } => assert!(!retryable),
             other => panic!("expected Outcome::Failure, got {other:?}"),
@@ -409,8 +417,11 @@ mod tests {
         )
         .unwrap();
 
-        let backend =
-            HybridToolBackend::new(fallback.clone(), artifacts_base.clone(), working_dir.clone());
+        let backend = HybridToolBackend::new(
+            fallback.clone(),
+            artifacts_base.clone(),
+            working_dir.clone(),
+        );
 
         let candidate_id = "test-candidate-relative";
         let args = json!({

@@ -1617,7 +1617,10 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        backend.generate("test prompt", None, None, &ctx).await.unwrap();
+        backend
+            .generate("test prompt", None, None, &ctx)
+            .await
+            .unwrap();
 
         let captured = std::fs::read_to_string(&args_file).unwrap();
         assert!(
@@ -1853,7 +1856,10 @@ mod tests {
         };
 
         let ctx = smasher_attractor::state::Context::new();
-        let result = backend.generate("test prompt", None, None, &ctx).await.unwrap();
+        let result = backend
+            .generate("test prompt", None, None, &ctx)
+            .await
+            .unwrap();
 
         match result {
             Outcome::Success {
@@ -2061,7 +2067,10 @@ mod tests {
         ctx.set("project_name", serde_json::json!("my_project"));
         ctx.set("_internal", serde_json::json!("hidden"));
 
-        backend.generate("do the thing", None, None, &ctx).await.unwrap();
+        backend
+            .generate("do the thing", None, None, &ctx)
+            .await
+            .unwrap();
 
         let captured = std::fs::read_to_string(&prompt_file).unwrap();
         assert!(

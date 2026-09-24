@@ -158,7 +158,10 @@ mod tests {
 
     #[test]
     fn artifact_dir_joins_base_and_candidate_id() {
-        let path = artifact_dir(Path::new("/data/artifacts/run-123/artifacts"), "candidate-abc");
+        let path = artifact_dir(
+            Path::new("/data/artifacts/run-123/artifacts"),
+            "candidate-abc",
+        );
         assert_eq!(
             path,
             std::path::PathBuf::from("/data/artifacts/run-123/artifacts/candidate-abc")

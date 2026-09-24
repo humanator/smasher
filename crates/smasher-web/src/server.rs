@@ -452,10 +452,7 @@ mod tests {
         }
 
         let app = build_router(test_state());
-        let req = Request::builder()
-            .uri("/")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
         let resp = app.oneshot(req).await.unwrap();
 
         unsafe {

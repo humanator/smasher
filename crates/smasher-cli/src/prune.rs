@@ -41,7 +41,11 @@ pub fn run(args: PruneArgs) -> Result<(), CliError> {
     if report.removed_run_ids.is_empty() {
         eprintln!("Nothing to prune.");
     } else {
-        let verb = if args.dry_run { "Would remove" } else { "Removed" };
+        let verb = if args.dry_run {
+            "Would remove"
+        } else {
+            "Removed"
+        };
         eprintln!(
             "{verb} {} run(s), reclaiming {} bytes: {}",
             report.removed_run_ids.len(),

@@ -181,7 +181,10 @@ fn format_attr_value(v: &NodeAttrValue) -> String {
 /// Append `key=value` DOT attribute pairs for every entry in `attrs` not in
 /// `skip`, sorted by key for deterministic output.
 fn write_extra_attrs(out: &mut Vec<String>, attrs: &HashMap<String, NodeAttrValue>, skip: &[&str]) {
-    let mut keys: Vec<&String> = attrs.keys().filter(|k| !skip.contains(&k.as_str())).collect();
+    let mut keys: Vec<&String> = attrs
+        .keys()
+        .filter(|k| !skip.contains(&k.as_str()))
+        .collect();
     keys.sort();
     for key in keys {
         out.push(format!("{key}={}", format_attr_value(&attrs[key])));
@@ -273,7 +276,11 @@ fn render_graph_preamble(graph: &Graph) -> Vec<String> {
     lines.push("    edge [fontname=\"Helvetica\" fontsize=10];".to_string());
 
     let mut extra_graph_attrs = Vec::new();
-    write_extra_attrs(&mut extra_graph_attrs, &graph.graph_attrs, &["rankdir", "bgcolor"]);
+    write_extra_attrs(
+        &mut extra_graph_attrs,
+        &graph.graph_attrs,
+        &["rankdir", "bgcolor"],
+    );
     for attr in extra_graph_attrs {
         lines.push(format!("    {attr};"));
     }

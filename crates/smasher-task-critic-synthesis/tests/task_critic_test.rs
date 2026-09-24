@@ -15,8 +15,11 @@ fn fixture_screenshot_bytes() -> Vec<u8> {
 
 fn place_fixture_screenshot(candidate_dir: &Path) {
     std::fs::create_dir_all(candidate_dir).expect("create artifact dir");
-    std::fs::write(candidate_dir.join("screenshot.png"), fixture_screenshot_bytes())
-        .expect("write fixture screenshot");
+    std::fs::write(
+        candidate_dir.join("screenshot.png"),
+        fixture_screenshot_bytes(),
+    )
+    .expect("write fixture screenshot");
 }
 
 #[tokio::test]
@@ -50,9 +53,15 @@ async fn live_call_against_fixture_screenshot_produces_legible_report() {
         "task": "find the primary call-to-action button",
     });
 
-    let report = run_task_critic(&client, "claude-sonnet-4-20250514", None, candidate_dir, &args)
-        .await
-        .expect("live task_critic call should succeed with a real API key");
+    let report = run_task_critic(
+        &client,
+        "claude-sonnet-4-20250514",
+        None,
+        candidate_dir,
+        &args,
+    )
+    .await
+    .expect("live task_critic call should succeed with a real API key");
 
     assert_eq!(report.persona, "a new user unfamiliar with the product");
     assert_eq!(report.task, "find the primary call-to-action button");

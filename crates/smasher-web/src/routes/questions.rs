@@ -14,7 +14,9 @@ use smasher_attractor::http_interviewer::{
 use crate::candidates;
 use crate::error::WebError;
 use crate::routes::api::CandidateResponse;
-use crate::routes::gallery::{candidate_ids_for_gate, find_gallery_gate_for_node, resolve_candidate_count};
+use crate::routes::gallery::{
+    candidate_ids_for_gate, find_gallery_gate_for_node, resolve_candidate_count,
+};
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -114,8 +116,7 @@ async fn list_questions(
                     bundle_url: summary.bundle_url,
                     manifest: serde_json::to_value(&summary.manifest)
                         .unwrap_or(serde_json::Value::Null),
-                    scorecard: serde_json::to_value(&scorecard)
-                        .unwrap_or(serde_json::Value::Null),
+                    scorecard: serde_json::to_value(&scorecard).unwrap_or(serde_json::Value::Null),
                 }
             })
             .collect();
@@ -380,11 +381,10 @@ mod tests {
         let run_id = "questions-plain";
         let state = test_state();
         let interviewer = HttpInterviewer::new();
-        state
-            .runs
-            .write()
-            .await
-            .insert(run_id.into(), gallery_gate_record(run_id, interviewer.clone()));
+        state.runs.write().await.insert(
+            run_id.into(),
+            gallery_gate_record(run_id, interviewer.clone()),
+        );
 
         let iv = interviewer.clone();
         let ask_handle = tokio::spawn(async move { iv.ask("Continue?", &Context::new()).await });
@@ -408,11 +408,10 @@ mod tests {
         let run_id = "questions-gate-no-candidates";
         let state = test_state();
         let interviewer = HttpInterviewer::new();
-        state
-            .runs
-            .write()
-            .await
-            .insert(run_id.into(), gallery_gate_record(run_id, interviewer.clone()));
+        state.runs.write().await.insert(
+            run_id.into(),
+            gallery_gate_record(run_id, interviewer.clone()),
+        );
 
         let qid = spawn_gate_ask(interviewer.clone()).await;
 
@@ -438,11 +437,10 @@ mod tests {
 
         let state = test_state();
         let interviewer = HttpInterviewer::new();
-        state
-            .runs
-            .write()
-            .await
-            .insert(run_id.into(), gallery_gate_record(run_id, interviewer.clone()));
+        state.runs.write().await.insert(
+            run_id.into(),
+            gallery_gate_record(run_id, interviewer.clone()),
+        );
 
         let qid = spawn_gate_ask(interviewer.clone()).await;
 
@@ -455,9 +453,16 @@ mod tests {
         let mut edges = gate.outgoing_edges.clone();
         edges.sort();
         assert_eq!(edges, vec!["iterate".to_string(), "proceed".to_string()]);
-        let mut ids: Vec<_> = gate.candidates.iter().map(|c| c.candidate_id.clone()).collect();
+        let mut ids: Vec<_> = gate
+            .candidates
+            .iter()
+            .map(|c| c.candidate_id.clone())
+            .collect();
         ids.sort();
-        assert_eq!(ids, vec!["candidate-a".to_string(), "candidate-b".to_string()]);
+        assert_eq!(
+            ids,
+            vec!["candidate-a".to_string(), "candidate-b".to_string()]
+        );
 
         assert!(
             !parsed.questions.iter().any(|q| q.id == qid),

@@ -102,9 +102,8 @@ fn node_type_from_str(s: &str) -> Option<NodeType> {
 fn attr_value_to_json(v: &NodeAttrValue) -> serde_json::Value {
     match v {
         NodeAttrValue::String(s) => serde_json::Value::String(s.clone()),
-        NodeAttrValue::Number(n) => {
-            serde_json::Number::from_f64(*n).map_or(serde_json::Value::Null, serde_json::Value::Number)
-        }
+        NodeAttrValue::Number(n) => serde_json::Number::from_f64(*n)
+            .map_or(serde_json::Value::Null, serde_json::Value::Number),
         NodeAttrValue::Bool(b) => serde_json::Value::Bool(*b),
         // No real fixture stores a Duration in a node/edge's generic attrs
         // today (typed handler fields read String/Number/Bool only), but
@@ -617,10 +616,8 @@ digraph {
 
         let created: CreateGraphResponse = body_json_response(resp).await;
         assert!(tmp.path().join("brand-new.dot").exists());
-        let resolved = crate::workflows::resolve_workflow(
-            &[tmp.path().display().to_string()],
-            &created.id,
-        );
+        let resolved =
+            crate::workflows::resolve_workflow(&[tmp.path().display().to_string()], &created.id);
         assert!(resolved.is_some());
     }
 

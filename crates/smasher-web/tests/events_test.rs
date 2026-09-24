@@ -3,7 +3,7 @@
 
 use futures::StreamExt;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::time::Duration;
 use tokio::task;
 
@@ -64,15 +64,18 @@ async fn start_test_server() -> (String, task::JoinHandle<()>) {
     // Build the app router and start serving
     let app = {
         let client = smasher_llm::client::Client::from_env();
-        let state =
-            smasher_web::state::AppState::new(client, "test-model".into(), None, "/tmp".into(), vec![]);
+        let state = smasher_web::state::AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            "/tmp".into(),
+            vec![],
+        );
         smasher_web::server::build_router(state)
     };
 
     let server_task = task::spawn(async move {
-        axum::serve(listener, app)
-            .await
-            .expect("server error");
+        axum::serve(listener, app).await.expect("server error");
     });
 
     (base_url, server_task)

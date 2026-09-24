@@ -53,7 +53,9 @@ fn build_request(
     screenshot: &[u8],
     markup: Option<&str>,
 ) -> Request {
-    let mut content = vec![ContentPart::text(format!("Persona: {persona}\nTask: {task}"))];
+    let mut content = vec![ContentPart::text(format!(
+        "Persona: {persona}\nTask: {task}"
+    ))];
     if let Some(markup) = markup {
         content.push(ContentPart::text(format!(
             "Candidate markup (index.html, for non-visual context only — judge the \
@@ -135,7 +137,14 @@ pub async fn run_task_critic(
     })?;
     let markup = read_optional_markup(candidate_dir);
 
-    let request = build_request(model, provider, persona, task, &screenshot, markup.as_deref());
+    let request = build_request(
+        model,
+        provider,
+        persona,
+        task,
+        &screenshot,
+        markup.as_deref(),
+    );
 
     let response =
         client
@@ -210,7 +219,11 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(text_parts.len(), 2, "persona/task text and markup text should be separate parts");
+        assert_eq!(
+            text_parts.len(),
+            2,
+            "persona/task text and markup text should be separate parts"
+        );
         assert_eq!(text_parts[0], "Persona: new user\nTask: find settings");
         assert!(
             text_parts[1].contains("<button>Submit</button>"),
@@ -223,7 +236,11 @@ mod tests {
              screenshot description, got: {:?}",
             text_parts[1]
         );
-        assert_eq!(request.messages[0].content.len(), 3, "text + markup text + image");
+        assert_eq!(
+            request.messages[0].content.len(),
+            3,
+            "text + markup text + image"
+        );
     }
 
     #[test]
