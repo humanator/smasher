@@ -90,7 +90,7 @@ T3-T5 and T6-T8 are independent after T2 and can run in parallel sessions.
 - [x] T1: Spike: CLAUDE.md leak, allowlist patterns, how `dontAsk` denies
 
 ### Phase 1: Single-call adapter (`smasher-llm`)
-- [ ] T2: `Provider::ClaudeCli` and shared process plumbing
+- [x] T2: `Provider::ClaudeCli` and shared process plumbing
 - [ ] T3: `ClaudeCliAdapter` answers a text request
 - [ ] T4: Images, JSON schema, multi-turn
 - [ ] T5: Register from env, plus a real-CLI test

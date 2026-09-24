@@ -46,17 +46,17 @@ under "Spike 2 results".
 and `base_command()`. No adapter yet.
 
 **Acceptance criteria:**
-- [ ] `"claude-cli".parse::<Provider>()` round-trips through `Display`. All
+- [x] `"claude-cli".parse::<Provider>()` round-trips through `Display`. All
       exhaustive matches compile (catalog: no models, `get_latest_model` → `None`;
       agent profile → `AnthropicProfile`).
-- [ ] `resolve_binary(explicit, env, home, path)` follows the spec order. It's a pure
+- [x] `resolve_binary(explicit, env, home, path)` follows the spec order. It's a pure
       function over injected inputs, tested for each rung and for "not found".
-- [ ] `base_command()` removes the five nested-session env vars (test: inspect
+- [x] `base_command()` removes the five nested-session env vars (test: inspect
       `Command::get_envs()`).
 
 **Verification:**
-- [ ] `cargo test -p smasher-llm claude_cli` and `cargo test -p smasher-agent`
-- [ ] `cargo clippy --workspace -- -D warnings`
+- [x] `cargo test -p smasher-llm claude_cli` and `cargo test -p smasher-agent`
+- [x] `cargo clippy --workspace -- -D warnings`
 
 **Dependencies:** T1 (informs nothing structural, but T1 may add a flag to `base_command`)
 **Files likely touched:** `smasher-llm/src/types/catalog.rs`,

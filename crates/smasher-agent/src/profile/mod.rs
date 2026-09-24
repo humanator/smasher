@@ -275,6 +275,8 @@ pub fn profile_for_model(model: &str) -> Box<dyn ProviderProfile> {
         // infer from — so this arm is unreachable today; it falls through to
         // the same default as an unrecognized model.
         Some(Provider::Ollama) | None => Box::new(AnthropicProfile),
+        // Also unreachable via `infer_provider`; the CLI runs Claude models.
+        Some(Provider::ClaudeCli) => Box::new(AnthropicProfile),
     }
 }
 
