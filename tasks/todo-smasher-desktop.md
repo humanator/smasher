@@ -23,8 +23,8 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 
 ### Checkpoint B: Native features
 - [x] Workspace + frontend (`vitest`, `check`, `test:e2e`) clean, browser target unregressed
-- [ ] Success Criteria 1 and 3 verified by hand in the desktop app
-- [ ] Human review before Phase 3
+- [x] Success Criteria 1 and 3 verified by hand in the desktop app
+- [x] Human review before Phase 3
 
 ## Phase 3: Ship
 

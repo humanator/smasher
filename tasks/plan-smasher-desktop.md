@@ -222,8 +222,8 @@ start as soon as Task 1 is done.
 
 ### Checkpoint B: Native features
 - [ ] Workspace test/clippy/fmt clean. Frontend `npx vitest run`, `npm run check`, and `npm run test:e2e` clean (no regressions to the browser target)
-- [ ] Success Criteria 1 (dev window + HMR) and 3 (save/load dialog, completion notification) verified by hand in the desktop app
-- [ ] Human review before Phase 3
+- [x] Success Criteria 1 (dev window + HMR) and 3 (save/load dialog, completion notification) verified by hand in the desktop app
+- [x] Human review before Phase 3
 
 ### Phase 3: Ship
 
