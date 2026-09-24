@@ -3,7 +3,7 @@
 
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
 use smasher_llm::provider::claude_cli::process::base_command;
@@ -103,6 +103,8 @@ pub struct ClaudeCliBackend {
     /// Model used when the node names none (or names a non-Claude model).
     default_model: Option<String>,
     permissions: ClaudeCliPermissions,
+    /// Run-wide (input, output) token totals, added to from each streamed result line.
+    token_counters: Option<(Arc<AtomicU64>, Arc<AtomicU64>)>,
 }
 
 #[async_trait::async_trait]
@@ -200,6 +202,7 @@ impl CodergenBackend for ClaudeCliBackend {
             // Streaming path: read stdout line-by-line as NDJSON and emit PipelineEvents.
             // stderr is consumed in the background to prevent pipe buffer deadlock.
             let emitter = self.emitter.clone();
+            let token_counters = self.token_counters.clone();
             let node_id = context.get_string("_current_node_id").unwrap_or_default();
 
             let stdout = child
@@ -222,15 +225,6 @@ impl CodergenBackend for ClaudeCliBackend {
                 let reader = tokio::io::BufReader::new(stdout);
                 let mut lines = reader.lines();
                 let mut result_text: Option<String> = None;
-                // Track cumulative token counts to emit deltas. Claude CLI reports
-                // cumulative usage per assistant message, so we subtract the previous
-                // cumulative value to get the incremental tokens for each step.
-                let mut prev_input_tokens: u64 = 0;
-                let mut prev_output_tokens: u64 = 0;
-                // Deduplicate per-step token emissions by message ID (parallel tool
-                // calls share the same ID with identical usage data).
-                let mut seen_msg_ids: std::collections::HashSet<String> =
-                    std::collections::HashSet::new();
 
                 while let Some(line) = lines.next_line().await? {
                     let line = line.trim().to_string();
@@ -242,35 +236,6 @@ impl CodergenBackend for ClaudeCliBackend {
                     };
                     match obj.get("type").and_then(|v| v.as_str()) {
                         Some("assistant") => {
-                            // Emit per-step token usage from the assistant message (deduped).
-                            if let Some(ref emitter) = emitter {
-                                let msg_id =
-                                    obj["message"]["id"].as_str().unwrap_or("").to_string();
-                                if !msg_id.is_empty() && seen_msg_ids.insert(msg_id) {
-                                    let cumulative_in = obj["message"]["usage"]["input_tokens"]
-                                        .as_u64()
-                                        .unwrap_or(0);
-                                    let cumulative_out = obj["message"]["usage"]["output_tokens"]
-                                        .as_u64()
-                                        .unwrap_or(0);
-                                    // Emit the delta (increment since last message).
-                                    let delta_in = cumulative_in.saturating_sub(prev_input_tokens);
-                                    let delta_out =
-                                        cumulative_out.saturating_sub(prev_output_tokens);
-                                    prev_input_tokens = cumulative_in;
-                                    prev_output_tokens = cumulative_out;
-                                    if delta_in > 0 || delta_out > 0 {
-                                        emitter.emit(PipelineEvent::AgentTokenUsage {
-                                            node_id: node_id.clone(),
-                                            input_tokens: delta_in,
-                                            output_tokens: delta_out,
-                                            cost_usd: 0.0,
-                                            timestamp: chrono::Utc::now(),
-                                        });
-                                    }
-                                }
-                            }
-
                             let Some(content) = obj["message"]["content"].as_array() else {
                                 continue;
                             };
@@ -312,18 +277,27 @@ impl CodergenBackend for ClaudeCliBackend {
                         }
                         Some("result") => {
                             result_text = Some(obj["result"].as_str().unwrap_or("").to_string());
-                            // Emit final cost from the result line.
-                            if let Some(ref emitter) = emitter {
-                                let cost_usd = obj["total_cost_usd"].as_f64().unwrap_or(0.0);
-                                if cost_usd > 0.0 {
-                                    emitter.emit(PipelineEvent::AgentTokenUsage {
-                                        node_id: node_id.clone(),
-                                        input_tokens: 0,
-                                        output_tokens: 0,
-                                        cost_usd,
-                                        timestamp: chrono::Utc::now(),
-                                    });
-                                }
+                            // Usage comes from the result line only. Each assistant line
+                            // carries one API call's usage, with an output count taken
+                            // mid-stream, so those lines undercount. `input_tokens` excludes
+                            // cache reads and writes, matching the Anthropic API adapter.
+                            let input_tokens = obj["usage"]["input_tokens"].as_u64().unwrap_or(0);
+                            let output_tokens = obj["usage"]["output_tokens"].as_u64().unwrap_or(0);
+                            let cost_usd = obj["total_cost_usd"].as_f64().unwrap_or(0.0);
+                            if let Some((ref input_total, ref output_total)) = token_counters {
+                                input_total.fetch_add(input_tokens, Ordering::Relaxed);
+                                output_total.fetch_add(output_tokens, Ordering::Relaxed);
+                            }
+                            if let Some(ref emitter) = emitter
+                                && (input_tokens > 0 || output_tokens > 0 || cost_usd > 0.0)
+                            {
+                                emitter.emit(PipelineEvent::AgentTokenUsage {
+                                    node_id: node_id.clone(),
+                                    input_tokens,
+                                    output_tokens,
+                                    cost_usd,
+                                    timestamp: chrono::Utc::now(),
+                                });
                             }
                         }
                         _ => {}
@@ -464,6 +438,7 @@ impl ClaudeCliBackend {
             max_consecutive_timeouts: 3,
             default_model: None,
             permissions: ClaudeCliPermissions::default(),
+            token_counters: None,
         }
     }
 
@@ -492,6 +467,12 @@ impl ClaudeCliBackend {
     }
 
     /// Forward parsed stream events to this emitter.
+    /// Add each call's token usage to these run totals (streaming mode only).
+    pub fn with_token_counters(mut self, input: Arc<AtomicU64>, output: Arc<AtomicU64>) -> Self {
+        self.token_counters = Some((input, output));
+        self
+    }
+
     pub fn with_emitter(mut self, emitter: Arc<PipelineEventEmitter>) -> Self {
         self.emitter = Some(emitter);
         self
@@ -740,6 +721,69 @@ mod tests {
         assert_eq!(tool_starts[0].0, "bash");
         assert_eq!(tool_starts[0].1, "tc1");
         assert_eq!(tool_starts[0].2, "coder_node");
+    }
+
+    /// Shaped like a real `claude -p` stream: each assistant line carries one API
+    /// call's usage (not a running total) with a partial output count, and only
+    /// the result line has the true totals.
+    #[tokio::test]
+    async fn claude_cli_backend_streaming_reports_usage_from_the_result_line() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ndjson_file = tmp.path().join("output.ndjson");
+        std::fs::write(
+            &ndjson_file,
+            concat!(
+                "{\"type\":\"assistant\",\"message\":{\"id\":\"m1\",\"role\":\"assistant\",\"content\":[{\"type\":\"tool_use\",\"id\":\"tc1\",\"name\":\"bash\",\"input\":{\"command\":\"ls\"}}],\"usage\":{\"input_tokens\":10,\"output_tokens\":3,\"cache_read_input_tokens\":12306,\"cache_creation_input_tokens\":7118}}}\n",
+                "{\"type\":\"assistant\",\"message\":{\"id\":\"m2\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"done\"}],\"usage\":{\"input_tokens\":8,\"output_tokens\":2,\"cache_read_input_tokens\":19424,\"cache_creation_input_tokens\":8245}}}\n",
+                "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":1,\"result\":\"done\",\"total_cost_usd\":0.034722,\"usage\":{\"input_tokens\":18,\"output_tokens\":161,\"cache_read_input_tokens\":31730,\"cache_creation_input_tokens\":15363}}\n"
+            ),
+        )
+        .unwrap();
+        let script_path = tmp.path().join("claude");
+        let script_content = format!("#!/bin/sh\ncat {}\n", ndjson_file.display());
+        std::fs::write(&script_path, script_content).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let emitter = Arc::new(crate::events::PipelineEventEmitter::default());
+        let mut rx = emitter.subscribe();
+        let input_tokens = Arc::new(AtomicU64::new(0));
+        let output_tokens = Arc::new(AtomicU64::new(0));
+
+        let backend = ClaudeCliBackend::new(
+            tmp.path().display().to_string(),
+            std::time::Duration::from_secs(10),
+        )
+        .with_claude_path(script_path.display().to_string())
+        .with_streaming(true)
+        .with_emitter(Arc::clone(&emitter))
+        .with_token_counters(Arc::clone(&input_tokens), Arc::clone(&output_tokens));
+
+        let ctx = crate::state::Context::new();
+        ctx.set("_current_node_id", serde_json::json!("node1"));
+        backend.generate("test", None, None, &ctx).await.unwrap();
+        drop(emitter);
+
+        let mut usage = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            if let crate::events::PipelineEvent::AgentTokenUsage {
+                node_id,
+                input_tokens,
+                output_tokens,
+                cost_usd,
+                ..
+            } = event
+            {
+                usage.push((node_id, input_tokens, output_tokens, cost_usd));
+            }
+        }
+
+        assert_eq!(usage, vec![("node1".to_string(), 18, 161, 0.034722)]);
+        assert_eq!(input_tokens.load(Ordering::Relaxed), 18);
+        assert_eq!(output_tokens.load(Ordering::Relaxed), 161);
     }
 
     // ---- Backend flag tests ----

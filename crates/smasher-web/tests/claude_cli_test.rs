@@ -1,5 +1,5 @@
 // ABOUTME: Boots the web server with only a fake `claude` CLI configured and runs a codergen
-// ABOUTME: pipeline through it, checking the CLI's NDJSON events reach the SSE stream.
+// ABOUTME: pipeline through it, checking the CLI's NDJSON events and token usage reach the run.
 
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
@@ -21,7 +21,9 @@ fn fake_claude(dir: &std::path::Path) -> std::path::PathBuf {
         {"type": "text", "text": "Wrote index.html"}
     ]}});
     let result = json!({"type": "result", "subtype": "success", "is_error": false,
-        "result": "Wrote index.html"});
+        "result": "Wrote index.html", "total_cost_usd": 0.0125,
+        "usage": {"input_tokens": 18, "output_tokens": 161,
+                  "cache_read_input_tokens": 31730, "cache_creation_input_tokens": 15363}});
     std::fs::write(
         dir.join("out.ndjson"),
         format!("{tool_use}\n{text}\n{result}\n"),
@@ -123,6 +125,12 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
     )
     .await
     .expect("pipeline did not finish");
+    let run: Value = reqwest::get(format!("{base}/api/runs/{run_id}"))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
     shutdown.cancel();
 
     let names: Vec<&str> = events.iter().map(|(n, _)| n.as_str()).collect();
@@ -138,6 +146,10 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
         .map(|(_, v)| v.to_string())
         .expect("no agent_message event");
     assert!(message.contains("Wrote index.html"), "{message}");
+
+    // The result line's usage reaches the run totals, cache tokens excluded.
+    assert_eq!(run["input_tokens"], 18, "{run}");
+    assert_eq!(run["output_tokens"], 161, "{run}");
 
     let argv = std::fs::read_to_string(dir.path().join("argv.txt")).unwrap();
     assert!(argv.contains("dontAsk"), "argv: {argv}");

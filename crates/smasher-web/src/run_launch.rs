@@ -205,17 +205,16 @@ pub async fn launch_pipeline(
             model.clone(),
             provider.clone(),
             spawn_working_dir.clone(),
-            input_tokens,
-            output_tokens,
+            Arc::clone(&input_tokens),
+            Arc::clone(&output_tokens),
             Arc::clone(&emitter),
         ));
         let backend: Arc<dyn CodergenBackend> = if provider.as_deref() == Some("claude-cli") {
             Arc::new(ClaudeCliRouter::new(
-                Arc::new(claude_cli_backend(
-                    &spawn_working_dir,
-                    &model,
-                    Arc::clone(&emitter),
-                )),
+                Arc::new(
+                    claude_cli_backend(&spawn_working_dir, &model, Arc::clone(&emitter))
+                        .with_token_counters(input_tokens, output_tokens),
+                ),
                 agent_backend,
             ))
         } else {
