@@ -445,12 +445,17 @@ open target/release/bundle/macos/Smasher.app
 The bundle is machine-local: it serves the SPA build, examples, and design
 kit from this checkout, so keep the repo where it was built.
 
+**Data dir:** the app keeps runs, workflows, and settings in
+`~/Documents/smasher` so they're easy to browse in Finder. Set
+`SMASHER_DATA_DIR` to use another location. The CLI still defaults to
+`~/.smasher`.
+
 **API keys:** an app launched from Finder or the Dock has no shell environment
 and a working directory of `/`, so it can't see your shell exports or the
-repo's `.env`. Put your keys in `~/.smasher/.env` (or `$SMASHER_DATA_DIR/.env`):
+repo's `.env`. Put your keys in `~/Documents/smasher/.env` (or `$SMASHER_DATA_DIR/.env`):
 
 ```bash
-# ~/.smasher/.env
+# ~/Documents/smasher/.env
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
