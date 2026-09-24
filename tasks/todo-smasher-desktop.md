@@ -5,7 +5,7 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 ## Phase 1: Embedded server boots, loopback-only
 
 - [x] Task 1: Split `smasher-web` startup into bind-then-serve (`server::start()` → bound `SocketAddr` + cancellable serve; `run_with_config` unchanged behaviour)
-- [ ] Task 2: New `smasher-desktop` Tauri 2 crate: bootstrap (127.0.0.1 hard-coded, port 0 release / 21541 debug, `~/.smasher/.env`), window opened only after bind, error dialog on failure, CI webkit deps
+- [x] Task 2: New `smasher-desktop` Tauri 2 crate: bootstrap (127.0.0.1 hard-coded, port 0 release / 21541 debug, `~/.smasher/.env`), window opened only after bind, error dialog on failure, CI webkit deps
 - [ ] Task 3: `tests/bootstrap_test.rs`: headless boot, health + SPA index, loopback-only, shutdown
 
 ### Checkpoint A: Embedded server + window

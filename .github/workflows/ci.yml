@@ -37,6 +37,7 @@ jobs:
     needs: [fmt]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/tauri-linux-deps
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -51,6 +52,7 @@ jobs:
     needs: [check]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/tauri-linux-deps
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -78,6 +80,7 @@ jobs:
     needs: [check]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/tauri-linux-deps
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -106,6 +109,7 @@ jobs:
     needs: [fmt]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/tauri-linux-deps
       - uses: dtolnay/rust-toolchain@1.92.0
       - uses: Swatinem/rust-cache@v2
         with:
@@ -122,6 +126,7 @@ jobs:
     needs: [check]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/tauri-linux-deps
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -149,6 +154,7 @@ jobs:
     if: always()
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/tauri-linux-deps
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:

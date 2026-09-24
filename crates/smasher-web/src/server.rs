@@ -204,10 +204,12 @@ pub async fn start(
     if client.registered_providers().is_empty() {
         return Err(ServerError::NoApiKeys);
     }
-    bind_and_serve(config, client, shutdown).await
+    start_with_client(config, client, shutdown).await
 }
 
-async fn bind_and_serve(
+/// Like [`start`], but with a caller-supplied LLM client and no API-key
+/// check, so embedders and tests can boot the server without provider keys.
+pub async fn start_with_client(
     config: ServerConfig,
     client: smasher_llm::client::Client,
     shutdown: CancellationToken,
@@ -478,11 +480,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bind_and_serve_on_port_zero_returns_a_real_loopback_port_serving_health() {
+    async fn start_with_client_on_port_zero_returns_a_real_loopback_port_serving_health() {
         let data_dir = tempfile::tempdir().unwrap();
         let shutdown = CancellationToken::new();
 
-        let server = bind_and_serve(
+        let server = start_with_client(
             ephemeral_config(data_dir.path()),
             smasher_llm::client::Client::new(),
             shutdown.clone(),
@@ -501,14 +503,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bind_and_serve_on_an_already_bound_port_errors_naming_the_address() {
+    async fn start_with_client_on_an_already_bound_port_errors_naming_the_address() {
         let data_dir = tempfile::tempdir().unwrap();
         let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let port = occupied.local_addr().unwrap().port();
         let mut config = ephemeral_config(data_dir.path());
         config.port = port;
 
-        let err = bind_and_serve(
+        let err = start_with_client(
             config,
             smasher_llm::client::Client::new(),
             CancellationToken::new(),
@@ -525,7 +527,7 @@ mod tests {
     async fn cancelling_the_shutdown_token_stops_the_server() {
         let data_dir = tempfile::tempdir().unwrap();
         let shutdown = CancellationToken::new();
-        let server = bind_and_serve(
+        let server = start_with_client(
             ephemeral_config(data_dir.path()),
             smasher_llm::client::Client::new(),
             shutdown.clone(),

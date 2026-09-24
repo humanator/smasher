@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Baseline core permissions for the main window. Grants nothing to the served (remote) origin.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

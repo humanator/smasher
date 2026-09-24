@@ -10,6 +10,7 @@ members = [
     "crates/smasher-system-lint",
     "crates/smasher-render-capture",
     "crates/smasher-task-critic-synthesis",
+    "crates/smasher-desktop",
 ]
 
 [workspace.package]
