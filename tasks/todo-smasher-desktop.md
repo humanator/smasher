@@ -28,7 +28,7 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 
 ## Phase 3: Ship
 
-- [x] Task 8: `cargo tauri build` → `.app` that works when launched from Finder (absolute workflow dirs, no secrets in bundle) — `.app` only (dmg dropped); real-key hello-world run from Finder still pending `~/.smasher/.env`
+- [x] Task 8: `cargo tauri build` → `.app` that works when launched from Finder (absolute workflow dirs, no secrets in bundle) — `.app` only (dmg dropped); real-key hello-world run verified by hand
 - [x] Task 9: Docs, Makefile targets, API reference, CAPABILITY_MAP + spec status
 
 ### Checkpoint C: Complete

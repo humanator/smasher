@@ -233,7 +233,7 @@ start as soon as Task 1 is done.
 
 **Acceptance criteria:**
 - [x] `cargo tauri build` succeeds and produces `target/release/bundle/macos/Smasher.app` (bundle targets narrowed to `app`: the `.dmg` step's Finder AppleScript needs Automation permission and the spec only requires a machine-local `.app`)
-- [ ] Double-clicking the `.app` (not from a terminal) shows the dashboard with workflows listed and can run hello-world end to end (verified with cwd `/`, stripped env, dummy key in the data dir `.env`: SPA 200, 34 workflows incl. hello-world. Real-key hello-world run pending `~/.smasher/.env`)
+- [x] Double-clicking the `.app` (not from a terminal) shows the dashboard with workflows listed and can run hello-world end to end (verified with cwd `/`, stripped env, dummy key in the data dir `.env`: SPA 200, 34 workflows incl. hello-world. Real-key hello-world run by hand 2026-09-24 with keys from `~/.smasher/.env`: `HelloWorld` Completed)
 - [x] No keys or secrets in `tauri.conf.json` or the bundle (`grep -r "sk-" Smasher.app` finds nothing)
 
 **Verification:**
