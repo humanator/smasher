@@ -223,10 +223,7 @@ fn tool_candidate_id(node: &GraphNode) -> Option<String> {
 /// Map `phase_default(<phase>)` to its gallery size: discover=4, define=2,
 /// deliver=1. Returns `None` for anything else.
 fn phase_default(s: &str) -> Option<usize> {
-    let phase = s
-        .strip_prefix("phase_default(")?
-        .strip_suffix(")")?
-        .trim();
+    let phase = s.strip_prefix("phase_default(")?.strip_suffix(")")?.trim();
     match phase {
         "discover" => Some(4),
         "define" => Some(2),
@@ -262,12 +259,17 @@ async fn submit_gallery_decision(
         // in the graph" — a pipeline with more than one gallery gate (e.g. a
         // Discover gate and a separate Define gate) would otherwise only ever
         // let the first one's questions through this endpoint.
-        let belongs_to_gate = record.interviewer.list_questions().questions.iter().any(|q| {
-            q.id == qid
-                && q.node_id
-                    .as_deref()
-                    .is_some_and(|nid| find_gallery_gate_for_node(&record.graph, nid).is_some())
-        });
+        let belongs_to_gate = record
+            .interviewer
+            .list_questions()
+            .questions
+            .iter()
+            .any(|q| {
+                q.id == qid
+                    && q.node_id
+                        .as_deref()
+                        .is_some_and(|nid| find_gallery_gate_for_node(&record.graph, nid).is_some())
+            });
 
         if !belongs_to_gate {
             return Ok(Json(AnswerQuestionResponse {
@@ -286,13 +288,11 @@ async fn submit_gallery_decision(
     };
     let run_id = id.clone();
     let artifacts_base = std::path::Path::new(&state.data_dir).join("artifacts");
-    let candidates = tokio::task::spawn_blocking(move || {
-        candidates::scan_candidates(&artifacts_base, &run_id)
-    })
-    .await
-    .map_err(|e| WebError::Internal(format!("candidate scan task panicked: {e}")))?;
-    let canonical =
-        validate_decision(&candidates, &decision).map_err(WebError::BadRequest)?;
+    let candidates =
+        tokio::task::spawn_blocking(move || candidates::scan_candidates(&artifacts_base, &run_id))
+            .await
+            .map_err(|e| WebError::Internal(format!("candidate scan task panicked: {e}")))?;
+    let canonical = validate_decision(&candidates, &decision).map_err(WebError::BadRequest)?;
     Ok(Json(interviewer.answer_question(&qid, &canonical)))
 }
 
@@ -308,7 +308,9 @@ mod tests {
     fn summary(candidate_id: &str, failed: bool) -> CandidateSummary {
         CandidateSummary {
             candidate_id: candidate_id.into(),
-            screenshot_url: format!("/candidate-artifacts/run/artifacts/{candidate_id}/screenshot.png"),
+            screenshot_url: format!(
+                "/candidate-artifacts/run/artifacts/{candidate_id}/screenshot.png"
+            ),
             bundle_url: None,
             manifest: Manifest {
                 captured_at: chrono::Utc::now(),
@@ -377,7 +379,10 @@ mod tests {
         )
         .unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&canonical).unwrap();
-        assert_eq!(parsed["comments"], serde_json::json!({"b": "tweak spacing"}));
+        assert_eq!(
+            parsed["comments"],
+            serde_json::json!({"b": "tweak spacing"})
+        );
     }
 
     #[test]
@@ -807,7 +812,8 @@ mod tests {
 
         let other_waiter = interviewer.clone();
         let other_handle = tokio::spawn(async move {
-            let ctx = Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("OtherNode"));
+            let ctx =
+                Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!("OtherNode"));
             other_waiter.ask("Unrelated question", &ctx).await
         });
         let other_qid = wait_for_qid_from(&interviewer, "OtherNode").await;
@@ -877,7 +883,9 @@ mod tests {
 
     #[test]
     fn find_gallery_gate_ignores_non_gallery_graph() {
-        let graph = resolve_graph("digraph { Start [shape=Mdiamond]; A [shape=box]; End [shape=Msquare]; Start -> A -> End; }");
+        let graph = resolve_graph(
+            "digraph { Start [shape=Mdiamond]; A [shape=box]; End [shape=Msquare]; Start -> A -> End; }",
+        );
         assert!(find_gallery_gate(&graph).is_none());
     }
 

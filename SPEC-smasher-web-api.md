@@ -108,14 +108,15 @@ impl ApiError {
 ## Success Criteria
 
 - [x] JSON/SSE endpoints cover: submit pipeline, live event stream, list/status, human-gate answer.
-- [x] Static file route serves `smasher-spa`'s build output with SPA-style fallback routing. (Mounted at `/spa`, not yet at `/` — moving it to `/` is Task 9, blocked below.)
+- [x] Static file route serves `smasher-spa`'s build output with SPA-style fallback routing. (Mounted at `/` since the Task 9 cutover.)
 - [x] `smasher serve` behavior is otherwise unchanged from the user's perspective (same command, same port).
 - [x] askama templates and HTMX JS removed.
 - [x] All new/changed code has unit + integration coverage; `cargo test -p smasher-web` and `cargo clippy -p smasher-web` clean.
 
-## Open Questions
+## Resolved Questions (2026-09-24)
 
-- Exact route prefix (`/api/*` vs unprefixed) and SSE path naming.
-- Static assets: read from disk (`frontend/dist`) for dev simplicity vs.
-  embedded into the binary (`rust-embed`) for distribution — recommend
-  disk-based now, revisit at `smasher-desktop` ship time.
+- Route prefix: `/api/*` for JSON routes, SSE at `GET /api/runs/{id}/events`
+  (see `docs/api-reference.md`).
+- Static assets: read from disk (`frontend/dist`, overridable with
+  `SMASHER_SPA_DIST`). Revisited at `smasher-desktop` ship time and kept: the
+  desktop ships a machine-local `.app`, so embedding isn't needed yet.

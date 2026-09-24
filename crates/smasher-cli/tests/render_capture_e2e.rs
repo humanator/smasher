@@ -33,11 +33,10 @@ async fn render_capture_pipeline_makes_zero_llm_calls() {
     // binary), same as smasher-render-capture's own tests. Running more than one
     // real Chrome instance at once across concurrently-run test binaries is flaky
     // (resource contention), so share that crate's lock.
-    let _guard = tokio::task::spawn_blocking(
-        smasher_render_capture::testing::acquire_browser_test_lock,
-    )
-    .await
-    .unwrap();
+    let _guard =
+        tokio::task::spawn_blocking(smasher_render_capture::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
 
     // No mocks are registered: any request that reaches this server is a real LLM
     // call that should never have happened, and shows up in received_requests().

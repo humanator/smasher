@@ -69,10 +69,10 @@ async fn save_dot_file(contents: String) -> Result<(), String> {
 
 ## Success Criteria
 
-- [ ] `cargo tauri dev` opens a working window showing the live `smasher-spa` dashboard, backed by the local server, with frontend hot-reload.
-- [ ] `cargo tauri build` produces a native bundle for the target OS.
-- [ ] Native-only features (save/load DOT file dialog, OS notification on pipeline completion) work end-to-end.
-- [ ] Embedded server verified bound to `127.0.0.1` only, never externally reachable.
+- [x] `cargo tauri dev` opens a working window showing the live `smasher-spa` dashboard, backed by the local server, with frontend hot-reload.
+- [x] `cargo tauri build` produces a native bundle for the target OS.
+- [x] Native-only features (save/load DOT file dialog, OS notification on pipeline completion) work end-to-end.
+- [x] Embedded server verified bound to `127.0.0.1` only, never externally reachable.
 
 ## Resolved Questions (2026-09-24)
 

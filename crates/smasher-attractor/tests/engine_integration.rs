@@ -2,8 +2,8 @@
 // ABOUTME: Exercises multi-node traversal, checkpointing, handlers, retries, and error cases.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use serde_json::json;

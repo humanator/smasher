@@ -71,10 +71,10 @@ pub fn gallery_decisions(events: &[PipelineEvent], graph: &Graph) -> Vec<Gallery
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use smasher_attractor::dot::parser;
     use smasher_attractor::graph;
     use smasher_attractor::state::Outcome;
-    use serde_json::json;
 
     const GALLERY_DOT: &str = r#"digraph {
         Start [shape=Mdiamond];

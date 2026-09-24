@@ -392,6 +392,8 @@ The default server binds to `127.0.0.1:21541`.
 | `POST` | `/api/runs/{id}/questions/{qid}/answer` | Answer a human-gate question (JSON). |
 | `POST` | `/api/graph/nodes` | Parse DOT source and return node list. |
 | `GET` | `/api/workflows` | List all discovered workflow files from configured directories. |
+| `GET` | `/api/workflows/{id}/dot` | Return a workflow's raw on-disk DOT source (used by the editor's "Export .dot"). |
+| `POST` | `/api/workflows/import` | Save raw DOT as a new workflow under `{data_dir}/workflows` (used by the catalog's "Import .dot"). |
 | `POST` | `/editor/workflows` | Save a new workflow (used by node-editor). |
 | `PUT` | `/editor/workflows/{id}/graph` | Update an existing workflow's graph (used by node-editor). |
 | `POST` | `/api/runs/{id}/gallery/{qid}/decision` | Submit a gallery-gate decision (used by gallery-gate component). |
@@ -696,6 +698,44 @@ Request body (all fields optional):
 Response body: same shape as `POST /api/runs` (`run_id`, `status`, `run_working_dir`).
 
 404 if `id` doesn't match a discovered workflow.
+
+### GET /api/workflows/{id}/dot -- Export Workflow DOT
+
+Returns the workflow's `.dot` file exactly as it is on disk, byte for byte, so
+comments and formatting survive (the editor's own graph API re-renders from
+`EditorGraph` JSON and would lose them).
+
+Response (200 OK): the raw DOT text, `Content-Type: text/vnd.graphviz; charset=utf-8`.
+
+404 if `id` doesn't match a discovered workflow, including ids that try to
+escape the configured workflow directories.
+
+### POST /api/workflows/import -- Import Workflow DOT
+
+Saves raw DOT text as a new workflow file at `{data_dir}/workflows/{name}.dot`,
+byte for byte, after checking that it parses and resolves.
+
+Request body:
+
+```json
+{
+  "name": "my_workflow",
+  "dot": "digraph my_workflow { ... }"
+}
+```
+
+Response body (200 OK):
+
+```json
+{
+  "id": "workflows__my_workflow"
+}
+```
+
+| Status | When |
+|---|---|
+| 400 | `name` is blank or not a valid id, or `dot` fails to parse or resolve (`invalid DOT: ...`). |
+| 409 | A workflow file with that name already exists. Import never overwrites. |
 
 ### POST /editor/workflows -- Create Workflow
 

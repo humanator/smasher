@@ -1,9 +1,9 @@
 // ABOUTME: Pure directory scanner for `.dot`/`.gv` workflow files under configured roots.
 // ABOUTME: No axum/askama types -- unit-tests cheaply via tempfile fixtures, no HTTP round-trips.
 
+use serde::Serialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use serde::Serialize;
 
 /// A single discovered workflow file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -232,10 +232,7 @@ mod tests {
         write_file(&root_a, "hello.dot", "digraph { a -> b }");
         write_file(&root_b, "hello.dot", "digraph { a -> b }");
 
-        let dirs = vec![
-            root_a.display().to_string(),
-            root_b.display().to_string(),
-        ];
+        let dirs = vec![root_a.display().to_string(), root_b.display().to_string()];
         let results = scan_workflows(&dirs);
 
         // Documented known limitation: both files are found (not dropped),

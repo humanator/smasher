@@ -46,7 +46,8 @@ pub async fn capture_screenshot(url: &str, viewport: Viewport) -> Result<Vec<u8>
     // chromiumoxide defaults to a single fixed, shared profile directory reused by
     // every launch. Leftover state from a prior run (crash flags, session restore)
     // then leaks into this one, so give each capture its own fresh profile.
-    let user_data_dir = tempfile::tempdir().map_err(|e| CaptureError::BrowserLaunch(e.to_string()))?;
+    let user_data_dir =
+        tempfile::tempdir().map_err(|e| CaptureError::BrowserLaunch(e.to_string()))?;
 
     let config = BrowserConfig::builder()
         .window_size(viewport.width, viewport.height)

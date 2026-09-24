@@ -175,10 +175,8 @@ pub fn merge_contexts(
             for branch in branches {
                 for (k, v) in branch {
                     match merged.get(k) {
-                        Some(existing) if existing != v => {
-                            if !conflicting_keys.contains(k) {
-                                conflicting_keys.push(k.clone());
-                            }
+                        Some(existing) if existing != v && !conflicting_keys.contains(k) => {
+                            conflicting_keys.push(k.clone());
                         }
                         None => {
                             merged.insert(k.clone(), v.clone());
@@ -215,7 +213,8 @@ pub enum ParallelError {
 }
 
 /// A single branch's boxed, pinned dispatch future, paired with its node ID.
-type BranchFuture<'a> = Pin<Box<dyn Future<Output = (String, Result<Outcome, HandlerError>)> + Send + 'a>>;
+type BranchFuture<'a> =
+    Pin<Box<dyn Future<Output = (String, Result<Outcome, HandlerError>)> + Send + 'a>>;
 
 /// Execute a set of graph nodes concurrently via the handler registry.
 ///
@@ -1544,7 +1543,10 @@ mod tests {
         );
 
         let resolved = resolve_parallel_branches(&graph, "par").expect("should resolve");
-        assert_eq!(resolved.branch_node_ids, vec!["a".to_string(), "b".to_string()]);
+        assert_eq!(
+            resolved.branch_node_ids,
+            vec!["a".to_string(), "b".to_string()]
+        );
         assert_eq!(resolved.fan_in_id, "fanin");
     }
 
@@ -1567,7 +1569,10 @@ mod tests {
         );
 
         let resolved = resolve_parallel_branches(&graph, "par").expect("should resolve");
-        assert_eq!(resolved.branch_node_ids, vec!["z".to_string(), "a".to_string()]);
+        assert_eq!(
+            resolved.branch_node_ids,
+            vec!["z".to_string(), "a".to_string()]
+        );
     }
 
     #[test]

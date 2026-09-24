@@ -43,3 +43,16 @@ if (!window.matchMedia) {
     dispatchEvent: () => false,
   }) as MediaQueryList;
 }
+
+// jsdom's Blob predates Blob.prototype.text(), which every target webview
+// (WKWebView, Chromium) implements. Read through FileReader, which jsdom has.
+if (!Blob.prototype.text) {
+  Blob.prototype.text = function (this: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(this);
+    });
+  };
+}

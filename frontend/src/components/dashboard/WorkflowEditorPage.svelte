@@ -1,11 +1,13 @@
 <script lang="ts">
   // ABOUTME: Edit existing workflow page - fetches graph and mounts canvas in edit mode
-  // ABOUTME: Wires onSave to updateWorkflowGraph for existing workflows
+  // ABOUTME: Wires onSave to updateWorkflowGraph, and Export .dot to the native save shim
 
   import { onMount } from 'svelte';
   import * as workflowsApi from '../../lib/api/workflows';
   import type { EditorGraph } from '../../lib/api/workflows';
   import WorkflowCanvas from '../node-editor/WorkflowCanvas.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
+  import { saveFile } from '../../lib/native';
 
   let { workflowId }: { workflowId: string } = $props();
 
@@ -31,6 +33,15 @@
       error = err instanceof Error ? err.message : 'Failed to save workflow';
     }
   }
+
+  async function handleExport() {
+    try {
+      const dot = await workflowsApi.getWorkflowDot(workflowId);
+      await saveFile(`${workflowId}.dot`, new Blob([dot], { type: 'text/vnd.graphviz' }));
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to export workflow';
+    }
+  }
 </script>
 
 <div class="workflow-editor-page flex flex-col gap-8 p-8">
@@ -44,6 +55,11 @@
       {error}
     </p>
   {:else if graph}
+    <div class="flex justify-end">
+      <Button variant="secondary" onclick={handleExport} data-testid="export-dot-button">
+        Export .dot
+      </Button>
+    </div>
     <WorkflowCanvas
       {graph}
       {workflowId}

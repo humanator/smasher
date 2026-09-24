@@ -96,12 +96,20 @@ frontend/
 
 ## Success Criteria
 
-- [ ] Feature parity with the current HTMX dashboard: submit pipeline, live events, human-gate Q&A.
-- [ ] Visual DOT graph editor that creates/edits pipelines matching `smasher-attractor`'s node-shape spec, round-tripping through the API (not a reimplemented client-side parser).
-- [ ] Runs correctly when served by `smasher-web-api` in a plain desktop browser, with zero Tauri-only code paths breaking.
-- [ ] Vitest and Playwright suites pass; Playwright runs against a real local `smasher-web-api` instance.
+- [x] Feature parity with the current HTMX dashboard: submit pipeline, live events, human-gate Q&A.
+- [x] Visual DOT graph editor that creates/edits pipelines matching `smasher-attractor`'s node-shape spec, round-tripping through the API (not a reimplemented client-side parser).
+- [x] Runs correctly when served by `smasher-web-api` in a plain desktop browser, with zero Tauri-only code paths breaking.
+- [x] Vitest and Playwright suites pass; Playwright runs against a real local `smasher-web-api` instance.
 
-## Open Questions
+## Resolved Questions (2026-09-24)
 
-- How much of the existing node editor ports as-is vs. needs new features for pipeline-specific node types (interviewer/manager/parallel/etc.)?
-- Confirm: all graph edits round-trip through the API for validation rather than being trusted client-side — recommended, since `smasher-attractor` owns the DOT grammar.
+- Node editor: ported, plus per-type property forms for pipeline node types
+  (codergen, interviewer, manager, tool, sub-pipeline, and a structural form
+  for the rest) under `frontend/src/components/node-editor/nodeForms/`.
+- Graph edits round-trip through the API: the editor sends `EditorGraph`
+  JSON, and `smasher-web` parses, resolves, and renders it server-side
+  before writing (`validate_and_render`). The client never trusts its own DOT.
+
+Success Criteria verified 2026-09-24: Vitest 218/218 with no stderr, and
+Playwright 4/4 (`critical-path`, `node-editor`, `no-tauri-breakage`,
+`gallery-gate`) against a real local `smasher-web`.

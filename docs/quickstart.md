@@ -412,6 +412,56 @@ Without `-v`, only `warn`-level messages are shown on stderr.
 | 5    | Parse, resolution, or stylesheet error     |
 | 6    | I/O error (file not found, etc.)           |
 
+## Desktop App (macOS)
+
+`smasher-desktop` wraps the web dashboard in a native Tauri window. On launch it
+starts the `smasher-web` server in-process, waits until the port is bound, and
+then opens the window on the `smasher-spa` dashboard. It adds native file
+dialogs for exporting and importing `.dot` files, and an OS notification when a
+pipeline completes or aborts.
+
+**Prerequisites:** the Rust toolchain above, Node.js with npm, Xcode Command
+Line Tools, and the Tauri CLI:
+
+```bash
+cargo install tauri-cli --version "^2"
+(cd frontend && npm install)
+```
+
+**Development** (the window loads Vite on `127.0.0.1:5173`, so frontend edits
+hot-reload; the embedded server uses the fixed port 21541 that Vite proxies to):
+
+```bash
+make desktop-dev          # = cd crates/smasher-desktop && cargo tauri dev
+```
+
+**Build a `.app`:**
+
+```bash
+make desktop-build        # = cd crates/smasher-desktop && cargo tauri build
+open target/release/bundle/macos/Smasher.app
+```
+
+The bundle is machine-local: it serves the SPA build, examples, and design
+kit from this checkout, so keep the repo where it was built.
+
+**API keys:** an app launched from Finder or the Dock has no shell environment
+and a working directory of `/`, so it can't see your shell exports or the
+repo's `.env`. Put your keys in `~/.smasher/.env` (or `$SMASHER_DATA_DIR/.env`):
+
+```bash
+# ~/.smasher/.env
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Without a key, the app shows a "Smasher couldn't start" dialog and exits. It
+also shows that dialog if the server can't bind its port.
+
+**Loopback only:** the embedded server always binds `127.0.0.1`. It ignores
+`SMASHER_WEB_HOST` and `SMASHER_WEB_PORT`. Release builds take an OS-assigned
+port, debug builds use 21541. The API has no auth, so it is never reachable
+from another machine.
+
 ## Next Steps
 
 - [DOT Format Reference](dot-reference.md) -- node shapes, attributes, edge conditions, stylesheets

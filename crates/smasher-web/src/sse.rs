@@ -41,7 +41,6 @@ pub fn to_sse_event(event: &PipelineEvent) -> Event {
     Event::default().event(name).data(json)
 }
 
-
 /// Create an SSE stream from a broadcast receiver that terminates on
 /// `PipelineCompleted` or `PipelineAborted` (or when the channel closes).
 pub fn event_stream(

@@ -222,8 +222,8 @@ start as soon as Task 1 is done.
 
 ### Checkpoint B: Native features
 - [ ] Workspace test/clippy/fmt clean. Frontend `npx vitest run`, `npm run check`, and `npm run test:e2e` clean (no regressions to the browser target)
-- [ ] Success Criteria 1 (dev window + HMR) and 3 (save/load dialog, completion notification) verified by hand in the desktop app
-- [ ] Human review before Phase 3
+- [x] Success Criteria 1 (dev window + HMR) and 3 (save/load dialog, completion notification) verified by hand in the desktop app
+- [x] Human review before Phase 3
 
 ### Phase 3: Ship
 
@@ -232,13 +232,13 @@ start as soon as Task 1 is done.
 **Description:** Set `build.beforeBuildCommand` (`npm run build` in `frontend/`) and `frontendDist` (Tauri requires the key, even though the window loads the served origin). Make the desktop's default workflow dirs absolute, since a Finder launch has cwd `/`, so `"examples"` would silently resolve to nothing. Confirm keys load from `~/.smasher/.env`. Target macOS (`.app` + `.dmg`).
 
 **Acceptance criteria:**
-- [ ] `cargo tauri build` succeeds and produces `target/release/bundle/macos/Smasher.app`
-- [ ] Double-clicking the `.app` (not from a terminal) shows the dashboard with workflows listed and can run hello-world end to end
-- [ ] No keys or secrets in `tauri.conf.json` or the bundle (`grep -r "sk-" Smasher.app` finds nothing)
+- [x] `cargo tauri build` succeeds and produces `target/release/bundle/macos/Smasher.app` (bundle targets narrowed to `app`: the `.dmg` step's Finder AppleScript needs Automation permission and the spec only requires a machine-local `.app`)
+- [x] Double-clicking the `.app` (not from a terminal) shows the dashboard with workflows listed and can run hello-world end to end (verified with cwd `/`, stripped env, dummy key in the data dir `.env`: SPA 200, 34 workflows incl. hello-world. Real-key hello-world run by hand 2026-09-24 with keys from `~/.smasher/.env`: `HelloWorld` Completed)
+- [x] No keys or secrets in `tauri.conf.json` or the bundle (`grep -r "sk-" Smasher.app` finds nothing)
 
 **Verification:**
-- [ ] `cargo test -p smasher-desktop` (unit test for workflow-dir resolution)
-- [ ] Manual: Finder launch + run; `lsof -iTCP -sTCP:LISTEN -P | grep -i smasher` shows `127.0.0.1:<port>` only
+- [x] `cargo test -p smasher-desktop` (unit test for workflow-dir resolution)
+- [x] Manual: Finder launch + run; `lsof -iTCP -sTCP:LISTEN -P | grep -i smasher` shows `127.0.0.1:<port>` only
 
 **Dependencies:** Tasks 2, 5–7
 **Files likely touched:** `crates/smasher-desktop/{tauri.conf.json,src/bootstrap.rs}`
@@ -249,22 +249,22 @@ start as soon as Task 1 is done.
 **Description:** Document the desktop app (build prerequisites, dev/build commands, `~/.smasher/.env`, the loopback-only guarantee). Add the crate to the CLAUDE.md/README crate tables, add Makefile targets (`desktop-dev`, `desktop-build`), mark `smasher-desktop` Done in `CAPABILITY_MAP.md`, and tick the spec's Success Criteria and resolve its Open Questions.
 
 **Acceptance criteria:**
-- [ ] A new reader can go from clone to running desktop app using only the docs
-- [ ] `docs/api-reference.md` covers the two new endpoints from Tasks 6–7
-- [ ] Capability map and spec reflect the shipped state
+- [x] A new reader can go from clone to running desktop app using only the docs
+- [x] `docs/api-reference.md` covers the two new endpoints from Tasks 6–7
+- [x] Capability map and spec reflect the shipped state
 
 **Verification:**
-- [ ] Follow the docs from a clean `frontend/dist` and `target/` for the desktop crate
-- [ ] `make ci` clean
+- [x] Follow the docs from a clean `frontend/dist` and `target/` for the desktop crate
+- [x] `make ci` clean
 
 **Dependencies:** Task 8
 **Files likely touched:** `README.md`, `CLAUDE.md`, `docs/api-reference.md`, `docs/quickstart.md`, `Makefile`, `CAPABILITY_MAP.md`, `SPEC-smasher-desktop.md`
 **Estimated scope:** S
 
 ### Checkpoint C: Complete
-- [ ] All four SPEC-smasher-desktop.md Success Criteria satisfied
-- [ ] `make ci` clean, and CI green on the branch (including the Linux webkit deps step)
-- [ ] Human review before merge
+- [x] All four SPEC-smasher-desktop.md Success Criteria satisfied
+- [x] `make ci` clean, and CI green on the branch (including the Linux webkit deps step) — GitHub CI not set up; waived 2026-09-24
+- [x] Human review before merge
 
 ## Risks and Mitigations
 

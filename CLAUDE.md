@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Rust implementation of [strongdm/attractor](https://github.com/strongdm/attractor) — layered AI
 workflow orchestration. Write a pipeline as a DOT directed graph, point it at an LLM, and run it.
 
-Cargo workspace, 9 crates under `crates/`. The first five form the core stack, bottom to top; the
+Cargo workspace, 10 crates under `crates/`. The first six form the core stack, bottom to top; the
 last four are a "design-factory" evaluation toolchain that judges generated UI candidates.
 
 | Crate | What it does |
@@ -19,13 +19,14 @@ last four are a "design-factory" evaluation toolchain that judges generated UI c
 | `smasher-attractor` | The graph engine. Parses DOT, resolves node types from shapes, dispatches handlers, runs the pipeline. |
 | `smasher-cli` | `smasher` binary: `complete`, `chat`, `run`, `resume`, `render`, `serve`, `ingest`, `archive`, `lint`, `prune-artifacts`. |
 | `smasher-web` | JSON+SSE API (axum, port 21541): submit pipelines, live event stream, human-gate Q&A, candidate tracking. Serves the `smasher-spa` static build at `/`. |
+| `smasher-desktop` | macOS Tauri 2 app: boots `smasher-web` in-process on `127.0.0.1` only, then opens a webview on it. Native dialogs + notifications via Tauri plugins. `make desktop-dev` / `make desktop-build`. |
 | `smasher-conformance` | Adapter CLI bridging smasher crates to the AttractorBench test contract. 15 subcommands across 3 tiers (LLM SDK, Agent Loop, Attractor Pipeline). |
 | `smasher-system-lint` | Deterministic design-system conformance checks for design-factory candidates. |
 | `smasher-render-capture` | Headless-Chromium screenshot capture (via CDP) of a candidate served locally. |
 | `smasher-task-critic-synthesis` | Vision-model usability critique (`task_critic`) and recommendation synthesis (`synthesis`) — one real LLM call each, no agent loop. |
 
 Each layer depends only on the ones below it. The core stack (`llm` → `agent` → `attractor` →
-`cli`/`web`) is standalone; the evaluation crates (`system-lint`, `render-capture`,
+`cli`/`web` → `desktop`) is standalone; the evaluation crates (`system-lint`, `render-capture`,
 `task-critic-synthesis`, `conformance`) are consumed as pipeline tools/handlers, not dependencies
 of the core layers.
 

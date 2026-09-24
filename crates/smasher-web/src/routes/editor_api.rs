@@ -1,9 +1,11 @@
 // ABOUTME: JSON graph API for the visual workflow editor: read/write a workflow's Graph as JSON.
-// ABOUTME: Provides GET/PUT /api/workflows/{id}/graph and POST /api/workflows/new.
+// ABOUTME: Provides GET/PUT /api/workflows/{id}/graph, GET .../dot, POST /api/workflows/new and /import.
 
 use std::collections::HashMap;
 
 use axum::extract::{Path, State};
+use axum::http::header;
+use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
@@ -18,7 +20,9 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/workflows/{id}/graph", get(get_graph).put(put_graph))
+        .route("/api/workflows/{id}/dot", get(get_dot))
         .route("/api/workflows/new", post(create_graph))
+        .route("/api/workflows/import", post(import_dot))
 }
 
 // ---------------------------------------------------------------------------
@@ -102,9 +106,8 @@ fn node_type_from_str(s: &str) -> Option<NodeType> {
 fn attr_value_to_json(v: &NodeAttrValue) -> serde_json::Value {
     match v {
         NodeAttrValue::String(s) => serde_json::Value::String(s.clone()),
-        NodeAttrValue::Number(n) => {
-            serde_json::Number::from_f64(*n).map_or(serde_json::Value::Null, serde_json::Value::Number)
-        }
+        NodeAttrValue::Number(n) => serde_json::Number::from_f64(*n)
+            .map_or(serde_json::Value::Null, serde_json::Value::Number),
         NodeAttrValue::Bool(b) => serde_json::Value::Bool(*b),
         // No real fixture stores a Duration in a node/edge's generic attrs
         // today (typed handler fields read String/Number/Bool only), but
@@ -260,6 +263,21 @@ async fn get_graph(
     Ok(Json(EditorGraph::from(&resolved)))
 }
 
+/// The workflow's DOT source exactly as it sits on disk (comments and
+/// formatting included), for "Export .dot".
+async fn get_dot(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, WebError> {
+    let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
+        .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let dot_source = std::fs::read_to_string(&workflow.path)?;
+    Ok((
+        [(header::CONTENT_TYPE, "text/vnd.graphviz; charset=utf-8")],
+        dot_source,
+    ))
+}
+
 async fn put_graph(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -286,15 +304,10 @@ struct CreateGraphResponse {
     id: String,
 }
 
-/// Writes a newly-created graph to `{target_dir}/{name}.dot`. Mirrors
-/// `routes::pages::create_workflow`'s validation exactly (blank-name
-/// rejection, `candidates::valid_id` traversal check, `target_dir` must be
-/// one of the operator-configured `state.workflow_dirs`).
-async fn create_graph(
-    State(state): State<AppState>,
-    Json(req): Json<CreateGraphRequest>,
-) -> Result<Json<CreateGraphResponse>, WebError> {
-    let name = req.name.trim();
+/// Trimmed workflow name, rejecting blanks and anything that could escape
+/// the target directory (`candidates::valid_id`).
+fn validate_workflow_name(name: &str) -> Result<&str, WebError> {
+    let name = name.trim();
     if name.is_empty() {
         return Err(WebError::BadRequest(
             "workflow name must not be blank".into(),
@@ -305,6 +318,18 @@ async fn create_graph(
             "invalid workflow name: {name}"
         )));
     }
+    Ok(name)
+}
+
+/// Writes a newly-created graph to `{target_dir}/{name}.dot`. Mirrors
+/// `routes::pages::create_workflow`'s validation exactly (blank-name
+/// rejection, `candidates::valid_id` traversal check, `target_dir` must be
+/// one of the operator-configured `state.workflow_dirs`).
+async fn create_graph(
+    State(state): State<AppState>,
+    Json(req): Json<CreateGraphRequest>,
+) -> Result<Json<CreateGraphResponse>, WebError> {
+    let name = validate_workflow_name(&req.name)?;
     if !state.workflow_dirs.contains(&req.target_dir) {
         return Err(WebError::BadRequest(format!(
             "unknown target directory: {}",
@@ -321,6 +346,46 @@ async fn create_graph(
 
     let root_name = crate::workflows::root_name_for(&req.target_dir);
     let id = crate::workflows::slug_for(&root_name, std::path::Path::new(&format!("{name}.dot")));
+
+    Ok(Json(CreateGraphResponse { id }))
+}
+
+#[derive(Debug, Deserialize)]
+struct ImportDotRequest {
+    name: String,
+    dot: String,
+}
+
+/// Writes raw DOT (from "Import .dot") to `{data_dir}/workflows/{name}.dot`,
+/// byte for byte, after checking it parses and resolves. Never overwrites:
+/// an existing file of that name is a 409.
+async fn import_dot(
+    State(state): State<AppState>,
+    Json(req): Json<ImportDotRequest>,
+) -> Result<Json<CreateGraphResponse>, WebError> {
+    let name = validate_workflow_name(&req.name)?;
+    let ast =
+        parser::parse(&req.dot).map_err(|e| WebError::BadRequest(format!("invalid DOT: {e}")))?;
+    graph::resolve(&ast).map_err(|e| WebError::BadRequest(format!("invalid DOT: {e}")))?;
+
+    let workflows_dir = format!("{}/workflows", state.data_dir);
+    std::fs::create_dir_all(&workflows_dir)?;
+    let file_name = format!("{name}.dot");
+    let file_path = std::path::Path::new(&workflows_dir).join(&file_name);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&file_path)
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::AlreadyExists => {
+                WebError::Conflict(format!("workflow {name} already exists"))
+            }
+            _ => WebError::Io(e),
+        })?;
+    std::io::Write::write_all(&mut file, req.dot.as_bytes())?;
+
+    let root_name = crate::workflows::root_name_for(&workflows_dir);
+    let id = crate::workflows::slug_for(&root_name, std::path::Path::new(&file_name));
 
     Ok(Json(CreateGraphResponse { id }))
 }
@@ -422,6 +487,72 @@ digraph {
             .body(Body::empty())
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    async fn body_text(resp: axum::response::Response) -> String {
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn get_dot_returns_the_exact_on_disk_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Comments and odd spacing survive only if we return the file's
+        // bytes rather than re-rendering the parsed graph.
+        let source = format!("// hand-written comment\n{FIXTURE_DOT}\n\n");
+        write_fixture(tmp.path(), "hello.dot", &source);
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let id = crate::workflows::scan_workflows(&[tmp.path().display().to_string()])
+            .into_iter()
+            .next()
+            .unwrap()
+            .id;
+
+        let req = Request::builder()
+            .uri(format!("/api/workflows/{id}/dot"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()[axum::http::header::CONTENT_TYPE],
+            "text/vnd.graphviz; charset=utf-8"
+        );
+        assert_eq!(body_text(resp).await, source);
+    }
+
+    #[tokio::test]
+    async fn get_dot_unknown_id_returns_404() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+
+        let req = Request::builder()
+            .uri("/api/workflows/no-such-id/dot")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn get_dot_rejects_a_traversal_id_to_a_file_outside_workflow_dirs() {
+        let root = tempfile::tempdir().unwrap();
+        let workflows = root.path().join("workflows");
+        std::fs::create_dir(&workflows).unwrap();
+        write_fixture(root.path(), "secret.dot", FIXTURE_DOT);
+        let app = router().with_state(state_with_workflow_dir(&workflows));
+
+        let req = Request::builder()
+            .uri("/api/workflows/..%2Fsecret/dot")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 
@@ -617,10 +748,8 @@ digraph {
 
         let created: CreateGraphResponse = body_json_response(resp).await;
         assert!(tmp.path().join("brand-new.dot").exists());
-        let resolved = crate::workflows::resolve_workflow(
-            &[tmp.path().display().to_string()],
-            &created.id,
-        );
+        let resolved =
+            crate::workflows::resolve_workflow(&[tmp.path().display().to_string()], &created.id);
         assert!(resolved.is_some());
     }
 
@@ -650,6 +779,106 @@ digraph {
             .unwrap();
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// State whose data dir is `data_dir`, scanning only the always-on
+    /// `{data_dir}/workflows` root -- the same dirs a real server derives.
+    fn state_with_data_dir(data_dir: &std::path::Path) -> AppState {
+        let data_dir = data_dir.display().to_string();
+        let workflow_dirs = crate::server::effective_workflow_dirs(&data_dir, &[]);
+        AppState::new(
+            smasher_llm::client::Client::from_env(),
+            "test-model".into(),
+            None,
+            data_dir,
+            workflow_dirs,
+        )
+    }
+
+    fn import_request(name: &str, dot: &str) -> Request<Body> {
+        Request::builder()
+            .method("POST")
+            .uri("/api/workflows/import")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::json!({ "name": name, "dot": dot }).to_string(),
+            ))
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn import_writes_the_dot_into_the_data_dir_and_returns_a_resolvable_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = state_with_data_dir(tmp.path());
+        let app = router().with_state(state.clone());
+
+        let resp = app
+            .oneshot(import_request("imported", FIXTURE_DOT))
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let created: CreateGraphResponse = body_json(resp).await;
+        let written = tmp.path().join("workflows/imported.dot");
+        assert_eq!(std::fs::read_to_string(&written).unwrap(), FIXTURE_DOT);
+        let resolved = crate::workflows::resolve_workflow(&state.workflow_dirs, &created.id)
+            .expect("imported workflow should be listed");
+        assert_eq!(resolved.path, written.display().to_string());
+    }
+
+    #[tokio::test]
+    async fn import_rejects_invalid_dot_with_400_and_the_parse_message_and_writes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = router().with_state(state_with_data_dir(tmp.path()));
+
+        let resp = app
+            .oneshot(import_request("broken", "digraph { a -> "))
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body: serde_json::Value = body_json(resp).await;
+        assert!(
+            body["error"].as_str().unwrap().contains("invalid DOT"),
+            "got {body}"
+        );
+        assert!(!tmp.path().join("workflows/broken.dot").exists());
+    }
+
+    #[tokio::test]
+    async fn import_onto_an_existing_workflow_name_is_409_and_leaves_it_untouched() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir(tmp.path().join("workflows")).unwrap();
+        let existing = tmp.path().join("workflows/taken.dot");
+        std::fs::write(&existing, "digraph { original }").unwrap();
+        let app = router().with_state(state_with_data_dir(tmp.path()));
+
+        let resp = app
+            .oneshot(import_request("taken", FIXTURE_DOT))
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            std::fs::read_to_string(&existing).unwrap(),
+            "digraph { original }"
+        );
+    }
+
+    #[tokio::test]
+    async fn import_rejects_blank_and_traversal_names() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = state_with_data_dir(tmp.path());
+
+        for name in ["", "   ", "../escaped", "nested/name"] {
+            let resp = router()
+                .with_state(state.clone())
+                .oneshot(import_request(name, FIXTURE_DOT))
+                .await
+                .unwrap();
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "name {name:?}");
+        }
+        assert!(!tmp.path().join("escaped.dot").exists());
     }
 
     #[test]

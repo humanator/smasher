@@ -26,7 +26,11 @@ impl SystemLintToolBackend {
     /// `working_dir` is the run's own working directory — a relative `candidate_dir`
     /// resolves against this, not the `smasher` process's own CWD. See
     /// `smasher_render_capture::backend::HybridToolBackend::new`.
-    pub fn new(fallback: Arc<dyn ToolBackend>, artifacts_base: PathBuf, working_dir: PathBuf) -> Self {
+    pub fn new(
+        fallback: Arc<dyn ToolBackend>,
+        artifacts_base: PathBuf,
+        working_dir: PathBuf,
+    ) -> Self {
         Self {
             fallback,
             artifacts_base,

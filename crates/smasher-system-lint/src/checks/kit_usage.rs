@@ -47,10 +47,7 @@ pub fn check_kit_usage(html: &str) -> Vec<String> {
 
     for tag_match in tag_re.find_iter(html) {
         let tag = tag_match.as_str();
-        let Some(tag_name) = tag_name_re
-            .captures(tag)
-            .map(|c| c[1].to_lowercase())
-        else {
+        let Some(tag_name) = tag_name_re.captures(tag).map(|c| c[1].to_lowercase()) else {
             continue;
         };
 
@@ -159,9 +156,8 @@ mod tests {
 
     #[test]
     fn role_button_with_list_row_action_class_passes() {
-        let violations = check_kit_usage(
-            r#"<li role="button" tabindex="0" class="list-row-action">Row</li>"#,
-        );
+        let violations =
+            check_kit_usage(r#"<li role="button" tabindex="0" class="list-row-action">Row</li>"#);
         assert!(violations.is_empty());
     }
 
@@ -228,7 +224,8 @@ mod tests {
 
     #[test]
     fn relative_design_kit_script_src_fails() {
-        let violations = check_kit_usage(r#"<script src="../../design-kit/components.js"></script>"#);
+        let violations =
+            check_kit_usage(r#"<script src="../../design-kit/components.js"></script>"#);
         assert_eq!(violations.len(), 1);
         assert!(violations[0].contains("absolute path"));
     }

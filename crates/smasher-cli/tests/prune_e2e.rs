@@ -19,7 +19,11 @@ fn create_backdated_run(artifacts_base: &Path, run_id: &str, age_days: i64) {
         serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
     value["created_at"] =
         serde_json::Value::String((Utc::now() - chrono::Duration::days(age_days)).to_rfc3339());
-    std::fs::write(&manifest_path, serde_json::to_string_pretty(&value).unwrap()).unwrap();
+    std::fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&value).unwrap(),
+    )
+    .unwrap();
 }
 
 /// Builds a fresh fixture `{data_dir}/artifacts/` with one old run (10 days) and one

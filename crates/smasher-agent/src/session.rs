@@ -2489,7 +2489,7 @@ mod tests {
         let has_loop_warning = messages.iter().any(|m| {
             m.is_user()
                 && m.text()
-                    .map_or(false, |t| t.contains("loop") || t.contains("repeating"))
+                    .is_some_and(|t| t.contains("loop") || t.contains("repeating"))
         });
         assert!(
             has_loop_warning,

@@ -1,4 +1,4 @@
-.PHONY: all check build test clippy lint fmt clean doc test-cli watch run-complete run-chat scenarios stats test-verbose test-single coverage bench pre-commit install uninstall
+.PHONY: all check build test clippy lint fmt clean doc test-cli watch run-complete run-chat scenarios stats test-verbose test-single coverage bench pre-commit install uninstall desktop-dev desktop-build
 
 all: fmt-check lint check test
 
@@ -79,6 +79,13 @@ run-complete:
 
 run-chat:
 	cargo run -p smasher-cli -- chat
+
+# ── Desktop (needs: cargo install tauri-cli --version "^2") ─────────
+desktop-dev:
+	cd crates/smasher-desktop && cargo tauri dev
+
+desktop-build:
+	cd crates/smasher-desktop && cargo tauri build
 
 # ── Scenarios ────────────────────────────────────────────────────────
 scenarios: release

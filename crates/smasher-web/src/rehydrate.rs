@@ -169,7 +169,8 @@ mod tests {
     #[tokio::test]
     async fn missing_artifacts_dir_rehydrates_to_empty_map() {
         let tmp = tempfile::tempdir().unwrap();
-        let rehydrated = rehydrate_runs(&tmp.path().join("no-such-dir").display().to_string()).await;
+        let rehydrated =
+            rehydrate_runs(&tmp.path().join("no-such-dir").display().to_string()).await;
         assert!(rehydrated.is_empty());
     }
 
@@ -212,8 +213,18 @@ mod tests {
         let rehydrated = rehydrate_runs(&tmp.path().display().to_string()).await;
         let record = rehydrated.get("run-1").expect("run-1 should rehydrate");
         assert_eq!(record.status, RunStatus::Aborted);
-        assert_eq!(record.input_tokens.load(std::sync::atomic::Ordering::Relaxed), 10);
-        assert_eq!(record.output_tokens.load(std::sync::atomic::Ordering::Relaxed), 20);
+        assert_eq!(
+            record
+                .input_tokens
+                .load(std::sync::atomic::Ordering::Relaxed),
+            10
+        );
+        assert_eq!(
+            record
+                .output_tokens
+                .load(std::sync::atomic::Ordering::Relaxed),
+            20
+        );
     }
 
     #[tokio::test]

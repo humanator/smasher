@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use axum::response::IntoResponse;
-use axum::{http::StatusCode, Router};
+use axum::{Router, http::StatusCode};
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::state::AppState;
@@ -68,7 +68,10 @@ fn dist_path() -> PathBuf {
 
 /// Fallback for when dist directory doesn't exist.
 async fn not_found_handler() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "404 - SPA dist directory not available")
+    (
+        StatusCode::NOT_FOUND,
+        "404 - SPA dist directory not available",
+    )
 }
 
 #[cfg(test)]

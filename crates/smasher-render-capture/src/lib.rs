@@ -29,7 +29,10 @@ fn design_kit_dir() -> PathBuf {
 /// `design-kit/components.css` references color/font/radius/shadow tokens defined in
 /// `style.css` here, not duplicated into `design-kit/tokens.css`.
 fn static_dir() -> PathBuf {
-    PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../smasher-web/static"))
+    PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../smasher-web/static"
+    ))
 }
 
 /// Serves `candidate_dir`, captures a screenshot at `viewport`, and writes
@@ -77,8 +80,8 @@ pub async fn capture(
         generation_params,
     };
 
-    let manifest_json =
-        serde_json::to_string_pretty(&manifest).map_err(|e| CaptureError::Capture(e.to_string()))?;
+    let manifest_json = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| CaptureError::Capture(e.to_string()))?;
     std::fs::write(output_dir.join("manifest.json"), manifest_json)
         .map_err(|e| CaptureError::Capture(e.to_string()))?;
 
@@ -163,14 +166,9 @@ mod tests {
         let candidate_dir =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/candidate-with-assets");
 
-        capture(
-            &candidate_dir,
-            output_dir.path(),
-            viewport,
-            BTreeMap::new(),
-        )
-        .await
-        .expect("capture should succeed against the fixture candidate");
+        capture(&candidate_dir, output_dir.path(), viewport, BTreeMap::new())
+            .await
+            .expect("capture should succeed against the fixture candidate");
 
         let bundled_asset = output_dir.path().join("bundle/assets/style.css");
         assert!(bundled_asset.is_file());

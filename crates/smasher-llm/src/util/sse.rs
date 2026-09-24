@@ -52,11 +52,7 @@ pub fn parse_sse_stream(
             // Process all complete lines (terminated by b'\n').
             // Since the SSE protocol is line-oriented and newline (0x0A) cannot appear
             // inside a multi-byte UTF-8 sequence, splitting on b'\n' is safe.
-            loop {
-                let Some(newline_pos) = byte_buf.iter().position(|&b| b == b'\n') else {
-                    break;
-                };
-
+            while let Some(newline_pos) = byte_buf.iter().position(|&b| b == b'\n') {
                 // Extract the line bytes and advance the buffer past the newline.
                 let line_bytes = byte_buf[..newline_pos].to_vec();
                 byte_buf = byte_buf[newline_pos + 1..].to_vec();

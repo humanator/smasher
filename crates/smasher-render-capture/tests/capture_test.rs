@@ -24,11 +24,10 @@ fn static_dir() -> PathBuf {
 #[tokio::test]
 async fn captures_a_real_png_of_the_fixture_candidate() {
     let _ = tracing_subscriber::fmt::try_init();
-    let _guard = tokio::task::spawn_blocking(
-        smasher_render_capture::testing::acquire_browser_test_lock,
-    )
-    .await
-    .unwrap();
+    let _guard =
+        tokio::task::spawn_blocking(smasher_render_capture::testing::acquire_browser_test_lock)
+            .await
+            .unwrap();
     let handle = start_server(&fixture_candidate_dir(), &design_kit_dir(), &static_dir())
         .await
         .expect("server should start against the fixture candidate");
@@ -44,6 +43,13 @@ async fn captures_a_real_png_of_the_fixture_candidate() {
 
     handle.shutdown().await;
 
-    assert!(png.len() > PNG_MAGIC.len(), "screenshot should be non-trivial");
-    assert_eq!(&png[..PNG_MAGIC.len()], &PNG_MAGIC, "output should be a valid PNG");
+    assert!(
+        png.len() > PNG_MAGIC.len(),
+        "screenshot should be non-trivial"
+    );
+    assert_eq!(
+        &png[..PNG_MAGIC.len()],
+        &PNG_MAGIC,
+        "output should be a valid PNG"
+    );
 }

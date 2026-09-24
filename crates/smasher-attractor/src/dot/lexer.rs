@@ -211,17 +211,13 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, LexerError> {
                 tokens.push(Token::Equals);
                 pos += 1;
             }
-            '-' => {
-                if pos + 1 < chars.len() {
-                    if chars[pos + 1] == '>' {
-                        tokens.push(Token::Arrow);
-                        pos += 2;
-                    } else if chars[pos + 1] == '-' {
-                        tokens.push(Token::DashDash);
-                        pos += 2;
-                    } else {
-                        return Err(LexerError::UnexpectedChar { ch, pos });
-                    }
+            '-' if pos + 1 < chars.len() => {
+                if chars[pos + 1] == '>' {
+                    tokens.push(Token::Arrow);
+                    pos += 2;
+                } else if chars[pos + 1] == '-' {
+                    tokens.push(Token::DashDash);
+                    pos += 2;
                 } else {
                     return Err(LexerError::UnexpectedChar { ch, pos });
                 }

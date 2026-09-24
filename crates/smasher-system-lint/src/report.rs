@@ -56,7 +56,10 @@ mod tests {
     #[test]
     fn passed_true_when_all_checks_pass() {
         let report = LintReport {
-            checks: vec![passing_check("token-adherence"), passing_check("kit-component-usage")],
+            checks: vec![
+                passing_check("token-adherence"),
+                passing_check("kit-component-usage"),
+            ],
         };
         assert!(report.passed());
     }
@@ -64,7 +67,10 @@ mod tests {
     #[test]
     fn passed_false_when_any_check_fails() {
         let report = LintReport {
-            checks: vec![passing_check("token-adherence"), failing_check("kit-component-usage")],
+            checks: vec![
+                passing_check("token-adherence"),
+                failing_check("kit-component-usage"),
+            ],
         };
         assert!(!report.passed());
     }
@@ -72,7 +78,10 @@ mod tests {
     #[test]
     fn lint_report_serde_roundtrip() {
         let report = LintReport {
-            checks: vec![passing_check("token-adherence"), failing_check("kit-component-usage")],
+            checks: vec![
+                passing_check("token-adherence"),
+                failing_check("kit-component-usage"),
+            ],
         };
 
         let json = serde_json::to_string(&report).unwrap();
@@ -83,7 +92,10 @@ mod tests {
 
     #[test]
     fn artifact_dir_joins_base_and_candidate_id() {
-        let path = artifact_dir(Path::new("/data/artifacts/run-123/artifacts"), "candidate-abc");
+        let path = artifact_dir(
+            Path::new("/data/artifacts/run-123/artifacts"),
+            "candidate-abc",
+        );
         assert_eq!(
             path,
             std::path::PathBuf::from("/data/artifacts/run-123/artifacts/candidate-abc")

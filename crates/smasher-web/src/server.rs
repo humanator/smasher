@@ -4,6 +4,7 @@
 use std::net::SocketAddr;
 
 use axum::Router;
+use tokio_util::sync::CancellationToken;
 use tower_http::services::ServeDir;
 
 use crate::state::AppState;
@@ -157,16 +158,62 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     run_with_config(ServerConfig::default()).await
 }
 
+/// Failure to bring the web server up.
+#[derive(Debug, thiserror::Error)]
+pub enum ServerError {
+    #[error(
+        "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_API_KEY."
+    )]
+    NoApiKeys,
+
+    #[error("failed to bind {addr}: {source}")]
+    Bind {
+        addr: SocketAddr,
+        source: std::io::Error,
+    },
+}
+
+/// A server whose listener is bound and which is serving on a spawned task.
+pub struct RunningServer {
+    /// The actual bound address (the real port when the config asked for 0).
+    pub addr: SocketAddr,
+    /// Completes once the shutdown token is cancelled and connections drain.
+    pub handle: tokio::task::JoinHandle<std::io::Result<()>>,
+}
+
 /// Start the web server with explicit configuration.
 pub async fn run_with_config(config: ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let shutdown = CancellationToken::new();
+    let server = start(config, shutdown.clone()).await?;
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        shutdown.cancel();
+    });
+    server.handle.await??;
+    Ok(())
+}
+
+/// Bind the listener and start serving on a spawned task, returning once the
+/// address is bound so callers know the server is ready to accept
+/// connections. Serving stops when `shutdown` is cancelled.
+pub async fn start(
+    config: ServerConfig,
+    shutdown: CancellationToken,
+) -> Result<RunningServer, ServerError> {
     let client = smasher_llm::client::Client::from_env();
     if client.registered_providers().is_empty() {
-        return Err(
-            "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, or OLLAMA_API_KEY."
-                .into(),
-        );
+        return Err(ServerError::NoApiKeys);
     }
+    start_with_client(config, client, shutdown).await
+}
 
+/// Like [`start`], but with a caller-supplied LLM client and no API-key
+/// check, so embedders and tests can boot the server without provider keys.
+pub async fn start_with_client(
+    config: ServerConfig,
+    client: smasher_llm::client::Client,
+    shutdown: CancellationToken,
+) -> Result<RunningServer, ServerError> {
     tracing::info!(data_dir = %config.data_dir, model = %config.model, provider = ?config.provider, "agent configuration");
 
     let workflow_dirs = effective_workflow_dirs(&config.data_dir, &config.workflow_dirs);
@@ -181,15 +228,26 @@ pub async fn run_with_config(config: ServerConfig) -> Result<(), Box<dyn std::er
     state.runs.write().await.extend(rehydrated);
     let app = build_router(state);
 
-    let addr = SocketAddr::from((config.host, config.port));
+    let requested = SocketAddr::from((config.host, config.port));
+    let listener = tokio::net::TcpListener::bind(requested)
+        .await
+        .map_err(|source| ServerError::Bind {
+            addr: requested,
+            source,
+        })?;
+    let addr = listener.local_addr().map_err(|source| ServerError::Bind {
+        addr: requested,
+        source,
+    })?;
     tracing::info!(%addr, "smasher dashboard starting");
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async move { shutdown.cancelled().await })
+            .await
+    });
 
-    Ok(())
+    Ok(RunningServer { addr, handle })
 }
 
 async fn shutdown_signal() {
@@ -396,10 +454,7 @@ mod tests {
         }
 
         let app = build_router(test_state());
-        let req = Request::builder()
-            .uri("/")
-            .body(Body::empty())
-            .unwrap();
+        let req = Request::builder().uri("/").body(Body::empty()).unwrap();
         let resp = app.oneshot(req).await.unwrap();
 
         unsafe {
@@ -411,6 +466,82 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(String::from_utf8_lossy(&body), index_content);
+    }
+
+    fn ephemeral_config(data_dir: &std::path::Path) -> ServerConfig {
+        ServerConfig {
+            port: 0,
+            host: [127, 0, 0, 1],
+            model: "test-model".into(),
+            provider: None,
+            data_dir: data_dir.display().to_string(),
+            workflow_dirs: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn start_with_client_on_port_zero_returns_a_real_loopback_port_serving_health() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let shutdown = CancellationToken::new();
+
+        let server = start_with_client(
+            ephemeral_config(data_dir.path()),
+            smasher_llm::client::Client::new(),
+            shutdown.clone(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(server.addr.ip(), std::net::Ipv4Addr::LOCALHOST);
+        assert_ne!(server.addr.port(), 0);
+        let resp = reqwest::get(format!("http://{}/api/health", server.addr))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), reqwest::StatusCode::OK);
+
+        shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn start_with_client_on_an_already_bound_port_errors_naming_the_address() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = occupied.local_addr().unwrap().port();
+        let mut config = ephemeral_config(data_dir.path());
+        config.port = port;
+
+        let err = start_with_client(
+            config,
+            smasher_llm::client::Client::new(),
+            CancellationToken::new(),
+        )
+        .await
+        .err()
+        .expect("binding an occupied port must fail");
+
+        assert!(matches!(err, ServerError::Bind { .. }));
+        assert!(err.to_string().contains(&format!("127.0.0.1:{port}")));
+    }
+
+    #[tokio::test]
+    async fn cancelling_the_shutdown_token_stops_the_server() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let shutdown = CancellationToken::new();
+        let server = start_with_client(
+            ephemeral_config(data_dir.path()),
+            smasher_llm::client::Client::new(),
+            shutdown.clone(),
+        )
+        .await
+        .unwrap();
+
+        shutdown.cancel();
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), server.handle)
+            .await
+            .expect("server should stop promptly after cancel");
+
+        assert!(result.unwrap().is_ok());
+        assert!(tokio::net::TcpStream::connect(server.addr).await.is_err());
     }
 
     #[tokio::test]

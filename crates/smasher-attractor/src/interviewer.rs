@@ -867,7 +867,11 @@ mod tests {
 
     #[async_trait::async_trait]
     impl Interviewer for NodeIdCapturingInterviewer {
-        async fn ask(&self, _question: &str, context: &Context) -> Result<String, InterviewerError> {
+        async fn ask(
+            &self,
+            _question: &str,
+            context: &Context,
+        ) -> Result<String, InterviewerError> {
             self.seen_node_ids
                 .lock()
                 .expect("lock poisoned")
@@ -2357,10 +2361,7 @@ mod tests {
         );
         assert!(parsed.is_some());
         let answer = parsed.unwrap();
-        assert_eq!(
-            answer.comments.get("a"),
-            Some(&"tweak spacing".to_string())
-        );
+        assert_eq!(answer.comments.get("a"), Some(&"tweak spacing".to_string()));
     }
 
     #[test]
@@ -2554,7 +2555,10 @@ mod tests {
         let edge = select_edge(&graph, "Gate1", &ctx, Some(&outcome))
             .unwrap()
             .expect("an edge should be selected");
-        assert_eq!(edge.to, "Proceed", "must route to the decided edge, not fall through to the alphabetical tiebreak");
+        assert_eq!(
+            edge.to, "Proceed",
+            "must route to the decided edge, not fall through to the alphabetical tiebreak"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -2606,6 +2610,9 @@ mod tests {
 
         let mut seen = interviewer.seen_node_ids();
         seen.sort();
-        assert_eq!(seen, vec![Some("gate-a".to_string()), Some("gate-b".to_string())]);
+        assert_eq!(
+            seen,
+            vec![Some("gate-a".to_string()), Some("gate-b".to_string())]
+        );
     }
 }

@@ -300,8 +300,12 @@ pub async fn launch_pipeline(
             if let Err(e) = run_directory_clone.persist_run_metadata(
                 workflow_id.clone(),
                 Some(format!("{:?}", record.status)),
-                record.input_tokens.load(std::sync::atomic::Ordering::Relaxed),
-                record.output_tokens.load(std::sync::atomic::Ordering::Relaxed),
+                record
+                    .input_tokens
+                    .load(std::sync::atomic::Ordering::Relaxed),
+                record
+                    .output_tokens
+                    .load(std::sync::atomic::Ordering::Relaxed),
                 record.completed_at,
             ) {
                 tracing::warn!(error = %e, "failed to persist run metadata after run completion");

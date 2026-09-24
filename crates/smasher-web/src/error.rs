@@ -12,6 +12,9 @@ pub enum WebError {
     #[error("bad request: {0}")]
     BadRequest(String),
 
+    #[error("conflict: {0}")]
+    Conflict(String),
+
     #[error("internal error: {0}")]
     Internal(String),
 
@@ -36,6 +39,7 @@ impl IntoResponse for WebError {
         let status = match &self {
             WebError::NotFound(_) => StatusCode::NOT_FOUND,
             WebError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            WebError::Conflict(_) => StatusCode::CONFLICT,
             WebError::Internal(_) | WebError::Pipeline(_) | WebError::Io(_) | WebError::Json(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -66,6 +70,13 @@ mod tests {
         let err = WebError::BadRequest("missing field".into());
         let response = err.into_response();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn conflict_returns_409() {
+        let err = WebError::Conflict("workflow exists".into());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
     }
 
     #[test]
