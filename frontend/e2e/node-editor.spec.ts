@@ -187,3 +187,38 @@ test('saving over a file changed on disk toasts the conflict, and Save anyway wr
     rmSync(path, { force: true });
   }
 });
+
+test('the canvas fills the viewport below the header on the edit and new pages', async ({ page, baseURL }) => {
+  const base = baseURL || 'http://127.0.0.1:5173';
+  const name = `_test_node_editor_fill_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const dot = 'digraph { start [shape=Mdiamond]; done [shape=doublecircle]; start -> done; }';
+  const { id } = await (await page.request.post(`${base}/api/workflows/import`, { data: { name, dot } })).json();
+  const listed = await (await page.request.get(`${base}/api/workflows`)).json();
+  const path: string = listed.workflows.find((w: { id: string }) => w.id === id).path;
+  await page.setViewportSize({ width: 1600, height: 1000 });
+
+  try {
+    for (const url of [`${base}/workflows/${id}/edit`, `${base}/workflows/new`]) {
+      await page.goto(url);
+      const flow = page.locator('.svelte-flow');
+      await expect(flow).toBeVisible({ timeout: 10000 });
+      await expect(page.getByTestId('save-button')).toBeVisible();
+
+      const header = (await page.locator('header').first().boundingBox())!;
+      const box = (await flow.boundingBox())!;
+      const palette = (await page.getByTestId('palette-entry-Codergen').boundingBox())!;
+      // Right up to the right and bottom edges of the window, left up to the
+      // palette, and no page scroll.
+      expect(box.x + box.width, url).toBeGreaterThan(1600 - 2);
+      expect(box.y + box.height, url).toBeGreaterThan(1000 - 2);
+      expect(box.x - (palette.x + palette.width), url).toBeLessThan(24);
+      expect(box.y - (header.y + header.height), url).toBeLessThan(80);
+      const scrolls = await page.evaluate(
+        () => document.scrollingElement!.scrollHeight > window.innerHeight
+      );
+      expect(scrolls, url).toBe(false);
+    }
+  } finally {
+    rmSync(path, { force: true });
+  }
+});

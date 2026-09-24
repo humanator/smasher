@@ -121,13 +121,13 @@
 
   <main>
     {#if workflowPageType === 'new'}
-      <!-- New Workflow Page -->
-      <div class="max-w-7xl mx-auto">
+      <!-- New Workflow Page: the canvas fills everything below the 3.5rem header -->
+      <div class="h-[calc(100dvh-3.5rem)]">
         <NewWorkflowPage />
       </div>
     {:else if workflowPageType === 'edit' && workflowId}
-      <!-- Edit Workflow Page -->
-      <div class="max-w-7xl mx-auto">
+      <!-- Edit Workflow Page: the canvas fills everything below the 3.5rem header -->
+      <div class="h-[calc(100dvh-3.5rem)]">
         <WorkflowEditorPage {workflowId} />
       </div>
     {:else if runId}

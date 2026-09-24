@@ -97,7 +97,13 @@
   }
 </script>
 
-<div class="workflow-editor-page flex flex-col gap-8 p-8">
+{#snippet extraActions()}
+  <Button variant="secondary" onclick={handleExport} data-testid="export-dot-button">
+    Export .dot
+  </Button>
+{/snippet}
+
+<div class="workflow-editor-page flex h-full flex-col">
   {#if loading}
     <p class="rounded bg-muted p-4 text-muted-foreground">Loading workflow...</p>
   {:else if error}
@@ -108,12 +114,8 @@
       {error}
     </p>
   {:else if graph}
-    <div class="flex justify-end">
-      <Button variant="secondary" onclick={handleExport} data-testid="export-dot-button">
-        Export .dot
-      </Button>
-    </div>
     <WorkflowCanvas
+      {extraActions}
       bind:this={canvas}
       {graph}
       {workflowId}

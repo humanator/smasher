@@ -14,7 +14,7 @@
     type XYPosition,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { setContext, untrack, type Component } from 'svelte';
+  import { setContext, untrack, type Component, type Snippet } from 'svelte';
   import Palette from './Palette.svelte';
   import FlowPositionBridge from './FlowPositionBridge.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, nodeStyleFor, type NodeKindConfig } from './nodeConfig';
@@ -89,11 +89,15 @@
   // instead, and `onSave` is called with a second `meta` argument so the
   // host shell can call `createGraph` (POST, a new file) rather than
   // `saveGraph` (PUT, an existing one).
-  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave }: {
+  //
+  // `extraActions` (e.g. the edit page's Export .dot) render next to Save,
+  // in the page header when there is one.
+  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, extraActions }: {
     graph?: EditorGraph;
     workflowId?: string;
     availableTargetDirs?: string[];
     onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | Promise<void>;
+    extraActions?: Snippet;
   } = $props();
 
   const uid = $props.id();
@@ -413,16 +417,17 @@
 </script>
 
 {#snippet saveAction()}
+  {@render extraActions?.()}
   <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
     {saving ? 'Saving…' : 'Save'}
   </Button>
 {/snippet}
 
-<div class="w-full h-full min-h-[480px] flex flex-row">
+<div class="w-full h-full flex-1 min-h-[480px] flex flex-row">
   <Palette />
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
-      <div class="flex gap-3 items-end pb-2">
+      <div class="flex gap-3 items-end px-3 py-2">
         <div class="flex flex-col gap-1.5">
           <Label for="{uid}-create-name">Name</Label>
           <Input
@@ -478,7 +483,7 @@
       {@render saveAction()}
     {/if}
     {#if saveError}
-      <p role="alert" data-testid="save-error" class="text-destructive text-sm mt-2">{saveError}</p>
+      <p role="alert" data-testid="save-error" class="text-destructive text-sm px-3 py-2">{saveError}</p>
     {/if}
   </div>
   {#if selectedNode}
