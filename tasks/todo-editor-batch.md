@@ -103,20 +103,20 @@ header contract in `docs/api-reference.md`, and fix that doc's stale `/editor/wo
 path (line 399).
 
 **Acceptance criteria:**
-- [ ] `GET` returns an `ETag`. A `PUT` with that `If-Match` succeeds and returns a new `ETag`
+- [x] `GET` returns an `ETag`. A `PUT` with that `If-Match` succeeds and returns a new `ETag`
       matching the new file bytes.
-- [ ] Change the file on disk after the `GET`, then `PUT` with the old `If-Match`: 409 with a JSON
+- [x] Change the file on disk after the `GET`, then `PUT` with the old `If-Match`: 409 with a JSON
       error body, and the file stays byte-for-byte as it was
-- [ ] A `PUT` with no `If-Match` still succeeds against a changed file, and existing `put_graph`
+- [x] A `PUT` with no `If-Match` still succeeds against a changed file, and existing `put_graph`
       tests pass unchanged
 
 **Verification:**
-- [ ] `cargo test -p smasher-web editor_api`: new tests for the ETag on GET, a matching If-Match
+- [x] `cargo test -p smasher-web editor_api`: new tests for the ETag on GET, a matching If-Match
       saves, a stale one gives 409 with the file untouched, a missing one still saves, and the
       PUT response ETag equals the hash of the file on disk
-- [ ] Manual with `curl -i` against `serve`: GET, `touch`+edit the file, PUT with the old
+- [x] Manual with `curl -i` against `serve`: GET, `touch`+edit the file, PUT with the old
       ETag → 409
-- [ ] `cargo clippy --workspace -- -D warnings`
+- [x] `cargo clippy --workspace -- -D warnings`
 
 **Dependencies:** T2 (same function; T2 already reads the existing file)
 

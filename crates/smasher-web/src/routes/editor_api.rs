@@ -1,14 +1,15 @@
 // ABOUTME: JSON graph API for the visual workflow editor: read/write a workflow's Graph as JSON.
-// ABOUTME: Provides GET/PUT /api/workflows/{id}/graph, GET .../dot, POST /api/workflows/new and /import.
+// ABOUTME: Provides GET/PUT /api/workflows/{id}/graph (ETag/If-Match), GET .../dot, POST .../new and /import.
 
 use std::collections::HashMap;
 
 use axum::extract::{Path, State};
-use axum::http::header;
+use axum::http::{HeaderMap, header};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use smasher_attractor::dot::parser;
 use smasher_attractor::graph::{self, Graph, GraphEdge, GraphNode, NodeAttrValue, NodeType};
@@ -250,16 +251,35 @@ fn validate_and_render(graph: Graph) -> Result<(String, Graph), WebError> {
 // Handlers
 // ---------------------------------------------------------------------------
 
+/// A strong ETag for a workflow file: the quoted SHA-256 of its bytes. A
+/// content hash, not mtime, so it survives a server restart and catches an
+/// edit that kept the same mtime.
+fn etag_for(dot_source: &str) -> String {
+    format!("\"{:x}\"", Sha256::digest(dot_source.as_bytes()))
+}
+
+/// Whether an `If-Match` header value lets a save go ahead over a file whose
+/// current ETag is `current`: `*`, or any listed tag equal to it.
+fn if_match_allows(if_match: &str, current: &str) -> bool {
+    if_match
+        .split(',')
+        .map(str::trim)
+        .any(|tag| tag == "*" || tag == current)
+}
+
 async fn get_graph(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<Json<EditorGraph>, WebError> {
+) -> Result<impl IntoResponse, WebError> {
     let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
         .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
     let dot_source = std::fs::read_to_string(&workflow.path)?;
     let ast = parser::parse(&dot_source)?;
     let resolved = graph::resolve(&ast)?;
-    Ok(Json(EditorGraph::from(&resolved)))
+    Ok((
+        [(header::ETAG, etag_for(&dot_source))],
+        Json(EditorGraph::from(&resolved)),
+    ))
 }
 
 /// The workflow's DOT source exactly as it sits on disk (comments and
@@ -277,18 +297,39 @@ async fn get_dot(
     ))
 }
 
+/// Overwrites the workflow with the editor's graph. With `If-Match`, the
+/// save is refused with 409 (file untouched) unless the file still has that
+/// ETag, i.e. nobody changed it since the editor loaded it. Without
+/// `If-Match` it's last-write-wins, which is what "Save anyway" sends.
 async fn put_graph(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    headers: HeaderMap,
     Json(editor_graph): Json<EditorGraph>,
-) -> Result<Json<EditorGraph>, WebError> {
+) -> Result<impl IntoResponse, WebError> {
     let workflow = crate::workflows::resolve_workflow(&state.workflow_dirs, &id)
         .ok_or_else(|| WebError::NotFound(format!("workflow {id}")))?;
+    let if_match = headers
+        .get(header::IF_MATCH)
+        .map(|v| {
+            v.to_str()
+                .map_err(|_| WebError::BadRequest("invalid If-Match header".into()))
+        })
+        .transpose()?;
 
+    let _guard = state.graph_save_lock.lock().await;
     // Keep the file's hand-written `node [...]`/`edge [...]` defaults, which
     // the editor never sees. If the file on disk doesn't parse any more,
     // there's nothing to keep and the save goes ahead.
     let existing = std::fs::read_to_string(&workflow.path)?;
+    if let Some(if_match) = if_match
+        && !if_match_allows(if_match, &etag_for(&existing))
+    {
+        return Err(WebError::Conflict(
+            "workflow changed on disk since it was loaded".into(),
+        ));
+    }
+
     let mut graph = editor_graph.into_graph()?;
     if let Some(old) = parser::parse(&existing)
         .ok()
@@ -301,7 +342,10 @@ async fn put_graph(
     let (dot_source, resolved) = validate_and_render(graph)?;
     std::fs::write(&workflow.path, &dot_source)?;
 
-    Ok(Json(EditorGraph::from(&resolved)))
+    Ok((
+        [(header::ETAG, etag_for(&dot_source))],
+        Json(EditorGraph::from(&resolved)),
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -710,6 +754,130 @@ digraph {
         assert_eq!(put_graph_json(&app, &id, &graph).await, StatusCode::OK);
         let second = std::fs::read_to_string(tmp.path().join("defaults.dot")).unwrap();
         assert_eq!(first, second);
+    }
+
+    fn quoted_sha256(bytes: &[u8]) -> String {
+        use sha2::{Digest, Sha256};
+        format!("\"{:x}\"", Sha256::digest(bytes))
+    }
+
+    fn etag_of(resp: &axum::response::Response) -> String {
+        resp.headers()
+            .get(header::ETAG)
+            .expect("ETag header")
+            .to_str()
+            .unwrap()
+            .to_string()
+    }
+
+    /// A temp workflow dir holding `hello.dot`, a router on it, and the
+    /// workflow's id.
+    fn hello_workflow() -> (tempfile::TempDir, Router, String) {
+        let tmp = tempfile::tempdir().unwrap();
+        write_fixture(tmp.path(), "hello.dot", FIXTURE_DOT);
+        let app = router().with_state(state_with_workflow_dir(tmp.path()));
+        let id = crate::workflows::scan_workflows(&[tmp.path().display().to_string()])
+            .into_iter()
+            .next()
+            .unwrap()
+            .id;
+        (tmp, app, id)
+    }
+
+    async fn get_graph_resp(app: &Router, id: &str) -> axum::response::Response {
+        let req = Request::builder()
+            .uri(format!("/api/workflows/{id}/graph"))
+            .body(Body::empty())
+            .unwrap();
+        app.clone().oneshot(req).await.unwrap()
+    }
+
+    async fn put_graph_if_match(
+        app: &Router,
+        id: &str,
+        graph: &EditorGraph,
+        if_match: Option<&str>,
+    ) -> axum::response::Response {
+        let mut req = Request::builder()
+            .method("PUT")
+            .uri(format!("/api/workflows/{id}/graph"))
+            .header("content-type", "application/json");
+        if let Some(tag) = if_match {
+            req = req.header(header::IF_MATCH, tag);
+        }
+        let req = req
+            .body(Body::from(serde_json::to_string(graph).unwrap()))
+            .unwrap();
+        app.clone().oneshot(req).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn get_graph_returns_the_sha256_of_the_file_as_its_etag() {
+        let (tmp, app, id) = hello_workflow();
+        let resp = get_graph_resp(&app, &id).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let on_disk = std::fs::read(tmp.path().join("hello.dot")).unwrap();
+        assert_eq!(etag_of(&resp), quoted_sha256(&on_disk));
+    }
+
+    #[tokio::test]
+    async fn put_graph_with_a_matching_if_match_saves_and_returns_the_new_etag() {
+        let (tmp, app, id) = hello_workflow();
+        let get = get_graph_resp(&app, &id).await;
+        let etag = etag_of(&get);
+        let graph: EditorGraph = body_json(get).await;
+
+        let put = put_graph_if_match(&app, &id, &graph, Some(&etag)).await;
+        assert_eq!(put.status(), StatusCode::OK);
+        let on_disk = std::fs::read(tmp.path().join("hello.dot")).unwrap();
+        assert_ne!(on_disk, FIXTURE_DOT.as_bytes(), "the save was written");
+        assert_eq!(etag_of(&put), quoted_sha256(&on_disk));
+
+        // The new ETag is good for the next save.
+        let new_etag = etag_of(&put);
+        let again = put_graph_if_match(&app, &id, &graph, Some(&new_etag)).await;
+        assert_eq!(again.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn put_graph_with_a_stale_if_match_is_409_and_leaves_the_file_alone() {
+        let (tmp, app, id) = hello_workflow();
+        let get = get_graph_resp(&app, &id).await;
+        let etag = etag_of(&get);
+        let graph: EditorGraph = body_json(get).await;
+
+        // Someone else edits the file after the editor loaded it.
+        let changed = FIXTURE_DOT.replace("Generate", "Generate (edited elsewhere)");
+        write_fixture(tmp.path(), "hello.dot", &changed);
+
+        let put = put_graph_if_match(&app, &id, &graph, Some(&etag)).await;
+        assert_eq!(put.status(), StatusCode::CONFLICT);
+        let content_type = put
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_string();
+        assert!(content_type.starts_with("application/json"));
+        let body: serde_json::Value = body_json(put).await;
+        assert!(body["error"].as_str().unwrap().contains("changed on disk"));
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("hello.dot")).unwrap(),
+            changed
+        );
+    }
+
+    #[tokio::test]
+    async fn put_graph_without_if_match_still_overwrites_a_changed_file() {
+        let (tmp, app, id) = hello_workflow();
+        let graph: EditorGraph = body_json(get_graph_resp(&app, &id).await).await;
+        let changed = FIXTURE_DOT.replace("Generate", "Generate (edited elsewhere)");
+        write_fixture(tmp.path(), "hello.dot", &changed);
+
+        let put = put_graph_if_match(&app, &id, &graph, None).await;
+        assert_eq!(put.status(), StatusCode::OK);
+        let on_disk = std::fs::read_to_string(tmp.path().join("hello.dot")).unwrap();
+        assert!(!on_disk.contains("edited elsewhere"));
     }
 
     #[tokio::test]
