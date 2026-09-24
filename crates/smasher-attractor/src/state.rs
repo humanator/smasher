@@ -1159,7 +1159,7 @@ impl RunStore for FileSystemRunStore {
             Err(e) => return Err(StateError::Io(e)),
         }
         // Sort by started_at descending
-        results.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        results.sort_by_key(|r| std::cmp::Reverse(r.started_at));
         Ok(results)
     }
 }
@@ -1243,7 +1243,7 @@ impl RunStore for InMemoryRunStore {
         let guard = self.metadata.read().await;
         let mut results: Vec<RunMetadata> = guard.values().cloned().collect();
         // Sort by started_at descending
-        results.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        results.sort_by_key(|r| std::cmp::Reverse(r.started_at));
         Ok(results)
     }
 }
@@ -1582,7 +1582,7 @@ mod tests {
 
     #[test]
     fn outcome_builder_notes_all_variants() {
-        let variants = vec![
+        let variants = [
             Outcome::success().with_notes("s"),
             Outcome::partial_success().with_notes("ps"),
             Outcome::failure("err").with_notes("f"),

@@ -68,7 +68,7 @@ impl PipelineStats {
     /// If `n` is greater than the number of nodes, all nodes are returned.
     pub fn top_slowest(&self, n: usize) -> Vec<&NodeStats> {
         let mut sorted: Vec<&NodeStats> = self.node_timings.iter().collect();
-        sorted.sort_by(|a, b| b.duration_ms.cmp(&a.duration_ms));
+        sorted.sort_by_key(|s| std::cmp::Reverse(s.duration_ms));
         sorted.into_iter().take(n).collect()
     }
 }

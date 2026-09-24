@@ -175,10 +175,8 @@ pub fn merge_contexts(
             for branch in branches {
                 for (k, v) in branch {
                     match merged.get(k) {
-                        Some(existing) if existing != v => {
-                            if !conflicting_keys.contains(k) {
-                                conflicting_keys.push(k.clone());
-                            }
+                        Some(existing) if existing != v && !conflicting_keys.contains(k) => {
+                            conflicting_keys.push(k.clone());
                         }
                         None => {
                             merged.insert(k.clone(), v.clone());
