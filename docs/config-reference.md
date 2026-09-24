@@ -53,7 +53,7 @@ Within the same specificity level, later rules override earlier ones.
 ```css
 /* Default model for all nodes */
 * {
-    model: "claude-sonnet-4-20250514";
+    model: "claude-sonnet-5";
 }
 
 /* Codergen nodes get higher token limits */
@@ -70,7 +70,7 @@ codergen {
 
 /* Override a specific node */
 #final_review {
-    model: "claude-sonnet-4-20250514";
+    model: "claude-sonnet-5";
     max_tokens: 8192;
 }
 ```

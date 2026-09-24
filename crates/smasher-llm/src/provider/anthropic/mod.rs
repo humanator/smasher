@@ -70,9 +70,10 @@ impl AnthropicAdapter {
     fn build_beta_header(&self, request: &Request) -> Option<String> {
         let mut betas: Vec<String> = types::extract_beta_headers(request);
 
-        // Add thinking beta when extended thinking is enabled.
+        // Add thinking beta when extended thinking is enabled. Adaptive thinking
+        // interleaves on its own and needs no beta.
         let thinking_enabled = request.thinking.as_ref().is_some_and(|t| t.enabled);
-        if thinking_enabled {
+        if thinking_enabled && !types::is_adaptive_only_model(&request.model) {
             let thinking_beta = "interleaved-thinking-2025-05-14".to_string();
             if !betas.contains(&thinking_beta) {
                 betas.push(thinking_beta);
@@ -559,6 +560,18 @@ mod tests {
             value.contains("interleaved-thinking-2025-05-14"),
             "expected thinking beta flag, got: {value}"
         );
+    }
+
+    #[test]
+    fn build_beta_header_omits_thinking_beta_for_adaptive_models() {
+        let request =
+            Request::new("claude-sonnet-5", vec![Message::user("Hi")]).thinking(ThinkingConfig {
+                enabled: true,
+                budget_tokens: Some(10000),
+            });
+
+        let adapter = AnthropicAdapter::new("key".into());
+        assert!(adapter.build_beta_header(&request).is_none());
     }
 
     #[test]

@@ -141,7 +141,30 @@ pub enum AnthropicToolChoice {
 pub struct AnthropicThinking {
     #[serde(rename = "type")]
     pub thinking_type: String,
-    pub budget_tokens: u32,
+    /// Set for `"enabled"` thinking; omitted for `"adaptive"`, which takes no budget.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub budget_tokens: Option<u32>,
+}
+
+/// Model families that only accept adaptive thinking and reject sampling parameters.
+///
+/// These models return a 400 for `temperature`, `top_p`, and
+/// `thinking: {type: "enabled", budget_tokens}`. Older models (Sonnet/Opus 4.6
+/// and earlier, Haiku 4.5) still accept all three.
+const ADAPTIVE_ONLY_MODEL_PREFIXES: &[&str] = &[
+    "claude-sonnet-5",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-fable-5",
+    "claude-mythos-5",
+];
+
+/// Whether `model` only accepts adaptive thinking and rejects sampling parameters.
+pub fn is_adaptive_only_model(model: &str) -> bool {
+    ADAPTIVE_ONLY_MODEL_PREFIXES
+        .iter()
+        .any(|prefix| model.starts_with(prefix))
 }
 
 // ---------------------------------------------------------------------------
@@ -318,15 +341,23 @@ pub fn convert_request(request: &Request) -> AnthropicRequest {
             ToolChoice::Specific { name } => Some(AnthropicToolChoice::Tool { name: name.clone() }),
         });
 
-    // Map thinking config.
+    let adaptive_only = is_adaptive_only_model(&request.model);
+
+    // Map thinking config. Adaptive-only models pick their own thinking depth,
+    // so any requested budget is dropped rather than sent and rejected.
     let thinking = request.thinking.as_ref().and_then(|config| {
-        if config.enabled {
+        if !config.enabled {
+            None
+        } else if adaptive_only {
             Some(AnthropicThinking {
-                thinking_type: "enabled".into(),
-                budget_tokens: config.budget_tokens.unwrap_or(DEFAULT_MAX_TOKENS),
+                thinking_type: "adaptive".into(),
+                budget_tokens: None,
             })
         } else {
-            None
+            Some(AnthropicThinking {
+                thinking_type: "enabled".into(),
+                budget_tokens: Some(config.budget_tokens.unwrap_or(DEFAULT_MAX_TOKENS)),
+            })
         }
     });
 
@@ -354,8 +385,9 @@ pub fn convert_request(request: &Request) -> AnthropicRequest {
         } else {
             Some(system_blocks)
         },
-        temperature: request.temperature,
-        top_p: request.top_p,
+        // Adaptive-only models reject sampling parameters with a 400.
+        temperature: request.temperature.filter(|_| !adaptive_only),
+        top_p: request.top_p.filter(|_| !adaptive_only),
         stop_sequences: request.stop_sequences.clone(),
         tools,
         tool_choice,
@@ -793,7 +825,7 @@ mod tests {
         let anthropic = convert_request(&req);
         let thinking = anthropic.thinking.expect("should have thinking");
         assert_eq!(thinking.thinking_type, "enabled");
-        assert_eq!(thinking.budget_tokens, 10000);
+        assert_eq!(thinking.budget_tokens, Some(10000));
     }
 
     #[test]
@@ -1166,7 +1198,7 @@ mod tests {
     fn thinking_config_serialization() {
         let thinking = AnthropicThinking {
             thinking_type: "enabled".into(),
-            budget_tokens: 10000,
+            budget_tokens: Some(10000),
         };
         let json = serde_json::to_value(&thinking).unwrap();
         assert_eq!(json["type"], "enabled");
@@ -1770,5 +1802,65 @@ mod tests {
         assert!(serialized.get("beta_headers").is_none());
         // But top_k should be there.
         assert_eq!(serialized["top_k"], 5);
+    }
+
+    #[test]
+    fn adaptive_only_models_are_recognised() {
+        for model in [
+            "claude-sonnet-5",
+            "claude-opus-5",
+            "claude-opus-5-5",
+            "claude-opus-4-8",
+            "claude-opus-4-7",
+            "claude-fable-5",
+            "claude-fable-5-1",
+            "claude-mythos-5-1",
+        ] {
+            assert!(
+                is_adaptive_only_model(model),
+                "{model} should be adaptive-only"
+            );
+        }
+        for model in [
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+            "claude-sonnet-4-20250514",
+            "claude-haiku-4-5",
+        ] {
+            assert!(
+                !is_adaptive_only_model(model),
+                "{model} should accept budget_tokens"
+            );
+        }
+    }
+
+    #[test]
+    fn convert_request_adaptive_model_drops_sampling_params() {
+        let req = Request::new("claude-sonnet-5", vec![Message::user("Hello")])
+            .temperature(0.0)
+            .top_p(0.9);
+        let serialized = serde_json::to_value(convert_request(&req)).unwrap();
+        assert!(serialized.get("temperature").is_none());
+        assert!(serialized.get("top_p").is_none());
+    }
+
+    #[test]
+    fn convert_request_legacy_model_keeps_sampling_params() {
+        let req = simple_request().temperature(0.0).top_p(0.9);
+        let serialized = serde_json::to_value(convert_request(&req)).unwrap();
+        assert_eq!(serialized["temperature"], 0.0);
+        assert!(serialized.get("top_p").is_some());
+    }
+
+    #[test]
+    fn convert_request_adaptive_model_sends_adaptive_thinking() {
+        let req = Request::new("claude-sonnet-5", vec![Message::user("Hello")]).thinking(
+            ThinkingConfig {
+                enabled: true,
+                budget_tokens: Some(10000),
+            },
+        );
+        let serialized = serde_json::to_value(convert_request(&req)).unwrap();
+        assert_eq!(serialized["thinking"], json!({"type": "adaptive"}));
     }
 }

@@ -41,6 +41,9 @@ impl FromStr for Provider {
     }
 }
 
+/// Model used when a caller doesn't name one. Change it here, not at call sites.
+pub const DEFAULT_MODEL: &str = "claude-sonnet-5";
+
 /// Information about a known model.
 #[derive(Debug, Clone)]
 pub struct ModelInfo {
@@ -79,6 +82,23 @@ pub struct ModelInfo {
 static CATALOG: LazyLock<Vec<ModelInfo>> = LazyLock::new(|| {
     vec![
         // ── Anthropic models ──────────────────────────────────────────
+        ModelInfo {
+            id: "claude-sonnet-5",
+            provider: Provider::Anthropic,
+            display_name: "Claude Sonnet 5",
+            aliases: &[],
+            context_window: 1_000_000,
+            max_output_tokens: 128_000,
+            supports_images: true,
+            supports_tool_use: true,
+            supports_streaming: true,
+            supports_thinking: true,
+            supports_reasoning: true,
+            supports_json_mode: true,
+            supports_system_prompt: true,
+            input_cost_per_million: Some(2.0),
+            output_cost_per_million: Some(10.0),
+        },
         ModelInfo {
             id: "claude-opus-4-6",
             provider: Provider::Anthropic,
@@ -835,6 +855,16 @@ mod tests {
         assert!(lookup_model("nonexistent-model").is_none());
     }
 
+    // ── Default model ─────────────────────────────────────────────────
+
+    #[test]
+    fn default_model_is_in_catalog() {
+        let info = lookup_model(DEFAULT_MODEL).unwrap();
+        assert_eq!(info.id, "claude-sonnet-5");
+        assert_eq!(info.provider, Provider::Anthropic);
+        assert_eq!(info.context_window, 1_000_000);
+    }
+
     // ── Alias lookups ─────────────────────────────────────────────────
 
     #[test]
@@ -1011,7 +1041,7 @@ mod tests {
     #[test]
     fn models_for_provider_anthropic() {
         let models = models_for_provider(Provider::Anthropic);
-        assert_eq!(models.len(), 6);
+        assert_eq!(models.len(), 7);
         assert!(models.iter().all(|m| m.provider == Provider::Anthropic));
     }
 

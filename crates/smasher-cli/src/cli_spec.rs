@@ -27,7 +27,7 @@
 /// |----------------------------|--------------------------------------------------|
 /// | `<PROMPT>`                 | Positional prompt text. Omit if using `--file`.  |
 /// | `--file <PATH>`            | Read the prompt from a file instead.             |
-/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-4-20250514`). |
+/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-5`). |
 /// | `--max-tokens <N>`         | Maximum tokens to generate.                      |
 /// | `--temperature <FLOAT>`    | Sampling temperature (0.0 - 2.0).                |
 /// | `--system <TEXT>`           | System prompt to prepend.                        |
@@ -39,7 +39,7 @@
 ///
 /// | Argument / Flag            | Description                                      |
 /// |----------------------------|--------------------------------------------------|
-/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-4-20250514`). |
+/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-5`). |
 /// | `--max-turns <N>`          | Maximum agentic turns (default: 100).            |
 /// | `--system <TEXT>`           | System prompt override.                          |
 /// | `--working-dir <PATH>`     | Working directory for tool operations.           |
@@ -52,7 +52,7 @@
 /// |----------------------------|--------------------------------------------------|
 /// | `<PIPELINE>`               | Path to the DOT pipeline file (positional).      |
 /// | `--var <KEY=VALUE>`        | Variable assignment, repeatable.                 |
-/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-4-20250514`). |
+/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-5`). |
 /// | `--max-steps <N>`          | Maximum pipeline steps (default: 1000).          |
 /// | `--stylesheet <PATH>`      | Path to a stylesheet file for graph transforms.  |
 /// | `--render <FILE>`          | Render the graph to a file before execution.     |
@@ -87,7 +87,7 @@
 /// |----------------------------|--------------------------------------------------|
 /// | `<REQUIREMENTS>`           | English-language requirements text (positional).  |
 /// | `-o`, `--output <FILE>`    | Output file path. Writes to stdout if omitted.   |
-/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-4-20250514`). |
+/// | `--model <MODEL>`          | Model identifier (default: `claude-sonnet-5`). |
 /// | `--skill <PATH>`           | Path to a custom skill file for LLM prompting.   |
 ///
 /// ### `smasher lint`

@@ -134,8 +134,8 @@ impl Default for ServerConfig {
             _ => [127, 0, 0, 1],
         };
 
-        let model =
-            std::env::var("SMASHER_MODEL").unwrap_or_else(|_| "claude-sonnet-4-20250514".into());
+        let model = std::env::var("SMASHER_MODEL")
+            .unwrap_or_else(|_| smasher_llm::types::DEFAULT_MODEL.into());
 
         let provider = std::env::var("SMASHER_PROVIDER").ok();
 

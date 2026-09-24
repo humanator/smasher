@@ -62,7 +62,7 @@ system instruction and uses the `model` attribute to select the LLM.
 generate [
     shape=box,
     label="Generate Code",
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-5",
     prompt="Write clean, tested code following the plan."
 ];
 ```
@@ -142,7 +142,7 @@ DOT attribute values support four types via automatic coercion:
 
 | Type | Examples | Notes |
 |------|----------|-------|
-| String | `"hello"`, `"claude-sonnet-4-20250514"` | Quoted text |
+| String | `"hello"`, `"claude-sonnet-5"` | Quoted text |
 | Number | `42`, `3.14` | Integer or floating-point |
 | Duration | `"100ms"`, `"900s"`, `"5m"`, `"2h"` | Quoted string with unit suffix |
 | Bool | `"true"`, `"false"` | Quoted strings coerced to boolean |
@@ -192,7 +192,7 @@ All nodes support these common attributes:
 
 | Attribute              | Type     | Description                                          |
 |------------------------|----------|------------------------------------------------------|
-| `model`                | string   | LLM model identifier (e.g. `"claude-sonnet-4-20250514"`) |
+| `model`                | string   | LLM model identifier (e.g. `"claude-sonnet-5"`) |
 | `prompt`               | string   | System instruction for the agent                     |
 
 ### Conditional Attributes
@@ -334,7 +334,7 @@ properties without editing the DOT file. They use a CSS-like syntax.
 
 | Type     | Examples                              |
 |----------|---------------------------------------|
-| String   | `"claude-sonnet-4-20250514"`          |
+| String   | `"claude-sonnet-5"`          |
 | Number   | `4096`, `0.7`                         |
 | Boolean  | `true`, `false`                       |
 | Duration | `30s`, `5m`, `2h`                     |
@@ -344,7 +344,7 @@ properties without editing the DOT file. They use a CSS-like syntax.
 ```css
 /* Apply to all codergen nodes */
 codergen {
-    model: "claude-sonnet-4-20250514";
+    model: "claude-sonnet-5";
     max_tokens: 4096;
 }
 
@@ -386,7 +386,7 @@ Block comments are supported:
 ```css
 /* This is a comment */
 codergen {
-    model: "claude-sonnet-4-20250514"; /* inline comment */
+    model: "claude-sonnet-5"; /* inline comment */
 }
 ```
 
@@ -410,7 +410,7 @@ included.
 |-----------------------|-----------------------------------------------------|
 | `<PIPELINE>`          | Path to the DOT pipeline file (positional, required) |
 | `--var KEY=VALUE`     | Set a context variable (repeatable)                  |
-| `--model MODEL`       | Model for codergen nodes (default: `claude-sonnet-4-20250514`) |
+| `--model MODEL`       | Model for codergen nodes (default: `claude-sonnet-5`) |
 | `--max-steps N`       | Max node visits before forced stop (default: 1000)   |
 | `--stylesheet PATH`   | Path to a stylesheet file for graph transforms       |
 

@@ -44,7 +44,7 @@ smasher complete [OPTIONS] [PROMPT]
 |---|---|
 | `<PROMPT>` | Positional prompt text. Omit if using `--file`. |
 | `--file <PATH>` | Read the prompt from a file instead. |
-| `--model <MODEL>` | Model identifier (default: `claude-sonnet-4-20250514`). |
+| `--model <MODEL>` | Model identifier (default: `claude-sonnet-5`). |
 | `--max-tokens <N>` | Maximum tokens to generate. |
 | `--temperature <FLOAT>` | Sampling temperature (0.0 - 2.0). |
 | `--system <TEXT>` | System prompt to prepend. |
@@ -77,7 +77,7 @@ smasher chat [OPTIONS]
 
 | Argument / Flag | Description |
 |---|---|
-| `--model <MODEL>` | Model identifier (default: `claude-sonnet-4-20250514`). |
+| `--model <MODEL>` | Model identifier (default: `claude-sonnet-5`). |
 | `--max-turns <N>` | Maximum agentic turns before the session ends (default: 100). |
 | `--system <TEXT>` | System prompt override. |
 | `--working-dir <PATH>` | Working directory for tool operations (default: current directory). |
@@ -92,7 +92,7 @@ Tool call progress is printed to stderr. At session end, usage statistics are pr
 Example:
 
 ```bash
-smasher chat --model claude-sonnet-4-20250514 --working-dir ./my-project
+smasher chat --model claude-sonnet-5 --working-dir ./my-project
 ```
 
 ### `smasher run`
@@ -107,7 +107,7 @@ smasher run [OPTIONS] <PIPELINE>
 |---|---|
 | `<PIPELINE>` | Path to the DOT pipeline file (positional, required). |
 | `--var <KEY=VALUE>` | Variable assignment, repeatable. Variables are injected into the pipeline context. |
-| `--model <MODEL>` | Model identifier for codergen nodes (default: `claude-sonnet-4-20250514`). Also injected as the `model` variable. |
+| `--model <MODEL>` | Model identifier for codergen nodes (default: `claude-sonnet-5`). Also injected as the `model` variable. |
 | `--max-steps <N>` | Maximum pipeline steps before forced stop (default: 1000). |
 | `--stylesheet <PATH>` | Path to a stylesheet file for graph attribute overrides. |
 
@@ -407,7 +407,7 @@ Request body:
 {
   "dot_source": "digraph { start [shape=circle]; exit [shape=doublecircle]; start -> exit; }",
   "variables": {"env": "production", "version": "1.0"},
-  "model": "claude-sonnet-4-20250514"
+  "model": "claude-sonnet-5"
 }
 ```
 
@@ -690,7 +690,7 @@ Request body (all fields optional):
 ```json
 {
   "variables": {"env": "production"},
-  "model": "claude-sonnet-4-20250514",
+  "model": "claude-sonnet-5",
   "node_overrides": {}
 }
 ```
@@ -1024,7 +1024,7 @@ Valid node type names: `start`, `exit`, `codergen`, `conditional`, `tool`,
 
 | Type | Syntax | Examples |
 |---|---|---|
-| String | `"quoted text"` | `"claude-sonnet-4-20250514"`, `"hello world"` |
+| String | `"quoted text"` | `"claude-sonnet-5"`, `"hello world"` |
 | Number | bare numeric | `4096`, `0.7`, `3` |
 | Duration | number + suffix | `30s` (seconds), `5m` (minutes), `2h` (hours) |
 | Boolean | `true` / `false` | `true`, `false` |
@@ -1052,7 +1052,7 @@ Cascade order (lowest to highest): `*` < NodeType < `.class` < `#id`
 
 /* All codergen nodes use this model by default */
 codergen {
-    model: "claude-sonnet-4-20250514";
+    model: "claude-sonnet-5";
     max_tokens: 4096;
     temperature: 0.7;
 }

@@ -158,7 +158,7 @@ pub struct ResumeArgs {
     pub checkpoint: Option<String>,
 
     /// Model identifier for codergen nodes.
-    #[arg(long, default_value = "claude-sonnet-4-20250514")]
+    #[arg(long, default_value = smasher_llm::types::DEFAULT_MODEL)]
     pub model: String,
 
     /// Maximum pipeline steps before forced stop.
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn resume_default_model() {
         let cli = TestCli::parse_from(["test", "/tmp/run"]);
-        assert_eq!(cli.resume.model, "claude-sonnet-4-20250514");
+        assert_eq!(cli.resume.model, smasher_llm::types::DEFAULT_MODEL);
     }
 
     #[test]

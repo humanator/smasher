@@ -113,7 +113,7 @@ impl ProviderProfile for AnthropicProfile {
     }
 
     fn default_model(&self) -> &str {
-        "claude-sonnet-4-20250514"
+        smasher_llm::types::DEFAULT_MODEL
     }
 }
 
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn anthropic_profile_default_model() {
         let profile = AnthropicProfile;
-        assert_eq!(profile.default_model(), "claude-sonnet-4-20250514");
+        assert_eq!(profile.default_model(), smasher_llm::types::DEFAULT_MODEL);
     }
 
     #[test]

@@ -12,15 +12,10 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
 ## P1: Do next (small, and each one fixes something real)
 
-1. **Replace the stale default model ID and define it once.**
-   `claude-sonnet-4-20250514` is hardcoded as the default in the CLI `--model`
-   flags (`run.rs`, `resume.rs`, `ingest.rs`, `complete.rs`, `chat.rs`, plus the
-   `cli_spec.rs` docs), `smasher-web/src/server.rs` (`SMASHER_MODEL` fallback), and
-   `smasher-agent` (`profile/mod.rs`, `types/mod.rs`, `subagent.rs`). Move it to a
-   single constant and switch it to a current, undated model ID. The old blocker
-   (whether the API accepts aliases) doesn't matter any more because current IDs
-   such as `claude-sonnet-5` have no date suffix. Check how this interacts with the
-   desktop LLM settings modal (`2cd3205`). *Source: DEFERRED "cross-cutting".*
+1. ~~**Replace the stale default model ID and define it once.**~~ **Done
+   2026-09-24** on `fix/default-model`. `smasher_llm::types::DEFAULT_MODEL` is
+   `claude-sonnet-5`, and the Anthropic adapter now sends adaptive thinking and no
+   sampling params to models that reject them.
 
 2. **Run the frontend in CI.** `.github/workflows/ci.yml` runs only cargo. The
    SPA's ~197 Vitest tests, `svelte-check`, lint, and the 4 Playwright specs never
@@ -37,6 +32,13 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
    the canvas in `<SvelteFlowProvider>` so `screenToFlowPosition()` can be used.
    This bug came across unchanged when the editor was ported to the SPA.
    *Source: DEFERRED `workflow-editor`.*
+
+## In progress
+
+- **Claude CLI provider.** Run every pipeline LLM call through `claude -p` from
+  the web and desktop apps, with no API key. Spec:
+  [`SPEC-claude-cli-provider.md`](SPEC-claude-cli-provider.md) (draft, pending
+  review).
 
 ## P2: Robustness (can lose data or grow without limit)
 
