@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
-use smasher_llm::provider::claude_cli::process::base_command;
+use smasher_llm::provider::claude_cli::process::{base_command, is_claude_model};
 
 use crate::events::{PipelineEvent, PipelineEventEmitter};
 use crate::handler::{CodergenBackend, HandlerError};
@@ -73,12 +73,6 @@ impl Default for ClaudeCliPermissions {
     fn default() -> Self {
         Self::Allowlist(DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec())
     }
-}
-
-/// True for model names the `claude` CLI accepts: full `claude-*` IDs and the
-/// family aliases.
-fn is_claude_model(model: &str) -> bool {
-    model.starts_with("claude-") || matches!(model, "sonnet" | "opus" | "haiku")
 }
 
 /// CodergenBackend that spawns `claude` CLI as a subprocess.

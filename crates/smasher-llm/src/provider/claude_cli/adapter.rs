@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde_json::{Value, json};
 use tokio::io::AsyncWriteExt;
 
-use super::process::base_command;
+use super::process::{base_command, is_claude_model};
 use crate::provider::{ProviderAdapter, StreamResponse};
 use crate::types::{
     ContentPart, Error, FinishReason, ImageSourceType, Message, Request, Response, ResponseFormat,
@@ -144,7 +144,8 @@ fn build_args(request: &Request) -> Vec<String> {
     args.push("--system-prompt".into());
     args.push(system_prompt(request));
 
-    if !request.model.is_empty() {
+    // Anything else (e.g. a server-wide Ollama model) is left to the CLI's default.
+    if is_claude_model(&request.model) {
         args.push("--model".into());
         args.push(request.model.clone());
     }
@@ -428,6 +429,33 @@ mod tests {
                 "claude-sonnet-5",
             ]
         );
+    }
+
+    /// A server-wide model meant for another provider (e.g. an Ollama model left
+    /// in `SMASHER_MODEL`) must not reach `--model`: the CLI rejects it.
+    #[tokio::test]
+    async fn non_claude_model_is_left_to_the_cli_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = fake_claude(dir.path(), &ok_stdout("pong"), "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let req = Request::new("gemma4:31b-cloud", vec![Message::user("ping")]);
+
+        adapter.complete(&req).await.unwrap();
+
+        let args = argv(dir.path());
+        assert!(!args.contains(&"--model".to_string()), "{args:?}");
+    }
+
+    #[tokio::test]
+    async fn claude_alias_is_passed_as_the_model() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = fake_claude(dir.path(), &ok_stdout("pong"), "", 0);
+        let adapter = ClaudeCliAdapter::new(&bin);
+        let req = Request::new("haiku", vec![Message::user("ping")]);
+
+        adapter.complete(&req).await.unwrap();
+
+        assert_eq!(arg_after(&argv(dir.path()), "--model"), Some("haiku"));
     }
 
     #[tokio::test]

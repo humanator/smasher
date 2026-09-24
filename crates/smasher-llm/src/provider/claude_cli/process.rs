@@ -4,6 +4,12 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+/// True for model names the `claude` CLI accepts: full `claude-*` IDs and the
+/// family aliases.
+pub fn is_claude_model(model: &str) -> bool {
+    model.starts_with("claude-") || matches!(model, "sonnet" | "opus" | "haiku")
+}
+
 /// Env vars the outer Claude Code session sets. If the inner `claude` process sees
 /// them it thinks it's nested and refuses to launch, so they're always removed.
 pub const NESTED_SESSION_ENV_VARS: [&str; 5] = [
