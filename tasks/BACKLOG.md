@@ -17,8 +17,8 @@ into `main`. `feat/claude-cli-provider` is still open, built on `main`, and hold
 only `SPEC-claude-cli-provider.md`, **awaiting Jobsworth's review**. No code yet.
 Until it merges, that spec exists only on that branch.
 
-**Agreed order.** #2, then the editor batch (#3 + #4 + #5 on one branch, since
-they share the save path and the canvas), then #6. The Claude CLI provider was
+**Agreed order.** #2, then the editor batch (#3 + #4 + #5, built on
+`feat/editor-save-batch` and awaiting review before merge), then #6. The Claude CLI provider was
 added mid-session and runs alongside. Its spec review comes first.
 
 **Waiting on Jobsworth:**
@@ -62,13 +62,11 @@ smasher-cli -- serve` from the branch under test first.
    Because of the gotcha above, the CI job has to build and start `smasher serve`
    before running Vitest.
 
-3. **Fix where dropped nodes land after pan or zoom in the node editor.** When you
-   drag a node in from the palette, its position is calculated in screen space
-   (`frontend/src/components/node-editor/WorkflowCanvas.svelte:139`). If the canvas
-   has been panned or zoomed, the node lands in the wrong place. The fix is to wrap
-   the canvas in `<SvelteFlowProvider>` so `screenToFlowPosition()` can be used.
-   This bug came across unchanged when the editor was ported to the SPA.
-   *Source: DEFERRED `workflow-editor`.*
+3. ~~**Fix where dropped nodes land after pan or zoom in the node editor.**~~
+   **Done 2026-09-24** on `feat/editor-save-batch` (not merged yet). A small
+   `FlowPositionBridge.svelte` inside `<SvelteFlow>` hands
+   `screenToFlowPosition()` to the canvas, so no `<SvelteFlowProvider>` split was
+   needed. The proof is a Playwright case in `e2e/node-editor.spec.ts`.
 
 ## In progress
 
@@ -87,17 +85,16 @@ smasher-cli -- serve` from the branch under test first.
 
 ## P2: Robustness (can lose data or grow without limit)
 
-4. **Detect conflicting edits when saving a workflow.** The last save always wins,
-   with no warning. This matters more now that the desktop app can import `.dot`
-   files and the editor and a text editor can be open on the same file. Send the
-   file's mtime or an ETag with each save and return 409 if the file changed in the
-   meantime. *Source: `SPEC-workflow-editor` Open Questions.*
+4. ~~**Detect conflicting edits when saving a workflow.**~~ **Done 2026-09-24**
+   on `feat/editor-save-batch` (not merged yet). The graph API sends an `ETag`
+   (SHA-256 of the file), and a `PUT` with a stale `If-Match` gets 409. The editor
+   shows Reload / Save anyway and keeps unsaved edits. A `PUT` without `If-Match`
+   still overwrites. See `docs/api-reference.md`.
 
-5. **Keep `node [...]` / `edge [...]` default-attribute blocks when saving.**
-   `render_to_dot` replaces them with its own hardcoded defaults, so a hand-written
-   `.dot` file that relies on them silently loses them on its first save from the
-   editor (`smasher-web/src/routes/editor_api.rs:45,188`). *Source: archived
-   `todo-workflow-editor` Task 2.*
+5. ~~**Keep `node [...]` / `edge [...]` default-attribute blocks when saving.**~~
+   **Done 2026-09-24** on `feat/editor-save-batch` (not merged yet).
+   `render_to_dot` merges a graph's defaults over its font defaults, and
+   `put_graph` copies them from the file it overwrites.
 
 6. **Prune artifacts automatically.** `smasher prune-artifacts` exists but nothing
    runs it. The desktop app now keeps its data in `~/Documents/smasher`, so run

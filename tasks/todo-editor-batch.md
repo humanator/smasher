@@ -173,10 +173,12 @@ return shape.
 ---
 
 ## Checkpoint B: complete
-- [ ] `make ci` clean
-- [ ] Full Vitest suite green against a server from this branch
-- [ ] `npx playwright test e2e/node-editor.spec.ts` green (by hand, since CI doesn't run it, see #2)
+- [x] `make ci` clean
+- [ ] Full Vitest suite green against a server from this branch. 235/237 on 2026-09-24:
+      `AppLayout` and `WorkflowCatalog` fail only because `~/.smasher/workflows/`
+      holds a second `human_gate_showcase.dot`, so the name is listed twice.
+- [x] `npx playwright test e2e/node-editor.spec.ts` green (by hand, since CI doesn't run it, see #2)
 - [ ] Manual in the desktop app: the T4 conflict flow end to end
-- [ ] `tasks/BACKLOG.md`: #3, #4, #5 marked done with the date. Remove the DEFERRED
+- [x] `tasks/BACKLOG.md`: #3, #4, #5 marked done with the date. Remove the DEFERRED
       `workflow-editor` source notes that now no longer apply.
 - [ ] Review with Jobsworth before merge
