@@ -249,20 +249,20 @@ start as soon as Task 1 is done.
 **Description:** Document the desktop app (build prerequisites, dev/build commands, `~/.smasher/.env`, the loopback-only guarantee). Add the crate to the CLAUDE.md/README crate tables, add Makefile targets (`desktop-dev`, `desktop-build`), mark `smasher-desktop` Done in `CAPABILITY_MAP.md`, and tick the spec's Success Criteria and resolve its Open Questions.
 
 **Acceptance criteria:**
-- [ ] A new reader can go from clone to running desktop app using only the docs
-- [ ] `docs/api-reference.md` covers the two new endpoints from Tasks 6–7
-- [ ] Capability map and spec reflect the shipped state
+- [x] A new reader can go from clone to running desktop app using only the docs
+- [x] `docs/api-reference.md` covers the two new endpoints from Tasks 6–7
+- [x] Capability map and spec reflect the shipped state
 
 **Verification:**
-- [ ] Follow the docs from a clean `frontend/dist` and `target/` for the desktop crate
-- [ ] `make ci` clean
+- [x] Follow the docs from a clean `frontend/dist` and `target/` for the desktop crate
+- [x] `make ci` clean
 
 **Dependencies:** Task 8
 **Files likely touched:** `README.md`, `CLAUDE.md`, `docs/api-reference.md`, `docs/quickstart.md`, `Makefile`, `CAPABILITY_MAP.md`, `SPEC-smasher-desktop.md`
 **Estimated scope:** S
 
 ### Checkpoint C: Complete
-- [ ] All four SPEC-smasher-desktop.md Success Criteria satisfied
+- [x] All four SPEC-smasher-desktop.md Success Criteria satisfied
 - [ ] `make ci` clean, and CI green on the branch (including the Linux webkit deps step)
 - [ ] Human review before merge
 

@@ -15,14 +15,18 @@ three independently shippable modules.
 |---|---|---|---|
 | `smasher-web-api` | Rework the existing `smasher-web` crate: drop askama/HTMX templates, keep/extend the JSON + SSE endpoints (pipeline submit, event stream, human-gate Q&A), serve the static SPA bundle. Local-only, no auth. | `smasher-attractor`, `smasher-agent`, `smasher-llm` (unchanged, already workspace deps) | Done |
 | `smasher-spa` | Svelte + shadcn-svelte SPA: dashboard, DOT graph node editor, live event stream view, human-gate response UI. Talks to `smasher-web-api` via fetch/SSE. Thin native-capability shim (`window.__TAURI__` check) with browser fallbacks. | `smasher-web-api` (API contract) | Done |
-| `smasher-desktop` | New Tauri crate. Spawns `smasher-web-api`'s axum server in-process on `127.0.0.1:<port>`, opens a webview pointed at it serving `smasher-spa`, adds native-only Tauri commands (file dialogs, notifications, tray) behind the shim. | `smasher-web-api`, `smasher-spa` | Not started |
+| `smasher-desktop` | New Tauri crate. Spawns `smasher-web-api`'s axum server in-process on `127.0.0.1:<port>`, opens a webview pointed at it serving `smasher-spa`, adds native-only Tauri commands (file dialogs, notifications, tray) behind the shim. | `smasher-web-api`, `smasher-spa` | Done |
 
 `smasher-web-api` finished all 9 tasks in `tasks/plan.md`, including the
 final-cutover task (askama/HTMX deleted, `smasher-spa` mounted at `/`) once
 `smasher-spa` shipped and confirmed parity. `smasher-spa` finished all 21
 tasks in `tasks/plan-smasher-spa.md`; see that plan's own todo for two pieces
 of flagged-but-not-fixed test debt (mocked API tests in `RunForm.test.ts`/
-`QuestionCard.test.ts`, non-pristine `EventLog.test.ts` stderr output).
+`QuestionCard.test.ts`, non-pristine `EventLog.test.ts` stderr output). `smasher-desktop` finished all
+9 tasks in `tasks/plan-smasher-desktop.md`. It ships a machine-local macOS
+`.app` (no `.dmg`). The native features are the official Tauri
+dialog/fs/notification plugins rather than custom commands, and the tray was
+deferred.
 
 ## Build order
 

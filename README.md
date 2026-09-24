@@ -16,6 +16,7 @@ Five crates, bottom to top:
 | `smasher-attractor` | The graph engine. Parses DOT, resolves node types from shapes, dispatches handlers, runs the pipeline. |
 | `smasher-cli` | `smasher complete`, `smasher chat`, `smasher run`, `smasher serve`, `smasher resume`, `smasher render`, `smasher ingest`, `smasher archive`, `smasher lint`. |
 | `smasher-web` | JSON+SSE API on port 21541 (submit, live event stream, human-gate Q&A). Serves the `smasher-spa` build at `/`. |
+| `smasher-desktop` | macOS Tauri app: runs `smasher-web` in-process on loopback and opens the dashboard in a native window. See [Desktop App](docs/quickstart.md#desktop-app-macos). |
 
 ## Setup
 
@@ -104,6 +105,7 @@ crates/
   smasher-attractor/    # DOT parser, graph engine, handlers
   smasher-cli/          # CLI binary
   smasher-web/          # JSON+SSE API + static SPA serving (axum)
+  smasher-desktop/      # Tauri desktop app wrapping smasher-web
 docs/                   # Reference docs, quickstart guide
 examples/               # Sample DOT pipelines
 scripts/                # CI helpers

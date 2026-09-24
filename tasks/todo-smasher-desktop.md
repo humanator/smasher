@@ -29,9 +29,9 @@ See `tasks/plan-smasher-desktop.md` for full task descriptions, acceptance crite
 ## Phase 3: Ship
 
 - [x] Task 8: `cargo tauri build` → `.app` that works when launched from Finder (absolute workflow dirs, no secrets in bundle) — `.app` only (dmg dropped); real-key hello-world run from Finder still pending `~/.smasher/.env`
-- [ ] Task 9: Docs, Makefile targets, API reference, CAPABILITY_MAP + spec status
+- [x] Task 9: Docs, Makefile targets, API reference, CAPABILITY_MAP + spec status
 
 ### Checkpoint C: Complete
-- [ ] All four SPEC-smasher-desktop.md Success Criteria satisfied
-- [ ] `make ci` clean, and CI green (incl. Linux webkit deps)
+- [x] All four SPEC-smasher-desktop.md Success Criteria satisfied
+- [ ] `make ci` clean, and CI green (incl. Linux webkit deps) — `make ci` clean locally; CI not yet run (branch not pushed)
 - [ ] Human review before merge
