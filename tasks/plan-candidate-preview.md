@@ -113,8 +113,8 @@ enough to do in order.
 See `todo-candidate-preview.md` for acceptance criteria and verification.
 
 ### Phase 1: Foundations
-- [ ] Task 1: Proxy `/candidate-artifacts` in the Vite dev server (approved 2026-09-25)
-- [ ] Task 2: `lib/previewScale.ts`
+- [x] Task 1: Proxy `/candidate-artifacts` in the Vite dev server (approved 2026-09-25)
+- [x] Task 2: `lib/previewScale.ts`
 
 ### Checkpoint A
 - [ ] Full Vitest suite green, `check`/`lint` add no new errors
