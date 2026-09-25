@@ -1,5 +1,5 @@
 // ABOUTME: Backend implementations for web-based pipeline execution handlers.
-// ABOUTME: Provides AgentCodergenBackend, LlmManagerBackend, and LlmToolBackend for the web server.
+// ABOUTME: Provides AgentCodergenBackend, ClaudeCliRouter, LlmManagerBackend, and LlmToolBackend for the web server.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -464,6 +464,37 @@ impl ToolBackend for LlmToolBackend {
     }
 }
 
+/// Codergen routing for `SMASHER_PROVIDER=claude-cli`: nodes go to the `claude -p`
+/// backend, except nodes that name another provider (e.g. `provider="openai"`),
+/// which go to the API agent. Those fail clearly if that provider has no key.
+pub struct ClaudeCliRouter {
+    cli: Arc<dyn CodergenBackend>,
+    agent: Arc<dyn CodergenBackend>,
+}
+
+impl ClaudeCliRouter {
+    pub fn new(cli: Arc<dyn CodergenBackend>, agent: Arc<dyn CodergenBackend>) -> Self {
+        Self { cli, agent }
+    }
+}
+
+#[async_trait::async_trait]
+impl CodergenBackend for ClaudeCliRouter {
+    async fn generate(
+        &self,
+        prompt: &str,
+        model: Option<&str>,
+        provider: Option<&str>,
+        context: &Context,
+    ) -> Result<Outcome, HandlerError> {
+        let backend = match provider {
+            Some(p) if p != "claude-cli" => &self.agent,
+            _ => &self.cli,
+        };
+        backend.generate(prompt, model, provider, context).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -536,5 +567,68 @@ mod tests {
         let client = Arc::new(smasher_llm::client::Client::from_env());
         let backend = LlmToolBackend::new(client, "test".into(), None, "/tmp".into());
         assert!(backend.available_tools().is_empty());
+    }
+
+    /// Records which backend a node reached.
+    struct Recording {
+        name: &'static str,
+        calls: Arc<std::sync::Mutex<Vec<&'static str>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl CodergenBackend for Recording {
+        async fn generate(
+            &self,
+            _prompt: &str,
+            _model: Option<&str>,
+            _provider: Option<&str>,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
+            self.calls.lock().unwrap().push(self.name);
+            Ok(Outcome::success())
+        }
+    }
+
+    fn router() -> (ClaudeCliRouter, Arc<std::sync::Mutex<Vec<&'static str>>>) {
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let cli = Arc::new(Recording {
+            name: "cli",
+            calls: Arc::clone(&calls),
+        });
+        let agent = Arc::new(Recording {
+            name: "agent",
+            calls: Arc::clone(&calls),
+        });
+        (ClaudeCliRouter::new(cli, agent), calls)
+    }
+
+    #[tokio::test]
+    async fn router_sends_nodes_without_a_provider_to_the_cli() {
+        let (router, calls) = router();
+        router
+            .generate("p", Some("claude-opus-5-5"), None, &Context::new())
+            .await
+            .unwrap();
+        assert_eq!(*calls.lock().unwrap(), vec!["cli"]);
+    }
+
+    #[tokio::test]
+    async fn router_sends_claude_cli_provider_to_the_cli() {
+        let (router, calls) = router();
+        router
+            .generate("p", None, Some("claude-cli"), &Context::new())
+            .await
+            .unwrap();
+        assert_eq!(*calls.lock().unwrap(), vec!["cli"]);
+    }
+
+    #[tokio::test]
+    async fn router_sends_another_provider_to_the_agent() {
+        let (router, calls) = router();
+        router
+            .generate("p", Some("gpt-5"), Some("openai"), &Context::new())
+            .await
+            .unwrap();
+        assert_eq!(*calls.lock().unwrap(), vec!["agent"]);
     }
 }

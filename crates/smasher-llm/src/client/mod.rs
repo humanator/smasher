@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::provider::anthropic::AnthropicAdapter;
+use crate::provider::claude_cli::{ClaudeCliAdapter, process::resolve_binary_from_env};
 use crate::provider::gemini::GeminiAdapter;
 use crate::provider::ollama::OllamaAdapter;
 use crate::provider::openai::OpenAiAdapter;
@@ -63,6 +64,8 @@ impl Client {
     ///     `ollama serve` instance (`http://localhost:11434`), which proxies
     ///     authenticated requests to Cloud `-cloud` models transparently and
     ///     does not itself validate the API key
+    /// - `SMASHER_CLAUDE_CLI` → registers the claude-cli adapter; `1` finds the
+    ///   `claude` binary, any other value is the path to it
     pub fn from_env() -> Self {
         let mut client = Self::new();
 
@@ -102,6 +105,21 @@ impl Client {
                 OllamaAdapter::new(key)
             };
             client.register_provider(Provider::Ollama, Arc::new(adapter));
+        }
+
+        if std::env::var("SMASHER_CLAUDE_CLI").is_ok_and(|v| !v.trim().is_empty()) {
+            match resolve_binary_from_env(None) {
+                Some(binary) => {
+                    client.register_provider(
+                        Provider::ClaudeCli,
+                        Arc::new(ClaudeCliAdapter::new(binary)),
+                    );
+                }
+                None => tracing::warn!(
+                    "SMASHER_CLAUDE_CLI is set but no claude binary was found; \
+                     the claude-cli provider is not registered"
+                ),
+            }
         }
 
         client

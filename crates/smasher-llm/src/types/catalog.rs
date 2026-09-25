@@ -14,6 +14,9 @@ pub enum Provider {
     OpenAi,
     Gemini,
     Ollama,
+    /// The local Claude Code CLI (`claude -p`), logged in with the user's account.
+    #[serde(rename = "claude-cli")]
+    ClaudeCli,
 }
 
 impl fmt::Display for Provider {
@@ -23,6 +26,7 @@ impl fmt::Display for Provider {
             Provider::OpenAi => write!(f, "openai"),
             Provider::Gemini => write!(f, "gemini"),
             Provider::Ollama => write!(f, "ollama"),
+            Provider::ClaudeCli => write!(f, "claude-cli"),
         }
     }
 }
@@ -36,6 +40,7 @@ impl FromStr for Provider {
             "openai" => Ok(Provider::OpenAi),
             "gemini" | "google" => Ok(Provider::Gemini),
             "ollama" => Ok(Provider::Ollama),
+            "claude-cli" => Ok(Provider::ClaudeCli),
             other => Err(format!("unknown provider: {other}")),
         }
     }
@@ -543,6 +548,8 @@ pub fn get_latest_model(provider: Provider) -> Option<&'static ModelInfo> {
         // Ollama serves whatever the user has pulled or has cloud access to —
         // there is no fixed flagship model to point at.
         Provider::Ollama => return None,
+        // The CLI resolves its own aliases (`sonnet`, `opus`); no catalog entry.
+        Provider::ClaudeCli => return None,
     };
     CATALOG.iter().find(|m| m.id == target_id)
 }
@@ -560,7 +567,9 @@ pub fn lookup_model_or_default(model_id: &str) -> ModelInfo {
     let provider = infer_provider(model_id).unwrap_or(Provider::OpenAi);
 
     match provider {
-        Provider::Anthropic => ModelInfo {
+        // `infer_provider` never returns `ClaudeCli`; it serves Claude models, so it
+        // shares the Anthropic defaults.
+        Provider::Anthropic | Provider::ClaudeCli => ModelInfo {
             id: "unknown",
             provider: Provider::Anthropic,
             display_name: "Unknown Anthropic Model",
@@ -1079,6 +1088,18 @@ mod tests {
         assert_eq!(Provider::OpenAi.to_string(), "openai");
         assert_eq!(Provider::Gemini.to_string(), "gemini");
         assert_eq!(Provider::Ollama.to_string(), "ollama");
+        assert_eq!(Provider::ClaudeCli.to_string(), "claude-cli");
+    }
+
+    #[test]
+    fn provider_claude_cli_round_trips_through_display() {
+        let parsed: Provider = Provider::ClaudeCli.to_string().parse().unwrap();
+        assert_eq!(parsed, Provider::ClaudeCli);
+    }
+
+    #[test]
+    fn get_latest_model_claude_cli_returns_none() {
+        assert!(get_latest_model(Provider::ClaudeCli).is_none());
     }
 
     #[test]
@@ -1088,6 +1109,7 @@ mod tests {
             Provider::OpenAi,
             Provider::Gemini,
             Provider::Ollama,
+            Provider::ClaudeCli,
         ] {
             let json = serde_json::to_string(&provider).unwrap();
             let back: Provider = serde_json::from_str(&json).unwrap();

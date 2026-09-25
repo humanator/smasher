@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use smasher_attractor::claude_cli_backend::{ALLOWED_TOOLS_ENV, DEFAULT_ALLOWED_TOOLS};
+use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
 
 /// Keychain service that holds the API keys, one entry per provider id.
 pub const KEYCHAIN_SERVICE: &str = "com.smasher.desktop";
@@ -53,6 +55,10 @@ fn provider(id: &str) -> Option<&'static ProviderSpec> {
     PROVIDERS.iter().find(|p| p.id == id)
 }
 
+/// The local Claude Code CLI. Not in [`PROVIDERS`]: it has no key or base URL,
+/// just the path to the `claude` binary and the tools codergen runs may use.
+pub const CLAUDE_CLI_ID: &str = "claude-cli";
+
 #[derive(Debug, thiserror::Error)]
 pub enum SettingsError {
     #[error("failed to read {path}: {source}")]
@@ -89,6 +95,12 @@ pub struct StoredSettings {
     /// Provider id -> base URL override.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub base_urls: BTreeMap<String, String>,
+    /// Path to the `claude` binary. `None` searches the usual install locations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claude_cli_path: Option<String>,
+    /// Tools claude-cli codergen runs may use. `None` is the built-in default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claude_cli_allowed_tools: Option<Vec<String>>,
 }
 
 pub fn settings_path(data_dir: &Path) -> PathBuf {
@@ -182,10 +194,13 @@ impl Keychain {
 
 /// The env vars that make `Client::from_env()` and `ServerConfig::default()`
 /// see these settings. A local Ollama (base URL set, no key) gets a
-/// placeholder key so its adapter still registers.
+/// placeholder key so its adapter still registers. With Claude CLI as the
+/// default provider, `claude_binary` (as resolved at boot) is exported, or `1`
+/// to let the client search when none was found.
 pub fn env_vars(
     settings: &StoredSettings,
     keys: &BTreeMap<String, String>,
+    claude_binary: Option<&Path>,
 ) -> Vec<(&'static str, String)> {
     let mut vars = Vec::new();
     if let Some(model) = &settings.default_model {
@@ -207,6 +222,13 @@ pub fn env_vars(
             vars.push((spec.base_url_var, url.clone()));
         }
     }
+    if settings.default_provider.as_deref() == Some(CLAUDE_CLI_ID) {
+        let binary = claude_binary.map_or_else(|| "1".into(), |p| p.display().to_string());
+        vars.push(("SMASHER_CLAUDE_CLI", binary));
+        if let Some(tools) = &settings.claude_cli_allowed_tools {
+            vars.push((ALLOWED_TOOLS_ENV, tools.join(",")));
+        }
+    }
     vars
 }
 
@@ -219,7 +241,8 @@ pub fn env_vars(
 pub unsafe fn apply_to_env(data_dir: &Path, keychain: &Keychain) -> Result<(), SettingsError> {
     let settings = load(data_dir)?;
     let keys = keychain.all()?;
-    for (name, value) in env_vars(&settings, &keys) {
+    let claude_binary = resolve_binary_from_env(settings.claude_cli_path.as_deref());
+    for (name, value) in env_vars(&settings, &keys, claude_binary.as_deref()) {
         unsafe { std::env::set_var(name, value) };
     }
     Ok(())
@@ -235,13 +258,52 @@ pub struct ProviderView {
     pub has_key: bool,
 }
 
+/// The Claude CLI settings as the modal shows them. Detection (the resolved
+/// binary and its version) is a separate call, [`detect_claude_cli`], so reading
+/// settings never spawns a process.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ClaudeCliView {
+    /// The saved binary path; empty means "search the usual locations".
+    pub path: String,
+    /// The allowlist in effect: the saved one, or the default.
+    pub allowed_tools: Vec<String>,
+    pub default_allowed_tools: Vec<String>,
+}
+
 /// What the settings modal reads.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SettingsView {
     pub default_model: String,
     pub default_provider: String,
     pub providers: Vec<ProviderView>,
+    pub claude_cli: ClaudeCliView,
     pub settings_path: String,
+}
+
+/// Which `claude` binary would be used, and what `claude --version` says.
+/// Both `None` means not found.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ClaudeCliDetection {
+    pub path: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Run `<binary> --version`. `--version` makes no model call.
+pub fn detect_claude_cli(binary: Option<PathBuf>) -> ClaudeCliDetection {
+    let version = binary.as_ref().and_then(|b| {
+        let output = std::process::Command::new(b)
+            .arg("--version")
+            .output()
+            .ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+    });
+    ClaudeCliDetection {
+        path: binary.map(|b| b.display().to_string()),
+        version,
+    }
 }
 
 /// One provider as the settings modal saves it. `api_key`: `None` leaves the
@@ -264,6 +326,13 @@ pub struct SettingsUpdate {
     pub default_provider: String,
     #[serde(default)]
     pub providers: Vec<ProviderUpdate>,
+    /// Path to the `claude` binary; empty searches the usual locations.
+    #[serde(default)]
+    pub claude_cli_path: String,
+    /// Tools claude-cli codergen runs may use. Blank entries are dropped; an
+    /// empty list, or the default list, stores nothing.
+    #[serde(default)]
+    pub claude_cli_allowed_tools: Vec<String>,
 }
 
 pub fn view(data_dir: &Path, keychain: &Keychain) -> Result<SettingsView, SettingsError> {
@@ -277,10 +346,18 @@ pub fn view(data_dir: &Path, keychain: &Keychain) -> Result<SettingsView, Settin
             has_key: keychain.get(spec.id)?.is_some(),
         });
     }
+    let default_allowed_tools: Vec<String> = DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec();
     Ok(SettingsView {
         default_model: settings.default_model.unwrap_or_default(),
         default_provider: settings.default_provider.unwrap_or_default(),
         providers,
+        claude_cli: ClaudeCliView {
+            path: settings.claude_cli_path.unwrap_or_default(),
+            allowed_tools: settings
+                .claude_cli_allowed_tools
+                .unwrap_or_else(|| default_allowed_tools.clone()),
+            default_allowed_tools,
+        },
         settings_path: settings_path(data_dir).display().to_string(),
     })
 }
@@ -299,6 +376,7 @@ pub fn update(
 ) -> Result<SettingsView, SettingsError> {
     let default_provider = non_empty(&update.default_provider);
     if let Some(id) = &default_provider
+        && id != CLAUDE_CLI_ID
         && provider(id).is_none()
     {
         return Err(SettingsError::Invalid(format!("unknown provider \"{id}\"")));
@@ -319,12 +397,31 @@ pub fn update(
         }
     }
 
+    let claude_cli_path = non_empty(&update.claude_cli_path);
+    if let Some(path) = &claude_cli_path
+        && !Path::new(path).is_file()
+    {
+        return Err(SettingsError::Invalid(format!(
+            "Claude CLI binary not found at {path}"
+        )));
+    }
+    let allowed_tools: Vec<String> = update
+        .claude_cli_allowed_tools
+        .iter()
+        .filter_map(|t| non_empty(t))
+        .collect();
+    let claude_cli_allowed_tools = (!allowed_tools.is_empty()
+        && allowed_tools != DEFAULT_ALLOWED_TOOLS)
+        .then_some(allowed_tools);
+
     save(
         data_dir,
         &StoredSettings {
             default_model: non_empty(&update.default_model),
             default_provider,
             base_urls,
+            claude_cli_path,
+            claude_cli_allowed_tools,
         },
     )?;
     for p in &update.providers {
@@ -377,6 +474,8 @@ mod tests {
             default_model: model.into(),
             default_provider: provider.into(),
             providers,
+            claude_cli_path: String::new(),
+            claude_cli_allowed_tools: Vec::new(),
         }
     }
 
@@ -395,6 +494,7 @@ mod tests {
             default_model: Some("gemma4:31b-cloud".into()),
             default_provider: Some("ollama".into()),
             base_urls: BTreeMap::from([("ollama".into(), "http://localhost:11434".into())]),
+            ..Default::default()
         };
 
         save(&data_dir, &settings).unwrap();
@@ -419,11 +519,12 @@ mod tests {
             default_model: Some("gpt-5".into()),
             default_provider: Some("openai".into()),
             base_urls: BTreeMap::from([("openai".into(), "https://proxy.example".into())]),
+            ..Default::default()
         };
         let keys = BTreeMap::from([("openai".to_string(), "sk-test".to_string())]);
 
         assert_eq!(
-            env_vars(&settings, &keys),
+            env_vars(&settings, &keys, None),
             vec![
                 ("SMASHER_MODEL", "gpt-5".to_string()),
                 ("SMASHER_PROVIDER", "openai".to_string()),
@@ -441,7 +542,7 @@ mod tests {
         };
 
         assert_eq!(
-            env_vars(&settings, &BTreeMap::new()),
+            env_vars(&settings, &BTreeMap::new(), None),
             vec![
                 ("OLLAMA_API_KEY", "ollama".to_string()),
                 ("OLLAMA_BASE_URL", "http://localhost:11434".to_string()),
@@ -451,7 +552,7 @@ mod tests {
 
     #[test]
     fn empty_settings_export_nothing() {
-        assert!(env_vars(&StoredSettings::default(), &BTreeMap::new()).is_empty());
+        assert!(env_vars(&StoredSettings::default(), &BTreeMap::new(), None).is_empty());
     }
 
     #[test]
@@ -612,5 +713,152 @@ mod tests {
         .unwrap_err();
 
         assert!(matches!(err, SettingsError::Invalid(_)));
+    }
+
+    // ---- Claude CLI ----
+
+    fn claude_cli_settings(path: Option<&str>, tools: Option<Vec<&str>>) -> StoredSettings {
+        StoredSettings {
+            default_provider: Some(CLAUDE_CLI_ID.into()),
+            claude_cli_path: path.map(Into::into),
+            claude_cli_allowed_tools: tools.map(|t| t.into_iter().map(Into::into).collect()),
+            ..Default::default()
+        }
+    }
+
+    fn fake_claude(dir: &Path, version: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let path = dir.join("claude");
+        std::fs::write(&path, format!("#!/bin/sh\necho '{version}'\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[test]
+    fn claude_cli_default_exports_provider_and_binary_and_no_keys() {
+        let settings = claude_cli_settings(Some("/saved/claude"), None);
+        let binary = PathBuf::from("/resolved/claude");
+
+        assert_eq!(
+            env_vars(&settings, &BTreeMap::new(), Some(&binary)),
+            vec![
+                ("SMASHER_PROVIDER", "claude-cli".to_string()),
+                ("SMASHER_CLAUDE_CLI", "/resolved/claude".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_cli_default_without_a_found_binary_asks_the_client_to_search() {
+        let settings = claude_cli_settings(None, None);
+
+        assert_eq!(
+            env_vars(&settings, &BTreeMap::new(), None),
+            vec![
+                ("SMASHER_PROVIDER", "claude-cli".to_string()),
+                ("SMASHER_CLAUDE_CLI", "1".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn claude_cli_allowlist_is_exported_comma_separated() {
+        let settings = claude_cli_settings(None, Some(vec!["Read", "Bash(npm run build:*)"]));
+        let binary = PathBuf::from("/resolved/claude");
+
+        let vars = env_vars(&settings, &BTreeMap::new(), Some(&binary));
+
+        assert!(vars.contains(&(
+            "SMASHER_CLAUDE_CLI_ALLOWED_TOOLS",
+            "Read,Bash(npm run build:*)".to_string()
+        )));
+    }
+
+    #[test]
+    fn claude_cli_is_not_exported_when_another_provider_is_default() {
+        let settings = StoredSettings {
+            default_provider: Some("anthropic".into()),
+            claude_cli_path: Some("/saved/claude".into()),
+            ..Default::default()
+        };
+        let binary = PathBuf::from("/resolved/claude");
+
+        let vars = env_vars(&settings, &BTreeMap::new(), Some(&binary));
+
+        assert!(
+            vars.iter()
+                .all(|(name, _)| !name.starts_with("SMASHER_CLAUDE_CLI"))
+        );
+    }
+
+    #[test]
+    fn update_accepts_claude_cli_without_a_key_and_round_trips_path_and_allowlist() {
+        let dir = tempfile::tempdir().unwrap();
+        let keychain = TestKeychain::new();
+        let binary = fake_claude(dir.path(), "2.1.281 (Claude Code)");
+        let mut update = settings_update("sonnet", "claude-cli", vec![]);
+        update.claude_cli_path = binary.display().to_string();
+        update.claude_cli_allowed_tools = vec![" Read ".into(), "".into(), "Write".into()];
+
+        let view = super::update(dir.path(), &keychain.0, update).unwrap();
+
+        let stored = load(dir.path()).unwrap();
+        assert_eq!(stored.default_provider.as_deref(), Some("claude-cli"));
+        assert_eq!(stored.claude_cli_path, Some(binary.display().to_string()));
+        assert_eq!(
+            stored.claude_cli_allowed_tools,
+            Some(vec!["Read".to_string(), "Write".to_string()])
+        );
+        assert_eq!(view.default_provider, "claude-cli");
+        assert_eq!(view.claude_cli.path, binary.display().to_string());
+        assert_eq!(view.claude_cli.allowed_tools, vec!["Read", "Write"]);
+    }
+
+    #[test]
+    fn default_allowlist_is_not_stored_so_it_tracks_future_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let keychain = TestKeychain::new();
+        let mut update = settings_update("", "claude-cli", vec![]);
+        update.claude_cli_allowed_tools = DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec();
+
+        let view = super::update(dir.path(), &keychain.0, update).unwrap();
+
+        assert_eq!(load(dir.path()).unwrap().claude_cli_allowed_tools, None);
+        assert_eq!(
+            view.claude_cli.allowed_tools,
+            DEFAULT_ALLOWED_TOOLS.to_vec()
+        );
+    }
+
+    #[test]
+    fn update_rejects_a_claude_cli_path_that_does_not_exist() {
+        let dir = tempfile::tempdir().unwrap();
+        let keychain = TestKeychain::new();
+        let mut update = settings_update("", "claude-cli", vec![]);
+        update.claude_cli_path = dir.path().join("nope").display().to_string();
+
+        let err = super::update(dir.path(), &keychain.0, update).unwrap_err();
+
+        assert!(err.to_string().contains("Claude CLI"), "{err}");
+        assert!(!settings_path(dir.path()).exists());
+    }
+
+    #[test]
+    fn detect_reports_the_binary_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = fake_claude(dir.path(), "2.1.281 (Claude Code)");
+
+        let detected = detect_claude_cli(Some(binary.clone()));
+
+        assert_eq!(detected.path.as_deref(), Some(binary.to_str().unwrap()));
+        assert_eq!(detected.version.as_deref(), Some("2.1.281 (Claude Code)"));
+    }
+
+    #[test]
+    fn detect_reports_not_found_for_a_missing_binary() {
+        let detected = detect_claude_cli(None);
+
+        assert_eq!(detected.path, None);
+        assert_eq!(detected.version, None);
     }
 }

@@ -159,8 +159,9 @@ The LLM client discovers providers from the environment. Set one or more:
 | `ANTHROPIC_API_KEY` | Anthropic (Claude models) | `claude-*` model identifiers |
 | `OPENAI_API_KEY` | OpenAI | `gpt-*`, `o1-*`, `o3-*` model identifiers |
 | `GEMINI_API_KEY` | Google Gemini | `gemini-*` model identifiers |
+| `SMASHER_CLAUDE_CLI` | Local Claude Code CLI (`claude -p`), no key | `SMASHER_PROVIDER=claude-cli`; see [config reference](config-reference.md#claude-cli-provider) |
 
-At least one API key must be set. If none are found, the CLI exits with an error.
+At least one provider must be configured. If none are found, the CLI exits with an error.
 
 ### .env File Support
 

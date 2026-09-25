@@ -2,6 +2,7 @@
 // ABOUTME: Defines the ProviderAdapter trait and re-exports all provider implementations.
 
 pub mod anthropic;
+pub mod claude_cli;
 pub mod gemini;
 pub mod ollama;
 pub mod openai;

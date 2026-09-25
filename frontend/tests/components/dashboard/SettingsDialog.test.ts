@@ -16,6 +16,11 @@ const stored: LlmSettings = {
     { id: 'gemini', label: 'Gemini', base_url: '', has_key: false },
     { id: 'ollama', label: 'Ollama', base_url: '', has_key: false },
   ],
+  claude_cli: {
+    path: '',
+    allowed_tools: ['Read', 'Write'],
+    default_allowed_tools: ['Read', 'Edit', 'Write'],
+  },
   settings_path: '/Users/test/Documents/smasher/settings.json',
 };
 
@@ -28,6 +33,10 @@ function fakeDesktop(overrides: Partial<Record<string, (args?: Record<string, un
     get_llm_settings: () => stored,
     save_llm_settings: () => stored,
     restart_app: () => undefined,
+    detect_claude_cli: () => ({
+      path: '/Users/test/.local/bin/claude',
+      version: '2.1.281 (Claude Code)',
+    }),
     ...overrides,
   };
   window.__TAURI__ = {
@@ -55,6 +64,8 @@ function savedUpdate(calls: Call[]) {
     default_model: string;
     default_provider: string;
     providers: { id: string; base_url: string; api_key?: string }[];
+    claude_cli_path: string;
+    claude_cli_allowed_tools: string[];
   };
 }
 
@@ -159,5 +170,68 @@ describe('SettingsDialog', () => {
     await user.click(await screen.findByRole('button', { name: 'Restart now' }));
 
     await waitFor(() => expect(calls.some((c) => c.command === 'restart_app')).toBe(true));
+  });
+
+  it('shows Claude CLI with a path, the detected version and the allowlist, and no key field', async () => {
+    fakeDesktop();
+    await openDialog();
+
+    const path = screen.getByLabelText('Claude CLI binary path') as HTMLInputElement;
+    expect(path.value).toBe('');
+    expect(path.getAttribute('placeholder')).toContain('/Users/test/.local/bin/claude');
+    expect(await screen.findByText(/2\.1\.281 \(Claude Code\)/)).toBeTruthy();
+    const tools = screen.getByLabelText('Claude CLI allowed tools') as HTMLTextAreaElement;
+    expect(tools.value).toBe('Read\nWrite');
+    expect(screen.queryByLabelText('Claude CLI API key')).toBeNull();
+    expect(screen.getByRole('option', { name: 'Claude CLI' })).toBeTruthy();
+  });
+
+  it('says when the Claude CLI is not found', async () => {
+    fakeDesktop({ detect_claude_cli: () => ({ path: null, version: null }) });
+    await openDialog();
+
+    expect(await screen.findByText(/not found/i)).toBeTruthy();
+  });
+
+  it('re-detects the Claude CLI at a typed path', async () => {
+    const calls = fakeDesktop();
+    const user = await openDialog();
+
+    await user.type(screen.getByLabelText('Claude CLI binary path'), '/opt/claude');
+    await user.click(screen.getByRole('button', { name: 'Detect Claude CLI' }));
+
+    await waitFor(() =>
+      expect(
+        calls.some((c) => c.command === 'detect_claude_cli' && c.args?.path === '/opt/claude')
+      ).toBe(true)
+    );
+  });
+
+  it('saves Claude CLI as the default provider with its path and allowlist', async () => {
+    const calls = fakeDesktop();
+    const user = await openDialog();
+
+    await user.selectOptions(screen.getByLabelText('Default provider'), 'claude-cli');
+    await user.type(screen.getByLabelText('Claude CLI binary path'), '/opt/claude');
+    const tools = screen.getByLabelText('Claude CLI allowed tools');
+    await user.clear(tools);
+    await user.type(tools, 'Read{Enter}  {Enter}Bash(npm run build:*)');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByText(/Restart Smasher to apply/);
+    const update = savedUpdate(calls);
+    expect(update.default_provider).toBe('claude-cli');
+    expect(update.claude_cli_path).toBe('/opt/claude');
+    expect(update.claude_cli_allowed_tools).toEqual(['Read', 'Bash(npm run build:*)']);
+  });
+
+  it('resets the allowlist to the default', async () => {
+    fakeDesktop();
+    const user = await openDialog();
+
+    await user.click(screen.getByRole('button', { name: 'Reset allowed tools to default' }));
+
+    const tools = screen.getByLabelText('Claude CLI allowed tools') as HTMLTextAreaElement;
+    expect(tools.value).toBe('Read\nEdit\nWrite');
   });
 });

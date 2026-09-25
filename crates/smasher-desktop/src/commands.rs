@@ -3,11 +3,20 @@
 
 use std::path::PathBuf;
 
-use crate::settings::{self, KEYCHAIN_SERVICE, Keychain, SettingsUpdate, SettingsView};
+use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
+
+use crate::settings::{
+    self, ClaudeCliDetection, KEYCHAIN_SERVICE, Keychain, SettingsUpdate, SettingsView,
+};
 
 /// Commands the served origin may invoke. `build.rs` turns each into an
 /// `allow-<name>` permission, which `capabilities/served-origin.json` grants.
-pub const COMMANDS: [&str; 3] = ["get_llm_settings", "save_llm_settings", "restart_app"];
+pub const COMMANDS: [&str; 4] = [
+    "get_llm_settings",
+    "save_llm_settings",
+    "detect_claude_cli",
+    "restart_app",
+];
 
 /// Where the settings live, managed as Tauri state.
 pub struct SettingsLocation {
@@ -26,6 +35,13 @@ pub fn save_llm_settings(
 ) -> Result<SettingsView, String> {
     settings::update(&location.data_dir, &Keychain::new(KEYCHAIN_SERVICE), update)
         .map_err(|e| e.to_string())
+}
+
+/// Find the `claude` binary the app would use (`path` first; empty searches the
+/// usual install locations) and report its version, or that it wasn't found.
+#[tauri::command]
+pub fn detect_claude_cli(path: String) -> ClaudeCliDetection {
+    settings::detect_claude_cli(resolve_binary_from_env(Some(&path)))
 }
 
 /// Relaunch the app so saved settings take effect at boot.
