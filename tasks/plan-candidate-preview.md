@@ -120,7 +120,7 @@ See `todo-candidate-preview.md` for acceptance criteria and verification.
 - [ ] Full Vitest suite green, `check`/`lint` add no new errors
 
 ### Phase 2: The preview component
-- [ ] Task 3: `CandidatePreview`: thumbnail button, placeholder and lightbox
+- [x] Task 3: `CandidatePreview`: thumbnail button, placeholder and lightbox
 - [ ] Task 4: ⟲ reset and **Open in new tab**
 
 ### Checkpoint B
