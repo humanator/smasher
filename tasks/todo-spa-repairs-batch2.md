@@ -242,16 +242,16 @@ the token counter.
   - Nothing shows before the first fetch.
 
 **Acceptance criteria:**
-- [ ] A `QUESTION_KINDS` run shows the `Multiple Choice` badge and that question's id within 1s of
+- [x] A `QUESTION_KINDS` run shows the `Multiple Choice` badge and that question's id within 1s of
       mounting.
-- [ ] A run with nothing pending (a cancelled one) shows `No pending questions.`
-- [ ] While a gallery gate is present, `No pending questions.` is absent. This is checked with the
+- [x] A run with nothing pending (a cancelled one) shows `No pending questions.`
+- [x] While a gallery gate is present, `No pending questions.` is absent. This is checked with the
       same gate setup `GalleryGate.test.ts` uses.
-- [ ] Re-rendering with a different `runId` drops the first run's answered list.
-- [ ] The poll-toast test is updated for the immediate first fetch, and it passes.
+- [x] Re-rendering with a different `runId` drops the first run's answered list.
+- [x] The poll-toast test is updated for the immediate first fetch, and it passes.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/QuestionCard.test.ts tests/stores/questions.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/QuestionCard.test.ts tests/stores/questions.test.ts`
 
 **Dependencies:** Task 1
 

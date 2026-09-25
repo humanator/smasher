@@ -2,12 +2,12 @@
   // ABOUTME: Human-gate Q&A form - answers pending questions via API
   // ABOUTME: Critical for Phase 3 E2E critical path
 
-  import { onMount } from 'svelte';
   import { questionStore } from '../../stores/questions.svelte';
   import * as questionsApi from '../../lib/api/questions';
   import { notifyError, pollFailureNotifier } from '$lib/notify';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
+  import { Badge } from '$lib/components/ui/badge/index.js';
 
   interface Props {
     runId: string;
@@ -15,23 +15,46 @@
 
   const { runId }: Props = $props();
 
-  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  const KIND_LABELS: Record<questionsApi.Question['kind'], string> = {
+    free_form: 'Free Form',
+    multiple_choice: 'Multiple Choice',
+    approval: 'Approval',
+  };
 
-  onMount(() => {
-    const pollFailure = pollFailureNotifier(`questions-poll:${runId}`, 'Failed to load questions');
-    // Poll questions every 2 seconds
-    pollInterval = setInterval(async () => {
+  // Set by each successful fetch; the empty state waits for the first one and
+  // stays hidden while a gallery gate card covers the pending question.
+  let loaded = $state(false);
+  let galleryGateShowing = $state(false);
+
+  // Per run: start from an empty store, fetch now, then every 2s. The store is
+  // a singleton, so it's reset again on cleanup so answers don't leak to the next run.
+  $effect(() => {
+    const id = runId;
+    questionStore.reset();
+    loaded = false;
+    galleryGateShowing = false;
+    const pollFailure = pollFailureNotifier(`questions-poll:${id}`, 'Failed to load questions');
+    let stopped = false;
+
+    async function poll() {
       try {
-        const response = await questionsApi.listQuestions(runId);
+        const response = await questionsApi.listQuestions(id);
+        if (stopped) return;
         questionStore.setPending(response.questions);
+        galleryGateShowing = response.gallery_gate !== null;
+        loaded = true;
         pollFailure.ok();
       } catch (err) {
-        pollFailure.fail(err);
+        if (!stopped) pollFailure.fail(err);
       }
-    }, 2000);
+    }
 
+    poll();
+    const pollInterval = setInterval(poll, 2000);
     return () => {
-      if (pollInterval) clearInterval(pollInterval);
+      stopped = true;
+      clearInterval(pollInterval);
+      questionStore.reset();
     };
   });
 
@@ -48,63 +71,71 @@
   }
 </script>
 
-<div class="questions rounded-lg border border-border bg-card p-4 text-card-foreground">
-  {#if questionStore.pending.length > 0}
-    <h3 class="mb-4 text-base font-semibold text-foreground">Pending Questions</h3>
-    {#each questionStore.pending as question (question.id)}
-      <div class="question-card mb-4 rounded border-l-4 border-primary bg-primary/5 p-4">
-        <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
+{#if questionStore.pending.length > 0 || questionStore.answered.length > 0 || (loaded && !galleryGateShowing)}
+  <div class="questions rounded-lg border border-border bg-card p-4 text-card-foreground">
+    {#if questionStore.pending.length > 0}
+      <h3 class="mb-4 text-base font-semibold text-foreground">Pending Questions</h3>
+      {#each questionStore.pending as question (question.id)}
+        <div class="question-card mb-4 rounded border-l-4 border-primary bg-primary/5 p-4">
+          <div class="mb-2 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" class="uppercase">{KIND_LABELS[question.kind]}</Badge>
+            <span class="font-mono text-xs text-muted-foreground break-all">{question.id}</span>
+          </div>
+          <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
 
-        {#if question.kind === 'free_form'}
-          <div class="answer-form">
-            <Input
-              type="text"
-              placeholder="Enter your answer"
-              onkeydown={(e) => {
-                if (e.key === 'Enter') {
-                  const target = e.target as HTMLInputElement;
-                  handleAnswer(question.id, target.value);
-                  target.value = '';
-                }
-              }}
-            />
-          </div>
-        {:else if question.kind === 'approval'}
-          <div class="button-group flex flex-wrap gap-2">
-            <!-- Yes/No colors carry semantic meaning (approve/reject). -->
-            <Button
-              onclick={() => handleAnswer(question.id, 'yes')}
-              class="bg-green-600 text-white hover:bg-green-700"
-            >
-              Yes
-            </Button>
-            <Button
-              onclick={() => handleAnswer(question.id, 'no')}
-              class="bg-destructive text-white hover:bg-destructive/90"
-            >
-              No
-            </Button>
-          </div>
-        {:else if question.kind === 'multiple_choice'}
-          <div class="choices flex flex-wrap gap-2">
-            {#each question.choices as choice}
-              <Button onclick={() => handleAnswer(question.id, choice)} variant="secondary">
-                {choice}
+          {#if question.kind === 'free_form'}
+            <div class="answer-form">
+              <Input
+                type="text"
+                placeholder="Enter your answer"
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') {
+                    const target = e.target as HTMLInputElement;
+                    handleAnswer(question.id, target.value);
+                    target.value = '';
+                  }
+                }}
+              />
+            </div>
+          {:else if question.kind === 'approval'}
+            <div class="button-group flex flex-wrap gap-2">
+              <!-- Yes/No colors carry semantic meaning (approve/reject). -->
+              <Button
+                onclick={() => handleAnswer(question.id, 'yes')}
+                class="bg-green-600 text-white hover:bg-green-700"
+              >
+                Yes
               </Button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/each}
-  {/if}
+              <Button
+                onclick={() => handleAnswer(question.id, 'no')}
+                class="bg-destructive text-white hover:bg-destructive/90"
+              >
+                No
+              </Button>
+            </div>
+          {:else if question.kind === 'multiple_choice'}
+            <div class="choices flex flex-wrap gap-2">
+              {#each question.choices as choice}
+                <Button onclick={() => handleAnswer(question.id, choice)} variant="secondary">
+                  {choice}
+                </Button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    {:else if loaded && !galleryGateShowing}
+      <p class="p-4 text-center text-muted-foreground">No pending questions.</p>
+    {/if}
 
-  {#if questionStore.answered.length > 0}
-    <h3 class="mb-4 text-base font-semibold text-foreground">Answered Questions</h3>
-    {#each questionStore.answered as question (question.id)}
-      <div class="answered-card mb-4 rounded border-l-4 border-green-600 bg-green-50 p-4">
-        <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
-        <p class="answer-text mt-2 italic text-green-700">Answer: {question.answer}</p>
-      </div>
-    {/each}
-  {/if}
-</div>
+    {#if questionStore.answered.length > 0}
+      <h3 class="mb-4 text-base font-semibold text-foreground">Answered Questions</h3>
+      {#each questionStore.answered as question (question.id)}
+        <div class="answered-card mb-4 rounded border-l-4 border-green-600 bg-green-50 p-4">
+          <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
+          <p class="answer-text mt-2 italic text-green-700">Answer: {question.answer}</p>
+        </div>
+      {/each}
+    {/if}
+  </div>
+{/if}

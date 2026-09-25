@@ -117,7 +117,7 @@ describe.skipIf(!process.env.SMASHER_LLM_TESTS)('Critical Path: Submit → Event
         if (answeredIds.has(q.id)) continue;
 
         // Extract gate name from node_id (e.g., FreeformGate, BinaryGate, etc.)
-        let answer = gateAnswers[q.node_id];
+        let answer = q.node_id ? gateAnswers[q.node_id] : undefined;
         if (!answer) {
           // Fallback: answer based on kind
           if (q.kind === 'approval') answer = 'yes';

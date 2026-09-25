@@ -10,7 +10,7 @@ export interface Question {
   question: string;
   choices: string[];
   kind: 'free_form' | 'multiple_choice' | 'approval';
-  node_id: string;
+  node_id?: string;
 }
 
 export interface GalleryGateInfo {
