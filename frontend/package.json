@@ -6,6 +6,7 @@
     "dev": "vite",
     "dev:backend": "cd .. && SMASHER_WORKFLOWS_DIR=examples cargo run -p smasher-web",
     "build": "vite build",
+    "build:check": "vite build && node scripts/check-bundle-size.mjs",
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",

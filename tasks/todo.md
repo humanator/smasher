@@ -17,7 +17,7 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
 
 ## Phase 2: #31
 
-- [ ] **Task 3: bundle-size check (red first)**
+- [x] **Task 3: bundle-size check (red first)**
   - Acceptance: `npm run build:check` fails on the current single 567 kB chunk.
   - Verify: run it and see the failure message name the chunk.
   - Files: `frontend/scripts/check-bundle-size.mjs`, `frontend/package.json`.
