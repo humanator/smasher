@@ -297,6 +297,17 @@ only on request.
     `human_response_received`. Open: whether gallery-gate answers are left out,
     and oldest- or newest-first order. Parked by Jobsworth 2026-09-25.
 
+32. **Find why the Rust CI jobs time out.** *Seen 2026-09-26 while speccing #2.*
+    On `myfork` (humanator/smasher), the last two pushes to `main` failed
+    (runs `36006298587` and `35957900741`, 2026-09-24). `Test` and `MSRV` ran
+    ~50 min and died inside `cargo test --workspace`, and no logs were kept.
+    Format, Check, Clippy, Docs and Test Summary pass. The cause isn't known.
+    One suspect is render-capture's `captures_a_real_png_of_the_fixture_candidate`,
+    which launches the runner image's Chrome and isn't `#[ignore]`d. Start by
+    adding a `timeout-minutes` and `--nocapture`-style progress so the next
+    run shows which test hangs. Kept out of the frontend CI batch
+    (`SPEC-frontend-ci.md`) by Jobsworth's call.
+
 ## P2: Robustness (can lose data or grow without limit)
 
 4. ~~**Detect conflicting edits when saving a workflow.**~~ **Done 2026-09-24**
