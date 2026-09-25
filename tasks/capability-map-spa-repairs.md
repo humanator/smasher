@@ -11,7 +11,7 @@ dropped). Old behaviour is read from the templates deleted in `0e5647c`
 | `run-launch` | Run dialog (Model, Variables, Brief, Node Overrides) opened by the catalog's Run button, replacing the empty-request launch. Submit navigates to `/runs/{id}` | `spa-shell` | Done 2026-09-25 |
 | `run-summary` | `RunDetail` shows Completed, Working Directory and Error; pipeline graph re-fetches every 3s, surfaces its errors, scales to fit the width; token counter total and 3s poll; run list shows "unnamed" for a blank graph name | `spa-shell` | Done 2026-09-25 |
 | `question-card` | Question type and id on the card, Submit button for free text, radio buttons + Submit for multiple choice, no 2s wait before the first fetch, "No pending questions." empty state | `spa-shell` | Done 2026-09-25 |
-| `event-log` | Newest-first, colour-coded by type, agent events indented, noisy ones faded, follows new events; a readable line for all 17 event types | — | Planned |
+| `event-log` | Newest-first, colour-coded by type, agent events indented, noisy ones faded, follows new events; a readable line for all 17 event types | — | Done 2026-09-25 |
 | `workflow-detail` | New `/workflows/{id}` route: name, source dir, Edit button, Run button (opens the `run-launch` dialog), active-run summary card linking to `/runs/{id}`, and that workflow's run history (runs filtered by `workflow_id`). Catalog links to it | `run-launch`, `run-summary` | Planned |
 
 Build order: `spa-shell` → `candidate-preview`, `run-launch`, `run-summary`, `question-card`,

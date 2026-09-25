@@ -41,8 +41,9 @@
 
   // Following new events. Newest is at the top: while the box is scrolled to
   // the top it stays there; otherwise the scroll moves by the height the new
-  // lines added, so what's being read doesn't shift. Done by hand rather than
-  // with overflow-anchor, so it behaves the same everywhere.
+  // lines added, so what's being read doesn't shift. Done by hand, so it behaves
+  // the same everywhere; the box sets overflow-anchor: none so the browser's own
+  // anchoring doesn't apply the shift a second time.
   let logBox: HTMLDivElement | undefined = $state();
   let atTop = true;
   let heightBefore = 0;
@@ -108,7 +109,7 @@
 <div
   bind:this={logBox}
   onscroll={() => (atTop = (logBox?.scrollTop ?? 0) <= 8)}
-  class="event-log max-h-[500px] overflow-y-auto rounded-lg border border-border bg-muted/50 p-4"
+  class="event-log max-h-[500px] overflow-y-auto [overflow-anchor:none] rounded-lg border border-border bg-muted/50 p-4"
 >
   <h3 class="mb-4 text-base font-semibold text-foreground">Events</h3>
 

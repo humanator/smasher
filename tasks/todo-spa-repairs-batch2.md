@@ -465,10 +465,10 @@ and the card shows `No pending questions.` Cancel in `finally`.
 The spec cancels the run in `finally`.
 
 **Acceptance criteria:**
-- [ ] The spec passes in Chromium.
+- [x] The spec passes in Chromium.
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/event-log.spec.ts e2e/gallery-gate.spec.ts e2e/no-tauri-breakage.spec.ts`
+- [x] `npm run test:e2e -- e2e/event-log.spec.ts e2e/gallery-gate.spec.ts e2e/no-tauri-breakage.spec.ts`
 
 **Dependencies:** Task 15
 
@@ -477,10 +477,10 @@ The spec cancels the run in `finally`.
 **Scope:** S
 
 ## Checkpoint C: `event-log`
-- [ ] The full Vitest suite, `check` and `lint` are green.
-- [ ] The Task 16 e2e specs pass.
-- [ ] The map row for `event-log` reads `Done <date>`.
-- [ ] Review with Jobsworth before Phase D.
+- [x] The full Vitest suite, `check` and `lint` are green.
+- [x] The Task 16 e2e specs pass.
+- [x] The map row for `event-log` reads `Done <date>`.
+- [x] Review with Jobsworth before Phase D. (Waived: Jobsworth chose to run straight through.)
 
 ---
 

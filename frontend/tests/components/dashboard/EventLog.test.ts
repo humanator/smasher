@@ -227,5 +227,11 @@ describe('EventLog', () => {
       await waitFor(() => expect(lines(container)).toHaveLength(4));
       expect(box.scrollTop).toBe(240);
     });
+
+    it("turns off the browser's own scroll anchoring, so the shift isn't applied twice", () => {
+      const { container } = render(EventLog, { props: { runId: 'no-such-run' } });
+
+      expect(container.querySelector('.event-log')).toHaveClass('[overflow-anchor:none]');
+    });
   });
 });
