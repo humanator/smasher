@@ -118,7 +118,7 @@ npm run build
 examples/run_launch_check.dot                       → NEW: gate-only fixture; its gate label is
                                                       "Brief: {{brief}} | Model: {{model}} | Colour: {{colour}}"
 frontend/src/lib/runRequest.ts                      → NEW: pure parse/validate → RunWorkflowRequest
-frontend/src/lib/runDrafts.svelte.ts                → NEW: in-memory per-workflow form values
+frontend/src/lib/runDrafts.ts                       → NEW: in-memory per-workflow form values
 frontend/src/components/dashboard/RunDialog.svelte  → NEW: the dialog
 frontend/src/components/dashboard/WorkflowCatalog.svelte → Run button opens RunDialog; drop runError
 frontend/tests/lib/runRequest.test.ts               → NEW
@@ -206,15 +206,20 @@ and the showcase's box nodes alone.
   another's, and there's an empty default for an unseen id.
 - **Component + integration (Vitest + real server), `RunDialog.test.ts`:**
   - it renders the four labelled fields with the old placeholders;
-  - Cancel and Escape send no request: the run count from `listRuns()` is unchanged;
+  - Cancel and Escape send no request: `listRuns()` has no run with that workflow's
+    `workflow_id`. The workflow is imported just for this test, so runs launched by tests
+    running in parallel can't affect the check;
   - validation errors show under their fields, block submit and clear on edit;
   - a real submit against `run_launch_check`, with Brief `hello`, Model `m-1` and Variables
     `colour=blue`, navigates to `/runs/{id}`. That run's pending question reads
     `Brief: hello | Model: m-1 | Colour: blue`;
-  - with Model blank, the question shows the server's default model, not an empty string;
+  - with Model blank, the question shows a non-empty model name, not `{{model}}` and not
+    blank;
   - a server rejection shows the server's message inline, keeps the values and re-enables Run.
-    Use a workflow id that no longer exists: import a workflow, open its dialog, delete the
-    workflow, then submit. That gives `not found: workflow …`;
+    Import a DOT that parses but fails lint, such as a start node with no exit. Import only
+    parses and resolves the DOT, but the launch lints it, so the submit gets
+    `Pipeline lint errors: …`. There's no API to delete a workflow, so the test removes the
+    imported file with `rmSync`, as the catalog's import tests do;
   - the button shows `Starting…` and is disabled while the request is in flight;
   - closing and reopening keeps the values and drops the errors.
 - **Integration, `WorkflowCatalog.test.ts`.** The existing "launches a real run" test now opens
