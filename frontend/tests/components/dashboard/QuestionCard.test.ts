@@ -1,10 +1,12 @@
 // ABOUTME: Tests for QuestionCard component
 // ABOUTME: Answers real human-gate questions on runs against the real smasher-web API, no mocking
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'svelte-sonner';
 import QuestionCard from '../../../src/components/dashboard/QuestionCard.svelte';
+import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import * as runsApi from '../../../src/lib/api/runs';
 import { questionStore } from '../../../src/stores/questions.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
@@ -119,5 +121,66 @@ describe('QuestionCard', () => {
 
     await waitFor(() => expect(screen.getByText('Answer: yes')).toBeTruthy());
     await waitForRunStatus(runId, 'Completed');
+  });
+
+  describe('error toasts', () => {
+    // Live toasts only: a toast dismissed earlier can briefly re-render,
+    // marked data-removed, because sonner's store is global.
+    const toasts = () =>
+      document.querySelectorAll('[data-sonner-toast][data-removed="false"]');
+
+    // Close every toast while this test's <Toaster> is still mounted so
+    // none carries over into the next test.
+    afterEach(async () => {
+      toast.dismiss();
+      await waitFor(() => expect(toasts().length).toBe(0));
+    });
+
+    it("toasts the server's message when an answer is rejected, and keeps the question", async () => {
+      const user = userEvent.setup();
+      const { run_id: runId } = await runsApi.submitRun({
+        dot_source: gatedPipeline('QuestionCardRejected', 'label="Real gate?"'),
+        variables: {},
+      });
+      await waitForRunStatus(runId, 'Running');
+      render(Toaster);
+      render(QuestionCard, { props: { runId } });
+      // A question the real run doesn't have, so the server rejects the answer.
+      questionStore.setPending([
+        {
+          id: 'no-such-q',
+          question: 'Stale question?',
+          choices: [],
+          kind: 'approval',
+          node_id: 'gate',
+        },
+      ]);
+
+      await user.click(await screen.findByText('Yes'));
+
+      expect(await screen.findByText('question not found: no-such-q')).toBeTruthy();
+      expect(screen.getByText('Stale question?')).toBeTruthy();
+      expect(screen.queryByText('Answer: yes')).toBeNull();
+      expect(questionStore.answered).toHaveLength(0);
+    });
+
+    it('toasts a failing poll once, not on every tick', async () => {
+      render(Toaster);
+      render(QuestionCard, { props: { runId: 'no-such-run' } });
+
+      expect(
+        await screen.findByText('not found: run no-such-run', {}, { timeout: 5000 })
+      ).toBeTruthy();
+      // Watch three more failing 2s ticks. The toast closes itself after
+      // sonner's 4s default, and none of the later failures brings it back.
+      let most = 0;
+      for (let waited = 0; waited < 6500; waited += 100) {
+        most = Math.max(most, toasts().length);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      expect(most).toBe(1);
+      expect(toasts().length).toBe(0);
+    }, 15000);
   });
 });

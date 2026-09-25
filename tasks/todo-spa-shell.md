@@ -82,13 +82,18 @@ answer path calls `notifyError(err, 'Failed to answer question')` and doesn't ca
 success. Don't change the poll interval or the first-fetch delay; `question-card` owns those.
 
 **Acceptance criteria:**
-- [ ] On a real gated run, answering an unknown question id (seeded into `questionStore`) shows a toast with the server's message, and the question is still rendered
-- [ ] Mounted with a nonexistent `runId`, the card shows exactly one toast after more than 3 poll ticks
-- [ ] No `console.error` is left in the component
+- [x] On a real gated run, answering an unknown question id (seeded into `questionStore`) shows a toast with the server's message, and the question is still rendered
+- [x] Mounted with a nonexistent `runId`, the card shows exactly one toast after more than 3 poll ticks
+- [x] No `console.error` is left in the component
 
 **Verification:**
-- [ ] New cases in `tests/components/dashboard/QuestionCard.test.ts` fail first, then pass, using `App`-less rendering plus a `Toaster`
-- [ ] The existing QuestionCard tests still pass
+- [x] New cases in `tests/components/dashboard/QuestionCard.test.ts` fail first, then pass, using `App`-less rendering plus a `Toaster`
+- [x] The existing QuestionCard tests still pass
+
+**Note (2026-09-25):** the server answers an unknown question id with a 200 and
+`{"success": false, "error": "question not found: …"}`, not an error status, so the card also
+treats `success: false` as a failure. The poll toast closes after sonner's 4s default, so the
+test checks that no more than one toast ever shows across the ticks, and none comes back.
 
 **Dependencies:** Tasks 2, 3
 

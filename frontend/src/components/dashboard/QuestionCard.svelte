@@ -5,6 +5,7 @@
   import { onMount } from 'svelte';
   import { questionStore } from '../../stores/questions.svelte';
   import * as questionsApi from '../../lib/api/questions';
+  import { notifyError, pollFailureNotifier } from '$lib/notify';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
 
@@ -17,13 +18,15 @@
   let pollInterval: ReturnType<typeof setInterval> | null = null;
 
   onMount(() => {
+    const pollFailure = pollFailureNotifier(`questions-poll:${runId}`, 'Failed to load questions');
     // Poll questions every 2 seconds
     pollInterval = setInterval(async () => {
       try {
         const response = await questionsApi.listQuestions(runId);
         questionStore.setPending(response.questions);
+        pollFailure.ok();
       } catch (err) {
-        console.error('Failed to poll questions:', err);
+        pollFailure.fail(err);
       }
     }, 2000);
 
@@ -34,10 +37,13 @@
 
   async function handleAnswer(questionId: string, answer: string) {
     try {
-      await questionsApi.answerQuestion(runId, questionId, answer);
+      const result = await questionsApi.answerQuestion(runId, questionId, answer);
+      // The server reports some rejections (e.g. an unknown question) as a 200.
+      if (!result.success) throw new Error(result.error ?? '');
       questionStore.answer(questionId, answer);
     } catch (err) {
-      console.error('Failed to answer question:', err);
+      // The question stays pending so it can be answered again.
+      notifyError(err, 'Failed to answer question');
     }
   }
 </script>

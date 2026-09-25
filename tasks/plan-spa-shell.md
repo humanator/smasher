@@ -61,7 +61,7 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 
 ### Phase 2: Toasts
 - [x] Task 3: `lib/notify.ts`
-- [ ] Task 4: QuestionCard toasts on answer and poll failure
+- [x] Task 4: QuestionCard toasts on answer and poll failure
 - [ ] Task 5: GalleryGate toasts on poll failure
 
 ### Checkpoint B
