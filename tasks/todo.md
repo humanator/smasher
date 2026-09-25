@@ -187,14 +187,14 @@ labelled with its node id, and its body is `{@html renderMarkdown(reply.text)}` 
 `eventStore` after the real `human_response_received`. No LLM.
 
 **Acceptance criteria:**
-- [ ] A constructed reply (`# Heading`, `**bold**`, a list) renders as `h1`/`strong`/`li` under
+- [x] A constructed reply (`# Heading`, `**bold**`, a list) renders as `h1`/`strong`/`li` under
       the right answer, labelled with its node id
-- [ ] A reply after a later prompt doesn't show under the earlier answer
-- [ ] `EventLog` still shows the one-line `Agent · node · text` entry for the same message
+- [x] A reply after a later prompt doesn't show under the earlier answer
+- [x] `EventLog` still shows the one-line `Agent · node · text` entry for the same message
 
 **Verification:**
-- [ ] `cd frontend && npx vitest run tests/components/dashboard/QuestionCard.test.ts tests/components/dashboard/EventLog.test.ts`
-- [ ] `npm run check && npm run lint`
+- [x] `cd frontend && npx vitest run tests/components/dashboard/QuestionCard.test.ts tests/components/dashboard/EventLog.test.ts`
+- [x] `npm run check && npm run lint`
 
 **Dependencies:** Tasks 5, 6
 

@@ -7,6 +7,7 @@
   import * as questionsApi from '../../lib/api/questions';
   import * as runsApi from '../../lib/api/runs';
   import { buildExchanges } from '../../lib/exchanges';
+  import { renderMarkdown } from '../../lib/markdown';
   import { notifyError, pollFailureNotifier } from '$lib/notify';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -224,6 +225,15 @@
         <div class="answered-card mb-4 rounded border-l-4 border-green-600 bg-green-50 p-4">
           <p class="question-text mb-4 font-medium text-foreground">{exchange.question}</p>
           <p class="answer-text mt-2 italic text-green-700">Answer: {exchange.answer}</p>
+          {#each exchange.replies as reply, replyIndex (replyIndex)}
+            <div class="reply mt-3 border-t border-green-600/20 pt-3">
+              <p class="reply-node font-mono text-xs text-muted-foreground">{reply.nodeId}</p>
+              <div class="markdown mt-1">
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown() sanitises with DOMPurify -->
+                {@html renderMarkdown(reply.text)}
+              </div>
+            </div>
+          {/each}
         </div>
       {/each}
     {/if}

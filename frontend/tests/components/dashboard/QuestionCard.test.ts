@@ -425,6 +425,77 @@ describe('QuestionCard', () => {
     await waitFor(() => expect(answeredCards()).toEqual(expected), { timeout: 4000 });
   }, 20000);
 
+  describe('agent replies', () => {
+    const agentMessage = (node_id: string, text: string) => ({
+      kind: 'agent_message' as const,
+      node_id,
+      text,
+      timestamp: new Date().toISOString(),
+    });
+
+    it('renders a reply as markdown under its answer, labelled with its node', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(gatedPipeline('QuestionCardReply', 'label="Anything?"'));
+
+      renderRun(runId);
+      await user.type(await screen.findByPlaceholderText('Enter your answer'), 'hello{Enter}');
+      await screen.findByText('Answer: hello');
+      // The real run has answered; a reply stands in for the agent's message.
+      eventStore.add(agentMessage('EchoNode', '# Heading\n\nYou said **hello**.\n\n- one\n- two'));
+
+      const card = (await screen.findByText('Answer: hello')).closest('.answered-card')!;
+      await waitFor(() => expect(card.querySelector('.reply')).toBeTruthy());
+      const reply = card.querySelector('.reply')!;
+      expect(reply.querySelector('.reply-node')?.textContent).toBe('EchoNode');
+      expect(reply.querySelector('.markdown h1')?.textContent).toBe('Heading');
+      expect(reply.querySelector('.markdown strong')?.textContent).toBe('hello');
+      expect(Array.from(reply.querySelectorAll('.markdown li')).map((li) => li.textContent)).toEqual([
+        'one',
+        'two',
+      ]);
+    });
+
+    it('keeps the one-line event log entry for the same message', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(gatedPipeline('QuestionCardReplyLog', 'label="Anything?"'));
+
+      renderRun(runId);
+      await user.type(await screen.findByPlaceholderText('Enter your answer'), 'hi{Enter}');
+      await screen.findByText('Answer: hi');
+      eventStore.add(agentMessage('EchoNode', '**Short** reply'));
+
+      await waitFor(() => expect(document.querySelector('.reply')).toBeTruthy());
+      const logLine = Array.from(document.querySelectorAll('.event-item')).find((line) =>
+        line.textContent?.includes('EchoNode')
+      );
+      expect(logLine?.textContent).toContain('Agent');
+      expect(logLine?.textContent).toContain('**Short** reply');
+    });
+
+    it('does not put a reply sent after a later question under the earlier answer', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(QUESTION_KINDS);
+
+      renderRun(runId);
+      await user.click(await screen.findByRole('radio', { name: 'Blue' }, { timeout: 2000 }));
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+      await screen.findByText('Answer: Blue');
+      // Wait for the real run to ask its next question, then send a reply.
+      await waitFor(
+        () =>
+          expect(
+            eventStore.events.some((e) => e.kind === 'human_prompt_issued' && e.node_id === 'ok')
+          ).toBe(true),
+        { timeout: 4000 }
+      );
+      eventStore.add(agentMessage('Stray', 'Not for Blue'));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(screen.getByText('Answer: Blue')).toBeTruthy();
+      expect(document.querySelector('.reply')).toBeNull();
+    });
+  });
+
   it('leaves gallery picks out of Answered Questions', async () => {
     const runId = await submitAndWaitForGalleryGate();
     const { gallery_gate } = await questionsApi.listQuestions(runId);
