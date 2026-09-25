@@ -245,17 +245,17 @@ test spends tokens.
 
 ## Success Criteria
 
-- [ ] Live cards in the gallery and at the gate show a screenshot thumbnail and no iframe. A
+- [x] Live cards in the gallery and at the gate show a screenshot thumbnail and no iframe. A
       missing screenshot shows `No screenshot`.
-- [ ] Clicking a thumbnail opens a lightbox with the live bundle at its capture viewport, scaled
+- [x] Clicking a thumbnail opens a lightbox with the live bundle at its capture viewport, scaled
       to fit and clickable. Without a bundle, it shows the full screenshot.
-- [ ] ⟲ resets the bundle to its start state.
-- [ ] **Open in new tab** opens the bundle, or the screenshot when there's no bundle.
-- [ ] A non-empty `generation_params` shows as a collapsed `params` section on both cards.
-- [ ] Failed cards in the gallery show `captured_at`, and the gate's don't.
-- [ ] At the gate, the thumbnail, params and lightbox never toggle the checkbox, and selections and
+- [x] ⟲ resets the bundle to its start state.
+- [x] **Open in new tab** opens the bundle, or the screenshot when there's no bundle.
+- [x] A non-empty `generation_params` shows as a collapsed `params` section on both cards.
+- [x] Failed cards in the gallery show `captured_at`, and the gate's don't.
+- [x] At the gate, the thumbnail, params and lightbox never toggle the checkbox, and selections and
       comments survive the lightbox and the poll.
-- [ ] New unit, integration and Playwright tests pass. The full Vitest suite passes, and `check`,
+- [x] New unit, integration and Playwright tests pass. The full Vitest suite passes, and `check`,
       `lint` and `make ci` add no new errors or warnings.
 
 ## Decisions (resolved 2026-09-25)

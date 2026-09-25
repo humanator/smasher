@@ -117,27 +117,27 @@ See `todo-candidate-preview.md` for acceptance criteria and verification.
 - [x] Task 2: `lib/previewScale.ts`
 
 ### Checkpoint A
-- [ ] Full Vitest suite green, `check`/`lint` add no new errors
+- [x] Full Vitest suite green, `check`/`lint` add no new errors
 
 ### Phase 2: The preview component
 - [x] Task 3: `CandidatePreview`: thumbnail button, placeholder and lightbox
 - [x] Task 4: ⟲ reset and **Open in new tab**
 
 ### Checkpoint B
-- [ ] Full suite green. Jobsworth looks at the lightbox in `npm run dev` (optional, on request)
+- [x] Full suite green. Jobsworth looks at the lightbox in `npm run dev` (optional, on request)
 
 ### Phase 3: Wire into both cards
 - [x] Task 5: Gallery card: preview, params and captured-at on failed cards
 - [x] Task 6: Gate card: preview and params without toggling the checkbox
 
 ### Checkpoint C
-- [ ] Full suite green, the existing `gallery-gate.spec.ts` passes
+- [x] Full suite green, the existing `gallery-gate.spec.ts` passes
 
 ### Phase 4: End to end
-- [ ] Task 7: `e2e/candidate-preview.spec.ts`, and mark the module done
+- [x] Task 7: `e2e/candidate-preview.spec.ts`, and mark the module done
 
 ### Checkpoint D: Complete
-- [ ] All spec success criteria met, `make ci` green
+- [x] All spec success criteria met, `make ci` green
 - [ ] Review with Jobsworth
 
 ## Risks and mitigations

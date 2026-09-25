@@ -89,7 +89,11 @@ only on request.
      off both edges. Probably `fitView` stopping at Svelte Flow's default
      `minZoom` of 0.5. Setting a lower `minZoom` on the canvas would likely fix it.
 
-9. **Show candidates as thumbnails that open a full-size, interactive lightbox.**
+9. ~~**Show candidates as thumbnails that open a full-size, interactive lightbox.**~~
+   **Done 2026-09-25** on `feat/spa-port-repairs` (module `candidate-preview`, see
+   `tasks/SPEC-candidate-preview.md`). Both cards show the screenshot as a thumbnail
+   that opens the live bundle at its capture viewport, scaled to fit, with ⟲ and
+   Open in new tab; both list `params`; the gallery's failed card shows captured-at.
    *Raised by Jobsworth 2026-09-25 from a real run, so moved up from P3.* This is
    partly a regression from the SPA port (see #21). The HTMX card
    (`_candidate_card.html`, `style.css:1279-1300` at `0e5647c^`) was 375px wide
@@ -138,7 +142,8 @@ only on request.
     0e5647c^:crates/smasher-web/templates/<file>`) against the SPA.* The SPA plan
     only required parity for submitting runs, live events and questions
     (`archive/SPEC-smasher-spa.md:99`), and none of these are recorded as
-    deliberate cuts. Candidate cards are #9. The rest, most serious first:
+    deliberate cuts. Candidate cards are #9 (done 2026-09-25: ⟲, params, captured-at on
+    failed cards). The rest, most serious first:
     - **No run form.** The old `workflow_run_form.html` had Model, Variables,
       Brief and Node Overrides fields. The catalog's Run button now sends an
       empty request (`WorkflowCatalog.svelte:48`), although the API accepts all
