@@ -65,12 +65,12 @@ strings for an id it hasn't seen) and `saveDraft(workflowId, values)`. It stores
 edits to the caller's object don't leak in.
 
 **Acceptance criteria:**
-- [ ] An unseen id gives four empty strings
-- [ ] A saved draft comes back equal but isn't the same object
-- [ ] Two workflow ids don't see each other's drafts
+- [x] An unseen id gives four empty strings
+- [x] A saved draft comes back equal but isn't the same object
+- [x] Two workflow ids don't see each other's drafts
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/runDrafts.test.ts`, written first and seen failing
+- [x] `npm test -- --run tests/lib/runDrafts.test.ts`, written first and seen failing
 
 **Dependencies:** Task 2 (the `RunFormValues` type)
 
