@@ -17,6 +17,7 @@ function run(id: string, status: string): RunSummary {
     output_tokens: 0,
     run_working_dir: null,
     workflow_id: 'wf',
+    gallery_gates: [],
   };
 }
 

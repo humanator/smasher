@@ -19,6 +19,7 @@ export interface RunSummary {
   output_tokens: number;
   run_working_dir: string | null;
   workflow_id: string | null;
+  gallery_gates: string[];
 }
 
 export interface ListRunsResponse {

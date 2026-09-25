@@ -67,14 +67,14 @@ Add `gallery_gates: string[]` to the SPA's `RunSummary` type. This lets Question
 exchanges without parsing DOT.
 
 **Acceptance criteria:**
-- [ ] `GET /api/runs/{id}` for a graph with a `gallery="true"` gate returns that node id in
+- [x] `GET /api/runs/{id}` for a graph with a `gallery="true"` gate returns that node id in
       `gallery_gates`, and returns `[]` for a graph without one
-- [ ] Rehydrated (finished, reloaded-from-disk) runs report the same list
-- [ ] The TS type matches, and `check` passes
+- [x] Rehydrated (finished, reloaded-from-disk) runs report the same list
+- [x] The TS type matches, and `check` passes
 
 **Verification:**
-- [ ] `cargo test -p smasher-web`
-- [ ] `cd frontend && npm run check`
+- [x] `cargo test -p smasher-web`
+- [x] `cd frontend && npm run check`
 
 **Dependencies:** None
 
