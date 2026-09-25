@@ -87,7 +87,7 @@ exchanges without parsing DOT.
 
 ## Checkpoint A: server
 
-- [ ] `cargo test --workspace` and `make ci` green
+- [x] `cargo test --workspace` and `make ci` green
 - [ ] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
 - [ ] Commit, then review with Jobsworth before starting the client
 
@@ -102,13 +102,13 @@ exchange for that node; `agent_message` goes to the most recently answered excha
 prompt has been issued since then; a re-asked gate opens a new exchange. Output is oldest first.
 
 **Acceptance criteria:**
-- [ ] The showcase shape (5 gates, one reply each) maps each reply to its own answer
-- [ ] A loop re-asking one gate produces separate exchanges, each with its own answer and replies
-- [ ] A message before any answer, and a message after a new prompt (before its answer), attach
+- [x] The showcase shape (5 gates, one reply each) maps each reply to its own answer
+- [x] A loop re-asking one gate produces separate exchanges, each with its own answer and replies
+- [x] A message before any answer, and a message after a new prompt (before its answer), attach
       to nothing
 
 **Verification:**
-- [ ] `cd frontend && npx vitest run tests/lib/exchanges.test.ts`
+- [x] `cd frontend && npx vitest run tests/lib/exchanges.test.ts`
 
 **Dependencies:** None (event types already exist in `lib/api/events.ts`)
 

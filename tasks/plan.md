@@ -66,12 +66,12 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 
 ### Checkpoint A: server
 
-- [ ] `cargo test --workspace`, `make ci` green
+- [x] `cargo test --workspace`, `make ci` green
 - [ ] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
 
 ### Phase 2: Client builds exchanges
 
-- [ ] T4: `buildExchanges` pure function (S)
+- [x] T4: `buildExchanges` pure function (S)
 - [ ] T5: `renderMarkdown` with `marked` + `DOMPurify`, and `.markdown` styles (S)
 - [ ] T6: Answered Questions comes from events, without gallery gates, and survives a remount (M)
 - [ ] T7: Agent replies render as markdown under their answer (S)
