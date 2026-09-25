@@ -8,12 +8,26 @@ import { join } from 'path';
 import RunDetail from '../../../src/components/dashboard/RunDetail.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
-import { RUN_FAIL_CHECK, submitGraph, cancelAll } from '../../fixtures/graphs';
+import * as questionsApi from '../../../src/lib/api/questions';
+import { ANONYMOUS_GATE, RUN_FAIL_CHECK, submitGraph, cancelAll } from '../../fixtures/graphs';
 
 const humanGateDot = readFileSync(
   join(process.cwd(), '..', 'examples', 'human_gate_showcase.dot'),
   'utf-8'
 );
+
+// Counts real graph requests for one run by wrapping fetch in a pass-through.
+function countGraphRequests(runId: string): { count: () => number; restore: () => void } {
+  const realFetch = globalThis.fetch;
+  let n = 0;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).endsWith(`/runs/${runId}/graph`)) n++;
+    return realFetch(input, init);
+  }) as typeof fetch;
+  return { count: () => n, restore: () => (globalThis.fetch = realFetch) };
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('RunDetail', () => {
   beforeAll(() => {
@@ -107,5 +121,52 @@ describe('RunDetail', () => {
       { timeout: 5000 }
     );
     expect(container.querySelector('dl')).toBeNull();
+  });
+
+  it('renders the graph under a Pipeline Graph heading, scaled to fit', async () => {
+    const runId = await submitGraph(ANONYMOUS_GATE);
+
+    const { container } = render(RunDetail, { props: { runId } });
+
+    await waitFor(() => expect(container.querySelector('.graph svg')).toBeTruthy(), {
+      timeout: 4000,
+    });
+    expect(screen.getByRole('heading', { name: 'Pipeline Graph' })).toBeTruthy();
+    const graph = container.querySelector('.graph')!;
+    expect(graph).toHaveClass('[&_svg]:max-w-full', '[&_svg]:h-auto');
+    expect(graph.className).not.toMatch(/overflow-(x-)?(auto|scroll)/);
+  });
+
+  it('polls the graph while running, then stops after one final fetch', async () => {
+    const runId = await submitGraph(ANONYMOUS_GATE);
+    const graphRequests = countGraphRequests(runId);
+
+    try {
+      render(RunDetail, { props: { runId } });
+      await sleep(7000);
+      expect(graphRequests.count()).toBeGreaterThan(1);
+
+      const [question] = (await questionsApi.listQuestions(runId)).questions;
+      await questionsApi.answerQuestion(runId, question.id, 'go');
+      await waitFor(() => expect(screen.getByText('Completed', { selector: '*:not(dt)' })).toBeTruthy(), {
+        timeout: 7000,
+      });
+
+      const atTerminal = graphRequests.count();
+      await sleep(7000);
+      expect(graphRequests.count() - atTerminal).toBeLessThanOrEqual(1);
+    } finally {
+      graphRequests.restore();
+    }
+  }, 30000);
+
+  it('shows a graph error inline for a missing run', async () => {
+    const { container } = render(RunDetail, { props: { runId: 'no-such-run' } });
+
+    await waitFor(() => {
+      const graphError = container.querySelector('.graph-error');
+      expect(graphError).toHaveTextContent('not found: run no-such-run');
+      expect(graphError).toHaveClass('text-destructive');
+    });
   });
 });

@@ -131,18 +131,18 @@ the token counter.
 - **Scaling.** The container gets `[&_svg]:h-auto [&_svg]:max-w-full` and drops `overflow-auto`.
 
 **Acceptance criteria:**
-- [ ] A gated run renders an `<svg>` under `Pipeline Graph`.
-- [ ] While the run is `Running`, more than one graph request happens within about 7s.
-- [ ] After the gate is answered and the run completes, the graph requests stop: at most one more
+- [x] A gated run renders an `<svg>` under `Pipeline Graph`.
+- [x] While the run is `Running`, more than one graph request happens within about 7s.
+- [x] After the gate is answered and the run completes, the graph requests stop: at most one more
       request in the following 7s.
-- [ ] `/runs/no-such-run` shows the graph error text inline, and adds no toast of its own.
-- [ ] The SVG carries the scaling classes, and the container has no horizontal overflow class.
+- [x] `/runs/no-such-run` shows the graph error text inline, and adds no toast of its own.
+- [x] The SVG carries the scaling classes, and the container has no horizontal overflow class.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/RunDetail.test.ts`. Requests are counted with a
+- [x] `npm test -- --run tests/components/dashboard/RunDetail.test.ts`. Requests are counted with a
       `PerformanceObserver` or by wrapping the real `fetch` in a pass-through counter. There's no
       mocked response.
-- [ ] `npm run test:e2e -- e2e/app-shell.spec.ts` still passes, with 2 toasts.
+- [x] `npm run test:e2e -- e2e/app-shell.spec.ts` still passes, with 2 toasts.
 
 **Dependencies:** Task 2
 

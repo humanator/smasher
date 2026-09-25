@@ -10,6 +10,7 @@
   import RunMetaList from './RunMetaList.svelte';
   import { sanitizeSvg } from '../../lib/sanitizeSvg';
   import { TERMINAL_STATUSES } from '../../lib/runStatus';
+  import { graphErrorMessage } from '../../lib/graphError';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { usePageActions } from '$lib/page-header.svelte';
@@ -17,34 +18,50 @@
   let { runId }: { runId: string } = $props();
 
   const POLL_INTERVAL_MS = 5000;
+  const GRAPH_POLL_INTERVAL_MS = 3000;
 
   let run: RunSummary | null = $state(null);
   let graphSvg: string | null = $state(null);
+  let graphError: string | null = $state(null);
+  let lastRawSvg: string | null = null;
   let error: string | null = $state(null);
   let aborting = $state(false);
   let pollHandle: ReturnType<typeof setInterval> | undefined;
+  let graphPollHandle: ReturnType<typeof setInterval> | undefined;
 
   async function refreshRun() {
     try {
       run = await runsApi.getRun(runId);
       error = null;
       if (run && TERMINAL_STATUSES.has(run.status) && pollHandle) {
-        clearInterval(pollHandle);
-        pollHandle = undefined;
+        stopPolling();
+        // One last fetch so the graph shows the final node colours.
+        loadGraph();
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load run';
     }
   }
 
+  function stopPolling() {
+    clearInterval(pollHandle);
+    clearInterval(graphPollHandle);
+    pollHandle = undefined;
+    graphPollHandle = undefined;
+  }
+
   async function loadGraph() {
     try {
       const rawSvg = await runsApi.renderGraph(runId);
-      graphSvg = sanitizeSvg(rawSvg);
-    } catch {
-      // Graph rendering can fail for workflows without a resolvable graph;
-      // non-fatal to the rest of the run detail view.
-      graphSvg = null;
+      graphError = null;
+      // Replace the markup only when the graph changed, so it doesn't flicker.
+      if (rawSvg !== lastRawSvg) {
+        lastRawSvg = rawSvg;
+        graphSvg = sanitizeSvg(rawSvg);
+      }
+    } catch (err) {
+      // Shown inline in the graph's place, never as a toast.
+      graphError = graphErrorMessage(err instanceof Error ? err.message : '');
     }
   }
 
@@ -64,11 +81,10 @@
     refreshRun();
     loadGraph();
     pollHandle = setInterval(refreshRun, POLL_INTERVAL_MS);
+    graphPollHandle = setInterval(loadGraph, GRAPH_POLL_INTERVAL_MS);
   });
 
-  onDestroy(() => {
-    if (pollHandle) clearInterval(pollHandle);
-  });
+  onDestroy(stopPolling);
 
   // Status + Abort live in the page header when there is one.
   const actionsInHeader = usePageActions(runActions);
@@ -107,12 +123,21 @@
     <RunMetaList {run} />
 
     <TokenCounter {runId} />
+  {/if}
 
-    {#if graphSvg}
-      <div class="graph overflow-auto rounded-lg border border-border bg-card p-4">
-        <!-- eslint-disable-next-line svelte/no-at-html-tags -- graphSvg is passed through sanitizeSvg() above, which strips <script>, on* handlers, and javascript: hrefs -->
-        {@html graphSvg}
-      </div>
-    {/if}
+  {#if graphSvg || graphError}
+    <section class="flex flex-col gap-2">
+      <h3 class="text-base font-semibold text-foreground">Pipeline Graph</h3>
+      {#if graphError}
+        <p class="graph-error text-destructive break-words">{graphError}</p>
+      {:else}
+        <div
+          class="graph rounded-lg border border-border bg-card p-4 [&_svg]:h-auto [&_svg]:max-w-full"
+        >
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -- graphSvg is passed through sanitizeSvg() above, which strips <script>, on* handlers, and javascript: hrefs -->
+          {@html graphSvg}
+        </div>
+      {/if}
+    </section>
   {/if}
 </div>
