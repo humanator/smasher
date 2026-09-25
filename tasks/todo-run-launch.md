@@ -79,8 +79,8 @@ edits to the caller's object don't leak in.
 **Scope:** XS
 
 ## Checkpoint A: after Tasks 1–3
-- [ ] `npm test -- --run` passes in full, and `npm run check` shows only the 6 pre-existing errors. `npm run lint` is clean.
-- [ ] Commit (one per task)
+- [x] `npm test -- --run` passes in full, and `npm run check` shows only the 6 pre-existing errors. `npm run lint` is clean.
+- [x] Commit (one per task)
 
 ## Task 4: `RunDialog.svelte`
 
@@ -103,18 +103,18 @@ launch spends nothing. The rejection test imports `digraph { Start [shape=Mdiamo
 expects the alert to contain `Pipeline lint errors: Graph has no exit node`.
 
 **Acceptance criteria:**
-- [ ] Four fields, found by their labels: Model, Variables, Brief and Node Overrides (JSON). Each has the old form's placeholder.
-- [ ] Cancel and Escape close the dialog, and `listRuns()` has no run for that workflow
-- [ ] A bad Variables line or bad Node Overrides shows its error under the field and sends no request. Editing the field clears the error.
-- [ ] A real submit on `run_launch_check` navigates to `/runs/{id}`, and that run's question reads `Brief: hello | Model: m-1 | Colour: blue`
-- [ ] With Model blank, the question's model is non-empty and not `{{model}}`
-- [ ] A lint-failing imported workflow shows `Pipeline lint errors: …` inline. The dialog stays open with its values, and Run is enabled again.
-- [ ] Run shows `Starting…` and is disabled while the request is in flight
-- [ ] Close then reopen keeps the values and shows no errors
-- [ ] The component imports nothing from `WorkflowCatalog`
+- [x] Four fields, found by their labels: Model, Variables, Brief and Node Overrides (JSON). Each has the old form's placeholder.
+- [x] Cancel and Escape close the dialog, and `listRuns()` has no run for that workflow
+- [x] A bad Variables line or bad Node Overrides shows its error under the field and sends no request. Editing the field clears the error.
+- [x] A real submit on `run_launch_check` navigates to `/runs/{id}`, and that run's question reads `Brief: hello | Model: m-1 | Colour: blue`
+- [x] With Model blank, the question's model is non-empty and not `{{model}}`
+- [x] A lint-failing imported workflow shows `Pipeline lint errors: …` inline. The dialog stays open with its values, and Run is enabled again.
+- [x] Run shows `Starting…` and is disabled while the request is in flight
+- [x] Close then reopen keeps the values and shows no errors
+- [x] The component imports nothing from `WorkflowCatalog`
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/RunDialog.test.ts`, written first and seen failing. It uses the real server, with `location` stubbed and `_test_run_launch_` imports removed in `afterEach`.
+- [x] `npm test -- --run tests/components/dashboard/RunDialog.test.ts`, written first and seen failing. It uses the real server, with `location` stubbed and `_test_run_launch_` imports removed in `afterEach`.
 
 **Dependencies:** Tasks 1, 2, 3
 

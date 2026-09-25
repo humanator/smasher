@@ -7,6 +7,7 @@
   import * as runsApi from '../../lib/api/runs';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Table from '$lib/components/ui/table/index.js';
+  import { formatWorkflowName } from '$lib/utils';
   import { loadFile } from '../../lib/native';
 
   interface Workflow {
@@ -66,15 +67,6 @@
     } catch (err) {
       importError = err instanceof Error ? err.message : 'Failed to import workflow';
     }
-  }
-
-  function formatWorkflowName(name: string): string {
-    // Convert "consensus_task.dot" to "Consensus Task"
-    return name
-      .replace(/\.dot$/, '')
-      .split('_')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
   }
 </script>
 
