@@ -320,12 +320,12 @@ the UI: a radio plus Submit, then Yes, then text plus Submit. The run then reach
 and the card shows `No pending questions.` Cancel in `finally`.
 
 **Acceptance criteria:**
-- [ ] The spec passes in Chromium.
-- [ ] `e2e/critical-path.spec.ts`'s selectors still exist. The spec isn't run, because it spends
+- [x] The spec passes in Chromium.
+- [x] `e2e/critical-path.spec.ts`'s selectors still exist. The spec isn't run, because it spends
       tokens. The check is a grep for the placeholder in `QuestionCard.svelte`.
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/question-card.spec.ts e2e/gallery-gate.spec.ts e2e/run-launch.spec.ts`
+- [x] `npm run test:e2e -- e2e/question-card.spec.ts e2e/gallery-gate.spec.ts e2e/run-launch.spec.ts`
 
 **Dependencies:** Task 10
 
@@ -334,10 +334,10 @@ and the card shows `No pending questions.` Cancel in `finally`.
 **Scope:** S
 
 ## Checkpoint B: `question-card`
-- [ ] The full Vitest suite, `check` and `lint` are green, as in Checkpoint A.
-- [ ] The Task 11 e2e specs pass.
-- [ ] The map row for `question-card` reads `Done <date>`.
-- [ ] Review with Jobsworth before Phase C.
+- [x] The full Vitest suite, `check` and `lint` are green, as in Checkpoint A.
+- [x] The Task 11 e2e specs pass.
+- [x] The map row for `question-card` reads `Done <date>`.
+- [x] Review with Jobsworth before Phase C. (Waived: Jobsworth chose to run straight through.)
 
 ---
 
