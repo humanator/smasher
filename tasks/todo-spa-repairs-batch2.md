@@ -413,18 +413,18 @@ and the card shows `No pending questions.` Cancel in `finally`.
 - Delete `eventDescription`. The notification body now uses `formatEvent`.
 
 **Acceptance criteria:**
-- [ ] On a real `LOOP_CHECK` run (answered `again` once, then `done`):
-  - [ ] the first line is `Pipeline completed`;
-  - [ ] a `Loop #1` line is present;
-  - [ ] the edge and checkpoint lines are `data-faded="true"`.
-- [ ] Constructed agent events added to the store render with `data-agent="true"`.
-- [ ] Changing `runId` empties the log.
-- [ ] `EventLog.test.ts`'s exact-string assertions are moved to the new text, and the whole file
+- [x] On a real `LOOP_CHECK` run (answered `again` once, then `done`):
+  - [x] the first line is `Pipeline completed`;
+  - [x] a `Loop #1` line is present;
+  - [x] the edge and checkpoint lines are `data-faded="true"`.
+- [x] Constructed agent events added to the store render with `data-agent="true"`.
+- [x] Changing `runId` empties the log.
+- [x] `EventLog.test.ts`'s exact-string assertions are moved to the new text, and the whole file
       passes.
-- [ ] The completion-notification test still passes.
+- [x] The completion-notification test still passes.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/EventLog.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/EventLog.test.ts`
 
 **Dependencies:** Tasks 1, 12 and 13
 
