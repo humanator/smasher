@@ -133,14 +133,14 @@ event log keeps one short line per agent message, so it stays a complete timelin
 - Collapsing long replies.
 - Recording the question kind or choices in `HumanPromptIssued`.
 
-## Open questions
+## Resolved questions (Jobsworth, 2026-09-25)
 
-1. **Gallery gates** answer through the same `answer_question`, so they'd emit a
-   `HumanResponseReceived` whose response is the JSON selection. Decision History already shows
-   that decision. Recommendation: leave the gallery gate's exchange out of Answered Questions,
-   matched by the `node_id` in `GET /runs/{id}/decisions`.
-2. **Ordering in the panel:** oldest first, reading like a conversation (recommended), or newest
-   first, as the event log is?
+1. **Gallery gates** answer through the same `answer_question`, so they emit a
+   `HumanResponseReceived` whose response is the selection JSON, which Decision History already
+   shows. Their exchanges are left out of Answered Questions, identified by graph attributes:
+   `GET /api/runs/{id}` gains `gallery_gates: string[]` (node ids where `is_gallery_gate()`), and
+   QuestionCard drops exchanges for those nodes.
+2. **Ordering in the panel:** oldest first, reading like a conversation.
 
 ## Success criteria
 
