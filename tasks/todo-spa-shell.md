@@ -60,12 +60,12 @@ lifted from `workflows.ts:51-65`, and re-export it from `lib/api/index.ts`.
 spec's Code Style section.
 
 **Acceptance criteria:**
-- [ ] `notifyError(new Error('x'), 'fallback')` shows a toast reading `x`, and a non-Error shows `fallback`
-- [ ] Three `fail()` calls on one notifier show exactly one toast. `ok()` then `fail()` shows a second one.
-- [ ] Two notifiers with different ids show two toasts at once
+- [x] `notifyError(new Error('x'), 'fallback')` shows a toast reading `x`, and a non-Error shows `fallback`
+- [x] Three `fail()` calls on one notifier show exactly one toast. `ok()` then `fail()` shows a second one.
+- [x] Two notifiers with different ids show two toasts at once
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/notify.test.ts` passes. The test renders the real `Toaster` from `$lib/components/ui/sonner`, asserts on the DOM, and calls `toast.dismiss()` in `afterEach`.
+- [x] `npm test -- --run tests/lib/notify.test.ts` passes. The test renders the real `Toaster` from `$lib/components/ui/sonner`, asserts on the DOM, and calls `toast.dismiss()` in `afterEach`.
 
 **Dependencies:** Task 1 (messages come from `ApiError`)
 

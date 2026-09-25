@@ -60,7 +60,7 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 - [x] Vitest suite and `npm run check` pass (no new errors), inline errors show server text
 
 ### Phase 2: Toasts
-- [ ] Task 3: `lib/notify.ts`
+- [x] Task 3: `lib/notify.ts`
 - [ ] Task 4: QuestionCard toasts on answer and poll failure
 - [ ] Task 5: GalleryGate toasts on poll failure
 
