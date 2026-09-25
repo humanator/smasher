@@ -73,7 +73,7 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 
 ### Checkpoint C: Complete
 - [x] All spec success criteria met, `make ci` green
-- [ ] Review with Jobsworth
+- [x] Review with Jobsworth (2026-09-25)
 
 ## Risks and mitigations
 
