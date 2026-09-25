@@ -289,8 +289,7 @@ only on request.
     `human_prompt_issued` / `human_response_received`, the run summary lists
     `gallery_gates`, and Answered Questions is rebuilt from events (oldest
     first, gallery picks left out), with replies rendered as markdown. Found
-    along the way: web runs never write `pipeline_completed` to `events.jsonl`
-    (SSE and the in-memory log do get it); not fixed. *Raised by
+    along the way: #29 and #30. *Raised by
     Jobsworth 2026-09-25* from run `01m3c6t5exbbr6b2jps2w3wnj7`
     (`human_gate_showcase.dot`). Each gate answer leads into an LLM node whose
     `agent_message` replies to it, but the reply only shows as a cut-off line in
@@ -303,6 +302,34 @@ only on request.
     `human_response_received`. Open: whether gallery-gate answers are left out,
     and oldest- or newest-first order (settled: gallery answers left out,
     oldest first).
+
+29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
+    *Seen 2026-09-25 while building #28.* In `crates/smasher-web/tests/events_test.rs`,
+    a gated run (`Start → Gate → Exit`, data dir a `tempfile` dir) reaches
+    `Completed`, and SSE delivers `pipeline_completed`. But the run's
+    `events.jsonl` stops at the Exit node's `node_completed`. The Exit
+    `checkpoint_created` and `pipeline_completed` never arrive, even after 10s.
+    A real `smasher serve` run does write both (checked on run
+    `01m3cacyq1mfp5ekvv56a2kcfq`), so this may be harness-only. The cause isn't
+    known yet. The file is written by the `FileLogSink` subscriber spawned in
+    `run_launch.rs`. `test_human_gate_exchange_is_recorded_in_events_jsonl`
+    works around it by waiting for Exit's `node_completed`. Once the cause is
+    known, make the test wait for `pipeline_completed` again. If it isn't
+    harness-only, finished runs reloaded from disk would be missing their final
+    events.
+30. **Clear the errors `npm run check` already reports.** *Seen 2026-09-25;
+    they're on `main` too, not from #28.* `svelte-check --threshold error`
+    reports 5 errors, so the "check passes" line in every plan is currently
+    false:
+    - `src/components/node-editor/WorkflowCanvas.svelte:527`:
+      `Record<string, unknown>` isn't assignable to `Record<string, AttrValue>`.
+    - `tests/setup.ts:14`: the `EventSource` redeclaration doesn't match the
+      DOM lib's type.
+    - `e2e/gallery-gate.spec.ts:87-89` (3 errors): `string | undefined` is
+      passed where `string` is expected.
+
+    Fix them, then add `npm run check` to #2's frontend CI job so they can't
+    come back.
 
 ## P2: Robustness (can lose data or grow without limit)
 
