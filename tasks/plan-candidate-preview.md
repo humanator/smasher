@@ -127,7 +127,7 @@ See `todo-candidate-preview.md` for acceptance criteria and verification.
 - [ ] Full suite green. Jobsworth looks at the lightbox in `npm run dev` (optional, on request)
 
 ### Phase 3: Wire into both cards
-- [ ] Task 5: Gallery card: preview, params and captured-at on failed cards
+- [x] Task 5: Gallery card: preview, params and captured-at on failed cards
 - [ ] Task 6: Gate card: preview and params without toggling the checkbox
 
 ### Checkpoint C

@@ -30,19 +30,20 @@ function writeManifest(
   runId: string,
   candidateId: string,
   exitStatus: Record<string, unknown>,
-  artifacts: Array<{ kind: string; path: string }> = []
+  artifacts: Array<{ kind: string; path: string }> = [],
+  generationParams: Record<string, string> = {}
 ) {
   const dir = join(artifactsRoot, runId, 'artifacts', candidateId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'manifest.json'),
     JSON.stringify({
-      captured_at: new Date().toISOString(),
+      captured_at: '2026-09-25T07:00:00Z',
       viewport: { width: 1280, height: 800 },
       candidate_dir: `/tmp/${candidateId}`,
       exit_status: exitStatus,
       artifacts,
-      generation_params: {},
+      generation_params: generationParams,
     })
   );
   return dir;
@@ -118,12 +119,67 @@ describe('CandidateGallery', () => {
     expect(screen.getByText('raw hex color')).toBeTruthy();
     expect(screen.getByText('synthesis: iterate')).toBeTruthy();
 
-    // candidate-b: bundle iframe instead of an <img>
-    const images = screen.getAllByRole('img');
-    expect(images.length).toBe(1); // only candidate-a falls back to <img>
-    expect(images[0].getAttribute('alt')).toContain('candidate-a');
+    // Every live candidate, bundle or not, is a screenshot thumbnail; no card embeds an iframe.
+    for (const id of ['candidate-a', 'candidate-b']) {
+      const thumbnail = screen.getByRole('button', { name: `Open preview of ${id}` });
+      expect(thumbnail.querySelector('img')?.getAttribute('alt')).toBe(`Candidate ${id}`);
+    }
+    expect(screen.queryByRole('button', { name: 'Open preview of candidate-c' })).toBeNull();
+    expect(document.querySelector('iframe')).toBeNull();
 
     // candidate-c: failed card shows its reason, no embed
     expect(screen.getByText('render timed out')).toBeTruthy();
+  });
+
+  it('lists generation_params in a collapsed params section, and leaves it out when empty', async () => {
+    const submitResp = await runsApi.submitRun({
+      dot_source: gatedDot,
+      variables: { test: 'candidate-gallery-params' },
+    });
+    const runId = submitResp.run_id;
+
+    writeManifest(runId, 'candidate-a', { status: 'success' }, [], {
+      temperature: '0.4',
+      seed: '7',
+    });
+    writeManifest(runId, 'candidate-b', { status: 'success' });
+
+    render(CandidateGallery, { props: { runId } });
+    await waitFor(() => {
+      expect(screen.getByText('candidate-a')).toBeTruthy();
+      expect(screen.getByText('candidate-b')).toBeTruthy();
+    });
+
+    const summaries = screen.getAllByText('params');
+    expect(summaries.length).toBe(1);
+    const details = summaries[0].closest('details');
+    expect(details?.open).toBe(false);
+    expect(details?.closest('.candidate-card')?.textContent).toContain('candidate-a');
+    // The API sends generation_params sorted by key.
+    const rows = Array.from(details?.querySelectorAll('li') ?? []).map((li) => li.textContent);
+    expect(rows).toEqual(['seed: 7', 'temperature: 0.4']);
+  });
+
+  it("shows a failed candidate's id, then captured_at, then the reason", async () => {
+    const submitResp = await runsApi.submitRun({
+      dot_source: gatedDot,
+      variables: { test: 'candidate-gallery-failed-captured-at' },
+    });
+    const runId = submitResp.run_id;
+
+    writeManifest(runId, 'candidate-f', { status: 'failed', reason: 'render timed out' });
+    // Shown raw, exactly as the API sends it.
+    const { candidates } = await runsApi.listCandidates(runId);
+    const capturedAt = candidates[0].manifest.captured_at as string;
+    expect(capturedAt).toMatch(/^2026-09-25T07:00:00/);
+
+    render(CandidateGallery, { props: { runId } });
+    await waitFor(() => expect(screen.getByText('render timed out')).toBeTruthy());
+
+    const card = screen.getByText('render timed out').closest('.candidate-card');
+    const text = card?.textContent ?? '';
+    expect(text).toContain(capturedAt);
+    expect(text.indexOf('candidate-f')).toBeLessThan(text.indexOf(capturedAt));
+    expect(text.indexOf(capturedAt)).toBeLessThan(text.indexOf('render timed out'));
   });
 });
