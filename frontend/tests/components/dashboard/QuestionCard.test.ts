@@ -209,6 +209,57 @@ describe('QuestionCard', () => {
     }
   });
 
+  it('answers multiple choice with radios and Submit, then approval with Yes', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(QUESTION_KINDS);
+
+    render(QuestionCard, { props: { runId } });
+
+    const group = await screen.findByRole('group', { name: 'Pick a colour' }, { timeout: 2000 });
+    const radios = ['Red', 'Blue', 'Green'].map((name) => screen.getByRole('radio', { name }));
+    expect(group).toContainElement(radios[0]);
+    for (const radio of radios) expect(radio).not.toBeChecked();
+    const submit = screen.getByRole('button', { name: 'Submit' });
+    expect(submit).toBeDisabled();
+
+    // Picking a choice doesn't submit it.
+    await user.click(radios[1]);
+    expect(radios[1]).toBeChecked();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(screen.queryByText('Answer: Blue')).toBeNull();
+    expect((await questionsApi.listQuestions(runId)).questions[0]?.kind).toBe('multiple_choice');
+
+    await user.click(submit);
+    await waitFor(() => expect(screen.getByText('Answer: Blue')).toBeTruthy());
+
+    await user.click(await screen.findByRole('button', { name: 'Yes' }, { timeout: 4000 }));
+    await waitFor(() => expect(screen.getByText('Answer: yes')).toBeTruthy());
+
+    expect(await screen.findByText('Say something', {}, { timeout: 4000 })).toBeTruthy();
+  }, 15000);
+
+  it('disables Yes and No while an approval answer is in flight', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(gatedPipeline('QuestionCardHeldApproval', 'label="Go?", approve=true'));
+    const answers = holdAnswers(runId);
+
+    try {
+      render(QuestionCard, { props: { runId } });
+      const yes = await screen.findByRole('button', { name: 'Yes' });
+      const no = screen.getByRole('button', { name: 'No' });
+      await user.click(yes);
+
+      await waitFor(() => expect(yes).toBeDisabled());
+      expect(no).toBeDisabled();
+
+      answers.release();
+      await waitFor(() => expect(screen.getByText('Answer: yes')).toBeTruthy());
+    } finally {
+      answers.release();
+      answers.restore();
+    }
+  });
+
   it("drops the first run's answered questions when the run changes", async () => {
     const user = userEvent.setup();
     const firstRun = await submitGraph(ANONYMOUS_GATE);

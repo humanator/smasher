@@ -296,16 +296,16 @@ the token counter.
 - The approval Yes/No buttons are disabled while an answer is in flight.
 
 **Acceptance criteria:**
-- [ ] On a `QUESTION_KINDS` run, the card shows three unselected radios named `Red`, `Blue` and
+- [x] On a `QUESTION_KINDS` run, the card shows three unselected radios named `Red`, `Blue` and
       `Green`, and a disabled Submit.
-- [ ] Clicking Blue doesn't submit. Clicking Submit answers `Blue`, and the approval question
+- [x] Clicking Blue doesn't submit. Clicking Submit answers `Blue`, and the approval question
       appears next.
-- [ ] Clicking Yes answers the approval question, and the free-text question appears.
-- [ ] The radios can be found with `getByRole('radio', { name })`, and the group with
+- [x] Clicking Yes answers the approval question, and the free-text question appears.
+- [x] The radios can be found with `getByRole('radio', { name })`, and the group with
       `getByRole('group', { name: <question> })`.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/QuestionCard.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/QuestionCard.test.ts`
 
 **Dependencies:** Task 9
 

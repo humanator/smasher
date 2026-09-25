@@ -105,7 +105,10 @@
             <Badge variant="secondary" class="uppercase">{KIND_LABELS[question.kind]}</Badge>
             <span class="font-mono text-xs text-muted-foreground break-all">{question.id}</span>
           </div>
-          <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
+          <!-- Multiple choice shows the question as its fieldset's legend instead. -->
+          {#if question.kind !== 'multiple_choice'}
+            <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
+          {/if}
 
           {#if question.kind === 'free_form'}
             <!-- A form, so Enter in the input submits too. -->
@@ -134,25 +137,53 @@
               <!-- Yes/No colors carry semantic meaning (approve/reject). -->
               <Button
                 onclick={() => handleAnswer(question.id, 'yes')}
+                disabled={card(question.id).submitting}
                 class="bg-green-600 text-white hover:bg-green-700"
               >
                 Yes
               </Button>
               <Button
                 onclick={() => handleAnswer(question.id, 'no')}
+                disabled={card(question.id).submitting}
                 class="bg-destructive text-white hover:bg-destructive/90"
               >
                 No
               </Button>
             </div>
           {:else if question.kind === 'multiple_choice'}
-            <div class="choices flex flex-wrap gap-2">
-              {#each question.choices as choice}
-                <Button onclick={() => handleAnswer(question.id, choice)} variant="secondary">
-                  {choice}
-                </Button>
-              {/each}
-            </div>
+            <form
+              class="choices flex flex-col gap-4"
+              onsubmit={(e) => {
+                e.preventDefault();
+                handleAnswer(question.id, card(question.id).choice ?? '');
+              }}
+            >
+              <fieldset class="flex flex-col gap-2" disabled={card(question.id).submitting}>
+                <legend class="question-text mb-2 font-medium text-foreground">
+                  {question.question}
+                </legend>
+                {#each question.choices as choice (choice)}
+                  <label class="flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="radio"
+                      name="choice-{question.id}"
+                      value={choice}
+                      checked={card(question.id).choice === choice}
+                      onchange={() => update(question.id, { choice })}
+                      class="accent-primary"
+                    />
+                    {choice}
+                  </label>
+                {/each}
+              </fieldset>
+              <Button
+                type="submit"
+                class="self-start"
+                disabled={!card(question.id).choice || card(question.id).submitting}
+              >
+                Submit
+              </Button>
+            </form>
           {/if}
         </div>
       {/each}
