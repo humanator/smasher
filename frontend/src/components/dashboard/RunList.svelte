@@ -5,8 +5,7 @@
   import { onMount, onDestroy } from 'svelte';
   import * as runsApi from '../../lib/api/runs';
   import type { RunSummary } from '../../lib/api/runs';
-  import * as Table from '$lib/components/ui/table/index.js';
-  import StatusBadge from './StatusBadge.svelte';
+  import RunTable from './RunTable.svelte';
 
   const POLL_INTERVAL_MS = 5000;
 
@@ -47,35 +46,6 @@
   {:else if runs.length === 0}
     <p class="p-8 text-center text-lg text-muted-foreground">No runs yet.</p>
   {:else}
-    <div class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
-      <Table.Root>
-        <Table.Header class="bg-muted/50">
-          <Table.Row>
-            <Table.Head class="text-muted-foreground">Run</Table.Head>
-            <Table.Head class="text-muted-foreground">Workflow</Table.Head>
-            <Table.Head class="text-muted-foreground">Status</Table.Head>
-            <Table.Head class="text-muted-foreground">Started</Table.Head>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {#each runs as run (run.id)}
-            <Table.Row>
-              <Table.Cell>
-                <a href="/runs/{run.id}" class="font-mono text-primary hover:underline">{run.id}</a>
-              </Table.Cell>
-              <Table.Cell>
-                {#if run.graph_name?.trim()}
-                  {run.graph_name}
-                {:else}
-                  <span class="text-muted-foreground">unnamed</span>
-                {/if}
-              </Table.Cell>
-              <Table.Cell><StatusBadge status={run.status} /></Table.Cell>
-              <Table.Cell>{new Date(run.started_at).toLocaleString()}</Table.Cell>
-            </Table.Row>
-          {/each}
-        </Table.Body>
-      </Table.Root>
-    </div>
+    <RunTable {runs} />
   {/if}
 </div>

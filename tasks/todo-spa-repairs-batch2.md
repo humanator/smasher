@@ -493,11 +493,11 @@ The spec cancels the run in `finally`.
 `RunTable`.
 
 **Acceptance criteria:**
-- [ ] `RunList.test.ts` passes unchanged.
-- [ ] A new `RunTable.test.ts`, run on real `listRuns()` data, renders one linked row per run.
+- [x] `RunList.test.ts` passes unchanged.
+- [x] A new `RunTable.test.ts`, run on real `listRuns()` data, renders one linked row per run.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/RunList.test.ts tests/components/dashboard/RunTable.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/RunList.test.ts tests/components/dashboard/RunTable.test.ts`
 
 **Dependencies:** Task 6
 
