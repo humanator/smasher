@@ -155,3 +155,54 @@ describe('App settings button', () => {
     expect(within(header).getByRole('link', { name: 'New Workflow' })).toBeTruthy();
   });
 });
+
+describe('App document title', () => {
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(() => {
+    visit('/');
+  });
+
+  it('is Smasher on the catalog, while the header still reads Smasher Pipelines', async () => {
+    visit('/');
+    render(App);
+
+    await waitFor(() => expect(document.title).toBe('Smasher'));
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { name: 'Smasher Pipelines' })).toBeTruthy();
+  });
+
+  it('puts the run id first on a run page', async () => {
+    visit('/runs/no-such-run');
+    render(App);
+
+    await waitFor(() => expect(document.title).toBe('Run no-such-run — Smasher'));
+  });
+
+  it('is Edit Workflow — Smasher on the editor', async () => {
+    visit('/workflows/examples__consensus_task/edit');
+    render(App);
+
+    await waitFor(() => expect(document.title).toBe('Edit Workflow — Smasher'));
+  });
+
+  it('is New Workflow — Smasher on the new-workflow page', async () => {
+    visit('/workflows/new');
+    render(App);
+
+    await waitFor(() => expect(document.title).toBe('New Workflow — Smasher'));
+  });
+
+  it('follows back navigation from a run page to the catalog', async () => {
+    visit('/runs/no-such-run');
+    render(App);
+    await waitFor(() => expect(document.title).toBe('Run no-such-run — Smasher'));
+
+    visit('/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    await waitFor(() => expect(document.title).toBe('Smasher'));
+  });
+});

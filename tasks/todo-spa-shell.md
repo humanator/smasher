@@ -140,12 +140,12 @@ error path (`:82`) as it is, since it already shows inline.
 The header's `pageTitle` is unchanged. Update the `index.html` `<title>` fallback to `Smasher`.
 
 **Acceptance criteria:**
-- [ ] Each route sets the title above
-- [ ] After `pushState` to a run and then a `popstate` back to `/`, the title is `Smasher`
-- [ ] The catalog header still reads "Smasher Pipelines"
+- [x] Each route sets the title above
+- [x] After `pushState` to a run and then a `popstate` back to `/`, the title is `Smasher`
+- [x] The catalog header still reads "Smasher Pipelines"
 
 **Verification:**
-- [ ] New cases in `tests/components/AppLayout.test.ts` fail first, then pass
+- [x] New cases in `tests/components/AppLayout.test.ts` fail first, then pass
 
 **Dependencies:** None
 

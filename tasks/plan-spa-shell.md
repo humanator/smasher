@@ -68,7 +68,7 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 - [x] Full suite green; manual check: a rejected answer and a dead poll each toast once
 
 ### Phase 3: Title and icon
-- [ ] Task 6: `document.title` per route
+- [x] Task 6: `document.title` per route
 - [ ] Task 7: ⚡ favicon and the `app-shell` Playwright spec
 
 ### Checkpoint C: Complete

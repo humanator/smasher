@@ -40,6 +40,20 @@
           ? `Run ${runId}`
           : 'Smasher Pipelines'
   );
+  // The tab title puts the page first so truncated tabs stay readable.
+  const documentTitle = $derived(
+    workflowPageType === 'new'
+      ? 'New Workflow — Smasher'
+      : workflowPageType === 'edit'
+        ? 'Edit Workflow — Smasher'
+        : runId
+          ? `Run ${runId} — Smasher`
+          : 'Smasher'
+  );
+
+  $effect(() => {
+    document.title = documentTitle;
+  });
 
   onMount(() => {
     // Set initial path from window.location
