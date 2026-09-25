@@ -46,8 +46,12 @@
 
   // Per run: start from an empty store, fetch now, then every 2s. The store is
   // a singleton, so it's reset again on cleanup so answers don't leak to the next run.
+  // Derived, so setting the same runId again doesn't reset the card (a derived
+  // only notifies when its value changes).
+  const pollRunId = $derived(runId);
+
   $effect(() => {
-    const id = runId;
+    const id = pollRunId;
     questionStore.reset();
     cards = {};
     loaded = false;

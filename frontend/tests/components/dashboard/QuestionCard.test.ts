@@ -260,6 +260,20 @@ describe('QuestionCard', () => {
     }
   });
 
+  it('keeps the answered questions when given the same run again', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(ANONYMOUS_GATE);
+
+    const { rerender } = render(QuestionCard, { props: { runId } });
+    await user.type(await screen.findByPlaceholderText('Enter your answer'), 'kept{Enter}');
+    await waitFor(() => expect(screen.getByText('Answer: kept')).toBeTruthy());
+
+    await rerender({ runId });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(screen.getByText('Answer: kept')).toBeTruthy();
+  });
+
   it("drops the first run's answered questions when the run changes", async () => {
     const user = userEvent.setup();
     const firstRun = await submitGraph(ANONYMOUS_GATE);
