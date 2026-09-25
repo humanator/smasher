@@ -9,7 +9,7 @@
   import TokenCounter from './TokenCounter.svelte';
   import RunMetaList from './RunMetaList.svelte';
   import { sanitizeSvg } from '../../lib/sanitizeSvg';
-  import { TERMINAL_STATUSES } from '../../lib/runStatus';
+  import { TERMINAL_STATUSES, isActive } from '../../lib/runStatus';
   import { graphErrorMessage } from '../../lib/graphError';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Separator } from '$lib/components/ui/separator/index.js';
@@ -122,7 +122,7 @@
 
     <RunMetaList {run} />
 
-    <TokenCounter {runId} />
+    <TokenCounter {runId} active={run ? isActive(run.status) : true} />
   {/if}
 
   {#if graphSvg || graphError}

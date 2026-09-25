@@ -161,12 +161,12 @@ the token counter.
 - `RunDetail` passes `active={run ? isActive(run.status) : true}`.
 
 **Acceptance criteria:**
-- [ ] On a gated run, the counter shows all three labels, and Total equals Input plus Output.
-- [ ] With `active` true, a second token request happens within about 4s.
-- [ ] After `active` turns false, exactly one more request happens and then no more.
+- [x] On a gated run, the counter shows all three labels, and Total equals Input plus Output.
+- [x] With `active` true, a second token request happens within about 4s.
+- [x] After `active` turns false, exactly one more request happens and then no more.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/TokenCounter.test.ts tests/components/dashboard/RunDetail.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/TokenCounter.test.ts tests/components/dashboard/RunDetail.test.ts`
 
 **Dependencies:** Task 2
 

@@ -1,18 +1,16 @@
 <script lang="ts">
-  // ABOUTME: Polls GET /api/runs/{id}/tokens and shows live input/output token counts
-  // ABOUTME: Polling cadence matches the old dashboard's 5s refresh
+  // ABOUTME: Polls GET /api/runs/{id}/tokens and shows live input, output and total token counts
+  // ABOUTME: Refreshes every 3s while the run is active, as the old dashboard did, then once more
 
-  import { onMount, onDestroy } from 'svelte';
   import * as runsApi from '../../lib/api/runs';
 
-  let { runId }: { runId: string } = $props();
+  let { runId, active = true }: { runId: string; active?: boolean } = $props();
 
-  const POLL_INTERVAL_MS = 5000;
+  const POLL_INTERVAL_MS = 3000;
 
   let inputTokens = $state(0);
   let outputTokens = $state(0);
   let error: string | null = $state(null);
-  let pollHandle: ReturnType<typeof setInterval> | undefined;
 
   async function refresh() {
     try {
@@ -25,13 +23,13 @@
     }
   }
 
-  onMount(() => {
+  // Fetch now; keep polling only while active. Turning inactive clears the
+  // interval and re-runs this once, which is the final fetch.
+  $effect(() => {
     refresh();
-    pollHandle = setInterval(refresh, POLL_INTERVAL_MS);
-  });
-
-  onDestroy(() => {
-    if (pollHandle) clearInterval(pollHandle);
+    if (!active) return;
+    const pollHandle = setInterval(refresh, POLL_INTERVAL_MS);
+    return () => clearInterval(pollHandle);
   });
 </script>
 
@@ -39,7 +37,8 @@
   {#if error}
     <span class="text-destructive" role="alert">Error: {error}</span>
   {:else}
-    <span class="token">Input tokens: {inputTokens}</span>
-    <span class="token">Output tokens: {outputTokens}</span>
+    <span class="token">Input tokens: {inputTokens.toLocaleString()}</span>
+    <span class="token">Output tokens: {outputTokens.toLocaleString()}</span>
+    <span class="token">Total tokens: {(inputTokens + outputTokens).toLocaleString()}</span>
   {/if}
 </div>
