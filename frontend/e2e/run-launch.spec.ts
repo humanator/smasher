@@ -26,7 +26,9 @@ test('launches the typed brief, model and variable, then shows them on the run p
     runId = new URL(page.url()).pathname.split('/')[2];
 
     // The fixture's gate label echoes the launch values; the question card polls every 2s.
-    await expect(page.getByText('Brief: e2e brief | Model: m-e2e | Colour: blue')).toBeVisible({
+    await expect(
+      page.locator('.question-card').getByText('Brief: e2e brief | Model: m-e2e | Colour: blue')
+    ).toBeVisible({
       timeout: 10000,
     });
   } finally {
