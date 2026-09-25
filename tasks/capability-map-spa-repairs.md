@@ -6,7 +6,7 @@ dropped). Old behaviour is read from the templates deleted in `0e5647c`
 
 | Module id | Responsibility | Depends on | Status |
 |---|---|---|---|
-| `spa-shell` | Shared error toast for failed API requests (deduped, so a failing poll doesn't toast every tick), per-page `<title>`, ⚡ favicon | — | Planned |
+| `spa-shell` | Shared error toast for failed API requests (deduped, so a failing poll doesn't toast every tick), per-page `<title>`, ⚡ favicon | — | Done 2026-09-25 |
 | `candidate-preview` | #9: screenshot thumbnail → full-size, interactive lightbox of the live bundle with a ⟲ reset; params section (`generation_params`); captured-at on failed cards; in both `CandidateCard` and `GalleryGate`. Scorecard badges, checkbox and comment box stay on the card | `spa-shell` | Planned |
 | `run-launch` | Run dialog (Model, Variables, Brief, Node Overrides) opened by the catalog's Run button, replacing the empty-request launch. Submit navigates to `/runs/{id}` | `spa-shell` | Planned |
 | `run-summary` | `RunDetail` shows Completed, Working Directory and Error; pipeline graph re-fetches every 3s, surfaces its errors, scales to fit the width; token counter total and 3s poll; run list shows "unnamed" for a blank graph name | `spa-shell` | Planned |

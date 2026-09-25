@@ -72,7 +72,8 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 - [x] Task 7: ⚡ favicon and the `app-shell` Playwright spec
 
 ### Checkpoint C: Complete
-- [ ] All spec success criteria met, `make ci` green, review with Jobsworth
+- [x] All spec success criteria met, `make ci` green
+- [ ] Review with Jobsworth
 
 ## Risks and mitigations
 

@@ -198,13 +198,13 @@ Everything uses real HTTP against the real server, with no mocks, as the rest of
 
 ## Success Criteria
 
-- [ ] A rejected answer shows a toast with the server's `error` text, and the question stays.
-- [ ] A dead question or gallery-gate poll gives exactly one toast per run of failures, per poller.
-- [ ] All four API modules share `errorFromResponse`, and no copy of `handleResponse` throws a
+- [x] A rejected answer shows a toast with the server's `error` text, and the question stays.
+- [x] A dead question or gallery-gate poll gives exactly one toast per run of failures, per poller.
+- [x] All four API modules share `errorFromResponse`, and no copy of `handleResponse` throws a
       bare `HTTP <status>` when the body has an `error`.
-- [ ] `document.title` matches the table in story 4 on each route and after back/forward.
-- [ ] The tab shows ⚡, and `/vite.svg` isn't requested.
-- [ ] New unit, integration and Playwright tests pass; the full Vitest suite passes; `check`,
+- [x] `document.title` matches the table in story 4 on each route and after back/forward.
+- [x] The tab shows ⚡, and `/vite.svg` isn't requested.
+- [x] New unit, integration and Playwright tests pass; the full Vitest suite passes; `check`,
       `lint` and `make ci` add no new errors or warnings.
 
 ## Decisions (resolved 2026-09-25)

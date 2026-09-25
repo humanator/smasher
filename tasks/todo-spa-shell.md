@@ -175,7 +175,7 @@ inline-SVG ⚡ data URI from `0e5647c^:crates/smasher-web/templates/base.html:7`
 **Scope:** S
 
 ## Checkpoint C: complete
-- [ ] Every item in the spec's Success Criteria is checked
-- [ ] `npm test -- --run`, `npm run check` (6 pre-existing errors only), `npm run lint`, `npm run build`, `npm run test:e2e -- e2e/app-shell.spec.ts` and `make ci` all pass with no new warnings
-- [ ] `capability-map-spa-repairs.md` marks `spa-shell` as Done
+- [x] Every item in the spec's Success Criteria is checked
+- [x] `npm test -- --run`, `npm run check` (6 pre-existing errors only), `npm run lint`, `npm run build`, `npm run test:e2e -- e2e/app-shell.spec.ts` and `make ci` all pass with no new warnings (the build's chunk-size warning was already there before this module)
+- [x] `capability-map-spa-repairs.md` marks `spa-shell` as Done
 - [ ] Review with Jobsworth before starting the next module
