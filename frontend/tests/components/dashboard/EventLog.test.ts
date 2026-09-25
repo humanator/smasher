@@ -42,6 +42,25 @@ async function answerGate(runId: string, answer = 'go', notId?: string): Promise
   return questionId!;
 }
 
+// jsdom has no layout, so give the log box simple geometry: 40px per rendered
+// line, and a plain settable scrollTop. DOM geometry only; no server is mocked.
+function stubGeometry(box: HTMLElement): void {
+  let scrollTop = 0;
+  Object.defineProperty(box, 'scrollHeight', {
+    configurable: true,
+    get: () => 40 * box.querySelectorAll('.event-item').length,
+  });
+  Object.defineProperty(box, 'scrollTop', {
+    configurable: true,
+    get: () => scrollTop,
+    set: (value: number) => (scrollTop = value),
+  });
+}
+
+function checkpoint(node: string) {
+  return { kind: 'checkpoint_created' as const, timestamp: '2026-09-25T10:00:00Z', node_id: node };
+}
+
 // The rendered lines, newest first, as their text content.
 function lines(container: HTMLElement): HTMLElement[] {
   return [...container.querySelectorAll<HTMLElement>('.event-item')];
@@ -178,5 +197,35 @@ describe('EventLog', () => {
 
     await waitFor(() => expect(lines(container)).toHaveLength(0));
     expect(screen.getByText('Waiting for events...')).toBeTruthy();
+  });
+
+  describe('following new events', () => {
+    it('stays at the top, showing the new line first', async () => {
+      const { container } = render(EventLog, { props: { runId: 'no-such-run' } });
+      const box = container.querySelector<HTMLElement>('.event-log')!;
+      stubGeometry(box);
+      eventStore.add(checkpoint('first'));
+      await waitFor(() => expect(lines(container)).toHaveLength(1));
+
+      eventStore.add(checkpoint('second'));
+
+      await waitFor(() => expect(lines(container)[0]).toHaveTextContent('second'));
+      expect(box.scrollTop).toBe(0);
+    });
+
+    it("keeps what I'm reading in place when I've scrolled down", async () => {
+      const { container } = render(EventLog, { props: { runId: 'no-such-run' } });
+      const box = container.querySelector<HTMLElement>('.event-log')!;
+      stubGeometry(box);
+      for (const node of ['a', 'b', 'c']) eventStore.add(checkpoint(node));
+      await waitFor(() => expect(lines(container)).toHaveLength(3));
+      box.scrollTop = 200;
+      box.dispatchEvent(new Event('scroll'));
+
+      eventStore.add(checkpoint('d'));
+
+      await waitFor(() => expect(lines(container)).toHaveLength(4));
+      expect(box.scrollTop).toBe(240);
+    });
   });
 });

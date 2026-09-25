@@ -39,6 +39,26 @@
 
   let notified = $state(false);
 
+  // Following new events. Newest is at the top: while the box is scrolled to
+  // the top it stays there; otherwise the scroll moves by the height the new
+  // lines added, so what's being read doesn't shift. Done by hand rather than
+  // with overflow-anchor, so it behaves the same everywhere.
+  let logBox: HTMLDivElement | undefined = $state();
+  let atTop = true;
+  let heightBefore = 0;
+
+  $effect.pre(() => {
+    void eventStore.entries.length;
+    if (logBox) heightBefore = logBox.scrollHeight;
+  });
+
+  $effect(() => {
+    void eventStore.entries.length;
+    if (!logBox) return;
+    if (atTop) logBox.scrollTop = 0;
+    else logBox.scrollTop += logBox.scrollHeight - heightBefore;
+  });
+
   // One run's events stay with that run: start from an empty store, and clear
   // it again when the run changes or the log unmounts.
   // Derived, so setting the same runId again doesn't restart the stream (a
@@ -85,7 +105,11 @@
   });
 </script>
 
-<div class="event-log max-h-[500px] overflow-y-auto rounded-lg border border-border bg-muted/50 p-4">
+<div
+  bind:this={logBox}
+  onscroll={() => (atTop = (logBox?.scrollTop ?? 0) <= 8)}
+  class="event-log max-h-[500px] overflow-y-auto rounded-lg border border-border bg-muted/50 p-4"
+>
   <h3 class="mb-4 text-base font-semibold text-foreground">Events</h3>
 
   {#if lines.length === 0}

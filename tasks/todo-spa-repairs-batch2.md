@@ -441,13 +441,13 @@ and the card shows `No pending questions.` Cancel in `finally`.
   - otherwise, add the height difference to `scrollTop`.
 
 **Acceptance criteria:**
-- [ ] At the top, adding an event leaves `scrollTop` at 0, with the new line first.
-- [ ] Scrolled to 200 with an event added that adds 40px, `scrollTop` becomes 240. The test stubs
+- [x] At the top, adding an event leaves `scrollTop` at 0, with the new line first.
+- [x] Scrolled to 200 with an event added that adds 40px, `scrollTop` becomes 240. The test stubs
       `scrollHeight` with `Object.defineProperty` because jsdom has no layout. That's DOM geometry,
       not a server mock.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/EventLog.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/EventLog.test.ts`
 
 **Dependencies:** Task 14
 
