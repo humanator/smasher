@@ -60,7 +60,7 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 
 ### Phase 1: Server emits the exchange
 
-- [ ] T1: `HttpInterviewer` emits prompt and response events (S)
+- [x] T1: `HttpInterviewer` emits prompt and response events (S)
 - [ ] T2: Web runs pass their emitter, and `events.jsonl` records the exchange (S)
 - [ ] T3: Run summary lists the run's gallery gates (S)
 

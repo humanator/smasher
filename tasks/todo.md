@@ -17,15 +17,15 @@ a `node_id` and a live receiver (`!tx.is_closed()`), it emits `HumanResponseRece
 emitter, behaviour is unchanged.
 
 **Acceptance criteria:**
-- [ ] With an emitter, `ask`, `ask_with_options` and `approve` each emit one `HumanPromptIssued`
+- [x] With an emitter, `ask`, `ask_with_options` and `approve` each emit one `HumanPromptIssued`
       with the context's node id and the question text; no node id → no event
-- [ ] A successful `answer_question` emits one `HumanResponseReceived` with the node id and the
+- [x] A successful `answer_question` emits one `HumanResponseReceived` with the node id and the
       answer; unknown id and dropped receiver emit nothing
-- [ ] Without an emitter nothing is emitted, and every existing test passes unchanged
+- [x] Without an emitter nothing is emitted, and every existing test passes unchanged
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor http_interviewer`
-- [ ] `cargo clippy -p smasher-attractor -- -D warnings`
+- [x] `cargo test -p smasher-attractor http_interviewer`
+- [x] `cargo clippy -p smasher-attractor -- -D warnings`
 
 **Dependencies:** None
 
