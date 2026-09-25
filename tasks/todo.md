@@ -42,14 +42,14 @@ through the router (the pattern in `events_test.rs`): answer the gate over HTTP,
 completion, then read the run's `events.jsonl`.
 
 **Acceptance criteria:**
-- [ ] `events.jsonl` contains `human_prompt_issued` (node id, question) and
+- [x] `events.jsonl` contains `human_prompt_issued` (node id, question) and
       `human_response_received` (node id, answer) for the gate
-- [ ] Their order is prompt → response → the gate's `node_completed`
-- [ ] The SSE stream carries both events, and the existing SSE shape tests pass
+- [x] Their order is prompt → response → the gate's `node_completed`
+- [x] The SSE stream carries both events, and the existing SSE shape tests pass
 
 **Verification:**
-- [ ] `cargo test -p smasher-web`
-- [ ] Manual: after answering a run in `smasher serve`, `grep human_ ~/.smasher/artifacts/<run>/…/events.jsonl`
+- [x] `cargo test -p smasher-web`
+- [ ] Manual (Checkpoint A): after answering a run in `smasher serve`, `grep human_ ~/.smasher/artifacts/<run>/…/events.jsonl`
 
 **Dependencies:** Task 1
 

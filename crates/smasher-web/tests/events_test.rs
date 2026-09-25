@@ -54,6 +54,11 @@ async fn collect_sse_events(client: &Client, url: String) -> Vec<(String, Value)
 
 /// Helper to find an available port and start a test server
 async fn start_test_server() -> (String, task::JoinHandle<()>) {
+    start_test_server_in("/tmp").await
+}
+
+/// Like `start_test_server`, with run artifacts written under `data_dir`.
+async fn start_test_server_in(data_dir: &str) -> (String, task::JoinHandle<()>) {
     // Bind to port 0 to get an ephemeral port using async tokio
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -68,7 +73,7 @@ async fn start_test_server() -> (String, task::JoinHandle<()>) {
             client,
             "test-model".into(),
             None,
-            "/tmp".into(),
+            data_dir.into(),
             vec![],
         );
         smasher_web::server::build_router(state)
@@ -271,4 +276,138 @@ async fn test_human_gate_answer_round_trip() {
         .expect("at least one event should have been captured");
     assert_eq!(pipeline_completed.0, "pipeline_completed");
     assert_eq!(pipeline_completed.1["kind"], "pipeline_completed");
+}
+
+/// Polls the run's pending questions until the gate has issued one.
+async fn wait_for_question_id(client: &Client, base_url: &str, run_id: &str) -> String {
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_secs(10) {
+        let body: Value = client
+            .get(format!("{base_url}/api/runs/{run_id}/questions"))
+            .send()
+            .await
+            .expect("failed to list questions")
+            .json()
+            .await
+            .expect("failed to parse questions response");
+        if let Some(id) = body["questions"].get(0).and_then(|q| q["id"].as_str()) {
+            return id.to_string();
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!("gate should have issued a pending question");
+}
+
+/// Reads the run's `events.jsonl` (unwrapping each `{sequence, event}` entry)
+/// once the file sink has written the Exit node's `node_completed`.
+async fn read_finished_event_log(path: &std::path::Path) -> Vec<Value> {
+    let start = std::time::Instant::now();
+    while start.elapsed() < Duration::from_secs(10) {
+        let events: Vec<Value> = std::fs::read_to_string(path)
+            .unwrap_or_default()
+            .lines()
+            .map(|line| {
+                let entry: Value =
+                    serde_json::from_str(line).expect("events.jsonl line should be JSON");
+                entry["event"].clone()
+            })
+            .collect();
+        if events
+            .iter()
+            .any(|e| e["kind"] == "node_completed" && e["node_id"] == "Exit")
+        {
+            return events;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!(
+        "events.jsonl at {} never recorded Exit's node_completed:\n{}",
+        path.display(),
+        std::fs::read_to_string(path).unwrap_or_else(|e| e.to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_human_gate_exchange_is_recorded_in_events_jsonl() {
+    let data_dir = tempfile::tempdir().expect("failed to create data dir");
+    let (base_url, _server) = start_test_server_in(data_dir.path().to_str().unwrap()).await;
+    let client = Client::new();
+
+    let submit_body: Value = client
+        .post(format!("{base_url}/api/runs"))
+        .json(&json!({ "dot_source": human_gate_workflow_dot(), "variables": {} }))
+        .send()
+        .await
+        .expect("failed to submit pipeline")
+        .json()
+        .await
+        .expect("failed to parse submit response");
+    let run_id = submit_body["run_id"].as_str().expect("run_id").to_string();
+
+    let question_id = wait_for_question_id(&client, &base_url, &run_id).await;
+
+    // The SSE endpoint replays history, so the prompt issued before this
+    // connection is still delivered, followed by the live response.
+    let sse_client = client.clone();
+    let sse_url = format!("{base_url}/api/runs/{run_id}/events");
+    let sse_task = task::spawn(async move { collect_sse_events(&sse_client, sse_url).await });
+
+    let answer_body: Value = client
+        .post(format!(
+            "{base_url}/api/runs/{run_id}/questions/{question_id}/answer"
+        ))
+        .json(&json!({ "answer": "[Y] Yes" }))
+        .send()
+        .await
+        .expect("failed to post answer")
+        .json()
+        .await
+        .expect("failed to parse answer response");
+    assert_eq!(answer_body["success"], true);
+
+    let summary: Value = client
+        .get(format!("{base_url}/api/runs/{run_id}"))
+        .send()
+        .await
+        .expect("failed to get run")
+        .json()
+        .await
+        .expect("failed to parse run summary");
+    let run_dir = summary["run_working_dir"]
+        .as_str()
+        .expect("run_working_dir");
+    let log_path = data_dir
+        .path()
+        .join(run_dir)
+        .join("events")
+        .join("events.jsonl");
+
+    let events = read_finished_event_log(&log_path).await;
+    let position = |kind: &str| {
+        events
+            .iter()
+            .position(|e| e["kind"] == kind && e["node_id"] == "Gate")
+            .unwrap_or_else(|| panic!("no {kind} for Gate in {events:#?}"))
+    };
+    let prompt = position("human_prompt_issued");
+    let response = position("human_response_received");
+    let completed = position("node_completed");
+
+    assert_eq!(events[prompt]["question"], "Approve?");
+    assert_eq!(events[response]["response"], "[Y] Yes");
+    assert!(
+        prompt < response && response < completed,
+        "expected prompt ({prompt}) < response ({response}) < node_completed ({completed})"
+    );
+
+    let sse_events = tokio::time::timeout(Duration::from_secs(5), sse_task)
+        .await
+        .expect("SSE collection task timed out")
+        .expect("SSE collection task panicked");
+    let sse_names: Vec<&str> = sse_events.iter().map(|(name, _)| name.as_str()).collect();
+    assert!(
+        sse_names.contains(&"human_prompt_issued")
+            && sse_names.contains(&"human_response_received"),
+        "expected both exchange events on the SSE stream, got {sse_names:?}"
+    );
 }
