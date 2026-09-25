@@ -12,10 +12,12 @@ import * as runsApi from '../../../src/lib/api/runs';
 import * as questionsApi from '../../../src/lib/api/questions';
 import * as galleryApi from '../../../src/lib/api/gallery';
 
+// The showcase's Proceed/Iterate are Codergen (box) nodes, so a decision
+// would start a real LLM call. As conditionals they just pass the run on to Exit.
 const galleryGateDot = readFileSync(
   join(process.cwd(), '..', 'examples', 'gallery_gate_showcase.dot'),
   'utf-8'
-);
+).replace(/\[shape=box,/g, '[shape=diamond,');
 
 const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
 const artifactsRoot = join(dataDir, 'artifacts');

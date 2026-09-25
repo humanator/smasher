@@ -32,10 +32,14 @@ describe('workflows API client - raw DOT export', () => {
 });
 
 describe('workflows API client - raw DOT import', () => {
-  const helloWorld = readFileSync(
-    join(process.cwd(), '..', 'examples', 'old-examples', 'hello-world.dot'),
-    'utf-8'
-  );
+  // Parks on its human gate once run, so no LLM node ever runs.
+  const gatedDot = `digraph ImportGated {
+  start [shape=circle];
+  gate [shape=oval, label="Proceed?"];
+  done [shape=doublecircle];
+  start -> gate -> done;
+}
+`;
   const importedIds: string[] = [];
 
   beforeAll(() => {
@@ -55,12 +59,12 @@ describe('workflows API client - raw DOT import', () => {
   const uniqueName = () => `_test_import_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   it('imports valid DOT byte-for-byte as a listed, runnable workflow (export round trip)', async () => {
-    const { id } = await workflows.importWorkflowDot(uniqueName(), helloWorld);
+    const { id } = await workflows.importWorkflowDot(uniqueName(), gatedDot);
     importedIds.push(id);
 
     const { workflows: all } = await workflows.listWorkflows();
     expect(all.some((w) => w.id === id)).toBe(true);
-    expect(await workflows.getWorkflowDot(id)).toBe(helloWorld);
+    expect(await workflows.getWorkflowDot(id)).toBe(gatedDot);
     const run = await runs.runWorkflow(id);
     expect(run.run_id).toBeTruthy();
   });
@@ -74,10 +78,10 @@ describe('workflows API client - raw DOT import', () => {
 
   it('rejects importing over an existing workflow name with a 409', async () => {
     const name = uniqueName();
-    const { id } = await workflows.importWorkflowDot(name, helloWorld);
+    const { id } = await workflows.importWorkflowDot(name, gatedDot);
     importedIds.push(id);
 
-    await expect(workflows.importWorkflowDot(name, helloWorld)).rejects.toMatchObject({
+    await expect(workflows.importWorkflowDot(name, gatedDot)).rejects.toMatchObject({
       status: 409,
     });
   });

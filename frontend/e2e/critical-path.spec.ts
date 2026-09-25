@@ -3,6 +3,10 @@
 
 import { test, expect } from '@playwright/test';
 
+// Runs real Codergen nodes for up to 10 minutes and spends real LLM tokens,
+// so it only runs when asked for: SMASHER_LLM_TESTS=1 npm run test:e2e -- e2e/critical-path.spec.ts
+test.skip(!process.env.SMASHER_LLM_TESTS, 'spends real LLM tokens; set SMASHER_LLM_TESTS=1 to run');
+
 test('submit pipeline, stream events, answer 5 human gates, observe completion', async ({
   page,
   baseURL,

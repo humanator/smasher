@@ -17,6 +17,14 @@ const consensusTaskDot = readFileSync(
   'utf-8'
 );
 
+// Submitted runs park on this human gate, so no LLM node ever runs.
+const gatedDot = `digraph RunsApiGated {
+  start [shape=circle];
+  gate [shape=oval, label="Proceed?"];
+  done [shape=doublecircle];
+  start -> gate -> done;
+}`;
+
 describe('runs API client - REAL API INTEGRATION TESTS', () => {
   beforeAll(() => {
     setApiBaseUrl(API_URL);
@@ -29,7 +37,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
 
   it('should submit a real run and get back a run_id', async () => {
     const response = await runs.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'integration' },
     });
 
@@ -42,7 +50,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
   it('should list runs and get array of run summaries', async () => {
     // Submit a run first
     const submitResp = await runs.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'list' },
     });
 
@@ -60,7 +68,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
   it('should get a specific run by id', async () => {
     // Submit a run
     const submitResp = await runs.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'get' },
     });
 
@@ -114,7 +122,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
   it('should get token counts for a real run', async () => {
     // Submit a run
     const submitResp = await runs.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'tokens' },
     });
 
@@ -128,7 +136,8 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
 
   it('should launch a real run from an on-disk workflow via runWorkflow, associated with that workflow', async () => {
     const { workflows: available } = await workflows.listWorkflows();
-    const workflow = available.find((w) => w.name === 'consensus_task.dot');
+    // Starts at a human gate, so the run parks there and never reaches an LLM node.
+    const workflow = available.find((w) => w.name === 'human_gate_showcase.dot');
     expect(workflow).toBeTruthy();
 
     const response = await runs.runWorkflow(workflow!.id, { variables: { test: 'run-workflow' } });

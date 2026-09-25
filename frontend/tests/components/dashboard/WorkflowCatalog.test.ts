@@ -41,14 +41,16 @@ describe('WorkflowCatalog', () => {
 
     render(WorkflowCatalog);
 
+    // Human Gate Showcase starts at a human gate, so the launched run parks
+    // there and never reaches its LLM nodes.
     await waitFor(
       () => {
-        expect(screen.getByText('Consensus Task')).toBeTruthy();
+        expect(screen.getByText('Human Gate Showcase')).toBeTruthy();
       },
       { timeout: 5000 }
     );
 
-    const row = screen.getByText('Consensus Task').closest('tr') as HTMLElement;
+    const row = screen.getByText('Human Gate Showcase').closest('tr') as HTMLElement;
     const runButton = within(row).getByText('Run Workflow');
     await fireEvent.click(runButton);
 

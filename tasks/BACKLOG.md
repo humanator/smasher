@@ -38,6 +38,11 @@ candidate manifests there directly, and fail with "gallery gate never appeared"
 if the directories differ. To serve without API keys or spending anything, point
 `SMASHER_CLAUDE_CLI` at a fake `claude` script and set
 `SMASHER_PROVIDER=claude-cli`.
+The suites start no LLM node by default. Every submitted run parks on a human
+gate or passes through non-LLM nodes only. The two critical-path tests
+(`tests/critical-path.test.ts`, `e2e/critical-path.spec.ts`) run real Codergen nodes
+and spend tokens, so they're skipped unless `SMASHER_LLM_TESTS=1` is set. Run them
+only on request.
 
 ## P1: Do next (small, and each one fixes something real)
 

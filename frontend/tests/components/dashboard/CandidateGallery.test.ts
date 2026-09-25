@@ -7,17 +7,20 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
-import { readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import CandidateGallery from '../../../src/components/dashboard/CandidateGallery.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
 
-const consensusTaskDot = readFileSync(
-  join(process.cwd(), '..', 'examples', 'consensus_task.dot'),
-  'utf-8'
-);
+// Parks on its human gate, so no LLM node ever runs.
+const gatedDot = `digraph CandidateGalleryGated {
+  start [shape=circle];
+  gate [shape=oval, label="Proceed?"];
+  done [shape=doublecircle];
+  start -> gate -> done;
+}`;
 
 // Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/.smasher.
 const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
@@ -57,7 +60,7 @@ describe('CandidateGallery', () => {
 
   it('shows an empty state for a real run with no candidates on disk', async () => {
     const submitResp = await runsApi.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'candidate-gallery-empty' },
     });
 
@@ -70,7 +73,7 @@ describe('CandidateGallery', () => {
 
   it('renders real candidates (screenshot-only, bundle, and failed) with scorecard data from the real API', async () => {
     const submitResp = await runsApi.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'candidate-gallery-real' },
     });
     const runId = submitResp.run_id;

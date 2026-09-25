@@ -12,7 +12,9 @@ import type { Question } from '../src/lib/api/questions';
 
 const BASE_URL = 'http://127.0.0.1:21541';
 
-describe('Critical Path: Submit → Events → Answer Gate → Complete', () => {
+// Answers every gate in human_gate_showcase.dot, so all of its Codergen nodes
+// run and spend real LLM tokens. Opt in with SMASHER_LLM_TESTS=1.
+describe.skipIf(!process.env.SMASHER_LLM_TESTS)('Critical Path: Submit → Events → Answer Gate → Complete', () => {
   beforeAll(() => {
     setApiBaseUrl(`${BASE_URL}/api`);
   });

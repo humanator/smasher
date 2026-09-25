@@ -3,16 +3,17 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import RunList from '../../../src/components/dashboard/RunList.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
 
-const consensusTaskDot = readFileSync(
-  join(process.cwd(), '..', 'examples', 'consensus_task.dot'),
-  'utf-8'
-);
+// Parks on its human gate, so no LLM node ever runs.
+const gatedDot = `digraph RunListGated {
+  start [shape=circle];
+  gate [shape=oval, label="Proceed?"];
+  done [shape=doublecircle];
+  start -> gate -> done;
+}`;
 
 describe('RunList', () => {
   beforeAll(() => {
@@ -26,7 +27,7 @@ describe('RunList', () => {
 
   it('renders a real submitted run with its status and links to its detail page', async () => {
     const submitResp = await runsApi.submitRun({
-      dot_source: consensusTaskDot,
+      dot_source: gatedDot,
       variables: { test: 'run-list-render' },
     });
 

@@ -23,13 +23,15 @@ const artifactsRoot = join(dataDir, 'artifacts');
 // dependency, per the same precedent CandidateGallery.test.ts/Task 13 set:
 // exercise the real gallery-gate API/UI against fixture files written
 // straight to the artifacts dir, not a real render_capture execution.
+// Proceed/Iterate are conditionals, not Codergen boxes, so the decision
+// passes straight to Exit without spending LLM tokens.
 const galleryGateDot = `
 digraph GalleryGateE2E {
   graph [goal="Minimal gallery-gate round trip for Playwright E2E"];
   Start [shape=Mdiamond, label="Start"];
   Gate1 [shape=hexagon, label="Pick your favorite candidate(s)", gallery="true", candidate_count=3];
-  Proceed [shape=box, label="Proceed"];
-  Iterate [shape=box, label="Iterate"];
+  Proceed [shape=diamond, label="Proceed"];
+  Iterate [shape=diamond, label="Iterate"];
   Exit [shape=Msquare, label="Exit"];
   Start -> Gate1;
   Gate1 -> Proceed [label="proceed"];
