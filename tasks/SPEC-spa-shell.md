@@ -27,7 +27,7 @@ What the SPA does today:
 - **Errors lose the server's message.** `handleResponse` in `runs.ts`, `questions.ts` and
   `gallery.ts` (and the one in `workflows.ts`) throw `HTTP <status>` without reading the body.
   Only `gallery.ts`'s `handleResponse` and `workflows.ts`'s `errorFromResponse` read it. So even
-  the errors shown inline today say `HTTP 404` instead of `run xyz not found`.
+  the errors shown inline today say `HTTP 404` instead of `not found: run xyz`.
 - **The title is always `smasher-spa`**, and the favicon points at `/vite.svg`, which doesn't
   exist (`frontend/public/` is empty), so there's no icon.
 
