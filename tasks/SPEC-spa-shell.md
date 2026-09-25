@@ -206,9 +206,9 @@ Everything uses real HTTP against the real server, with no mocks, as the rest of
 - [ ] New unit, integration and Playwright tests pass; the full Vitest suite passes; `check`,
       `lint` and `make ci` add no new errors or warnings.
 
-## Open Questions
+## Decisions (resolved 2026-09-25)
 
-1. **Title format.** I've put the page first (`Run 01m… — Smasher`), so tabs stay readable when
-   truncated. The old app put the brand first, in capitals: `SMASHER — Run`. Which do you want?
-2. **Toast duration.** The old toast closed after 6s. Sonner's default is 4s. I'd keep sonner's
-   default unless you want 6s.
+1. **Title format:** page name first (`Run 01m… — Smasher`), so truncated tabs stay readable.
+2. **Toast duration:** sonner's default 4s.
+
+Spec approved by Jobsworth 2026-09-25.
