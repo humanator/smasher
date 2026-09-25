@@ -88,10 +88,10 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 
 ### Checkpoint C: complete
 
-- [ ] Every success criterion in the spec is ticked
-- [ ] `cargo test`, `make ci`, the full Vitest suite, `check`, `lint` and the non-LLM Playwright
+- [x] Every success criterion in the spec is ticked
+- [x] `cargo test`, `make ci`, the full Vitest suite, `check`, `lint` and the non-LLM Playwright
       specs are green
-- [ ] Ready for review
+- [x] Ready for review
 
 ## Risks and mitigations
 

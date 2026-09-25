@@ -259,7 +259,7 @@ done, and update the backlog entry.
 
 ## Checkpoint C: complete
 
-- [ ] Every spec success criterion is ticked
-- [ ] `cargo test --workspace`, `make ci`, the full Vitest suite, `check`, `lint` and the non-LLM
+- [x] Every spec success criterion is ticked
+- [x] `cargo test --workspace`, `make ci`, the full Vitest suite, `check`, `lint` and the non-LLM
       Playwright specs are green; no test spent tokens
-- [ ] Ready for review
+- [x] Ready for review
