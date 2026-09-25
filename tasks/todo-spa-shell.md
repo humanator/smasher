@@ -12,12 +12,12 @@ All commands below run from `frontend/`.
 lifted from `workflows.ts:51-65`, and re-export it from `lib/api/index.ts`.
 
 **Acceptance criteria:**
-- [ ] A JSON `{"error": "x"}` body gives an `Error` with message `x` and `.status` set to the HTTP status
-- [ ] A JSON body without `error`, a non-JSON body, or an empty body gives `HTTP <status>`
-- [ ] Two `ABOUTME:` lines at the top
+- [x] A JSON `{"error": "x"}` body gives an `Error` with message `x` and `.status` set to the HTTP status
+- [x] A JSON body without `error`, a non-JSON body, or an empty body gives `HTTP <status>`
+- [x] Two `ABOUTME:` lines at the top
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/api/errors.test.ts` passes (real `Response` objects, written first and seen failing)
+- [x] `npm test -- --run tests/lib/api/errors.test.ts` passes (real `Response` objects, written first and seen failing)
 
 **Dependencies:** None
 

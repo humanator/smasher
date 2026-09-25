@@ -53,7 +53,7 @@ index.html favicon           (independent)
 See `todo-spa-shell.md` for acceptance criteria and verification.
 
 ### Phase 1: Errors carry the server's message
-- [ ] Task 1: Shared `errorFromResponse` in `lib/api/errors.ts`
+- [x] Task 1: Shared `errorFromResponse` in `lib/api/errors.ts`
 - [ ] Task 2: All four API modules throw it
 
 ### Checkpoint A
