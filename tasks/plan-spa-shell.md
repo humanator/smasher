@@ -69,7 +69,7 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 
 ### Phase 3: Title and icon
 - [x] Task 6: `document.title` per route
-- [ ] Task 7: ⚡ favicon and the `app-shell` Playwright spec
+- [x] Task 7: ⚡ favicon and the `app-shell` Playwright spec
 
 ### Checkpoint C: Complete
 - [ ] All spec success criteria met, `make ci` green, review with Jobsworth

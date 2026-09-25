@@ -106,7 +106,7 @@ frontend/src/components/dashboard/GalleryGate.svelte   → toasts on poll failur
 frontend/tests/lib/api/errors.test.ts      → NEW
 frontend/tests/lib/notify.test.ts          → NEW
 frontend/tests/components/…                → extend QuestionCard, GalleryGate, AppLayout tests
-frontend/e2e/critical-path.spec.ts         → extend: title + favicon
+frontend/e2e/app-shell.spec.ts             → NEW: titles, favicon and poll toasts, no LLM run (see the plan)
 ```
 
 ## Code Style
@@ -168,8 +168,9 @@ Everything uses real HTTP against the real server, with no mocks, as the rest of
   - `GalleryGate` and `QuestionCard` polls for a nonexistent run show one toast after several
     ticks.
   - `AppLayout`: `document.title` for each route, and after a `popstate`.
-- **End-to-end (Playwright), `critical-path.spec.ts`.** Assert `page.title()` on the catalog and a
-  run page, and that the favicon `<link>` is the ⚡ data URI.
+- **End-to-end (Playwright), `app-shell.spec.ts`.** Assert `page.title()` on the catalog and a
+  run page, that the favicon `<link>` is the ⚡ data URI, and that a missing run's polls toast
+  once each. It's a new file, not `critical-path.spec.ts`, so it needs no LLM run.
 - **Gates:**
   - `npm run check` and `npm run lint` add no new errors. The 6 existing `svelte-check` errors
     are #2's, not this module's.

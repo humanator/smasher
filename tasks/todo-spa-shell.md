@@ -160,13 +160,13 @@ inline-SVG ⚡ data URI from `0e5647c^:crates/smasher-web/templates/base.html:7`
 `e2e/app-shell.spec.ts`, which needs no LLM run.
 
 **Acceptance criteria:**
-- [ ] `page.title()` is `Smasher` on `/` and `Run no-such-run — Smasher` on `/runs/no-such-run`
-- [ ] The favicon `<link>` `href` starts with `data:image/svg+xml` and contains `26A1` (⚡), and no request for `/vite.svg` is made
-- [ ] On `/runs/no-such-run`, the questions toast is visible once, and 5s later there's still one
+- [x] `page.title()` is `Smasher` on `/` and `Run no-such-run — Smasher` on `/runs/no-such-run`
+- [x] The favicon `<link>` `href` starts with `data:image/svg+xml` and contains ⚡ (`index.html` writes `&#x26A1;`, which the parser decodes), and no request for `/vite.svg` is made
+- [x] On `/runs/no-such-run`, the questions and gallery-gate polls each toast once (two toasts, same `not found` text), and over the next 5s no tick adds another. They close after sonner's 4s default, so "5s later there's still one" couldn't hold.
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/app-shell.spec.ts` passes
-- [ ] `npm run build` succeeds
+- [x] `npm run test:e2e -- e2e/app-shell.spec.ts` passes
+- [x] `npm run build` succeeds
 
 **Dependencies:** Tasks 4, 6
 
