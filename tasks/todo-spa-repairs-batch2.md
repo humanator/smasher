@@ -524,17 +524,17 @@ The spec cancels the run in `finally`.
   - A failed load shows the error inline.
 
 **Acceptance criteria:**
-- [ ] `AppLayout.test.ts`:
-  - [ ] `/workflows/{id}` renders the page;
-  - [ ] `/workflows/new` and `/workflows/{id}/edit` still route as before;
-  - [ ] the document titles are `{formatted} — Smasher` and `Workflow not found — Smasher`.
-- [ ] On a throwaway import of `run_launch_check.dot` named with an uppercase letter and a dot,
+- [x] `AppLayout.test.ts`:
+  - [x] `/workflows/{id}` renders the page;
+  - [x] `/workflows/new` and `/workflows/{id}/edit` still route as before;
+  - [x] the document titles are `{formatted} — Smasher` and `Workflow not found — Smasher`.
+- [x] On a throwaway import of `run_launch_check.dot` named with an uppercase letter and a dot,
       the page shows the name and source, and has an Edit link and a Run Workflow button.
-- [ ] Run Workflow opens `RunDialog`, and Cancel doesn't launch anything.
-- [ ] An unknown id shows `Workflow not found.`
+- [x] Run Workflow opens `RunDialog`, and Cancel doesn't launch anything.
+- [x] An unknown id shows `Workflow not found.`
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/AppLayout.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm test -- --run tests/components/AppLayout.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
 
 **Dependencies:** Task 2
 

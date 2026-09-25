@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Root app shell - routes to components based on URL path
-  // ABOUTME: Minimal manual routing: catalog at /, run detail at /runs/{id}, workflow editor at /workflows/*
+  // ABOUTME: Minimal manual routing: catalog at /, run detail at /runs/{id}, workflow pages at /workflows/*
 
   import './app.css';
   import { onMount } from 'svelte';
@@ -14,6 +14,7 @@
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import NewWorkflowPage from './components/dashboard/NewWorkflowPage.svelte';
   import WorkflowEditorPage from './components/dashboard/WorkflowEditorPage.svelte';
+  import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import PageHeader from './components/dashboard/PageHeader.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -22,7 +23,7 @@
   import { isTauri } from '$lib/native';
 
   let runId = $state<string | null>(null);
-  let workflowPageType = $state<'new' | 'edit' | null>(null);
+  let workflowPageType = $state<'new' | 'edit' | 'detail' | null>(null);
   let workflowId = $state<string | null>(null);
 
   // Pages below register their own controls (Save, Abort) into this header.
@@ -36,7 +37,9 @@
       ? 'Create New Workflow'
       : workflowPageType === 'edit'
         ? 'Edit Workflow'
-        : runId
+        : workflowPageType === 'detail'
+          ? (pageHeader.title ?? 'Workflow')
+          : runId
           ? `Run ${runId}`
           : 'Smasher Pipelines'
   );
@@ -46,7 +49,9 @@
       ? 'New Workflow — Smasher'
       : workflowPageType === 'edit'
         ? 'Edit Workflow — Smasher'
-        : runId
+        : workflowPageType === 'detail'
+          ? `${pageHeader.title ?? 'Workflow'} — Smasher`
+          : runId
           ? `Run ${runId} — Smasher`
           : 'Smasher'
   );
@@ -104,6 +109,21 @@
       return;
     }
 
+    // /workflows/{id} -> the workflow's page. Ids can have uppercase letters,
+    // dots and spaces, so any single segment matches; a malformed escape
+    // falls through to the catalog.
+    const detailWorkflowMatch = path.match(/^\/workflows\/(?!new$)([^/]+)$/);
+    if (detailWorkflowMatch) {
+      try {
+        workflowId = decodeURIComponent(detailWorkflowMatch[1]);
+        runId = null;
+        workflowPageType = 'detail';
+        return;
+      } catch {
+        // Not a valid escape; show the catalog.
+      }
+    }
+
     // Default to catalog view
     runId = null;
     workflowPageType = null;
@@ -143,6 +163,12 @@
       <!-- Edit Workflow Page: the canvas fills everything below the 3.5rem header -->
       <div class="h-[calc(100dvh-3.5rem)]">
         <WorkflowEditorPage {workflowId} />
+      </div>
+    {:else if workflowPageType === 'detail' && workflowId}
+      <div class="max-w-6xl mx-auto p-8">
+        {#key workflowId}
+          <WorkflowDetailPage {workflowId} />
+        {/key}
       </div>
     {:else if runId}
       <!-- Run Detail View: EventLog + QuestionCard -->

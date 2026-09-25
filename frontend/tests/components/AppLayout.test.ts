@@ -8,6 +8,9 @@ import { join } from 'path';
 import App from '../../src/App.svelte';
 import { setApiBaseUrl } from '../../src/lib/api/client-config';
 import * as runsApi from '../../src/lib/api/runs';
+import * as workflowsApi from '../../src/lib/api/workflows';
+import { formatWorkflowName } from '../../src/lib/utils';
+import { rmSync } from 'fs';
 
 const humanGateDot = readFileSync(
   join(process.cwd(), '..', 'examples', 'human_gate_showcase.dot'),
@@ -206,3 +209,54 @@ describe('App document title', () => {
     await waitFor(() => expect(document.title).toBe('Smasher'));
   });
 });
+
+describe('App workflow detail route', () => {
+  let imported: string | undefined;
+
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(() => {
+    visit('/');
+    if (imported) rmSync(imported, { force: true });
+    imported = undefined;
+  });
+
+  it('renders the workflow page, titled with the formatted name', async () => {
+    // No leading underscore: it would format to a leading space, which document.title drops.
+    const name = `test_AppDetail.v1_${Date.now()}`;
+    const { id } = await workflowsApi.importWorkflowDot(
+      name,
+      readFileSync(join(process.cwd(), '..', 'examples', 'run_launch_check.dot'), 'utf-8')
+    );
+    imported = (await workflowsApi.listWorkflows()).workflows.find((w) => w.id === id)?.path;
+
+    visit(`/workflows/${encodeURIComponent(id)}`);
+    render(App);
+
+    const title = formatWorkflowName(`${name}.dot`);
+    await waitFor(() => expect(document.title).toBe(`${title} — Smasher`), { timeout: 4000 });
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 1, name: title })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'Smasher Pipelines' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Run Workflow' })).toBeTruthy();
+    expect(screen.getByText(/^Source: /)).toBeTruthy();
+  });
+
+  it('titles an unknown workflow as not found', async () => {
+    visit('/workflows/no-such-workflow');
+    render(App);
+
+    expect(await screen.findByText('Workflow not found.', {}, { timeout: 5000 })).toBeTruthy();
+    await waitFor(() => expect(document.title).toBe('Workflow not found — Smasher'));
+  });
+
+  it('falls back to the catalog for a malformed escape', () => {
+    visit('/workflows/%E0%A4%A');
+    render(App);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Smasher Pipelines' })).toBeTruthy();
+  });
+});
+
