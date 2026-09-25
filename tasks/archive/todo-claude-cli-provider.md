@@ -1,6 +1,6 @@
 # Todo: `claude-cli-provider`
 
-Plan: [`plan.md`](plan.md). Spec: [`SPEC-claude-cli-provider.md`](SPEC-claude-cli-provider.md).
+Plan: [`plan-claude-cli-provider.md`](plan-claude-cli-provider.md). Spec: [`SPEC-claude-cli-provider.md`](SPEC-claude-cli-provider.md).
 TDD throughout: failing test first. Commit at the end of each task.
 
 ---
@@ -10,7 +10,7 @@ TDD throughout: failing test first. Commit at the end of each task.
 ### T1: Spike: CLAUDE.md leak, allowlist patterns, how `dontAsk` denies
 
 **Description:** Real `claude -p` calls, no production code. Answer spec open
-questions 2 and 3, and prove denial doesn't hang. Record the findings in `plan.md`
+questions 2 and 3, and prove denial doesn't hang. Record the findings in `plan-claude-cli-provider.md`
 under "Spike 2 results".
 
 **Acceptance criteria:**
@@ -20,19 +20,19 @@ under "Spike 2 results".
       → No leak with `--setting-sources ""`. The control run without it leaks.
 - [x] Known: the exact `--allowedTools` syntax for Bash prefixes (e.g.
       `Bash(npm run build:*)`), and a proposed default list checked against one real
-      design-kit candidate build. → `Bash(<prefix>:*)`. Default list is in `plan.md`.
+      design-kit candidate build. → `Bash(<prefix>:*)`. Default list is in `plan-claude-cli-provider.md`.
 - [x] Known: a prompt forcing `curl https://example.com` under `--permission-mode
       dontAsk` gets denied, the run ends, and the exit code and `result` event are
       recorded. → Exit 0, `subtype: success`, listed in `permission_denials`, 9s.
 
 **Verification:**
-- [x] Commands and outputs recorded in `plan.md` ("Spike 2 results")
+- [x] Commands and outputs recorded in `plan-claude-cli-provider.md` ("Spike 2 results")
 - [x] Manual check: no stray sessions in `~/.claude/projects` from
       `--no-session-persistence` runs → no transcripts. Only an empty `memory/` folder
       per working dir (removed).
 
 **Dependencies:** None
-**Files likely touched:** `tasks/plan.md`
+**Files likely touched:** `plan-claude-cli-provider.md`
 **Estimated scope:** XS
 
 ---
@@ -138,7 +138,7 @@ user message.
 
 ## Checkpoint A: adapter works for real
 - [ ] `make ci` clean
-- [ ] Ignored real-CLI tests pass. Cost per call is noted in `plan.md`.
+- [ ] Ignored real-CLI tests pass. Cost per call is noted in `plan-claude-cli-provider.md`.
 - [ ] Review with Jobsworth before Phase 2
 
 ---
@@ -174,7 +174,7 @@ imports it. No flag changes.
 --no-session-persistence --setting-sources ""` (T1: the last one keeps
 `~/.claude/CLAUDE.md` out), and set stdin to null. Forward the node `model` as
 `--model` when it's a Claude ID or alias; otherwise use `default_model`. Parse
-`SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` and define the default list from T1 (in `plan.md`).
+`SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` and define the default list from T1 (in `plan-claude-cli-provider.md`).
 
 **Acceptance criteria:**
 - [x] Default config argv has `dontAsk`, the default allowlist,

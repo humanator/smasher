@@ -1,7 +1,12 @@
 # Spec: `claude-cli-provider` — Run Pipelines Through `claude -p`
 
-Status: **Implemented** (2026-09-24) on `feat/claude-cli-provider`. Manual checkpoint
-runs (real CLI, desktop app, product design factory) are still to do; see `todo.md`.
+Status: **Merged to `main`** (2026-09-25) with a known limitation. Checkpoint C's
+candidate and critique steps passed in a desktop run, but the other manual
+checkpoints were not run before merge (see
+[`todo-claude-cli-provider.md`](todo-claude-cli-provider.md)). **Correction:** this
+spec says `LlmManagerBackend` and `LlmToolBackend` are single-turn and tool-less.
+They aren't. Both run agent sessions with tools, so under claude-cli, generic tool
+nodes and manager nodes fail. See `BACKLOG.md`, the known limitation and #22.
 Was: draft, pending review (2026-09-24). Depends on `smasher-desktop` (done)
 and the `DEFAULT_MODEL` change on `fix/default-model`.
 

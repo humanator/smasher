@@ -12,25 +12,17 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
 ## Where things stand (2026-09-25)
 
-**Branches.** `chore/tasks-triage`, `fix/default-model` (item #1) and the editor
-batch are merged into `main`. `feat/claude-cli-provider` is still open. It was
-rebased onto `main` (`47a8759`) on 2026-09-25. The provider is implemented there
-(T2-T12 in `todo.md`), plus two fixes from the first real desktop run (see In
-progress). It's **waiting on Jobsworth's manual checkpoint runs and review**
-before it merges.
+**Branches.** `chore/tasks-triage`, `fix/default-model` (item #1), the editor
+batch and `feat/claude-cli-provider` are all merged into `main`. The Claude CLI
+provider merged on 2026-09-25 with a known limitation (#23).
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
-added mid-session and runs alongside. Its manual checkpoints and merge come first.
-Straight after that merge: the SPA port repairs, #9 (candidate thumbnails and
+added mid-session and ran alongside. It's now merged (#23). Next up: the SPA port repairs, #9 (candidate thumbnails and
 lightbox) + #21 (the rest of what the port dropped), as one frontend batch.
 
 **Waiting on Jobsworth:**
-- Claude CLI provider: the manual checkpoint runs listed in `todo.md` (real-CLI
-  `#[ignore]` tests, `product_design_factory.dot` with no keys, the desktop app),
-  then review and merge. Restart the desktop app from the branch first, since
-  the fixes below need a rebuild. Then rerun the product design factory to
-  finish Checkpoint C.
+- #23: whether to run the Claude CLI checkpoints skipped before merge.
 - #2: whether CI installs Chromium (for Playwright and `render-capture`'s
   integration test).
 - #6: the default artifact retention policy.
@@ -187,56 +179,56 @@ if the directories differ. To serve without API keys or spending anything, point
     (`archive/plan-smasher-spa.md:492`). The lint badge now always lists its
     violations, where the old one needed a click. That's arguably better.
 
-## In progress
+23. **Claude CLI provider: known limitation and follow-ups.** *Merged to `main`
+    2026-09-25* with a known limitation. The provider runs pipeline LLM calls
+    through `claude -p` from the web and desktop apps, with no API key. Spec, plan
+    and todo are in `archive/*-claude-cli-provider.md`. See
+    `docs/config-reference.md` for setup.
 
-- **Claude CLI provider.** Run every pipeline LLM call through `claude -p` from
-  the web and desktop apps, with no API key. Spec, plan and todo are on branch
-  `feat/claude-cli-provider`. The code is done. Still to do: the manual checkpoint
-  runs (real CLI, product design factory with no keys, desktop app), then review
-  and merge.
+    **Known limitation, the fix to do first.** Tool nodes that don't name a
+    built-in tool (such as `tool_command`-only nodes: 34 across 9 examples,
+    including `A11yCheck` in the product design factory) and manager nodes fail
+    under claude-cli with "the claude-cli provider answers single calls and can't
+    run tools". The spec assumed `LlmToolBackend` and `LlmManagerBackend` were
+    single-turn and tool-less, but both run agent sessions with tools
+    (`smasher-web/src/backend.rs`). Fix: when the provider is claude-cli, route
+    those sessions through `ClaudeCliBackend` as a `claude -p` agent, as codergen
+    is. Workaround until then: `provider="<other>"` on the node. The deeper fix
+    for `tool_command` is #22.
 
-  First real desktop run (`01m39tb2qn0b4msk4cgdr94fry`, 2026-09-24, product
-  design factory):
-  - `Read` through the `design-kit` symlink works under `dontAsk`.
-  - The allowlist is enough to **build** candidates (4 Discover candidates plus
-    the Define build), but not to **check** them. The codergen agents reported
-    shell access denied, so they couldn't run the design-kit token linter or
-    open their pages. Decide whether to allow the linter command, or leave the
-    checks to the pipeline's own `system_lint`/`render` nodes.
-  - Fixed: run token totals were always 0, and the CLI's streamed usage was
-    misread (`5308541`). Usage now comes from the result line, with cost.
-    Input excludes cache tokens, as with the Anthropic API adapter, so for
-    claude-cli runs the cost figure is the useful number.
-  - Fixed: `TaskCritic` failed with "issue with the selected model
-    (gemma4:31b-cloud)". A server-wide Ollama model reached `claude -p --model`
-    through the single-call adapter (`944c09c`). This took `CritiqueJoin` and
-    `Synthesis` down with it, so Checkpoint C still needs a clean rerun. The
-    underlying problem is item #20.
-  - The gallery stays empty until every render node has run. `IAOptions`
-    writes all four candidates in one ~5 minute node, so nothing shows for a
-    while. That's how the pipeline is built, not a bug.
+    **Checkpoints not run before merge** (Jobsworth's call):
+    - the `#[ignore]` real-CLI tests, including the `curl` denial;
+    - `smasher run` on hello-world and a codergen example;
+    - hello-world in the desktop app.
 
-  Second desktop run (`01m3awkpeahghg0v6d2pshnzyb`, 2026-09-25, after both
-  fixes): **Checkpoint C's candidate and critique steps pass.** `TaskCritic` wrote
-  a valid `critic-report.json` that describes the real screenshot, lint passed,
-  `Synthesis` recommended `proceed`, and token totals were counted. But the last
-  node, `A11yCheck`, failed with "the claude-cli provider answers single calls and
-  can't run tools". **The spec made a wrong assumption.** It says `LlmToolBackend`
-  and `LlmManagerBackend` are single-turn and tool-less, so they would route to
-  `ClaudeCliAdapter` unchanged (`SPEC-claude-cli-provider.md` lines 53 and 113).
-  In fact both run agent sessions with tools (`smasher-web/src/backend.rs`). So
-  under claude-cli, every generic tool node fails (34 `tool_command` nodes across
-  9 examples), and so does every manager node. The fix proposed for this branch
-  (not yet agreed): when the provider is claude-cli, route those sessions through
-  `ClaudeCliBackend` as a `claude -p` agent, as codergen is. The deeper fix is
-  #22.
+    **Other follow-ups:**
+    - The allowlist is enough to *build* candidates but not to *check* them.
+      Codergen agents are denied the shell, so they can't run the design-kit
+      token linter or open their pages. Decide whether to allow the linter
+      command, or leave checking to the pipeline's `system_lint`/`render` nodes.
+    - Show `permission_denials` from the CLI's result event in the run view.
+    - Make the web server's claude-cli codergen timeout configurable. It's fixed
+      at 600s (`smasher-web/src/run_launch.rs`).
+    - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path. Today it runs `claude`
+      from `PATH`.
 
-  Possible follow-ups:
-  - Show `permission_denials` from the CLI's result event in the run view.
-  - Make the web server's claude-cli codergen timeout configurable. It's fixed at
-    600s (`smasher-web/src/run_launch.rs`).
-  - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path. Today it runs `claude`
-    from `PATH`.
+    **History.** First desktop run (`01m39tb2qn0b4msk4cgdr94fry`, 2026-09-24):
+    - Reads through the `design-kit` symlink work under `dontAsk`.
+    - Two bugs, both fixed before merge:
+      - Token totals were always 0, and the streamed usage was misread
+        (`5308541`). Usage now comes from the result line, with cost. Input
+        excludes cache tokens, as with the Anthropic API adapter, so for
+        claude-cli runs cost is the useful figure.
+      - `TaskCritic` sent an Ollama model name (`gemma4:31b-cloud`, from the
+        repo `.env`) to `claude -p --model` (`944c09c`). The underlying problem
+        is #20.
+    - The gallery stays empty until all render nodes run. `IAOptions` builds
+      all four candidates in one ~5 minute node. That's by design.
+
+    Second run (`01m3awkpeahghg0v6d2pshnzyb`, 2026-09-25):
+    - Candidate and critique steps passed. `critic-report.json` described the
+      real screenshot, lint passed, and `Synthesis` said `proceed`.
+    - `A11yCheck` failed, which uncovered the limitation above.
 
 ## P2: Robustness (can lose data or grow without limit)
 
@@ -300,7 +292,7 @@ decides the `candidate_id` convention, and the lint override lives in the same
     "execute" the tool. On API providers the agent improvises (often by running
     the command), so these nodes seem to work, but the result is slow, costs
     tokens, and can vary between runs. Under claude-cli they fail outright (see
-    In progress). Attractor intends tool nodes to run `tool_command` directly.
+    #23). Attractor intends tool nodes to run `tool_command` directly.
     Doing that makes them deterministic and free. Decide first:
     - It changes behaviour for every provider.
     - It runs shell commands written in the DOT file. Workflows are

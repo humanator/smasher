@@ -7,8 +7,15 @@
 
 Runs LLM work through the local Claude Code CLI (`claude -p`) with whatever account
 `claude` is logged into, so no provider API key is needed. Codergen nodes run as
-Claude Code agent sessions. Single-call work (`task_critic`, `synthesis`, manager
-and tool nodes) runs as trimmed, tool-less `claude -p` calls.
+Claude Code agent sessions. Single-call work (`task_critic`, `synthesis`) runs as
+trimmed, tool-less `claude -p` calls.
+
+**Known limitation:** tool nodes that don't name a built-in tool (for example,
+nodes with only a `tool_command`), and manager (`house`) nodes, fail under
+`claude-cli` with "the claude-cli provider answers single calls and can't run
+tools". Those nodes run an LLM agent session with tools, which this provider
+doesn't support yet. To run them, give the node `provider="<other>"` with that
+provider's key configured.
 
 | Variable | Description |
 |----------|-------------|
