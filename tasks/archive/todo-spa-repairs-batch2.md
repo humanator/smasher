@@ -611,4 +611,4 @@ renders:
 - [x] `make ci` is green.
 - [x] The map marks all seven modules done. `BACKLOG.md` #21 is updated to done, with the
       deliberate cuts noted.
-- [ ] Review with Jobsworth.
+- [x] Review with Jobsworth. (2026-09-25: "the changes look good".)

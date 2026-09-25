@@ -20,8 +20,8 @@ provider merged on 2026-09-25 with a known limitation (#23).
 2026-09-24), then #6. The Claude CLI provider was
 added mid-session and ran alongside. It's now merged (#23). The SPA port repairs,
 #9 (candidate thumbnails and lightbox) + #21 (the rest of what the port
-dropped), are done on `feat/spa-port-repairs` (2026-09-25), awaiting review and
-merge.
+dropped), are done on `feat/spa-port-repairs` (2026-09-25), reviewed by Jobsworth, and
+awaiting merge. Their specs, plans and todos are in `archive/`.
 
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
@@ -93,7 +93,7 @@ only on request.
 
 9. ~~**Show candidates as thumbnails that open a full-size, interactive lightbox.**~~
    **Done 2026-09-25** on `feat/spa-port-repairs` (module `candidate-preview`, see
-   `tasks/SPEC-candidate-preview.md`). Both cards show the screenshot as a thumbnail
+   `tasks/archive/SPEC-candidate-preview.md`). Both cards show the screenshot as a thumbnail
    that opens the live bundle at its capture viewport, scaled to fit, with ⟲ and
    Open in new tab; both list `params`; the gallery's failed card shows captured-at.
    *Raised by Jobsworth 2026-09-25 from a real run, so moved up from P3.* This is
@@ -142,7 +142,7 @@ only on request.
 21. ~~**Restore what the HTMX → SPA port dropped.**~~ **Done 2026-09-25** on
     `feat/spa-port-repairs` (seven modules: `spa-shell`, `candidate-preview`,
     `run-launch`, `run-summary`, `question-card`, `event-log`, `workflow-detail`;
-    see `capability-map-spa-repairs.md`). Deliberately left out, per the batch-2
+    see `archive/capability-map-spa-repairs.md`). Deliberately left out, per the batch-2
     spec: SSE reconnect after `onerror`; an event-log cap; server emits for
     `human_prompt_issued`, `human_response_received` and `context_updated`;
     per-id workflow and filtered-run endpoints (the workflow page filters

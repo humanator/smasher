@@ -205,7 +205,7 @@ The acceptance criteria and verification for each task are in `todo-spa-repairs-
 ### Checkpoint D: complete
 - [x] All spec success criteria are met, and `make ci` is green
 - [x] The map marks all seven modules done, and `BACKLOG.md` #21 is updated
-- [ ] Review with Jobsworth
+- [x] Review with Jobsworth (2026-09-25: "the changes look good")
 
 ## Risks and mitigations
 
