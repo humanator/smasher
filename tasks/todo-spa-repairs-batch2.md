@@ -181,13 +181,13 @@ the token counter.
 - `RunList` renders a muted `unnamed` when `graph_name` is null, empty or whitespace.
 
 **Acceptance criteria:**
-- [ ] An `ANONYMOUS_GATE` run's row reads `unnamed`.
-- [ ] A named run's row still shows its name.
-- [ ] `npm run check` adds no errors.
+- [x] An `ANONYMOUS_GATE` run's row reads `unnamed`.
+- [x] A named run's row still shows its name.
+- [x] `npm run check` adds no errors.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/RunList.test.ts`
-- [ ] `npm run check`
+- [x] `npm test -- --run tests/components/dashboard/RunList.test.ts`
+- [x] `npm run check`
 
 **Dependencies:** Task 1
 

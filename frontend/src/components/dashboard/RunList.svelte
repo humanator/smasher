@@ -63,7 +63,13 @@
               <Table.Cell>
                 <a href="/runs/{run.id}" class="font-mono text-primary hover:underline">{run.id}</a>
               </Table.Cell>
-              <Table.Cell>{run.graph_name}</Table.Cell>
+              <Table.Cell>
+                {#if run.graph_name?.trim()}
+                  {run.graph_name}
+                {:else}
+                  <span class="text-muted-foreground">unnamed</span>
+                {/if}
+              </Table.Cell>
               <Table.Cell><StatusBadge status={run.status} /></Table.Cell>
               <Table.Cell>{new Date(run.started_at).toLocaleString()}</Table.Cell>
             </Table.Row>

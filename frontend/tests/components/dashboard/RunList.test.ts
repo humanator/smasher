@@ -1,11 +1,12 @@
 // ABOUTME: Tests for RunList component
 // ABOUTME: Renders against the real GET /api/runs endpoint, no mocking
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import RunList from '../../../src/components/dashboard/RunList.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
+import { ANONYMOUS_GATE, QUESTION_KINDS, submitGraph, cancelAll } from '../../fixtures/graphs';
 
 // Parks on its human gate, so no LLM node ever runs.
 const gatedDot = `digraph RunListGated {
@@ -18,6 +19,10 @@ const gatedDot = `digraph RunListGated {
 describe('RunList', () => {
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(async () => {
+    await cancelAll();
   });
 
   it('renders loading state initially', () => {
@@ -40,5 +45,29 @@ describe('RunList', () => {
       },
       { timeout: 5000 }
     );
+  });
+
+  it('shows "unnamed" for a run whose graph has no name', async () => {
+    const runId = await submitGraph(ANONYMOUS_GATE);
+
+    render(RunList);
+
+    const row = await waitFor(() => screen.getByRole('link', { name: runId }).closest('tr')!, {
+      timeout: 5000,
+    });
+    const workflowCell = row.querySelectorAll('td')[1];
+    expect(workflowCell).toHaveTextContent('unnamed');
+    expect(workflowCell.querySelector('.text-muted-foreground')).toHaveTextContent('unnamed');
+  });
+
+  it('shows a named run\'s graph name', async () => {
+    const runId = await submitGraph(QUESTION_KINDS);
+
+    render(RunList);
+
+    const row = await waitFor(() => screen.getByRole('link', { name: runId }).closest('tr')!, {
+      timeout: 5000,
+    });
+    expect(row.querySelectorAll('td')[1]).toHaveTextContent('QuestionKinds');
   });
 });

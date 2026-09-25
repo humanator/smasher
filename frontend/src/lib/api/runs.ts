@@ -13,7 +13,7 @@ export interface RunSummary {
   status: string;
   started_at: string;
   completed_at: string | null;
-  graph_name: string;
+  graph_name: string | null;
   error: string | null;
   input_tokens: number;
   output_tokens: number;
