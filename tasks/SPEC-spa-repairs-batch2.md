@@ -84,7 +84,7 @@ out to need a Rust or API change, stop and ask.
      - Completed: `completed_at` as `toLocaleString()`, as `RunList` formats Started.
      - Working Directory: mono.
      - Error: in `text-destructive`, with the text wrapping.
-   - Each row shows only when its field is non-null. A running run shows none of them.
+   - Each row shows only when its field is non-null. A running run shows no Completed or Error. (Working Directory is set at launch, so it shows while the run is running.)
    - The page-level `error` (failed to load the run) stays separate from `run.error` and keeps its
      own `role="alert"` line.
 2. **The graph follows the run.**

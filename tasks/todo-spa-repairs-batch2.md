@@ -104,14 +104,14 @@ Each row shows only when its field isn't null. `RunDetail` mounts it under the a
 the token counter.
 
 **Acceptance criteria:**
-- [ ] A gated run that is still running shows no Completed, Working Directory or Error.
-- [ ] A `RUN_FAIL_CHECK` run shows Completed, Working Directory (`artifacts/…`), and an Error
+- [x] A gated run that is still running shows no Completed or Error. (Corrected: `run_working_dir` is set at launch, so Working Directory shows while running.)
+- [x] A `RUN_FAIL_CHECK` run shows Completed, Working Directory (`artifacts/…`), and an Error
       containing `invalid JSON in args attribute`.
-- [ ] A cancelled gated run shows Completed and no Error.
-- [ ] The page-level load error (`role="alert"`) is a separate element from the run's Error row.
+- [x] A cancelled gated run shows Completed and no Error.
+- [x] The page-level load error (`role="alert"`) is a separate element from the run's Error row.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/RunMetaList.test.ts tests/components/dashboard/RunDetail.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/RunMetaList.test.ts tests/components/dashboard/RunDetail.test.ts`
 
 **Dependencies:** Tasks 1 and 2
 

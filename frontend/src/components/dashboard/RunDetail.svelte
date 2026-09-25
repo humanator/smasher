@@ -7,6 +7,7 @@
   import type { RunSummary } from '../../lib/api/runs';
   import StatusBadge from './StatusBadge.svelte';
   import TokenCounter from './TokenCounter.svelte';
+  import RunMetaList from './RunMetaList.svelte';
   import { sanitizeSvg } from '../../lib/sanitizeSvg';
   import { TERMINAL_STATUSES } from '../../lib/runStatus';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -102,6 +103,8 @@
     {#if !actionsInHeader}
       {@render runActions()}
     {/if}
+
+    <RunMetaList {run} />
 
     <TokenCounter {runId} />
 
