@@ -67,7 +67,7 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 ### Checkpoint A: server
 
 - [x] `cargo test --workspace`, `make ci` green
-- [ ] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
+- [x] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
 
 ### Phase 2: Client builds exchanges
 
@@ -78,12 +78,12 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 
 ### Checkpoint B: client
 
-- [ ] Vitest, `check` and `lint` green; the fake claude still fails and no test reaches an LLM
-- [ ] Manual: `cargo run -p smasher-cli -- serve`, answer a `QUESTION_KINDS` run, then reload. The list stays.
+- [x] Vitest, `check` and `lint` green; the fake claude still fails and no test reaches an LLM
+- [x] Manual: `cargo run -p smasher-cli -- serve`, answer a `QUESTION_KINDS` run, then reload. The list stays.
 
 ### Phase 3: End to end and docs
 
-- [ ] T8: Playwright `question-replies.spec.ts` (S)
+- [x] T8: Playwright `question-replies.spec.ts` (S)
 - [ ] T9: Docs, backlog and spec status (S)
 
 ### Checkpoint C: complete

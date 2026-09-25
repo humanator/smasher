@@ -49,7 +49,7 @@ completion, then read the run's `events.jsonl`.
 
 **Verification:**
 - [x] `cargo test -p smasher-web`
-- [ ] Manual (Checkpoint A): after answering a run in `smasher serve`, `grep human_ ~/.smasher/artifacts/<run>/…/events.jsonl`
+- [x] Manual (Checkpoint A): after answering a run in `smasher serve`, `grep human_ ~/.smasher/artifacts/<run>/…/events.jsonl`
 
 **Dependencies:** Task 1
 
@@ -88,8 +88,8 @@ exchanges without parsing DOT.
 ## Checkpoint A: server
 
 - [x] `cargo test --workspace` and `make ci` green
-- [ ] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
-- [ ] Commit, then review with Jobsworth before starting the client
+- [x] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
+- [ ] (Skipped in the /build auto run; review at the end) Commit, then review with Jobsworth before starting the client
 
 ## Phase 2: Client builds exchanges
 
@@ -206,11 +206,11 @@ labelled with its node id, and its body is `{@html renderMarkdown(reply.text)}` 
 
 ## Checkpoint B: client
 
-- [ ] Full Vitest suite, `check` and `lint` green; the fake claude still fails and no test
+- [x] Full Vitest suite, `check` and `lint` green; the fake claude still fails and no test
       reaches an LLM
-- [ ] Manual: `cargo run -p smasher-cli -- serve`, answer a `QUESTION_KINDS` run, reload; the
+- [x] Manual: `cargo run -p smasher-cli -- serve`, answer a `QUESTION_KINDS` run, reload; the
       answered list stays, and the log shows `Awaiting input` / `Input received`
-- [ ] Commit, then review with Jobsworth
+- [ ] (Skipped in the /build auto run; review at the end) Commit, then review with Jobsworth
 
 ## Phase 3: End to end and docs
 
@@ -221,11 +221,11 @@ the three answers under Answered Questions, reload the page, and check they're s
 oldest first. Cancel the run in `finally`, as `question-card.spec.ts` does.
 
 **Acceptance criteria:**
-- [ ] After a reload, Answered Questions lists the three answers in answer order
-- [ ] The spec never reaches an LLM
+- [x] After a reload, Answered Questions lists the three answers in answer order
+- [x] The spec never reaches an LLM
 
 **Verification:**
-- [ ] `cd frontend && npx playwright test e2e/question-replies.spec.ts`
+- [x] `cd frontend && npx playwright test e2e/question-replies.spec.ts`
 
 **Dependencies:** Task 6
 
