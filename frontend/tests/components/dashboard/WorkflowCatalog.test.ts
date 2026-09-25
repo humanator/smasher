@@ -5,9 +5,11 @@ import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/svelte/svelte5';
+import userEvent from '@testing-library/user-event';
 import WorkflowCatalog from '../../../src/components/dashboard/WorkflowCatalog.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
+import * as runsApi from '../../../src/lib/api/runs';
 
 describe('WorkflowCatalog', () => {
   beforeAll(() => {
@@ -33,35 +35,78 @@ describe('WorkflowCatalog', () => {
     );
   });
 
-  it('launches a real run via the Run Workflow button and navigates to it (POST /api/workflows/{id}/run)', async () => {
-    // Regression test: this button used to be an <a href="/runs/new?workflow=...">
-    // that nothing consumed and that collided with App.svelte's /runs/{id}
-    // route (matched "new" as a literal run id, 404ing every child fetch).
-    vi.stubGlobal('location', { href: '' });
+  describe('Run Workflow', () => {
+    let launched: string[] = [];
 
-    render(WorkflowCatalog);
+    afterEach(async () => {
+      vi.unstubAllGlobals();
+      // bits-ui's scroll lock clears this on a timer after the open dialog
+      // unmounts; reset it so the next test's clicks aren't blocked.
+      document.body.style.pointerEvents = '';
+      await Promise.all(launched.map((id) => runsApi.cancelRun(id).catch(() => {})));
+      launched = [];
+      const { workflows } = await workflowsApi.listWorkflows();
+      for (const w of workflows) {
+        if (w.name.includes('_test_catalog_run_')) rmSync(w.path, { force: true });
+      }
+    });
 
-    // Human Gate Showcase starts at a human gate, so the launched run parks
-    // there and never reaches its LLM nodes.
-    await waitFor(
-      () => {
-        expect(screen.getByText('Human Gate Showcase')).toBeTruthy();
-      },
-      { timeout: 5000 }
-    );
+    async function rowFor(fileName: string): Promise<HTMLElement> {
+      const name = await screen.findByText(fileName, {}, { timeout: 5000 });
+      return name.closest('tr') as HTMLElement;
+    }
 
-    const row = screen.getByText('Human Gate Showcase').closest('tr') as HTMLElement;
-    const runButton = within(row).getByText('Run Workflow');
-    await fireEvent.click(runButton);
+    it('opens the run dialog without launching anything', async () => {
+      // Imported under a unique name, so no other test file's runs share its
+      // workflow_id. It's the gate-only fixture, so even a stray launch is free.
+      const name = `_test_catalog_run_${Date.now()}`;
+      const { id } = await workflowsApi.importWorkflowDot(
+        name,
+        readFileSync(join(process.cwd(), '..', 'examples', 'run_launch_check.dot'), 'utf-8')
+      );
+      vi.stubGlobal('location', { href: '' });
+      render(WorkflowCatalog);
 
-    await waitFor(
-      () => {
-        expect(location.href).toMatch(/\/runs\/[a-zA-Z0-9-]+$/);
-      },
-      { timeout: 5000 }
-    );
+      await fireEvent.click(within(await rowFor(`${name}.dot`)).getByText('Run Workflow'));
 
-    vi.unstubAllGlobals();
+      expect(await screen.findByRole('heading', { name: /^Run / })).toBeTruthy();
+      expect(screen.getByLabelText('Brief')).toBeTruthy();
+      expect(location.href).toBe('');
+      const { runs } = await runsApi.listRuns();
+      expect(runs.filter((r) => r.workflow_id === id)).toEqual([]);
+    });
+
+    it('titles the dialog with the formatted workflow name', async () => {
+      render(WorkflowCatalog);
+
+      await fireEvent.click(
+        within(await rowFor('human_gate_showcase.dot')).getByText('Run Workflow')
+      );
+
+      expect(await screen.findByRole('heading', { name: 'Run Human Gate Showcase' })).toBeTruthy();
+    });
+
+    it('launches a real run through the dialog and navigates to it (POST /api/workflows/{id}/run)', async () => {
+      // Regression test: this button used to be an <a href="/runs/new?workflow=...">
+      // that nothing consumed and that collided with App.svelte's /runs/{id}
+      // route (matched "new" as a literal run id, 404ing every child fetch).
+      vi.stubGlobal('location', { href: '' });
+      const user = userEvent.setup();
+      render(WorkflowCatalog);
+
+      // Human Gate Showcase starts at a human gate, so the launched run parks
+      // there and never reaches its LLM nodes.
+      await user.click(within(await rowFor('human_gate_showcase.dot')).getByText('Run Workflow'));
+      await user.click(await screen.findByRole('button', { name: 'Run' }));
+
+      await waitFor(
+        () => {
+          expect(location.href).toMatch(/\/runs\/[a-zA-Z0-9-]+$/);
+        },
+        { timeout: 5000 }
+      );
+      launched.push(location.href.split('/')[2]);
+    });
   });
 
   describe('Import .dot', () => {

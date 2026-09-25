@@ -131,13 +131,13 @@ old handler. In the test file, move the "launches a real run" test's `vi.unstubA
 an `afterEach`, and cancel the run it launches.
 
 **Acceptance criteria:**
-- [ ] Clicking Run Workflow opens `Run Human Gate Showcase`, and no run is launched for it
-- [ ] The existing "launches a real run" test goes through the dialog and still navigates to `/runs/{id}`
-- [ ] No `runError` or `Starting…` is left in the catalog
+- [x] Clicking Run Workflow opens `Run Human Gate Showcase`, and no run is launched for it
+- [x] The existing "launches a real run" test goes through the dialog and still navigates to `/runs/{id}`
+- [x] No `runError` or `Starting…` is left in the catalog
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/WorkflowCatalog.test.ts`, with the new case failing first
-- [ ] `npm test -- --run` passes in full
+- [x] `npm test -- --run tests/components/dashboard/WorkflowCatalog.test.ts`, with the new case failing first
+- [x] `npm test -- --run` passes in full
 
 **Dependencies:** Task 4
 
@@ -146,8 +146,8 @@ an `afterEach`, and cancel the run it launches.
 **Scope:** S
 
 ## Checkpoint B: after Tasks 4–5
-- [ ] Full Vitest suite passes, and `check`/`lint` add no new errors
-- [ ] Commit (one per task)
+- [x] Full Vitest suite passes, and `check`/`lint` add no new errors
+- [x] Commit (one per task)
 - [ ] If Jobsworth wants to, look at the dialog in `npm run dev` before Phase 3
 
 ## Task 6: `e2e/run-launch.spec.ts`, and mark the module done

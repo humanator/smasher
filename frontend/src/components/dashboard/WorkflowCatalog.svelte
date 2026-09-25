@@ -1,14 +1,14 @@
 <script lang="ts">
   // ABOUTME: Workflow catalog page listing discovered workflows
-  // ABOUTME: Fetches from GET /api/workflows, links to run submission, imports .dot files
+  // ABOUTME: Fetches from GET /api/workflows, opens the run dialog for a workflow, imports .dot files
 
   import { onMount } from 'svelte';
   import * as workflowsApi from '../../lib/api/workflows';
-  import * as runsApi from '../../lib/api/runs';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Table from '$lib/components/ui/table/index.js';
   import { formatWorkflowName } from '$lib/utils';
   import { loadFile } from '../../lib/native';
+  import RunDialog from './RunDialog.svelte';
 
   interface Workflow {
     id: string;
@@ -20,8 +20,8 @@
   let workflows: Workflow[] = $state([]);
   let loading = $state(true);
   let error: string | null = $state(null);
-  let runningWorkflowId: string | null = $state(null);
-  let runError: string | null = $state(null);
+  let runTarget: Workflow | null = $state(null);
+  let runDialogOpen = $state(false);
   let importError: string | null = $state(null);
 
   onMount(async () => {
@@ -35,23 +35,14 @@
     }
   });
 
-  // Launches a real run of the workflow's on-disk .dot file (server-side,
-  // via POST /api/workflows/{id}/run) and navigates straight to the new
-  // run's detail page -- no intermediate "confirm" page, matching the old
-  // HTMX dashboard's single-click "run this workflow" behavior. Previously
-  // this linked to `/runs/new?workflow={id}`, but nothing consumed that
-  // query param and "new" collided with App.svelte's /runs/{id} route
-  // regex (matched as a literal run id "new", 404ing every child fetch).
-  async function handleRunWorkflow(workflowId: string) {
-    runError = null;
-    runningWorkflowId = workflowId;
-    try {
-      const response = await runsApi.runWorkflow(workflowId);
-      window.location.href = `/runs/${response.run_id}`;
-    } catch (err) {
-      runError = err instanceof Error ? err.message : 'Failed to start run';
-      runningWorkflowId = null;
-    }
+  // Opens the run dialog, which launches a real run of the workflow's
+  // on-disk .dot file (POST /api/workflows/{id}/run) and navigates to it.
+  // This used to link to `/runs/new?workflow={id}`, but nothing consumed that
+  // query param and "new" collided with App.svelte's /runs/{id} route regex
+  // (matched as a literal run id "new", 404ing every child fetch).
+  function handleRunWorkflow(workflow: Workflow) {
+    runTarget = workflow;
+    runDialogOpen = true;
   }
 
   // Native open dialog in the desktop app, file input in the browser. The
@@ -89,9 +80,6 @@
   {:else if workflows.length === 0}
     <p class="p-8 text-center text-lg text-muted-foreground">No workflows configured.</p>
   {:else}
-    {#if runError}
-      <p class="p-8 text-center text-lg text-destructive" role="alert">{runError}</p>
-    {/if}
     <div class="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <Table.Root>
         <Table.Header class="bg-muted/50">
@@ -114,13 +102,7 @@
                   <Button href="/workflows/{workflow.id}/edit" variant="secondary" size="sm">
                     Edit
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={runningWorkflowId === workflow.id}
-                    onclick={() => handleRunWorkflow(workflow.id)}
-                  >
-                    {runningWorkflowId === workflow.id ? 'Starting…' : 'Run Workflow'}
-                  </Button>
+                  <Button size="sm" onclick={() => handleRunWorkflow(workflow)}>Run Workflow</Button>
                 </div>
               </Table.Cell>
             </Table.Row>
@@ -128,5 +110,9 @@
         </Table.Body>
       </Table.Root>
     </div>
+  {/if}
+
+  {#if runTarget}
+    <RunDialog workflow={runTarget} bind:open={runDialogOpen} />
   {/if}
 </div>
