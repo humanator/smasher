@@ -12,17 +12,20 @@ lint. Never set `SMASHER_LLM_TESTS=1`.
 **Description:** Add `examples/run_launch_check.dot`: `Start` (Mdiamond) → `EchoGate` (hexagon,
 `mode="freeform"`, label `Brief: {{brief}} | Model: {{model}} | Colour: {{colour}}`) → `Exit`
 (Msquare). Give it two `ABOUTME:` comment lines and a `goal` saying what it's for, as
-`manual-workflow-run-shell-check.dot` does. Add an integration test that launches it with
-`runsApi.runWorkflow` directly.
+`manual-workflow-run-shell-check.dot` does. The gate must set no `question` or `prompt`
+attribute, because either one would replace the label as the question text. Add an integration
+test that launches it with `runsApi.runWorkflow` directly, reads
+`questionsApi.listQuestions(runId)` and cancels the run afterwards.
 
 **Acceptance criteria:**
 - [ ] The catalog (`listWorkflows`) lists it
-- [ ] `runWorkflow(id, { variables: { brief: 'hello', colour: 'blue' }, model: 'm-1' })` gives a run whose pending question text is `Brief: hello | Model: m-1 | Colour: blue`
+- [ ] `runWorkflow(id, { variables: { brief: 'hello', colour: 'blue' }, model: 'm-1' })` gives a run whose pending `questions[0].question` is `Brief: hello | Model: m-1 | Colour: blue`
 - [ ] The file has no `box` nodes
+- [ ] The test cancels its run in `afterEach`
 
 **Verification:**
 - [ ] A new case in `tests/lib/api/runs.test.ts` fails first (no such workflow), then passes against the real server
-- [ ] `cargo test -p smasher-attractor --test example_dot_parse` still passes
+- [ ] `cargo test -p smasher-attractor --test example_lint` passes. `all_examples_pass_lint` reads every `examples/*.dot`, so it covers the new file.
 
 **Dependencies:** None
 
@@ -87,8 +90,17 @@ clears all errors. Every input calls `saveDraft`, and clears that field's error 
 error. **Run** calls `buildRunRequest`. On errors, they show under their fields. When the
 request is OK, the dialog calls `runsApi.runWorkflow`, then sets `window.location.href` to
 `/runs/{run_id}`. On rejection, it shows `errorMessage(err, 'Failed to start run')` inline in a
-`role="alert"`. **Cancel** closes the dialog. Move `formatWorkflowName` from
-`WorkflowCatalog.svelte` to `lib/utils.ts` for the title `Run {formatted name}`.
+`role="alert"`. **Cancel** closes the dialog. Closing while a launch is in flight doesn't
+abort it, and a successful launch still navigates (see the plan). Move `formatWorkflowName` from
+`WorkflowCatalog.svelte` to `lib/utils.ts` for the title `Run {formatted name}`, in that file's
+double-quote style.
+
+**Test setup:** copy `SettingsDialog.test.ts`. Use `userEvent.setup()` and query `screen`, and
+reset `document.body.style.pointerEvents = ''` in `afterEach`. Also in `afterEach`: cancel every
+launched run, `rmSync` every `_test_run_launch_` import, and `vi.unstubAllGlobals()`. The
+no-launch test imports the fixture's own gate-only DOT under a unique name, so even a buggy
+launch spends nothing. The rejection test imports `digraph { Start [shape=Mdiamond] }` and
+expects the alert to contain `Pipeline lint errors: Graph has no exit node`.
 
 **Acceptance criteria:**
 - [ ] Four fields, found by their labels: Model, Variables, Brief and Node Overrides (JSON). Each has the old form's placeholder.
@@ -115,7 +127,8 @@ request is OK, the dialog calls `runsApi.runWorkflow`, then sets `window.locatio
 **Description:** Replace `handleRunWorkflow`, `runningWorkflowId` and `runError` with a
 `runTarget` `$state` and a single `<RunDialog bind:open workflow={runTarget} />`. Run Workflow
 sets the target and opens the dialog. Update the header `ABOUTME:` line and the comment above the
-old handler.
+old handler. In the test file, move the "launches a real run" test's `vi.unstubAllGlobals()` into
+an `afterEach`, and cancel the run it launches.
 
 **Acceptance criteria:**
 - [ ] Clicking Run Workflow opens `Run Human Gate Showcase`, and no run is launched for it
@@ -142,6 +155,7 @@ old handler.
 **Description:** A Playwright spec that needs no LLM run:
 - From `/`, open Run Workflow on Run Launch Check, fill Brief, Model and `colour=blue`, and click Run. The run page loads, and its question card shows the filled-in text.
 - Enter `{"a": "m"}` in Node Overrides and click Run. The shape error shows, and the URL stays `/`.
+- Cancel the launched run afterwards with `POST /api/runs/{id}/cancel`, using Playwright's `request` fixture.
 
 Then tick the spec's success criteria, and mark `run-launch` as Done in the capability map.
 
@@ -150,7 +164,7 @@ Then tick the spec's success criteria, and mark `run-launch` as Done in the capa
 - [ ] Every spec success criterion is ticked, and the capability map row reads `Done 2026-09-25` (or the actual date)
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/run-launch.spec.ts`
+- [ ] `npm run test:e2e -- e2e/run-launch.spec.ts`, with the same `smasher serve` running on 21541. Playwright only starts Vite, which proxies `/api` there.
 - [ ] `npm run build`
 
 **Dependencies:** Task 5

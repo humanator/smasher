@@ -49,13 +49,59 @@ The first three have no dependencies on each other.
   already stub `location` with `vi.stubGlobal`.
 - **The fixture is `Start → Gate → Exit` with a freeform `hexagon` gate,** as in
   `human_gate_showcase.dot`. Its label is `Brief: {{brief}} | Model: {{model}} | Colour:
-  {{colour}}`. It has no box nodes, so a run spends nothing. It isn't added to the Rust
-  `example_lint.rs` list, because that would be a Rust change. The real launch lints it anyway, so
-  a lint failure would fail the Task 1 test.
-- **Server-rejection tests import a DOT that parses but fails lint** (a start with no exit),
-  because import doesn't lint but launch does. There's no delete API, so cleanup uses `rmSync`
-  on the imported path, as `WorkflowCatalog.test.ts` does. Imported names carry a
-  `_test_run_launch_` marker.
+  {{colour}}`. It has no box nodes, so a run spends nothing. The Rust suite needs no change to
+  cover it: `example_lint.rs::all_examples_pass_lint` reads every `examples/*.dot`, so `make ci`
+  lints it automatically. The real launch lints it too.
+- **Server-rejection tests import a DOT that parses but fails lint**:
+  `digraph { Start [shape=Mdiamond] }`. Import only parses and resolves it, but the launch lints
+  it and fails E003, so the dialog shows `Pipeline lint errors: Graph has no exit node`. There's
+  no delete API, so cleanup uses `rmSync` on the imported path, as `WorkflowCatalog.test.ts`
+  does. Imported names carry a `_test_run_launch_` marker.
+- **Every run a test launches is cancelled in `afterEach`** with `runsApi.cancelRun(id)`, as
+  `EventLog.test.ts:65` and `AppLayout.test.ts:128` do. Otherwise gate-parked runs pile up on
+  the dev server for the rest of the session.
+- **Closing the dialog while a launch is in flight doesn't abort it.** The run already exists on
+  the server, so when the request resolves, the dialog still navigates to `/runs/{id}`. That's
+  better than leaving an orphaned run the user can't see. There's nothing to cancel on the
+  client, since `runWorkflow` takes no `AbortSignal`, and changing that would change its
+  signature (spec: ask first).
+
+## Verified context (checked against the code 2026-09-25)
+
+Facts the tasks rely on, with where each one was checked:
+
+- **`{{model}}` is available to the fixture.** `launch_and_record` inserts `model` into
+  `variables` (the given one, or `state.default_model`), then runs `apply_transforms`. That
+  happens before lint and before launch (`smasher-web/src/routes/api.rs:218-223`).
+- **Consequence: a `model=` line in Variables never takes effect.** The server overwrites it with
+  the Model field or the default, as the old form's server did. The client doesn't warn about
+  it. The spec calls it out, and there's no test for it, because nothing new is built for it.
+- **Unknown placeholders stay as they are.** Launching without `colour` leaves `{{colour}}` in
+  the question (`transforms.rs`, `expand_variables_leaves_unknown_variables`).
+- **The question text is the node's `question` attribute, then its `prompt`, then its label**
+  (`smasher-attractor/src/interviewer.rs:692-697`). So the fixture gate must set neither
+  `question` nor `prompt`. Tests read it from `questionsApi.listQuestions(runId)`, as
+  `questions[0].question`, with `kind: 'free_form'`.
+- **Only E001–E003 are lint errors** (no start, several starts, no exit). Warnings and infos
+  (such as unlabelled edges) don't block a launch (`lint.rs:18-26`).
+- **Import writes to `{data_dir}/workflows/`, not `examples/`** (`editor_api.rs`, `import_dot`).
+  So a lint-failing import that leaks after a crashed test can't break `all_examples_pass_lint`.
+  It does stay in the catalog until it's removed.
+- **The catalog lists `examples/` only when the server runs from the repo root**
+  (`SMASHER_WORKFLOWS_DIR` defaults to `examples`).
+- **Playwright's `webServer` starts only Vite (`npm run dev`, port 5173)**, which proxies `/api`
+  and `/events` to `127.0.0.1:21541` (`vite.config.ts`). So `e2e/run-launch.spec.ts` needs the
+  same `smasher serve` running as Vitest does.
+- **Dialog test setup to copy** (`SettingsDialog.test.ts`): `userEvent.setup()`, queries on
+  `screen` (bits-ui portals to `body`), and `document.body.style.pointerEvents = ''` in
+  `afterEach`. That reset is needed because bits-ui's scroll lock clears it on a timer, which
+  otherwise blocks the next test's clicks.
+- **Import style in `WorkflowCatalog.svelte`:** app modules use relative paths
+  (`../../lib/api/runs`), and shadcn components use `$lib/components/ui/...`. `lib/utils.ts` is
+  shadcn's file (double quotes), so match its style when `formatWorkflowName` moves there.
+- **The "launches a real run" catalog test calls `vi.unstubAllGlobals()` at its end, not in an
+  `afterEach`.** If it fails partway, the `location` stub leaks into later tests. Task 5 moves it
+  to `afterEach` while rewriting that test.
 
 ## Task list
 
@@ -93,6 +139,8 @@ See `todo-run-launch.md` for acceptance criteria and verification.
 | Parallel test files launch runs, so a count of runs isn't stable | Med | Assert on runs with this test's own imported `workflow_id`, never on a total |
 | Imported test workflows leak into the catalog if a test fails partway | Low | `afterEach` removes every workflow whose name contains `_test_run_launch_` |
 | The server's default model differs between setups | Low | The blank-model test asserts non-empty and not `{{model}}`, not an exact name |
+| Gate-parked test runs pile up on the dev server | Low | Collect launched run ids and `cancelRun` them in `afterEach` |
+| A bug makes Cancel or Escape launch anyway, and that launch spends tokens | Med | The workflow imported for the no-launch test uses the fixture's gate-only DOT, not `hello-world.dot` |
 | The Vitest server isn't on this branch, or the desktop app holds 21541 | Med | Follow the backlog's "Frontend test gotcha": quit the app, serve from this branch with the fake-claude env |
 
 ## Open questions

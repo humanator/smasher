@@ -31,6 +31,9 @@ What the SPA does today:
   - **A blank model isn't filtered out.** `launch_and_record` uses
     `model.unwrap_or_else(default)`, so sending `"model": ""` replaces the default with an empty
     string. The client must leave `model` out when it's blank.
+  - **The server puts the model into `variables.model`** after the given variables
+    (`api.rs:218-220`), so `{{model}}` expands in labels and prompts. A `model=` line in
+    Variables is always overwritten, as it was in the old form. The client doesn't warn about it.
   - **A wrong override shape isn't rejected cleanly.** Each override value must be
     `{ model?: string, provider?: string }` (`transforms::NodeOverride`). Other fields are
     ignored. A wrong shape gets axum's 422 plain-text rejection, not a JSON `error`. So the
