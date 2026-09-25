@@ -36,4 +36,7 @@ Build order: `spa-shell` → `candidate-preview`, `run-launch`, `run-summary`, `
 ## Files
 
 One branch, `feat/spa-port-repairs`. Each module gets `tasks/SPEC-<module-id>.md`, then
-`plan-`/`todo-` files, all moved to `archive/` when the batch merges.
+`plan-`/`todo-` files, all moved to `archive/` when the batch merges. The last four modules
+(`run-summary`, `question-card`, `event-log`, `workflow-detail`) share one set instead:
+`SPEC-spa-repairs-batch2.md`, `plan-`/`todo-spa-repairs-batch2.md`, with one section and one
+checkpoint per module (agreed with Jobsworth 2026-09-25).
