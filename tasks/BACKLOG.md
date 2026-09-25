@@ -37,7 +37,8 @@ smasher-cli -- serve` from the branch under test first. If the server uses a cus
 candidate manifests there directly, and fail with "gallery gate never appeared"
 if the directories differ. To serve without API keys or spending anything, point
 `SMASHER_CLAUDE_CLI` at a fake `claude` script and set
-`SMASHER_PROVIDER=claude-cli`.
+`SMASHER_PROVIDER=claude-cli`. The repo keeps one at
+`frontend/tests/fixtures/fake-claude.sh`; set `FAKE_CLAUDE_LOG` to log its calls.
 The suites start no LLM node by default. Every submitted run parks on a human
 gate or passes through non-LLM nodes only. The two critical-path tests
 (`tests/critical-path.test.ts`, `e2e/critical-path.spec.ts`) run real Codergen nodes
