@@ -557,14 +557,14 @@ renders:
   runs.
 
 **Acceptance criteria:**
-- [ ] A fresh import shows no card and shows `No runs yet.`
-- [ ] After two launches through `runWorkflow`, the history lists exactly those two runs, and the
+- [x] A fresh import shows no card and shows `No runs yet.`
+- [x] After two launches through `runWorkflow`, the history lists exactly those two runs, and the
       card reads `Active run`, links to the newest, and says `+1 more running`.
-- [ ] After both runs are cancelled, the card reads `Latest run` and shows Completed.
-- [ ] Runs of other workflows never appear.
+- [x] After both runs are cancelled, the card reads `Latest run` and shows Completed.
+- [x] Runs of other workflows never appear.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/WorkflowDetailPage.test.ts`
 
 **Dependencies:** Tasks 3, 17 and 18
 
