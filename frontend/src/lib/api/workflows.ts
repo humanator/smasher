@@ -2,6 +2,7 @@
 // ABOUTME: Get workflows list, create new, update existing (ETag-checked), export/import raw DOT
 
 import { getApiUrl } from './client-config';
+import { errorFromResponse } from './errors';
 
 export interface EditorNode {
   id: string;
@@ -43,33 +44,8 @@ export interface CreateGraphResponse {
   id: string;
 }
 
-interface ApiError {
-  status: number;
-  message: string;
-}
-
-/** An error carrying the response's status and its JSON `error` message, if any. */
-async function errorFromResponse(response: Response): Promise<ApiError> {
-  let message = `HTTP ${response.status}`;
-  try {
-    const body = await response.json();
-    if (typeof body?.error === 'string') {
-      message = body.error;
-    }
-  } catch {
-    // Non-JSON error body; keep the status-only message.
-  }
-  const error = new Error(message) as unknown as ApiError;
-  error.status = response.status;
-  return error;
-}
-
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
 
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {
@@ -99,11 +75,7 @@ export async function getWorkflowGraph(
 /** The workflow's DOT source exactly as it is on disk. */
 export async function getWorkflowDot(id: string): Promise<string> {
   const response = await fetch(getApiUrl(`/workflows/${id}/dot`));
-  if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
   return response.text();
 }
 

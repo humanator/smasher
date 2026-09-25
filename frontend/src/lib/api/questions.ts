@@ -2,6 +2,7 @@
 // ABOUTME: List and answer questions
 
 import { getApiUrl } from './client-config';
+import { errorFromResponse } from './errors';
 import type { CandidateResponse } from './runs';
 
 export interface Question {
@@ -33,17 +34,8 @@ export interface AnswerQuestionResponse {
   error?: string;
 }
 
-interface ApiError {
-  status: number;
-  message: string;
-}
-
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as unknown as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
 
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {

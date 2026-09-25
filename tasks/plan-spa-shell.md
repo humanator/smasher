@@ -54,10 +54,10 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 
 ### Phase 1: Errors carry the server's message
 - [x] Task 1: Shared `errorFromResponse` in `lib/api/errors.ts`
-- [ ] Task 2: All four API modules throw it
+- [x] Task 2: All four API modules throw it
 
 ### Checkpoint A
-- [ ] Vitest suite and `npm run check` pass (no new errors), inline errors show server text
+- [x] Vitest suite and `npm run check` pass (no new errors), inline errors show server text
 
 ### Phase 2: Toasts
 - [ ] Task 3: `lib/notify.ts`

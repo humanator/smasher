@@ -2,6 +2,7 @@
 // ABOUTME: Get candidates and submit decisions
 
 import { getApiUrl } from './client-config';
+import { errorFromResponse } from './errors';
 
 export interface GalleryDecisionRequest {
   selected: string[];
@@ -14,26 +15,8 @@ export interface GalleryDecisionResponse {
   error?: string;
 }
 
-interface ApiError {
-  status: number;
-  message: string;
-}
-
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    let message = `HTTP ${response.status}`;
-    try {
-      const body = await response.json();
-      if (typeof body?.error === 'string') {
-        message = body.error;
-      }
-    } catch {
-      // Body wasn't JSON (or was empty) - fall back to the generic message.
-    }
-    const error = new Error(message) as unknown as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
 
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {

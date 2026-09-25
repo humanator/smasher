@@ -2,6 +2,7 @@
 // ABOUTME: Submit, list, get, cancel, resume, token counts, graph rendering, candidates
 
 import { getApiUrl } from './client-config';
+import { errorFromResponse } from './errors';
 
 export interface HealthResponse {
   status: string;
@@ -91,16 +92,8 @@ export interface GraphNodesRequest {
   dot_source: string;
 }
 
-interface ApiError extends Error {
-  status: number;
-}
-
 async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as ApiError;
-    error.status = response.status;
-    throw error;
-  }
+  if (!response.ok) throw await errorFromResponse(response);
 
   const contentType = response.headers.get('content-type');
   if (contentType?.includes('application/json')) {

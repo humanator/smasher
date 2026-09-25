@@ -68,10 +68,9 @@ describe('WorkflowEditorPage', () => {
       () => {
         const errorElement = screen.queryByRole('alert');
         expect(errorElement).toBeTruthy();
-        // Error message will contain HTTP error or "failed to load" text
+        // The server's own message, not a bare HTTP status
         const errorText = errorElement?.textContent || '';
-        expect(errorText.length).toBeGreaterThan(0);
-        expect(errorText).toMatch(/http|failed|error/i);
+        expect(errorText).toContain(`not found: workflow ${invalidId}`);
       },
       { timeout: 5000 }
     );

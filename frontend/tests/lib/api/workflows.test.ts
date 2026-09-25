@@ -29,6 +29,20 @@ describe('workflows API client - raw DOT export', () => {
       status: 404,
     });
   });
+
+  it('rejects with the server message for an unknown workflow id', async () => {
+    await expect(workflows.getWorkflowDot('no-such-wf')).rejects.toMatchObject({
+      message: 'not found: workflow no-such-wf',
+      status: 404,
+    });
+  });
+
+  it('rejects getWorkflowGraph with the server message for an unknown workflow id', async () => {
+    await expect(workflows.getWorkflowGraph('no-such-wf')).rejects.toMatchObject({
+      message: 'not found: workflow no-such-wf',
+      status: 404,
+    });
+  });
 });
 
 describe('workflows API client - raw DOT import', () => {

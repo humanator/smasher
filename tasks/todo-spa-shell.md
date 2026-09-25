@@ -34,14 +34,14 @@ lifted from `workflows.ts:51-65`, and re-export it from `lib/api/index.ts`.
 `runs.ts` returning text for SVG.
 
 **Acceptance criteria:**
-- [ ] `grep -n "HTTP \${" src/lib/api` matches only `errors.ts`
-- [ ] Against the real server, `runsApi.getRun('no-such-run')`, `questionsApi.listQuestions('no-such-run')` and a gallery/workflow 404 reject with `not found: …` and `.status === 404`
-- [ ] Existing inline errors (for example `RunList` and `CandidateGallery`) are unchanged in the code, but now receive the server's text
+- [x] `grep -n "HTTP \${" src/lib/api` matches only `errors.ts`
+- [x] Against the real server, `runsApi.getRun('no-such-run')`, `questionsApi.listQuestions('no-such-run')` and a gallery/workflow 404 reject with `not found: …` and `.status === 404`
+- [x] Existing inline errors (for example `RunList` and `CandidateGallery`) are unchanged in the code, but now receive the server's text
 
 **Verification:**
-- [ ] Integration cases added to `tests/lib/api/runs.test.ts`, `workflows.test.ts` and `gallery.test.ts` (questions goes in `runs.test.ts`, which has no file of its own) fail first, then pass
-- [ ] `npm test -- --run` passes in full
-- [ ] `npm run check` shows only the 6 pre-existing errors
+- [x] Integration cases added to `tests/lib/api/runs.test.ts`, `workflows.test.ts` and `gallery.test.ts` (questions goes in `runs.test.ts`, which has no file of its own) fail first, then pass
+- [x] `npm test -- --run` passes in full
+- [x] `npm run check` shows only the 6 pre-existing errors
 
 **Dependencies:** Task 1
 
@@ -50,9 +50,9 @@ lifted from `workflows.ts:51-65`, and re-export it from `lib/api/index.ts`.
 **Scope:** M (7 files, but each change is a few lines of the same edit)
 
 ## Checkpoint A: after Tasks 1–2
-- [ ] Full Vitest suite passes, and `check`/`lint` add no new errors
-- [ ] Manual: open `/runs/no-such-run` in `npm run dev`. The token counter's inline error reads `not found: …`, not `HTTP 404`.
-- [ ] Commit
+- [x] Full Vitest suite passes, and `check`/`lint` add no new errors
+- [x] ~~Manual~~ covered by the real-server 404 cases in `tests/lib/api/*.test.ts` (not checked by hand): open `/runs/no-such-run` in `npm run dev`. The token counter's inline error reads `not found: …`, not `HTTP 404`.
+- [x] Commit (one per task)
 
 ## Task 3: `lib/notify.ts`
 

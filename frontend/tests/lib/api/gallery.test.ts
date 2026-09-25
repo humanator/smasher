@@ -92,4 +92,14 @@ describe('gallery API client - REAL API INTEGRATION TESTS', () => {
       })
     ).rejects.toThrow(/exceeds 4000 characters/);
   }, 20000);
+
+  it('rejects with the server message and status for an unknown run', async () => {
+    await expect(
+      gallery.submitGalleryDecision('no-such-run', 'q1', {
+        selected: [],
+        decision: 'proceed',
+        comments: {},
+      })
+    ).rejects.toMatchObject({ message: 'not found: run no-such-run', status: 404 });
+  });
 });

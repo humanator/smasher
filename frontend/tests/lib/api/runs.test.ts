@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as runs from '../../../src/lib/api/runs';
 import * as workflows from '../../../src/lib/api/workflows';
+import * as questions from '../../../src/lib/api/questions';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -156,5 +157,32 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
       const apiError = error as { status: number };
       expect(apiError.status).toBe(404);
     }
+  });
+});
+
+describe('runs and questions API clients - server error messages', () => {
+  beforeAll(() => {
+    setApiBaseUrl(API_URL);
+  });
+
+  it('rejects getRun with the server message and status for an unknown run', async () => {
+    await expect(runs.getRun('no-such-run')).rejects.toMatchObject({
+      message: 'not found: run no-such-run',
+      status: 404,
+    });
+  });
+
+  it('rejects listQuestions with the server message and status for an unknown run', async () => {
+    await expect(questions.listQuestions('no-such-run')).rejects.toMatchObject({
+      message: 'not found: run no-such-run',
+      status: 404,
+    });
+  });
+
+  it('rejects answerQuestion with the server message and status for an unknown run', async () => {
+    await expect(questions.answerQuestion('no-such-run', 'q1', 'yes')).rejects.toMatchObject({
+      message: 'not found: run no-such-run',
+      status: 404,
+    });
   });
 });
