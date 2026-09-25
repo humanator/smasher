@@ -93,7 +93,12 @@
           {#each workflows as workflow (workflow.id)}
             <Table.Row>
               <Table.Cell>
-                <div class="font-semibold text-foreground">{formatWorkflowName(workflow.name)}</div>
+                <a
+                  href="/workflows/{encodeURIComponent(workflow.id)}"
+                  class="font-semibold text-foreground hover:underline"
+                >
+                  {formatWorkflowName(workflow.name)}
+                </a>
                 <div class="mt-0.5 font-mono text-xs text-muted-foreground">{workflow.name}</div>
               </Table.Cell>
               <Table.Cell>{workflow.source_dir}</Table.Cell>

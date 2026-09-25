@@ -241,6 +241,30 @@ only on request.
       real screenshot, lint passed, and `Synthesis` said `proceed`.
     - `A11yCheck` failed, which uncovered the limitation above.
 
+24. **Send a readable `node_failed.error`.** *Raised 2026-09-25 (SPA repairs,
+    batch 2).* The engine puts the outcome's Rust Debug form into the event
+    (`engine.rs:651`), e.g. `Failure { error: "…", retryable: false, notes: None }`.
+    The SPA's `eventFormat.ts` digs the quoted message out with a regex. The
+    server should send the message itself, and the client regex can then go.
+25. **Widen the edit route's id pattern.** *Raised 2026-09-25.* `App.svelte`
+    matches `/workflows/{id}/edit` with `[a-z0-9_-]+`, but workflow ids can have
+    uppercase letters, dots and spaces (`workflows.rs`, `valid_id`). Such a
+    workflow's Edit link falls through to the catalog. Match one segment and
+    `decodeURIComponent` it, as the `/workflows/{id}` route now does.
+26. **Fix `CLAUDE.md`'s DOT shape table.** *Raised 2026-09-25.* The code
+    (`smasher-attractor/src/graph/mod.rs`, `node_type_from_shape`) has
+    `parallelogram` as Tool, `hexagon`/`oval`/`ellipse` as Interviewer,
+    `component` as Parallel, `folder` as SubPipeline and `tripleoctagon` as FanIn,
+    and also accepts `Mdiamond`/`Msquare` for start/exit. `CLAUDE.md` says
+    `parallelogram` is parallel fan-out, `hexagon` is tool and `component` is a
+    sub-pipeline.
+27. **Fix a cleanup race in `CandidatePreview.test.ts`.** *Seen once
+    2026-09-25.* Its `afterEach` removes each run's artifacts directory with
+    `rmSync(..., { recursive: true, force: true })` straight after the run is
+    cancelled, while the server may still be writing that run's `events/`.
+    It failed once with `ENOTEMPTY` and passed on a re-run. Wait for the run
+    to reach `Aborted` (or retry the removal) before deleting.
+
 ## P2: Robustness (can lose data or grow without limit)
 
 4. ~~**Detect conflicting edits when saving a workflow.**~~ **Done 2026-09-24**

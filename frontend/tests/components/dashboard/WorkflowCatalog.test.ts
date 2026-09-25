@@ -35,6 +35,16 @@ describe('WorkflowCatalog', () => {
     );
   });
 
+  it("links each workflow's name to its page", async () => {
+    const { workflows } = await workflowsApi.listWorkflows();
+    const showcase = workflows.find((w) => w.name === 'human_gate_showcase.dot')!;
+
+    render(WorkflowCatalog);
+
+    const link = await screen.findByRole('link', { name: 'Human Gate Showcase' }, { timeout: 5000 });
+    expect(link).toHaveAttribute('href', `/workflows/${encodeURIComponent(showcase.id)}`);
+  });
+
   describe('Run Workflow', () => {
     let launched: string[] = [];
 

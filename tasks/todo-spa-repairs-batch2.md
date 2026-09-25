@@ -590,13 +590,13 @@ renders:
   - `CLAUDE.md`'s shape table (`parallelogram` is Tool, `component` is Parallel).
 
 **Acceptance criteria:**
-- [ ] `WorkflowCatalog.test.ts` has a new case checking that the name links to the detail page.
-- [ ] The e2e spec passes in Chromium.
-- [ ] The three backlog entries exist.
+- [x] `WorkflowCatalog.test.ts` has a new case checking that the name links to the detail page.
+- [x] The e2e spec passes in Chromium.
+- [x] The three backlog entries exist.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/WorkflowCatalog.test.ts`
-- [ ] `npm run test:e2e -- e2e/workflow-detail.spec.ts e2e/run-launch.spec.ts`
+- [x] `npm test -- --run tests/components/dashboard/WorkflowCatalog.test.ts`
+- [x] `npm run test:e2e -- e2e/workflow-detail.spec.ts e2e/run-launch.spec.ts`
 
 **Dependencies:** Task 19
 
