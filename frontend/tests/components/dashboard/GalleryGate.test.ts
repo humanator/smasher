@@ -2,7 +2,7 @@
 // ABOUTME: Renders against a real paused gallery-gate run, no mocked fetch
 
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
+import { render, screen, waitFor, fireEvent } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
@@ -24,7 +24,13 @@ const galleryGateDot = readFileSync(
 const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
-function writeCandidateManifest(runId: string, candidateId: string) {
+let launched: string[] = [];
+
+function writeCandidateManifest(
+  runId: string,
+  candidateId: string,
+  overrides: Record<string, unknown> = {}
+) {
   const dir = join(artifactsRoot, runId, 'artifacts', candidateId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -36,13 +42,22 @@ function writeCandidateManifest(runId: string, candidateId: string) {
       exit_status: { status: 'success' },
       artifacts: [],
       generation_params: {},
+      ...overrides,
     })
   );
 }
 
-async function submitAndWaitForGalleryGate(): Promise<string> {
+function seedTwoCandidates(runId: string) {
+  writeCandidateManifest(runId, 'candidate-a');
+  writeCandidateManifest(runId, 'candidate-b');
+}
+
+async function submitAndWaitForGalleryGate(
+  seed: (runId: string) => void = seedTwoCandidates
+): Promise<string> {
   const submitResp = await runsApi.submitRun({ dot_source: galleryGateDot, variables: {} });
   const runId = submitResp.run_id;
+  launched.push(runId);
 
   for (let i = 0; i < 40; i++) {
     const resp = await questionsApi.listQuestions(runId);
@@ -50,8 +65,7 @@ async function submitAndWaitForGalleryGate(): Promise<string> {
       return runId;
     }
     if (i === 0) {
-      writeCandidateManifest(runId, 'candidate-a');
-      writeCandidateManifest(runId, 'candidate-b');
+      seed(runId);
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -61,6 +75,14 @@ async function submitAndWaitForGalleryGate(): Promise<string> {
 describe('GalleryGate', () => {
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(async () => {
+    // bits-ui's scroll lock clears this on a timer after the open dialog
+    // unmounts; reset it so the next test's clicks aren't blocked.
+    document.body.style.pointerEvents = '';
+    await Promise.all(launched.map((id) => runsApi.cancelRun(id).catch(() => {})));
+    launched = [];
   });
 
   it('renders the real gate card with candidate checkboxes, comments, and decision buttons', async () => {
@@ -123,6 +145,91 @@ describe('GalleryGate', () => {
       { timeout: 5000 }
     );
   }, 20000);
+
+  describe('candidate preview and params', () => {
+    const checkbox = (id: string) => screen.getByRole('checkbox', { name: id });
+
+    it('opens the lightbox from the thumbnail without toggling the checkbox', async () => {
+      const runId = await submitAndWaitForGalleryGate();
+      const user = userEvent.setup();
+      render(GalleryGate, { props: { runId } });
+
+      const thumbnail = await screen.findByRole(
+        'button',
+        { name: 'Open preview of candidate-a' },
+        { timeout: 5000 }
+      );
+      await user.click(thumbnail);
+
+      expect(await screen.findByRole('dialog')).toBeTruthy();
+      expect(checkbox('candidate-a').getAttribute('aria-checked')).toBe('false');
+
+      await user.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(checkbox('candidate-a').getAttribute('aria-checked')).toBe('false');
+    }, 20000);
+
+    it('opens and closes the params section without toggling the checkbox', async () => {
+      const runId = await submitAndWaitForGalleryGate((id) => {
+        writeCandidateManifest(id, 'candidate-a', { generation_params: { seed: '7' } });
+        writeCandidateManifest(id, 'candidate-b');
+      });
+      render(GalleryGate, { props: { runId } });
+
+      const summary = await screen.findByText('params', {}, { timeout: 5000 });
+      const details = summary.closest('details');
+      expect(details?.closest('label')?.textContent).toContain('candidate-a');
+      expect(screen.getByText('seed: 7')).toBeTruthy();
+
+      // user-event's own <label> handling stops a <summary> inside one from toggling its
+      // <details>; a dispatched click follows the DOM, as a browser does (see the e2e).
+      await fireEvent.click(summary);
+      expect(details?.open).toBe(true);
+      expect(checkbox('candidate-a').getAttribute('aria-checked')).toBe('false');
+
+      await fireEvent.click(summary);
+      expect(details?.open).toBe(false);
+      expect(checkbox('candidate-a').getAttribute('aria-checked')).toBe('false');
+    }, 20000);
+
+    it('keeps a selection and comment through the lightbox and the next poll', async () => {
+      const runId = await submitAndWaitForGalleryGate();
+      const user = userEvent.setup();
+      render(GalleryGate, { props: { runId } });
+
+      await user.click(await screen.findByRole('checkbox', { name: 'candidate-a' }, { timeout: 5000 }));
+      await user.type(screen.getByLabelText('Comment for candidate-a'), 'keep the header');
+
+      await user.click(screen.getByRole('button', { name: 'Open preview of candidate-a' }));
+      await screen.findByRole('dialog');
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      // One 2s poll replaces the gate's candidates.
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+
+      expect(checkbox('candidate-a').getAttribute('aria-checked')).toBe('true');
+      expect(checkbox('candidate-b').getAttribute('aria-checked')).toBe('false');
+      expect((screen.getByLabelText('Comment for candidate-a') as HTMLTextAreaElement).value).toBe(
+        'keep the header'
+      );
+    }, 20000);
+
+    it("leaves captured_at off the gate's failed card", async () => {
+      const runId = await submitAndWaitForGalleryGate((id) => {
+        seedTwoCandidates(id);
+        writeCandidateManifest(id, 'candidate-c', {
+          captured_at: '2026-09-25T07:00:00Z',
+          exit_status: { status: 'failed', reason: 'render timed out' },
+        });
+      });
+      render(GalleryGate, { props: { runId } });
+
+      const reason = await screen.findByText('render timed out', {}, { timeout: 5000 });
+      const card = reason.closest('.candidate-card');
+      expect(card?.textContent).toContain('candidate-c');
+      expect(card?.textContent).not.toContain('2026-09-25');
+    }, 20000);
+  });
 
   describe('poll failure toasts', () => {
     // Live toasts only: a toast dismissed earlier can briefly re-render,

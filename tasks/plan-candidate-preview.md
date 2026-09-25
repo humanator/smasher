@@ -128,7 +128,7 @@ See `todo-candidate-preview.md` for acceptance criteria and verification.
 
 ### Phase 3: Wire into both cards
 - [x] Task 5: Gallery card: preview, params and captured-at on failed cards
-- [ ] Task 6: Gate card: preview and params without toggling the checkbox
+- [x] Task 6: Gate card: preview and params without toggling the checkbox
 
 ### Checkpoint C
 - [ ] Full suite green, the existing `gallery-gate.spec.ts` passes

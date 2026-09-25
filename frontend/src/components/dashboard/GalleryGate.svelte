@@ -7,6 +7,8 @@
   import * as galleryApi from '../../lib/api/gallery';
   import type { GalleryGateInfo } from '../../lib/api/questions';
   import ScorecardBadges, { type Scorecard } from './ScorecardBadges.svelte';
+  import CandidatePreview from './CandidatePreview.svelte';
+  import CandidateParams from './CandidateParams.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import * as Card from '$lib/components/ui/card/index.js';
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
@@ -138,23 +140,12 @@
               onCheckedChange={(checked) => (selected[candidate.candidate_id] = checked)}
               aria-label={candidate.candidate_id}
             />
-            <div class="candidate-embed aspect-[4/3] overflow-hidden rounded bg-muted">
-              {#if candidate.bundle_url}
-                <iframe
-                  src={candidate.bundle_url}
-                  title="Candidate {candidate.candidate_id}"
-                  sandbox="allow-scripts"
-                  class="candidate-thumbnail size-full border-none object-cover"
-                ></iframe>
-              {:else}
-                <img
-                  src={candidate.screenshot_url}
-                  alt="Candidate {candidate.candidate_id}"
-                  class="candidate-thumbnail size-full border-none object-cover"
-                />
-              {/if}
-            </div>
+            <!-- The thumbnail <button> and params <summary> take their own clicks, so the label doesn't toggle. -->
+            <CandidatePreview {candidate} />
             <span class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</span>
+            <CandidateParams
+              params={candidate.manifest?.generation_params as Record<string, string> | undefined}
+            />
             <ScorecardBadges scorecard={(candidate.scorecard ?? {}) as Scorecard} />
             <Textarea
               class="candidate-comment min-h-12 resize-y rounded-md px-2 py-2 text-xs md:text-xs"
