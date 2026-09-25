@@ -16,15 +16,18 @@ the same target and `changeOrigin` as `/api`. Without it, the dev server, and so
 answers every screenshot and bundle URL with the SPA's `index.html`.
 
 **Acceptance criteria:**
-- [ ] With the server and `npm run dev` running, a candidate file seeded on disk is served
+- [x] With the server and `npm run dev` running, a candidate file seeded on disk is served
       through `127.0.0.1:5173/candidate-artifacts/…` with its real content type (`image/png`), not
       `text/html`
-- [ ] `/api` and `/events` behave as before
+- [x] `/api` and `/events` behave as before *(`/api` checked with `curl`; `/events` through
+      the run page in `gallery-gate.spec.ts`)*
 
 **Verification:**
-- [ ] Before the change, `curl -sI 127.0.0.1:5173/candidate-artifacts/<run>/artifacts/<cand>/screenshot.png`
-      returns `text/html`. After it, `image/png`.
-- [ ] `npm run build` succeeds. `npm run test:e2e -- e2e/gallery-gate.spec.ts` still passes.
+- [x] Before the change, `curl -sI 127.0.0.1:5173/candidate-artifacts/<run>/artifacts/<cand>/screenshot.png`
+      returns `text/html`. After it, `image/png`. *(Checked against the desktop app's data before
+      the test server was up: a missing path went from `200 text/html` to a `404` from the server,
+      and a real screenshot came back `image/png`.)*
+- [x] `npm run build` succeeds. `npm run test:e2e -- e2e/gallery-gate.spec.ts` still passes.
 
 **Dependencies:** None
 
@@ -39,13 +42,13 @@ answers every screenshot and bundle URL with the SPA's `index.html`.
 Svelte or DOM imports.
 
 **Acceptance criteria:**
-- [ ] `viewportOf` returns a valid `{width, height}` as given, and 1280×800 for a missing
+- [x] `viewportOf` returns a valid `{width, height}` as given, and 1280×800 for a missing
       manifest, a missing viewport, a partial one, a zero or negative side, and non-numeric values
-- [ ] `fitScale` returns 1 when the box is larger in both directions (never scales up), and the
+- [x] `fitScale` returns 1 when the box is larger in both directions (never scales up), and the
       tighter of `box.width / w` and `box.height / h` when either is smaller
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/previewScale.test.ts`, written first and seen failing
+- [x] `npm test -- --run tests/lib/previewScale.test.ts`, written first and seen failing
 
 **Dependencies:** None
 
@@ -54,9 +57,9 @@ Svelte or DOM imports.
 **Scope:** XS
 
 ## Checkpoint A: after Tasks 1–2
-- [ ] `npm test -- --run` passes in full, `npm run check` shows only the 6 pre-existing errors,
+- [x] `npm test -- --run` passes in full, `npm run check` shows only the 6 pre-existing errors,
       and `npm run lint` is clean
-- [ ] One commit per task
+- [x] One commit per task
 
 ## Task 3: `CandidatePreview`: thumbnail button, placeholder and lightbox
 
@@ -73,19 +76,20 @@ height px. Without one, it holds the full-size screenshot at the same size, with
 the stage measures 0.
 
 **Acceptance criteria:**
-- [ ] The component renders the button and `<img>` and no `<iframe>`. The aspect ratio follows
-      the manifest viewport, with 16:10 when it's missing.
-- [ ] Clicking the button opens a dialog titled with the id. With a bundle, the dialog has the
+- [x] The component renders the button and `<img>` and no `<iframe>`. The aspect ratio follows
+      the manifest viewport, with 16:10 when it's missing. *(smasher-web requires `viewport`, so
+      the API never returns a manifest without one; the fallback is covered by `previewScale.test.ts`.)*
+- [x] Clicking the button opens a dialog titled with the id. With a bundle, the dialog has the
       sandboxed iframe with `src` = `bundle_url` and a style width/height of the viewport. Without
       one, it has the full-size `<img>` and no iframe.
-- [ ] Escape and the close button both close it. Overlay click is covered in Task 7.
+- [x] Escape and the close button both close it. Overlay click is covered in Task 7.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/CandidatePreview.test.ts`, written first and
+- [x] `npm test -- --run tests/components/dashboard/CandidatePreview.test.ts`, written first and
       seen failing. It uses a real run (gate-only DOT) and candidates read back through
       `runsApi.listCandidates`, so the props are real API responses. It follows
       `RunDialog.test.ts`'s dialog setup.
-- [ ] `npm run check` adds no errors
+- [x] `npm run check` adds no errors
 
 **Dependencies:** Task 2
 
@@ -102,14 +106,14 @@ only with a bundle, that increments `resetCount`. Wrap the iframe in `{#key rese
 `screenshot_url` when there's no bundle. Nothing touches `contentWindow`.
 
 **Acceptance criteria:**
-- [ ] Clicking ⟲ replaces the iframe with a new element (`!==` the old node) that has the same
+- [x] Clicking ⟲ replaces the iframe with a new element (`!==` the old node) that has the same
       `src`
-- [ ] With no bundle, there's no ⟲ and the link points at `screenshot_url`. With one, it points
+- [x] With no bundle, there's no ⟲ and the link points at `screenshot_url`. With one, it points
       at `bundle_url`. Both have `target="_blank"` and `rel="noopener"`.
-- [ ] `grep contentWindow src/` finds nothing
+- [x] `grep contentWindow src/` finds nothing
 
 **Verification:**
-- [ ] New cases in `CandidatePreview.test.ts`, written first and seen failing, then passing
+- [x] New cases in `CandidatePreview.test.ts`, written first and seen failing, then passing
 
 **Dependencies:** Task 3
 
@@ -119,10 +123,10 @@ only with a bundle, that increments `resetCount`. Wrap the iframe in `{#key rese
 **Scope:** XS
 
 ## Checkpoint B: after Tasks 3–4
-- [ ] Full Vitest suite green, `check`/`lint` add no new errors
-- [ ] One commit per task
+- [x] Full Vitest suite green, `check`/`lint` add no new errors
+- [x] One commit per task
 - [ ] Optional, on request: Jobsworth looks at the lightbox in `npm run dev` with a seeded
-      candidate
+      candidate *(not requested)*
 
 ## Task 5: Gallery card: preview, params and captured-at on failed cards
 
@@ -135,14 +139,14 @@ In `CandidateCard.svelte`, replace the `candidate-embed` block with `<CandidateP
 longer says "live-embed".
 
 **Acceptance criteria:**
-- [ ] In the gallery, every live candidate has an `Open preview of {id}` button with an `<img>`,
+- [x] In the gallery, every live candidate has an `Open preview of {id}` button with an `<img>`,
       and no card renders an `<iframe>`. This replaces the "only one `<img>`" check.
-- [ ] A candidate with `generation_params: { seed: '7', temperature: '0.4' }` shows a collapsed
+- [x] A candidate with `generation_params: { seed: '7', temperature: '0.4' }` shows a collapsed
       `params` section with `seed: 7` then `temperature: 0.4`. One with `{}` has no `params` text.
-- [ ] The failed card shows id, then `captured_at` (the raw string), then the reason
+- [x] The failed card shows id, then `captured_at` (the raw string), then the reason
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/CandidateGallery.test.ts`, with the new
+- [x] `npm test -- --run tests/components/dashboard/CandidateGallery.test.ts`, with the new
       assertions written first and seen failing. `writeManifest` gains a `generationParams`
       argument.
 
@@ -164,16 +168,20 @@ scorecard badges and comment box stay where they are. The failed card is unchang
 `<label>` (see the plan).
 
 **Acceptance criteria:**
-- [ ] Clicking a candidate's thumbnail opens the lightbox, and that candidate's checkbox is still
+- [x] Clicking a candidate's thumbnail opens the lightbox, and that candidate's checkbox is still
       unchecked. So is it after closing the lightbox.
-- [ ] Opening and closing the `params` section leaves the checkbox unchecked
-- [ ] A checked box and a typed comment are still there after opening and closing the lightbox
+- [x] Opening and closing the `params` section leaves the checkbox unchecked
+- [x] A checked box and a typed comment are still there after opening and closing the lightbox
       and after the next 2s poll. The gate's failed card has no `captured_at`.
-- [ ] The existing gate tests (decision submit, comment cap, poll toasts) pass unchanged
+- [x] The existing gate tests (decision submit, comment cap, poll toasts) pass unchanged *(their
+      bodies are unchanged; the seeding helper gained optional arguments and runs are cancelled
+      in `afterEach`)*
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/GalleryGate.test.ts`, with the new cases
-      written first and seen failing
+- [x] `npm test -- --run tests/components/dashboard/GalleryGate.test.ts`, with the new cases
+      written first and seen failing *(3 of 4; the failed-card case passed from the start, as it
+      guards existing behaviour. The params case uses `fireEvent`, because user-event's own
+      `<label>` handling stops `<summary>` toggling; the e2e clicks it in Chromium.)*
 
 **Dependencies:** Task 5 (`CandidateParams`)
 
@@ -183,9 +191,9 @@ scorecard badges and comment box stay where they are. The failed card is unchang
 **Scope:** S
 
 ## Checkpoint C: after Tasks 5–6
-- [ ] Full Vitest suite green with no new warnings, `check`/`lint` add no new errors
-- [ ] `npm run test:e2e -- e2e/gallery-gate.spec.ts` passes unchanged
-- [ ] One commit per task
+- [x] Full Vitest suite green with no new warnings, `check`/`lint` add no new errors
+- [x] `npm run test:e2e -- e2e/gallery-gate.spec.ts` passes unchanged
+- [x] One commit per task
 
 ## Task 7: `e2e/candidate-preview.spec.ts`, and mark the module done
 
@@ -196,21 +204,21 @@ and `cand-c` with neither. The window is 1024×768. The run is cancelled, and it
 removed, in `finally`. Then mark the module done in the capability map and the backlog.
 
 **Acceptance criteria:**
-- [ ] The `cand-a` and `cand-b` thumbnails load (`naturalWidth > 0`), and `cand-c` shows
+- [x] The `cand-a` and `cand-b` thumbnails load (`naturalWidth > 0`), and `cand-c` shows
       `No screenshot`
-- [ ] Opening `cand-a` shows the iframe with a bounding box that is non-zero and inside the
+- [x] Opening `cand-a` shows the iframe with a bounding box that is non-zero and inside the
       1024×768 window. After resizing the window to 800×600, the box shrinks.
-- [ ] Clicking `Count: 0` inside the iframe (`frameLocator`) makes it `Count: 1`. Waiting over
+- [x] Clicking `Count: 0` inside the iframe (`frameLocator`) makes it `Count: 1`. Waiting over
       2s (one gate poll) keeps it at `Count: 1`. ⟲ puts it back to `Count: 0`.
-- [ ] **Open in new tab** opens a page at the bundle URL showing `Count: 0`. Clicking the overlay
+- [x] **Open in new tab** opens a page at the bundle URL showing `Count: 0`. Clicking the overlay
       closes the lightbox. `cand-b`'s lightbox shows its screenshot and no ⟲.
-- [ ] Every candidate checkbox is still unchecked at the end
-- [ ] `capability-map-spa-repairs.md` lists `candidate-preview` as `Done <date>`, and BACKLOG
+- [x] Every candidate checkbox is still unchecked at the end
+- [x] `capability-map-spa-repairs.md` lists `candidate-preview` as `Done <date>`, and BACKLOG
       #9 and the card items of #21 (⟲, params, captured-at on failed cards) are marked done
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/candidate-preview.spec.ts e2e/gallery-gate.spec.ts` passes
-- [ ] Full Vitest suite, `npm run check`, `npm run lint` and `npm run build` pass, then
+- [x] `npm run test:e2e -- e2e/candidate-preview.spec.ts e2e/gallery-gate.spec.ts` passes
+- [x] Full Vitest suite, `npm run check`, `npm run lint` and `npm run build` pass, then
       `make ci` from the repo root
 
 **Dependencies:** Tasks 1, 6
@@ -221,6 +229,6 @@ removed, in `finally`. Then mark the module done in the capability map and the b
 **Scope:** M
 
 ## Checkpoint D: Complete
-- [ ] Every Success Criteria box in the spec is ticked
-- [ ] `make ci` green. The diff outside `frontend/` is only in `tasks/`.
+- [x] Every Success Criteria box in the spec is ticked
+- [x] `make ci` green. The diff outside `frontend/` is only in `tasks/`.
 - [x] Review with Jobsworth (approved 2026-09-25)
