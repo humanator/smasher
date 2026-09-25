@@ -8,7 +8,7 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
   - Acceptance: that error is gone; no `@ts-ignore`/`as any`; editor behaviour unchanged.
   - Verify: `npm run check`; `npx vitest run tests/components/dashboard/WorkflowEditorPage.test.ts`; `npx playwright test node-editor.spec.ts`.
   - Files: `frontend/src/components/node-editor/WorkflowCanvas.svelte` (+ the type's source if it needs narrowing there).
-- [ ] **Task 2: fix the `tests/setup.ts` and `gallery-gate.spec.ts` errors**
+- [x] **Task 2: fix the `tests/setup.ts` and `gallery-gate.spec.ts` errors**
   - Acceptance: `npm run check` → 0 errors, 0 warnings.
   - Verify: `npm run check`; full `npx vitest run` against a local fake-claude `serve`; `npx playwright test gallery-gate.spec.ts`.
   - Files: `frontend/tests/setup.ts`, `frontend/e2e/gallery-gate.spec.ts`.
