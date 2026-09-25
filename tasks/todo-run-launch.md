@@ -175,4 +175,4 @@ Then tick the spec's success criteria, and mark `run-launch` as Done in the capa
 
 ## Checkpoint C: complete
 - [x] `npm test -- --run`, `npm run check` (6 pre-existing errors only), `npm run lint`, `npm run build`, `npm run test:e2e -- e2e/run-launch.spec.ts` and `make ci` all pass with no new warnings
-- [ ] Review with Jobsworth before starting the next module
+- [x] Review with Jobsworth before starting the next module (approved 2026-09-25)
