@@ -20,6 +20,10 @@ export default defineConfig({
         target: 'http://127.0.0.1:21541',
         changeOrigin: true,
       },
+      '/candidate-artifacts': {
+        target: 'http://127.0.0.1:21541',
+        changeOrigin: true,
+      },
     },
   },
   build: {
