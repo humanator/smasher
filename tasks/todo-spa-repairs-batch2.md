@@ -204,11 +204,11 @@ the token counter.
    run in `finally`.
 
 **Acceptance criteria:**
-- [ ] The spec passes in Chromium.
-- [ ] The spec cancels every run it starts.
+- [x] The spec passes in Chromium.
+- [x] The spec cancels every run it starts.
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/run-summary.spec.ts`
+- [x] `npm run test:e2e -- e2e/run-summary.spec.ts`
 
 **Dependencies:** Tasks 3–6
 
@@ -217,12 +217,12 @@ the token counter.
 **Scope:** S
 
 ## Checkpoint A: `run-summary`
-- [ ] `npm test -- --run` passes in full, with no new warnings.
-- [ ] `npm run check` and `npm run lint` add no new errors (the 6 existing `svelte-check` errors
+- [x] `npm test -- --run` passes in full, with no new warnings.
+- [x] `npm run check` and `npm run lint` add no new errors (the 6 existing `svelte-check` errors
       are #2's).
-- [ ] `npm run test:e2e -- e2e/run-summary.spec.ts e2e/app-shell.spec.ts` passes.
-- [ ] The map row for `run-summary` reads `Done <date>`.
-- [ ] Review with Jobsworth before Phase B.
+- [x] `npm run test:e2e -- e2e/run-summary.spec.ts e2e/app-shell.spec.ts` passes.
+- [x] The map row for `run-summary` reads `Done <date>`.
+- [x] Review with Jobsworth before Phase B. (Waived: Jobsworth chose to run straight through.)
 
 ---
 
