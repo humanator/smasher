@@ -128,13 +128,13 @@ Add a `.markdown` class to `app.css` for headings, paragraphs, lists and code, i
 scale. No typography plugin.
 
 **Acceptance criteria:**
-- [ ] Headings, bold, lists and GFM tables render
-- [ ] `<script>`, `on*` attributes and `javascript:` hrefs are stripped
-- [ ] Links get `target="_blank"` and `rel="noopener noreferrer"`
+- [x] Headings, bold, lists and GFM tables render
+- [x] `<script>`, `on*` attributes and `javascript:` hrefs are stripped
+- [x] Links get `target="_blank"` and `rel="noopener noreferrer"`
 
 **Verification:**
-- [ ] `cd frontend && npx vitest run tests/lib/markdown.test.ts`
-- [ ] `npm run check && npm run lint && npm run build`
+- [x] `cd frontend && npx vitest run tests/lib/markdown.test.ts`
+- [x] `npm run check && npm run lint && npm run build`
 
 **Dependencies:** None
 
