@@ -5,29 +5,33 @@ was checked against the code on `main` (`7b78f1f`), not just carried over from
 older docs.
 
 Every planned module is done: the design-factory modules (`component-kit` through
-`workflow-editor`) and the desktop-frontend modules (`smasher-web-api`,
-`smasher-spa`, `smasher-desktop`). Their specs, plans, todos and capability maps
-are in [`archive/`](archive/). What's left is follow-up work, known gaps, and
+`workflow-editor`), the desktop-frontend modules (`smasher-web-api`,
+`smasher-spa`, `smasher-desktop`) and the SPA port repairs (`spa-shell` through
+`workflow-detail`). Their specs, plans, todos and capability maps are in
+[`archive/`](archive/). What's left is follow-up work, known gaps, and
 deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
 ## Where things stand (2026-09-25)
 
 **Branches.** `chore/tasks-triage`, `fix/default-model` (item #1), the editor
-batch and `feat/claude-cli-provider` are all merged into `main`. The Claude CLI
-provider merged on 2026-09-25 with a known limitation (#23).
+batch, `feat/claude-cli-provider` and `feat/spa-port-repairs` are all merged into
+`main`. The Claude CLI provider merged on 2026-09-25 with a known limitation
+(#23). `feat/question-replies` holds only the draft spec for #28, parked.
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
 added mid-session and ran alongside. It's now merged (#23). The SPA port repairs,
 #9 (candidate thumbnails and lightbox) + #21 (the rest of what the port
-dropped), are done on `feat/spa-port-repairs` (2026-09-25), reviewed by Jobsworth, and
-awaiting merge. Their specs, plans and todos are in `archive/`.
+dropped), were reviewed by Jobsworth and merged to `main` on 2026-09-25. Their
+specs, plans and todos are in `archive/`. Still open from the agreed order: #2
+and #6.
 
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
 - #2: whether CI installs Chromium (for Playwright and `render-capture`'s
   integration test).
 - #6: the default artifact retention policy.
+- #28: the two open questions in its draft spec, and whether to start it.
 
 **Frontend test gotcha.** The Vitest suite's "real API" tests (gallery, gate,
 decision history, new-workflow) call whatever server is listening on
@@ -42,7 +46,10 @@ if the directories differ. To serve without API keys or spending anything, point
 `SMASHER_PROVIDER=claude-cli`. The repo keeps one at
 `frontend/tests/fixtures/fake-claude.sh`; set `FAKE_CLAUDE_LOG` to log its calls.
 The suites start no LLM node by default. Every submitted run parks on a human
-gate or passes through non-LLM nodes only. The two critical-path tests
+gate or passes through non-LLM nodes only. New tests should reuse the inline
+graphs in `frontend/tests/fixtures/graphs.ts` (`RUN_FAIL_CHECK`, `QUESTION_KINDS`,
+`LOOP_CHECK`, `ANONYMOUS_GATE`), whose `graphs.test.ts` proves they never reach an
+LLM. The two critical-path tests
 (`tests/critical-path.test.ts`, `e2e/critical-path.spec.ts`) run real Codergen nodes
 and spend tokens, so they're skipped unless `SMASHER_LLM_TESTS=1` is set. Run them
 only on request.
@@ -65,7 +72,7 @@ only on request.
      data. Leave them.
 
 2. **Run the frontend in CI.** `.github/workflows/ci.yml` runs only cargo. The
-   SPA's ~237 Vitest tests, `svelte-check`, lint, and the 4 Playwright specs never
+   SPA's ~430 Vitest tests, `svelte-check`, lint, and the 11 Playwright spec files never
    run in CI, even though they're the main guard for the SPA and desktop. Add a
    Node job, and decide at the same time whether Chromium gets installed for
    Playwright and `render-capture`'s integration test. That Chromium question has
@@ -73,9 +80,10 @@ only on request.
    Checkpoint C waiver.*
    Because of the gotcha above, the CI job has to build and start `smasher serve`
    before running Vitest.
-   `svelte-check --threshold error` already fails with 6 errors on `main`, so fix
+   `svelte-check --threshold error` already fails with 5 errors on `main`, so fix
    those first or the new job starts red. They're in `e2e/gallery-gate.spec.ts` (3),
-   `EventLog.svelte`, `WorkflowCanvas.svelte` and `tests/setup.ts`.
+   `WorkflowCanvas.svelte` and `tests/setup.ts`. (The `EventLog.svelte` one went
+   with the event-log rewrite.)
 
 3. ~~**Fix where dropped nodes land after pan or zoom in the node editor.**~~
    **Done 2026-09-24** (merged to `main`). A small
@@ -92,7 +100,7 @@ only on request.
      `minZoom` of 0.5. Setting a lower `minZoom` on the canvas would likely fix it.
 
 9. ~~**Show candidates as thumbnails that open a full-size, interactive lightbox.**~~
-   **Done 2026-09-25** on `feat/spa-port-repairs` (module `candidate-preview`, see
+   **Done 2026-09-25** (merged to `main`; module `candidate-preview`, see
    `tasks/archive/SPEC-candidate-preview.md`). Both cards show the screenshot as a thumbnail
    that opens the live bundle at its capture viewport, scaled to fit, with ⟲ and
    Open in new tab; both list `params`; the gallery's failed card shows captured-at.
@@ -139,8 +147,8 @@ only on request.
       providers' models (including Claude CLI), not free text.
     - Choosing a provider also sets a valid model for it.
 
-21. ~~**Restore what the HTMX → SPA port dropped.**~~ **Done 2026-09-25** on
-    `feat/spa-port-repairs` (seven modules: `spa-shell`, `candidate-preview`,
+21. ~~**Restore what the HTMX → SPA port dropped.**~~ **Done 2026-09-25**, merged
+    to `main` (seven modules: `spa-shell`, `candidate-preview`,
     `run-launch`, `run-summary`, `question-card`, `event-log`, `workflow-detail`;
     see `archive/capability-map-spa-repairs.md`). Deliberately left out, per the batch-2
     spec: SSE reconnect after `onerror`; an event-log cap; server emits for
@@ -276,6 +284,18 @@ only on request.
     cancelled, while the server may still be writing that run's `events/`.
     It failed once with `ENOTEMPTY` and passed on a re-run. Wait for the run
     to reach `Aborted` (or retry the removal) before deleting.
+28. **Show the agent's replies under the question they answer.** *Raised by
+    Jobsworth 2026-09-25* from run `01m3c6t5exbbr6b2jps2w3wnj7`
+    (`human_gate_showcase.dot`). Each gate answer leads into an LLM node whose
+    `agent_message` replies to it, but the reply only shows as a cut-off line in
+    the event log. Draft spec: `SPEC-question-replies.md` on branch
+    `feat/question-replies` (commit `92187dd`, based on the pre-merge branch, so
+    rebase it onto `main` first). Decided: a reply belongs to the last answer
+    until the next question is asked; the log keeps a one-line entry; replies
+    render as markdown (`marked` + `DOMPurify`); the answered list is rebuilt from
+    events, so `HttpInterviewer` must start emitting `human_prompt_issued` and
+    `human_response_received`. Open: whether gallery-gate answers are left out,
+    and oldest- or newest-first order. Parked by Jobsworth 2026-09-25.
 
 ## P2: Robustness (can lose data or grow without limit)
 
