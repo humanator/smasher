@@ -30,7 +30,7 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
 
 ## Phase 3: #2
 
-- [ ] **Task 5: add `.nvmrc` and the `frontend` job**
+- [x] **Task 5: add `.nvmrc` and the `frontend` job**
   - Acceptance: the job matches the plan's step list, with the fake-claude env and the empty-log assertion.
   - Verify: `actionlint` if available, otherwise a YAML parse; a local dry run of the same commands in a fresh temp data dir passes.
   - Files: `.nvmrc`, `.github/workflows/ci.yml`.
