@@ -328,6 +328,18 @@ only on request.
     Do this before #2, so its frontend CI job (which should run `npm run
     check`) doesn't start red.
 
+31. **Split the SPA bundle so the build stops warning about chunk size.**
+    *Seen 2026-09-25.* `npm run build` puts all the JS into one chunk and warns
+    that it's over 500 kB. It's 643 kB minified (201 kB gzipped); it was
+    567 kB before #28, whose `marked` + `dompurify` added about 76 kB. Nothing
+    in `src/` uses a dynamic `import()`. Low urgency: the SPA is served locally
+    (`smasher serve`, the desktop app), so it costs little load time. But the
+    warning hides any real regression. Likely fix: lazy-load the node editor,
+    which is the only user of `@xyflow/svelte` and `@dagrejs/dagre`, with a
+    dynamic `import()` from `App.svelte`. Maybe also lazy-load `lib/markdown`,
+    used only by `QuestionCard`. Then rebuild and check the warning is gone,
+    rather than raising `build.chunkSizeWarningLimit`.
+
 ## P2: Robustness (can lose data or grow without limit)
 
 4. ~~**Detect conflicting edits when saving a workflow.**~~ **Done 2026-09-24**
