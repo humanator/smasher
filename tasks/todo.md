@@ -21,7 +21,7 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
   - Acceptance: `npm run build:check` fails on the current single 567 kB chunk.
   - Verify: run it and see the failure message name the chunk.
   - Files: `frontend/scripts/check-bundle-size.mjs`, `frontend/package.json`.
-- [ ] **Task 4: lazy-load the node editor pages**
+- [x] **Task 4: lazy-load the node editor pages**
   - Acceptance: `build:check` passes; no chunk-size warning; editor routes still load.
   - Verify: `npm run build:check`; editor Vitest tests; `npx playwright test node-editor.spec.ts`; manual check of Edit + New Workflow.
   - Files: `frontend/src/App.svelte`.
