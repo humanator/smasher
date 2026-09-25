@@ -684,7 +684,7 @@ That's formatter input, not a mocked server. It's flagged here so Jobsworth can 
 - [ ] New unit, integration and Playwright tests pass. The full Vitest suite passes. `check`,
       `lint` and `make ci` add no new errors or warnings.
 
-## Decisions (proposed; confirm or change)
+## Decisions (resolved 2026-09-25)
 
 1. **Graph errors show inline and never toast.** This matches the old page and keeps the
    toast count in `app-shell.spec.ts`.
@@ -710,4 +710,6 @@ That's formatter input, not a mocked server. It's flagged here so Jobsworth can 
 
 ## Open Questions
 
-None, apart from confirming the decisions above.
+None.
+
+Spec approved by Jobsworth 2026-09-25.
