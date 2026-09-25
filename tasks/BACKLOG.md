@@ -11,7 +11,7 @@ Every planned module is done: the design-factory modules (`component-kit` throug
 [`archive/`](archive/). What's left is follow-up work, known gaps, and
 deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 
-## Where things stand (2026-09-25)
+## Where things stand (2026-09-26)
 
 **Branches.** `chore/tasks-triage`, `fix/default-model` (item #1), the editor
 batch, `feat/claude-cli-provider` and `feat/spa-port-repairs` are all merged into
@@ -31,7 +31,7 @@ and #6.
 - #2: whether CI installs Chromium (for Playwright and `render-capture`'s
   integration test).
 - #6: the default artifact retention policy.
-- #28: the two open questions in its draft spec, and whether to start it.
+- #28: review `feat/question-replies` and decide whether to merge it.
 
 **Frontend test gotcha.** The Vitest suite's "real API" tests (gallery, gate,
 decision history, new-workflow) call whatever server is listening on
@@ -72,7 +72,7 @@ only on request.
      data. Leave them.
 
 2. **Run the frontend in CI.** `.github/workflows/ci.yml` runs only cargo. The
-   SPA's ~430 Vitest tests, `svelte-check`, lint, and the 11 Playwright spec files never
+   SPA's ~450 Vitest tests, `svelte-check`, lint, and the 12 Playwright spec files never
    run in CI, even though they're the main guard for the SPA and desktop. Add a
    Node job, and decide at the same time whether Chromium gets installed for
    Playwright and `render-capture`'s integration test. That Chromium question has
@@ -80,10 +80,8 @@ only on request.
    Checkpoint C waiver.*
    Because of the gotcha above, the CI job has to build and start `smasher serve`
    before running Vitest.
-   `svelte-check --threshold error` already fails with 5 errors on `main`, so fix
-   those first or the new job starts red. They're in `e2e/gallery-gate.spec.ts` (3),
-   `WorkflowCanvas.svelte` and `tests/setup.ts`. (The `EventLog.svelte` one went
-   with the event-log rewrite.)
+   `svelte-check --threshold error` already fails with 5 errors on `main`, so do
+   #30 first or the new job starts red.
 
 3. ~~**Fix where dropped nodes land after pan or zoom in the node editor.**~~
    **Done 2026-09-24** (merged to `main`). A small
@@ -293,15 +291,14 @@ only on request.
     Jobsworth 2026-09-25* from run `01m3c6t5exbbr6b2jps2w3wnj7`
     (`human_gate_showcase.dot`). Each gate answer leads into an LLM node whose
     `agent_message` replies to it, but the reply only shows as a cut-off line in
-    the event log. Draft spec: `SPEC-question-replies.md` on branch
-    `feat/question-replies` (commit `92187dd`, based on the pre-merge branch, so
-    rebase it onto `main` first). Decided: a reply belongs to the last answer
-    until the next question is asked; the log keeps a one-line entry; replies
-    render as markdown (`marked` + `DOMPurify`); the answered list is rebuilt from
-    events, so `HttpInterviewer` must start emitting `human_prompt_issued` and
-    `human_response_received`. Open: whether gallery-gate answers are left out,
-    and oldest- or newest-first order (settled: gallery answers left out,
-    oldest first).
+    the event log. Spec, plan and todo: `SPEC-question-replies.md`,
+    `plan.md` and `todo.md` in `tasks/`. Archive them once the branch merges.
+    Decided by Jobsworth: a reply belongs to the last answer until the next
+    question is asked; the log keeps a one-line entry; replies render as
+    markdown (`marked` + `DOMPurify`); the answered list is rebuilt from
+    events; gallery-gate answers are left out; oldest first. The plan's review
+    pauses after Checkpoints A and B were skipped in the `/build auto` run, so
+    the branch review covers both.
 
 29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
     *Seen 2026-09-25 while building #28.* In `crates/smasher-web/tests/events_test.rs`,
@@ -328,8 +325,8 @@ only on request.
     - `e2e/gallery-gate.spec.ts:87-89` (3 errors): `string | undefined` is
       passed where `string` is expected.
 
-    Fix them, then add `npm run check` to #2's frontend CI job so they can't
-    come back.
+    Do this before #2, so its frontend CI job (which should run `npm run
+    check`) doesn't start red.
 
 ## P2: Robustness (can lose data or grow without limit)
 
