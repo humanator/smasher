@@ -34,23 +34,23 @@ Start from the spec's Project Structure section. Also export `submitGraph(dot)`,
 which proves each graph against the real server.
 
 **Acceptance criteria:**
-- [ ] `RUN_FAIL_CHECK` reaches `Failed`. Its `error` contains `invalid JSON in args attribute`,
+- [x] `RUN_FAIL_CHECK` reaches `Failed`. Its `error` contains `invalid JSON in args attribute`,
       and it has `completed_at`.
-- [ ] `QUESTION_KINDS` asks three questions in order. Their kinds are `multiple_choice` (choices
+- [x] `QUESTION_KINDS` asks three questions in order. Their kinds are `multiple_choice` (choices
       `Red`, `Blue`, `Green`), then `approval`, then `free_form`. Answering all three gets the run
       to `Completed`.
-- [ ] `LOOP_CHECK`:
-  - [ ] answering `again` gives a `loop_restarted` event with `restart_count: 1` and asks the gate
+- [x] `LOOP_CHECK`:
+  - [x] answering `again` gives a `loop_restarted` event with `restart_count: 1` and asks the gate
         again;
-  - [ ] answering `done` completes the run;
-  - [ ] if a restart to `start` isn't allowed, the graph loops to a second gate instead, and the
-        spec's fixture listing is updated to match.
-- [ ] `ANONYMOUS_GATE` gives a run with `graph_name === null`.
-- [ ] No graph contains `shape=box`, and every tool node has invalid `args`. A test checks both
+  - [x] answering `done` completes the run;
+  - [x] if a restart to `start` isn't allowed, the graph loops to a second gate instead, and the
+        spec's fixture listing is updated to match. Not needed: the restart to `start` works.
+- [x] `ANONYMOUS_GATE` gives a run with `graph_name === null`.
+- [x] No graph contains `shape=box`, and every tool node has invalid `args`. A test checks both
       conditions against the strings.
 
 **Verification:**
-- [ ] `npm test -- --run tests/fixtures/graphs.test.ts`
+- [x] `npm test -- --run tests/fixtures/graphs.test.ts`
 
 **Dependencies:** None
 

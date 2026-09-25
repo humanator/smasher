@@ -164,7 +164,7 @@ plan runs them A → B → C → D.
 The acceptance criteria and verification for each task are in `todo-spa-repairs-batch2.md`.
 
 ### Phase 0: Fixtures
-- [ ] Task 1: `tests/fixtures/graphs.ts`, with each graph proven through the real API
+- [x] Task 1: `tests/fixtures/graphs.ts`, with each graph proven through the real API
 
 ### Phase A: `run-summary`
 - [ ] Task 2: `lib/runStatus.ts` and `lib/graphError.ts`
