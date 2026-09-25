@@ -1,13 +1,15 @@
 // ABOUTME: Tests for GalleryGate component
 // ABOUTME: Renders against a real paused gallery-gate run, no mocked fetch
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'svelte-sonner';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import GalleryGate from '../../../src/components/dashboard/GalleryGate.svelte';
+import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
 import * as questionsApi from '../../../src/lib/api/questions';
@@ -121,4 +123,57 @@ describe('GalleryGate', () => {
       { timeout: 5000 }
     );
   }, 20000);
+
+  describe('poll failure toasts', () => {
+    // Live toasts only: a toast dismissed earlier can briefly re-render,
+    // marked data-removed, because sonner's store is global.
+    const toasts = () =>
+      document.querySelectorAll('[data-sonner-toast][data-removed="false"]');
+
+    // Close every toast while this test's <Toaster> is still mounted so
+    // none carries over into the next test.
+    afterEach(async () => {
+      toast.dismiss();
+      await waitFor(() => expect(toasts().length).toBe(0));
+    });
+
+    it('toasts a failing poll once, not on every tick', async () => {
+      render(Toaster);
+      render(GalleryGate, { props: { runId: 'no-such-run' } });
+
+      expect(
+        await screen.findByText('not found: run no-such-run', {}, { timeout: 5000 })
+      ).toBeTruthy();
+      // Watch three more failing 2s ticks. The toast closes itself after
+      // sonner's 4s default, and none of the later failures brings it back.
+      let most = 0;
+      for (let waited = 0; waited < 6500; waited += 100) {
+        most = Math.max(most, toasts().length);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      expect(most).toBe(1);
+      expect(toasts().length).toBe(0);
+    }, 15000);
+
+    it('shows no toast for a real run that has no gallery gate', async () => {
+      // Parks on a plain interviewer gate, so the poll succeeds with no gallery gate.
+      const { run_id: runId } = await runsApi.submitRun({
+        dot_source: `digraph GalleryGateNoGate {
+          start [shape=circle];
+          gate [shape=oval, label="Proceed?"];
+          done [shape=doublecircle];
+          start -> gate -> done;
+        }`,
+        variables: {},
+      });
+      render(Toaster);
+      render(GalleryGate, { props: { runId } });
+
+      // The first poll plus two 2s ticks.
+      await new Promise((resolve) => setTimeout(resolve, 4500));
+
+      expect(toasts().length).toBe(0);
+    }, 15000);
+  });
 });

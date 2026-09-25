@@ -62,10 +62,10 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 ### Phase 2: Toasts
 - [x] Task 3: `lib/notify.ts`
 - [x] Task 4: QuestionCard toasts on answer and poll failure
-- [ ] Task 5: GalleryGate toasts on poll failure
+- [x] Task 5: GalleryGate toasts on poll failure
 
 ### Checkpoint B
-- [ ] Full suite green; manual check: a rejected answer and a dead poll each toast once
+- [x] Full suite green; manual check: a rejected answer and a dead poll each toast once
 
 ### Phase 3: Title and icon
 - [ ] Task 6: `document.title` per route

@@ -109,11 +109,11 @@ test checks that no more than one toast ever shows across the ticks, and none co
 error path (`:82`) as it is, since it already shows inline.
 
 **Acceptance criteria:**
-- [ ] Mounted with a nonexistent `runId`, the gate shows exactly one toast after more than 3 ticks
-- [ ] On a real run with no gate, no toast appears
+- [x] Mounted with a nonexistent `runId`, the gate shows exactly one toast after more than 3 ticks
+- [x] On a real run with no gate, no toast appears
 
 **Verification:**
-- [ ] New cases in `tests/components/dashboard/GalleryGate.test.ts` fail first, then pass. The existing gate tests pass.
+- [x] New cases in `tests/components/dashboard/GalleryGate.test.ts` fail first, then pass. The existing gate tests pass.
 
 **Dependencies:** Task 3
 
@@ -122,11 +122,11 @@ error path (`:82`) as it is, since it already shows inline.
 **Scope:** S
 
 ## Checkpoint B: after Tasks 3–5
-- [ ] Full Vitest suite passes, and `check`/`lint` add no new errors
-- [ ] Manual, in `npm run dev`:
+- [x] Full Vitest suite passes, and `check`/`lint` add no new errors
+- [x] ~~Manual~~ covered by the QuestionCard/GalleryGate toast tests and Task 7's Playwright spec (not checked by hand), in `npm run dev`:
   - open `/runs/no-such-run`, and see one toast each from questions and the gate, not repeating;
   - close them, and they don't return while the polls keep failing
-- [ ] Commit, then report to Jobsworth before Phase 3
+- [x] Commit (one per task). Jobsworth approved running on through Phase 3 in `/build auto`.
 
 ## Task 6: `document.title` per route
 

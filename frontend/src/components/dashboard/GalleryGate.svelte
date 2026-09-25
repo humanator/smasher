@@ -11,6 +11,7 @@
   import * as Card from '$lib/components/ui/card/index.js';
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { pollFailureNotifier } from '$lib/notify';
 
   let { runId }: { runId: string } = $props();
 
@@ -23,6 +24,7 @@
   let done = $state(false);
   let error: string | null = $state(null);
   let pollHandle: ReturnType<typeof setInterval> | undefined;
+  let pollFailure: ReturnType<typeof pollFailureNotifier> | undefined;
 
   interface ExitStatus {
     status: 'success' | 'failed';
@@ -38,8 +40,10 @@
       if (!done) {
         gate = response.gallery_gate;
       }
-    } catch {
-      // Transient poll failures aren't surfaced here - the next poll retries.
+      pollFailure?.ok();
+    } catch (err) {
+      // The next poll retries; a run of failures toasts once, not every tick.
+      pollFailure?.fail(err);
     }
   }
 
@@ -87,6 +91,10 @@
   }
 
   onMount(() => {
+    pollFailure = pollFailureNotifier(
+      `gallery-gate-poll:${runId}`,
+      'Failed to load the gallery gate'
+    );
     refresh();
     pollHandle = setInterval(refresh, POLL_INTERVAL_MS);
   });
