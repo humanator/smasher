@@ -262,16 +262,16 @@ and the showcase's box nodes alone.
 
 ## Success Criteria
 
-- [ ] Run Workflow opens a dialog, and Cancel or Escape launches nothing.
-- [ ] A submitted Brief, Model and variable reach the server, and the fixture's question text
+- [x] Run Workflow opens a dialog, and Cancel or Escape launches nothing.
+- [x] A submitted Brief, Model and variable reach the server, and the fixture's question text
       shows each one.
-- [ ] A blank Model leaves `model` out of the request, so the run uses the server default.
-- [ ] A bad Variables line and a bad or wrong-shaped Node Overrides each show their inline
+- [x] A blank Model leaves `model` out of the request, so the run uses the server default.
+- [x] A bad Variables line and a bad or wrong-shaped Node Overrides each show their inline
       error and block submit.
-- [ ] A server rejection shows the server's message in the dialog and keeps its values.
-- [ ] Reopening a workflow's dialog restores its last values without errors.
-- [ ] `RunDialog` depends on nothing from the catalog.
-- [ ] New unit, integration and Playwright tests pass. The full Vitest suite passes, and
+- [x] A server rejection shows the server's message in the dialog and keeps its values.
+- [x] Reopening a workflow's dialog restores its last values without errors.
+- [x] `RunDialog` depends on nothing from the catalog.
+- [x] New unit, integration and Playwright tests pass. The full Vitest suite passes, and
       `check`, `lint` and `make ci` add no new errors or warnings.
 
 ## Decisions (resolved 2026-09-25)

@@ -123,10 +123,10 @@ See `todo-run-launch.md` for acceptance criteria and verification.
 - [x] Full suite green; review the dialog with Jobsworth in `npm run dev` (optional, on request)
 
 ### Phase 3: End to end
-- [ ] Task 6: `e2e/run-launch.spec.ts`, and mark the module done
+- [x] Task 6: `e2e/run-launch.spec.ts`, and mark the module done
 
 ### Checkpoint C: Complete
-- [ ] All spec success criteria met, `make ci` green
+- [x] All spec success criteria met, `make ci` green
 - [ ] Review with Jobsworth
 
 ## Risks and mitigations

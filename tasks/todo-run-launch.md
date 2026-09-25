@@ -160,12 +160,12 @@ an `afterEach`, and cancel the run it launches.
 Then tick the spec's success criteria, and mark `run-launch` as Done in the capability map.
 
 **Acceptance criteria:**
-- [ ] Both scenarios pass
-- [ ] Every spec success criterion is ticked, and the capability map row reads `Done 2026-09-25` (or the actual date)
+- [x] Both scenarios pass
+- [x] Every spec success criterion is ticked, and the capability map row reads `Done 2026-09-25` (or the actual date)
 
 **Verification:**
-- [ ] `npm run test:e2e -- e2e/run-launch.spec.ts`, with the same `smasher serve` running on 21541. Playwright only starts Vite, which proxies `/api` there.
-- [ ] `npm run build`
+- [x] `npm run test:e2e -- e2e/run-launch.spec.ts`, with the same `smasher serve` running on 21541. Playwright only starts Vite, which proxies `/api` there.
+- [x] `npm run build`
 
 **Dependencies:** Task 5
 
@@ -174,5 +174,5 @@ Then tick the spec's success criteria, and mark `run-launch` as Done in the capa
 **Scope:** S
 
 ## Checkpoint C: complete
-- [ ] `npm test -- --run`, `npm run check` (6 pre-existing errors only), `npm run lint`, `npm run build`, `npm run test:e2e -- e2e/run-launch.spec.ts` and `make ci` all pass with no new warnings
+- [x] `npm test -- --run`, `npm run check` (6 pre-existing errors only), `npm run lint`, `npm run build`, `npm run test:e2e -- e2e/run-launch.spec.ts` and `make ci` all pass with no new warnings
 - [ ] Review with Jobsworth before starting the next module
