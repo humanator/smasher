@@ -148,7 +148,7 @@ an `afterEach`, and cancel the run it launches.
 ## Checkpoint B: after Tasks 4–5
 - [x] Full Vitest suite passes, and `check`/`lint` add no new errors
 - [x] Commit (one per task)
-- [ ] If Jobsworth wants to, look at the dialog in `npm run dev` before Phase 3
+- [x] If Jobsworth wants to, look at the dialog in `npm run dev` before Phase 3 (approved 2026-09-25)
 
 ## Task 6: `e2e/run-launch.spec.ts`, and mark the module done
 
