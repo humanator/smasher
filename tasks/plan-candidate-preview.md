@@ -121,7 +121,7 @@ See `todo-candidate-preview.md` for acceptance criteria and verification.
 
 ### Phase 2: The preview component
 - [x] Task 3: `CandidatePreview`: thumbnail button, placeholder and lightbox
-- [ ] Task 4: ⟲ reset and **Open in new tab**
+- [x] Task 4: ⟲ reset and **Open in new tab**
 
 ### Checkpoint B
 - [ ] Full suite green. Jobsworth looks at the lightbox in `npm run dev` (optional, on request)

@@ -5,6 +5,7 @@
   import type { CandidateResponse } from '../../lib/api/runs';
   import { fitScale, viewportOf } from '../../lib/previewScale';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
+  import { Button } from '$lib/components/ui/button/index.js';
 
   let { candidate }: { candidate: CandidateResponse } = $props();
 
@@ -14,6 +15,8 @@
   let fullSizeFailed = $state(false);
   let stageWidth = $state(0);
   let stageHeight = $state(0);
+  // ⟲ re-creates the iframe, which reloads the bundle without reaching into the frame.
+  let resetCount = $state(0);
 
   const viewport = $derived(viewportOf(candidate.manifest));
   // An unmeasured stage (jsdom, or a browser's first frame) reads 0, and a 0 scale hides everything.
@@ -60,8 +63,27 @@
   <Dialog.Content
     class="flex h-[calc(100vh-2rem)] flex-col gap-3 p-4 sm:max-w-[calc(100vw-2rem)]"
   >
-    <Dialog.Header class="pr-10">
-      <Dialog.Title class="font-mono">{candidate.candidate_id}</Dialog.Title>
+    <Dialog.Header class="flex-row items-center gap-2 pr-10">
+      <Dialog.Title class="mr-auto font-mono">{candidate.candidate_id}</Dialog.Title>
+      {#if candidate.bundle_url}
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="Reset preview to start"
+          onclick={() => resetCount++}
+        >
+          ⟲
+        </Button>
+      {/if}
+      <Button
+        variant="outline"
+        size="sm"
+        href={candidate.bundle_url ?? candidate.screenshot_url}
+        target="_blank"
+        rel="noopener"
+      >
+        Open in new tab
+      </Button>
     </Dialog.Header>
     <div
       class="flex min-h-0 flex-1 items-start justify-center overflow-hidden"
@@ -74,13 +96,15 @@
         style="width: {viewport.width * scale}px; height: {viewport.height * scale}px"
       >
         {#if candidate.bundle_url}
-          <iframe
-            src={candidate.bundle_url}
-            title="Candidate {candidate.candidate_id}"
-            sandbox="allow-scripts"
-            class="border-none bg-white"
-            style={scaledStyle}
-          ></iframe>
+          {#key resetCount}
+            <iframe
+              src={candidate.bundle_url}
+              title="Candidate {candidate.candidate_id}"
+              sandbox="allow-scripts"
+              class="border-none bg-white"
+              style={scaledStyle}
+            ></iframe>
+          {/key}
         {:else if fullSizeFailed}
           <div
             class="flex items-center justify-center bg-muted text-sm text-muted-foreground"

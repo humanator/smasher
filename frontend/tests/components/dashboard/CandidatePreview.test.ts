@@ -166,6 +166,40 @@ describe('CandidatePreview', () => {
       expect(img?.getAttribute('style')).toContain('height: 800px');
     });
 
+    it('⟲ replaces the iframe with a fresh one at the same src', async () => {
+      const candidate = await seededCandidate('cand-reset', { bundle: true });
+      const { user, dialog } = await openLightbox(candidate);
+      const before = dialog.querySelector('iframe');
+
+      await user.click(screen.getByRole('button', { name: 'Reset preview to start' }));
+
+      const after = dialog.querySelector('iframe');
+      expect(after).not.toBeNull();
+      expect(after).not.toBe(before);
+      expect(after?.getAttribute('src')).toBe(candidate.bundle_url);
+    });
+
+    it('with a bundle, links to it in a new tab', async () => {
+      const candidate = await seededCandidate('cand-link-bundle', { bundle: true });
+      await openLightbox(candidate);
+
+      const link = screen.getByRole('link', { name: 'Open in new tab' });
+      expect(link.getAttribute('href')).toBe(candidate.bundle_url);
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener');
+    });
+
+    it('without a bundle, has no ⟲ and links to the screenshot', async () => {
+      const candidate = await seededCandidate('cand-link-shot');
+      await openLightbox(candidate);
+
+      expect(screen.queryByRole('button', { name: 'Reset preview to start' })).toBeNull();
+      const link = screen.getByRole('link', { name: 'Open in new tab' });
+      expect(link.getAttribute('href')).toBe(candidate.screenshot_url);
+      expect(link.getAttribute('target')).toBe('_blank');
+      expect(link.getAttribute('rel')).toBe('noopener');
+    });
+
     it('closes on Escape', async () => {
       const candidate = await seededCandidate('cand-escape', { bundle: true });
       const { user } = await openLightbox(candidate);
