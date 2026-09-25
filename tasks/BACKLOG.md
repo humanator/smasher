@@ -216,6 +216,21 @@ if the directories differ. To serve without API keys or spending anything, point
     writes all four candidates in one ~5 minute node, so nothing shows for a
     while. That's how the pipeline is built, not a bug.
 
+  Second desktop run (`01m3awkpeahghg0v6d2pshnzyb`, 2026-09-25, after both
+  fixes): **Checkpoint C's candidate and critique steps pass.** `TaskCritic` wrote
+  a valid `critic-report.json` that describes the real screenshot, lint passed,
+  `Synthesis` recommended `proceed`, and token totals were counted. But the last
+  node, `A11yCheck`, failed with "the claude-cli provider answers single calls and
+  can't run tools". **The spec made a wrong assumption.** It says `LlmToolBackend`
+  and `LlmManagerBackend` are single-turn and tool-less, so they would route to
+  `ClaudeCliAdapter` unchanged (`SPEC-claude-cli-provider.md` lines 53 and 113).
+  In fact both run agent sessions with tools (`smasher-web/src/backend.rs`). So
+  under claude-cli, every generic tool node fails (34 `tool_command` nodes across
+  9 examples), and so does every manager node. The fix proposed for this branch
+  (not yet agreed): when the provider is claude-cli, route those sessions through
+  `ClaudeCliBackend` as a `claude -p` agent, as codergen is. The deeper fix is
+  #22.
+
   Possible follow-ups:
   - Show `permission_denials` from the CLI's result event in the run view.
   - Make the web server's claude-cli codergen timeout configurable. It's fixed at
@@ -277,6 +292,22 @@ decides the `candidate_id` convention, and the lint override lives in the same
     a per-candidate option to skip saving the bundle.
 15. **Reuse the editor's saved layout in the run-view SVG** instead of laying the
     graph out again with Graphviz each time.
+22. **Make `tool_command` actually run its shell command.** *Raised 2026-09-25.*
+    Tool nodes in 9 examples (34 nodes) set `tool_command="..."`, but nothing in
+    the engine reads that attribute. A node with no `tool` attribute falls back to
+    its label as the tool name, and `LlmToolBackend` (`smasher-web/src/backend.rs`)
+    starts an LLM agent session with file and shell tools, asking it to
+    "execute" the tool. On API providers the agent improvises (often by running
+    the command), so these nodes seem to work, but the result is slow, costs
+    tokens, and can vary between runs. Under claude-cli they fail outright (see
+    In progress). Attractor intends tool nodes to run `tool_command` directly.
+    Doing that makes them deterministic and free. Decide first:
+    - It changes behaviour for every provider.
+    - It runs shell commands written in the DOT file. Workflows are
+      user-authored and local today, but #16 (serving remotely) would change
+      that.
+    - Whether `LlmToolBackend` stays as the fallback for tool nodes with neither
+      a `tool` nor a `tool_command`.
 
 ## P4: Distribution and remote access (bigger, strategic)
 
