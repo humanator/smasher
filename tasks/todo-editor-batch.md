@@ -80,12 +80,16 @@ gap": `editor_api.rs:43-46,188-191` and `rendering.rs:2065-2069`.
 ---
 
 ## Checkpoint A: after T1-T2
-- [ ] `make ci` clean
-- [ ] Full Vitest suite green against a server from this branch
+- [x] `make ci` clean (covered by Checkpoint B's `make ci`, run later on the same branch)
+- [x] Full Vitest suite green against a server from this branch. Confirmed 2026-09-25 on
+      `feat/spa-port-repairs` (main + test gating), against an isolated fake-claude server:
+      241 passed, 1 skipped (critical path, now opt-in), 0 LLM calls.
 - [ ] Manual: in `make desktop-dev` or `serve`, zoom and pan, then drop a node. It lands under the
       cursor.
-- [ ] Manual: save a workflow that has a `node [...]` block, then `git diff` the file. The block
-      is kept.
+- [x] Manual: save a workflow that has a `node [...]` block, then `git diff` the file. The block
+      is kept. Done 2026-09-25 through the editor's API (`GET` graph, edit a label, `PUT` with
+      `If-Match`): `node [color="red" model="x"]` and `edge [style=dashed]` kept, merged with
+      the font defaults. A second save was byte-identical.
 - [ ] Review with Jobsworth before Phase 2
 
 ---
@@ -174,9 +178,10 @@ return shape.
 
 ## Checkpoint B: complete
 - [x] `make ci` clean
-- [ ] Full Vitest suite green against a server from this branch. 235/237 on 2026-09-24:
+- [x] Full Vitest suite green against a server from this branch. 235/237 on 2026-09-24:
       `AppLayout` and `WorkflowCatalog` fail only because `~/.smasher/workflows/`
-      holds a second `human_gate_showcase.dot`, so the name is listed twice.
+      holds a second `human_gate_showcase.dot`, so the name is listed twice. Re-run clean on
+      2026-09-25 against an isolated data dir: 241 passed, 1 skipped.
 - [x] `npx playwright test e2e/node-editor.spec.ts` green (by hand, since CI doesn't run it, see #2)
 - [ ] Manual in the desktop app: the T4 conflict flow end to end
 - [x] `tasks/BACKLOG.md`: #3, #4, #5 marked done with the date. Remove the DEFERRED
