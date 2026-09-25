@@ -8,6 +8,7 @@
   import StatusBadge from './StatusBadge.svelte';
   import TokenCounter from './TokenCounter.svelte';
   import { sanitizeSvg } from '../../lib/sanitizeSvg';
+  import { TERMINAL_STATUSES } from '../../lib/runStatus';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { usePageActions } from '$lib/page-header.svelte';
@@ -15,7 +16,6 @@
   let { runId }: { runId: string } = $props();
 
   const POLL_INTERVAL_MS = 5000;
-  const TERMINAL_STATUSES = new Set(['Completed', 'Failed', 'Aborted']);
 
   let run: RunSummary | null = $state(null);
   let graphSvg: string | null = $state(null);

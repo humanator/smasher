@@ -72,20 +72,20 @@ which proves each graph against the real server.
 - `RunDetail` imports `TERMINAL_STATUSES` from `runStatus.ts` instead of defining it.
 
 **Acceptance criteria:**
-- [ ] `isActive('Running')` is true. It's false for `Completed`, `Failed` and `Aborted`.
-- [ ] `pickFeaturedRun`:
-  - [ ] `[]` gives `null`;
-  - [ ] the newest `Running` run is picked even when newer terminal runs exist;
-  - [ ] with no runs running, the newest run is picked with heading `Latest run`;
-  - [ ] `moreRunning` counts the other `Running` runs.
-- [ ] `graphErrorMessage`:
-  - [ ] a message containing `graphviz not available` gives the old install hint, word for word;
-  - [ ] any other message is returned as-is;
-  - [ ] `''` gives `Failed to render the pipeline graph`.
+- [x] `isActive('Running')` is true. It's false for `Completed`, `Failed` and `Aborted`.
+- [x] `pickFeaturedRun`:
+  - [x] `[]` gives `null`;
+  - [x] the newest `Running` run is picked even when newer terminal runs exist;
+  - [x] with no runs running, the newest run is picked with heading `Latest run`;
+  - [x] `moreRunning` counts the other `Running` runs.
+- [x] `graphErrorMessage`:
+  - [x] a message containing `graphviz not available` gives the old install hint, word for word;
+  - [x] any other message is returned as-is;
+  - [x] `''` gives `Failed to render the pipeline graph`.
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/runStatus.test.ts tests/lib/graphError.test.ts`
-- [ ] `RunDetail.test.ts` still passes
+- [x] `npm test -- --run tests/lib/runStatus.test.ts tests/lib/graphError.test.ts`
+- [x] `RunDetail.test.ts` still passes
 
 **Dependencies:** None
 
