@@ -116,6 +116,7 @@ npm run build
 ## Project Structure
 
 ```
+frontend/vite.config.ts                                       → proxy /candidate-artifacts to the server (dev + Playwright)
 frontend/src/lib/previewScale.ts                              → NEW: pure fit-to-box scale + viewport-from-manifest helpers
 frontend/src/components/dashboard/CandidatePreview.svelte     → NEW: thumbnail button + placeholder + lightbox (+ ⟲, new-tab link)
 frontend/src/components/dashboard/CandidateParams.svelte      → NEW: the collapsed `params` <details>
