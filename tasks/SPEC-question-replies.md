@@ -1,6 +1,6 @@
 # Spec: agent replies under the answered question
 
-Status: **draft, 2026-09-25**. Branch: `feat/question-replies`, from `feat/spa-port-repairs`.
+Status: **done, 2026-09-25** (built on `feat/question-replies`, not yet merged). Branch: `feat/question-replies`, from `feat/spa-port-repairs`.
 
 Raised by Jobsworth on run `01m3c6t5exbbr6b2jps2w3wnj7` (`human_gate_showcase.dot`): the agent's
 reply to each gate answer shows only as a cut-off line in the event log. It should read as a reply
@@ -144,12 +144,14 @@ event log keeps one short line per agent message, so it stays a complete timelin
 
 ## Success criteria
 
-- [ ] A web run's `events.jsonl` has `human_prompt_issued` and `human_response_received` for each
+- [x] A web run's `events.jsonl` has `human_prompt_issued` and `human_response_received` for each
       gate, with the node id, question and answer.
-- [ ] On the run page, each answered question shows its answer and the agent's replies, rendered
+- [x] On the run page, each answered question shows its answer and the agent's replies, rendered
       as markdown, matched by the rule in Decision 1.
-- [ ] Reloading the page, or opening a finished run, shows the same answered list and replies.
-- [ ] The event log still has a one-line entry for every agent message.
-- [ ] Rendered markdown can't run script. The sanitiser test proves it.
-- [ ] `cargo test`, `make ci`, the full Vitest suite, `check`, `lint` and the non-LLM Playwright
-      specs are green, and no test spends tokens.
+- [x] Reloading the page, or opening a finished run, shows the same answered list and replies.
+- [x] The event log still has a one-line entry for every agent message.
+- [x] Rendered markdown can't run script. The sanitiser test proves it.
+- [x] `cargo test`, `make ci`, the full Vitest suite, `check`, `lint` and the non-LLM Playwright
+      specs are green, and no test spends tokens. (`check` still reports 5 errors that were there
+      before this work, in `WorkflowCanvas.svelte`, `tests/setup.ts` and `e2e/gallery-gate.spec.ts`.
+      This work adds none.)

@@ -16,7 +16,7 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 **Branches.** `chore/tasks-triage`, `fix/default-model` (item #1), the editor
 batch, `feat/claude-cli-provider` and `feat/spa-port-repairs` are all merged into
 `main`. The Claude CLI provider merged on 2026-09-25 with a known limitation
-(#23). `feat/question-replies` holds only the draft spec for #28, parked.
+(#23). `feat/question-replies` has #28 built and waiting for review.
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
@@ -284,7 +284,13 @@ only on request.
     cancelled, while the server may still be writing that run's `events/`.
     It failed once with `ENOTEMPTY` and passed on a re-run. Wait for the run
     to reach `Aborted` (or retry the removal) before deleting.
-28. **Show the agent's replies under the question they answer.** *Raised by
+28. ~~**Show the agent's replies under the question they answer.**~~ **Done
+    2026-09-25** on `feat/question-replies`, not yet merged. Web runs emit
+    `human_prompt_issued` / `human_response_received`, the run summary lists
+    `gallery_gates`, and Answered Questions is rebuilt from events (oldest
+    first, gallery picks left out), with replies rendered as markdown. Found
+    along the way: web runs never write `pipeline_completed` to `events.jsonl`
+    (SSE and the in-memory log do get it); not fixed. *Raised by
     Jobsworth 2026-09-25* from run `01m3c6t5exbbr6b2jps2w3wnj7`
     (`human_gate_showcase.dot`). Each gate answer leads into an LLM node whose
     `agent_message` replies to it, but the reply only shows as a cut-off line in
@@ -295,7 +301,8 @@ only on request.
     render as markdown (`marked` + `DOMPurify`); the answered list is rebuilt from
     events, so `HttpInterviewer` must start emitting `human_prompt_issued` and
     `human_response_received`. Open: whether gallery-gate answers are left out,
-    and oldest- or newest-first order. Parked by Jobsworth 2026-09-25.
+    and oldest- or newest-first order (settled: gallery answers left out,
+    oldest first).
 
 ## P2: Robustness (can lose data or grow without limit)
 

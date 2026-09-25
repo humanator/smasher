@@ -241,12 +241,12 @@ oldest first. Cancel the run in `finally`, as `question-card.spec.ts` does.
 done, and update the backlog entry.
 
 **Acceptance criteria:**
-- [ ] `docs/api-reference.md` covers `gallery_gates` and the two events on web runs
-- [ ] `SPEC-question-replies.md` status and success criteria are updated
-- [ ] `tasks/BACKLOG.md` reflects the finished work
+- [x] `docs/api-reference.md` covers `gallery_gates` and the two events on web runs
+- [x] `SPEC-question-replies.md` status and success criteria are updated
+- [x] `tasks/BACKLOG.md` reflects the finished work
 
 **Verification:**
-- [ ] Read-through; links resolve
+- [x] Read-through; links resolve
 
 **Dependencies:** Tasks 1–8
 

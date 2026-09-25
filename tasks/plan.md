@@ -84,7 +84,7 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 ### Phase 3: End to end and docs
 
 - [x] T8: Playwright `question-replies.spec.ts` (S)
-- [ ] T9: Docs, backlog and spec status (S)
+- [x] T9: Docs, backlog and spec status (S)
 
 ### Checkpoint C: complete
 
