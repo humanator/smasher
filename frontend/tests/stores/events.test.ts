@@ -1,5 +1,5 @@
 // ABOUTME: Tests for event store with dedup logic
-// ABOUTME: Verifies accumulation, dedup by (kind, timestamp), and terminal state tracking
+// ABOUTME: Verifies accumulation, dedup of identical events, sequence keys, and terminal state
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { eventStore } from '../../src/stores/events.svelte';
@@ -26,7 +26,7 @@ describe('event store', () => {
     expect(eventStore.events[1].kind).toBe('node_started');
   });
 
-  it('dedups by (kind, timestamp)', () => {
+  it('dedups an identical event', () => {
     const event = { kind: 'node_completed' as const, timestamp: '2026-09-22T10:00:05Z', node_id: 'n1', outcome: { type: 'success' }, duration_ms: 1000 };
 
     eventStore.add(event);
@@ -76,4 +76,33 @@ describe('event store', () => {
     expect(eventStore.events).toHaveLength(0);
     expect(eventStore.isComplete).toBe(false);
   });
+
+  it('keeps two events with the same kind and timestamp but different payloads', () => {
+    const at = '2026-09-22T10:00:05Z';
+    eventStore.add({ kind: 'checkpoint_created', timestamp: at, node_id: 'a' });
+    eventStore.add({ kind: 'checkpoint_created', timestamp: at, node_id: 'b' });
+
+    expect(eventStore.events.map((e) => (e as { node_id: string }).node_id)).toEqual(['a', 'b']);
+  });
+
+  it('gives each entry an increasing sequence number in arrival order', () => {
+    eventStore.add({ kind: 'checkpoint_created', timestamp: '2026-09-22T10:00:01Z', node_id: 'a' });
+    eventStore.add({ kind: 'checkpoint_created', timestamp: '2026-09-22T10:00:02Z', node_id: 'b' });
+
+    const [first, second] = eventStore.entries;
+    expect(second.seq).toBeGreaterThan(first.seq);
+    expect(eventStore.entries.map((e) => e.event)).toEqual(eventStore.events);
+  });
+
+  it('dedups again after clear() for events seen before it', () => {
+    const event = { kind: 'checkpoint_created' as const, timestamp: '2026-09-22T10:00:01Z', node_id: 'a' };
+    eventStore.add(event);
+    eventStore.clear();
+
+    eventStore.add(event);
+
+    expect(eventStore.entries).toHaveLength(1);
+    expect(eventStore.entries[0].seq).toBe(0);
+  });
 });
+

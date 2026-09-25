@@ -383,14 +383,14 @@ and the card shows `No pending questions.` Cancel in `finally`.
 - Update the ABOUTME lines.
 
 **Acceptance criteria:**
-- [ ] Sending the same event twice keeps one copy.
-- [ ] Two events with the same kind and timestamp but different payloads keep both.
-- [ ] `seq` increases, and `events` stays in arrival order, so the existing store tests pass
+- [x] Sending the same event twice keeps one copy.
+- [x] Two events with the same kind and timestamp but different payloads keep both.
+- [x] `seq` increases, and `events` stays in arrival order, so the existing store tests pass
       unchanged.
-- [ ] `clear()` empties the store and resets `isComplete`.
+- [x] `clear()` empties the store and resets `isComplete`.
 
 **Verification:**
-- [ ] `npm test -- --run tests/stores/events.test.ts`
+- [x] `npm test -- --run tests/stores/events.test.ts`
 
 **Dependencies:** None
 

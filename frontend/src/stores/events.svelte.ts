@@ -1,18 +1,30 @@
 // ABOUTME: Svelte 5 rune-based store for pipeline event log
-// ABOUTME: Accumulates SSE events, dedups by (kind, timestamp) to handle at-least-once delivery
+// ABOUTME: Accumulates SSE events with sequence keys, deduping identical events from replay
 
 import type { PipelineEvent } from '../lib/api/events';
 
+export interface EventEntry {
+  seq: number;
+  event: PipelineEvent;
+}
+
 function createEventStore() {
-  let events = $state<PipelineEvent[]>([]);
+  let entries = $state<EventEntry[]>([]);
   let isTerminal = $state(false);
-  // Track seen (kind, timestamp) pairs to dedupe at-least-once delivery
-  // from Task 6b's event replay + live tail boundary
+  let nextSeq = 0;
+  // Full JSON of every event seen, to dedupe at-least-once delivery from
+  // Task 6b's event replay + live tail boundary. Distinct events that share a
+  // kind and timestamp both stay.
   const seen = new Set<string>();
 
   return {
+    // Arrival order, for keyed rendering.
+    get entries() {
+      return entries;
+    },
+
     get events() {
-      return events;
+      return entries.map((entry) => entry.event);
     },
 
     get isComplete() {
@@ -20,14 +32,12 @@ function createEventStore() {
     },
 
     add(event: PipelineEvent) {
-      // Dedupe by (kind, timestamp) -- at-least-once delivery from SSE replay
-      // may send the same event twice at the subscribe→read boundary
-      const key = `${event.kind}:${event.timestamp}`;
+      const key = JSON.stringify(event);
       if (seen.has(key)) {
         return;
       }
-      seen.has(key) || seen.add(key);
-      events = [...events, event];
+      seen.add(key);
+      entries = [...entries, { seq: nextSeq++, event }];
 
       // Track terminal state
       if (event.kind === 'pipeline_completed' || event.kind === 'pipeline_aborted') {
@@ -36,8 +46,9 @@ function createEventStore() {
     },
 
     clear() {
-      events = [];
+      entries = [];
       isTerminal = false;
+      nextSeq = 0;
       seen.clear();
     },
 
