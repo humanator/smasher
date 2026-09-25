@@ -84,13 +84,14 @@ gap": `editor_api.rs:43-46,188-191` and `rendering.rs:2065-2069`.
 - [x] Full Vitest suite green against a server from this branch. Confirmed 2026-09-25 on
       `feat/spa-port-repairs` (main + test gating), against an isolated fake-claude server:
       241 passed, 1 skipped (critical path, now opt-in), 0 LLM calls.
-- [ ] Manual: in `make desktop-dev` or `serve`, zoom and pan, then drop a node. It lands under the
+- [x] Manual: in `make desktop-dev` or `serve`, zoom and pan, then drop a node. It lands under the
       cursor.
+      Checked by hand by Jobsworth, 2026-09-25: passed.
 - [x] Manual: save a workflow that has a `node [...]` block, then `git diff` the file. The block
       is kept. Done 2026-09-25 through the editor's API (`GET` graph, edit a label, `PUT` with
       `If-Match`): `node [color="red" model="x"]` and `edge [style=dashed]` kept, merged with
       the font defaults. A second save was byte-identical.
-- [ ] Review with Jobsworth before Phase 2
+- [x] Review with Jobsworth before Phase 2 (approved 2026-09-25: the work completed and merged)
 
 ---
 
@@ -183,7 +184,8 @@ return shape.
       holds a second `human_gate_showcase.dot`, so the name is listed twice. Re-run clean on
       2026-09-25 against an isolated data dir: 241 passed, 1 skipped.
 - [x] `npx playwright test e2e/node-editor.spec.ts` green (by hand, since CI doesn't run it, see #2)
-- [ ] Manual in the desktop app: the T4 conflict flow end to end
+- [x] Manual in the desktop app: the T4 conflict flow end to end. Checked by hand by Jobsworth,
+      2026-09-25: passed.
 - [x] `tasks/BACKLOG.md`: #3, #4, #5 marked done with the date. Remove the DEFERRED
       `workflow-editor` source notes that now no longer apply.
-- [ ] Review with Jobsworth before merge
+- [x] Review with Jobsworth before merge (approved 2026-09-25: merged in `dcbf4bb`)

@@ -83,7 +83,6 @@ See `todo-spa-shell.md` for acceptance criteria and verification.
 | Poll tests are slow (2s interval × several ticks) | Med | Tests use `waitFor` with bounded timeouts, and target a nonexistent run id so each tick fails right away. The test waits past 3 ticks and asserts a single toast. |
 | Toasts from one test leak into the next (the Toaster is module-global state) | Med | Call `toast.dismiss()` in `afterEach` in each new test file |
 | The Vitest server isn't on this branch, or the desktop app holds 21541 | Med | Follow the backlog's "Frontend test gotcha": quit the app, serve from this branch with the fake-claude env |
-| `tasks/todo-editor-batch.md` still has 8 unchecked boxes, though the batch is merged | None for this plan | Separate files, not touched. Flagged to Jobsworth to archive. |
 
 ## Open questions
 
