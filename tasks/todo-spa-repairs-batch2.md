@@ -353,19 +353,19 @@ and the card shows `No pending questions.` Cancel in `finally`.
   `\"`, `\\` and `\n`. When the pattern isn't there, it returns the raw string.
 
 **Acceptance criteria:**
-- [ ] There's one test per kind, 17 in all, each checking `icon`, `label`, `detail`, `tone`,
+- [x] There's one test per kind, 17 in all, each checking `icon`, `label`, `detail`, `tone`,
       `agent`, `faded` and `tinted` against the spec's table.
-- [ ] `formatDuration`: 0 → `0ms`, 999 → `999ms`, 1000 → `1.0s`, 59_999 → `60.0s`,
+- [x] `formatDuration`: 0 → `0ms`, 999 → `999ms`, 1000 → `1.0s`, 59_999 → `60.0s`,
       61_000 → `1m 1s`.
-- [ ] The edge label is shown when set and left out when absent. `is_error` switches the tone
+- [x] The edge label is shown when set and left out when absent. `is_error` switches the tone
       between green and red. A cost of 0 is hidden and a cost above 0 is shown.
-- [ ] `node_failed` with `Failure { error: "boom \"x\"", retryable: false, notes: None }` gives
+- [x] `node_failed` with `Failure { error: "boom \"x\"", retryable: false, notes: None }` gives
       `boom "x"`. A plain string passes through unchanged.
-- [ ] An unknown kind gives its raw kind, in a muted tone.
-- [ ] The line text still contains `Pipeline started` and `Pipeline completed`.
+- [x] An unknown kind gives its raw kind, in a muted tone.
+- [x] The line text still contains `Pipeline started` and `Pipeline completed`.
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/eventFormat.test.ts`
+- [x] `npm test -- --run tests/lib/eventFormat.test.ts`
 
 **Dependencies:** None
 
