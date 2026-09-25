@@ -4,7 +4,7 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
 
 ## Phase 1: #30
 
-- [ ] **Task 1: fix the `WorkflowCanvas.svelte:527` type error**
+- [x] **Task 1: fix the `WorkflowCanvas.svelte:527` type error**
   - Acceptance: that error is gone; no `@ts-ignore`/`as any`; editor behaviour unchanged.
   - Verify: `npm run check`; `npx vitest run tests/components/dashboard/WorkflowEditorPage.test.ts`; `npx playwright test node-editor.spec.ts`.
   - Files: `frontend/src/components/node-editor/WorkflowCanvas.svelte` (+ the type's source if it needs narrowing there).

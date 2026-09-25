@@ -4,11 +4,15 @@
 import { getApiUrl } from './client-config';
 import { errorFromResponse } from './errors';
 
+// AttrValue mirrors smasher-attractor's scalar attribute values -- what
+// editor_api.rs's attr_value_to_json emits for every node attr.
+export type AttrValue = string | number | boolean;
+
 export interface EditorNode {
   id: string;
   node_type: string;
   label?: string;
-  attrs?: Record<string, unknown>;
+  attrs?: Record<string, AttrValue>;
 }
 
 export interface EditorEdge {
