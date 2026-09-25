@@ -18,14 +18,14 @@ test that launches it with `runsApi.runWorkflow` directly, reads
 `questionsApi.listQuestions(runId)` and cancels the run afterwards.
 
 **Acceptance criteria:**
-- [ ] The catalog (`listWorkflows`) lists it
-- [ ] `runWorkflow(id, { variables: { brief: 'hello', colour: 'blue' }, model: 'm-1' })` gives a run whose pending `questions[0].question` is `Brief: hello | Model: m-1 | Colour: blue`
-- [ ] The file has no `box` nodes
-- [ ] The test cancels its run in `afterEach`
+- [x] The catalog (`listWorkflows`) lists it
+- [x] `runWorkflow(id, { variables: { brief: 'hello', colour: 'blue' }, model: 'm-1' })` gives a run whose pending `questions[0].question` is `Brief: hello | Model: m-1 | Colour: blue`
+- [x] The file has no `box` nodes
+- [x] The test cancels its run in `afterEach`
 
 **Verification:**
-- [ ] A new case in `tests/lib/api/runs.test.ts` fails first (no such workflow), then passes against the real server
-- [ ] `cargo test -p smasher-attractor --test example_lint` passes. `all_examples_pass_lint` reads every `examples/*.dot`, so it covers the new file.
+- [x] A new case in `tests/lib/api/runs.test.ts` fails first (no such workflow), then passes against the real server
+- [x] `cargo test -p smasher-attractor --test example_lint` passes. `all_examples_pass_lint` reads every `examples/*.dot`, so it covers the new file.
 
 **Dependencies:** None
 

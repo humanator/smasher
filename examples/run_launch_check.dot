@@ -1,0 +1,23 @@
+// ABOUTME: Gate-only fixture for the run dialog: echoes {{brief}}, {{model}} and {{colour}} into a question
+// ABOUTME: Runs park at the gate and never reach an LLM node, so tests can launch it for free
+
+digraph RunLaunchCheck {
+  graph [
+    goal="Fixture for checking the run-launch dialog: the gate's question shows the brief, model and colour variable the run was launched with. It has no LLM nodes, so launching it spends nothing.",
+    rankdir=LR
+  ];
+
+  Start [shape=Mdiamond, label="Start"];
+  Exit [shape=Msquare, label="Exit"];
+
+  // The label is the question text only while no question or prompt
+  // attribute is set, so leave both off.
+  EchoGate [
+    shape=hexagon,
+    label="Brief: {{brief}} | Model: {{model}} | Colour: {{colour}}",
+    mode="freeform"
+  ];
+
+  Start -> EchoGate;
+  EchoGate -> Exit;
+}

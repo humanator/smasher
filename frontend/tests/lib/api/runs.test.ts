@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the runs REST client
 // ABOUTME: Tests call the REAL smasher-web-api instance, not mocked fetch
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as runs from '../../../src/lib/api/runs';
 import * as workflows from '../../../src/lib/api/workflows';
 import * as questions from '../../../src/lib/api/questions';
@@ -159,6 +159,51 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
     }
   });
 });
+
+describe('runs API client - run_launch_check fixture', () => {
+  const launched: string[] = [];
+
+  beforeAll(() => {
+    setApiBaseUrl(API_URL);
+  });
+
+  // The fixture parks at its gate, so cancel every run this block starts.
+  afterEach(async () => {
+    await Promise.all(launched.splice(0).map((id) => runs.cancelRun(id).catch(() => {})));
+  });
+
+  it('is gate-only, with no box nodes that could reach an LLM', () => {
+    const dot = readFileSync(join(process.cwd(), '..', 'examples', 'run_launch_check.dot'), 'utf-8');
+    expect(dot).not.toMatch(/shape\s*=\s*"?(box|rectangle)\b/);
+  });
+
+  it('echoes the brief, model and a variable into its gate question', async () => {
+    const { workflows: available } = await workflows.listWorkflows();
+    const workflow = available.find((w) => w.name === 'run_launch_check.dot');
+    expect(workflow).toBeTruthy();
+
+    const { run_id } = await runs.runWorkflow(workflow!.id, {
+      variables: { brief: 'hello', colour: 'blue' },
+      model: 'm-1',
+    });
+    launched.push(run_id);
+
+    await waitForQuestion(run_id, 'Brief: hello | Model: m-1 | Colour: blue');
+  });
+});
+
+async function waitForQuestion(runId: string, expected: string): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    const { questions: pending } = await questions.listQuestions(runId);
+    if (pending.length > 0) {
+      expect(pending[0].kind).toBe('free_form');
+      expect(pending[0].question).toBe(expected);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect.fail(`run ${runId} never asked a question`);
+}
 
 describe('runs and questions API clients - server error messages', () => {
   beforeAll(() => {
