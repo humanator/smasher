@@ -223,4 +223,4 @@ removed, in `finally`. Then mark the module done in the capability map and the b
 ## Checkpoint D: Complete
 - [ ] Every Success Criteria box in the spec is ticked
 - [ ] `make ci` green. The diff outside `frontend/` is only in `tasks/`.
-- [ ] Review with Jobsworth
+- [x] Review with Jobsworth (approved 2026-09-25)
