@@ -109,7 +109,7 @@ See `todo-run-launch.md` for acceptance criteria and verification.
 
 ### Phase 1: Building blocks
 - [ ] Task 1: Fixture `run_launch_check.dot`, proven through the real API
-- [ ] Task 2: `lib/runRequest.ts` (`buildRunRequest`)
+- [x] Task 2: `lib/runRequest.ts` (`buildRunRequest`)
 - [ ] Task 3: `lib/runDrafts.ts`
 
 ### Checkpoint A

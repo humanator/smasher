@@ -40,17 +40,17 @@ spec's Code Style section, with private `parseVariables` and `parseNodeOverrides
 `fetch` and has no Svelte imports.
 
 **Acceptance criteria:**
-- [ ] Every case in the spec's `runRequest.test.ts` list passes, including:
+- [x] Every case in the spec's `runRequest.test.ts` list passes, including:
   - all fields blank gives `{ variables: {} }` with no `model` or `node_overrides` keys;
   - `a=b=c` gives `{ a: 'b=c' }`;
   - `colour blue` on line 2 gives `Line 2: expected key=value`;
   - Brief beats a `brief=` line;
   - `[]`, `"x"`, `{"a": "m"}` and `{"a": {"model": 1}}` each give the shape error;
   - bad JSON gives `Invalid JSON: …`
-- [ ] Both errors are returned together when both fields are bad
+- [x] Both errors are returned together when both fields are bad
 
 **Verification:**
-- [ ] `npm test -- --run tests/lib/runRequest.test.ts`, written first and seen failing
+- [x] `npm test -- --run tests/lib/runRequest.test.ts`, written first and seen failing
 
 **Dependencies:** None
 
