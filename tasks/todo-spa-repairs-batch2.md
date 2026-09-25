@@ -270,15 +270,15 @@ the token counter.
 - The text clears only after the answer succeeds.
 
 **Acceptance criteria:**
-- [ ] Submit is disabled while the input is empty or whitespace.
-- [ ] Typing and clicking Submit answers a real `free_form` question, and it leaves pending.
-- [ ] Enter also answers it.
-- [ ] A rejected answer keeps the typed text, shows one toast, and re-enables Submit. The existing
+- [x] Submit is disabled while the input is empty or whitespace.
+- [x] Typing and clicking Submit answers a real `free_form` question, and it leaves pending.
+- [x] Enter also answers it.
+- [x] A rejected answer keeps the typed text, shows one toast, and re-enables Submit. The existing
       rejection test is extended to check all three.
-- [ ] The input and Submit are disabled while the answer is in flight.
+- [x] The input and Submit are disabled while the answer is in flight.
 
 **Verification:**
-- [ ] `npm test -- --run tests/components/dashboard/QuestionCard.test.ts`
+- [x] `npm test -- --run tests/components/dashboard/QuestionCard.test.ts`
 
 **Dependencies:** Task 8
 

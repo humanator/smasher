@@ -21,6 +21,24 @@
     approval: 'Approval',
   };
 
+  // Per-card UI state, keyed by question id. Cards read through card(), which
+  // falls back to EMPTY, so rendering never has to create an entry.
+  interface CardState {
+    text: string;
+    choice: string | null;
+    submitting: boolean;
+  }
+  const EMPTY: CardState = { text: '', choice: null, submitting: false };
+  let cards = $state<Record<string, CardState>>({});
+
+  function card(id: string): CardState {
+    return cards[id] ?? EMPTY;
+  }
+
+  function update(id: string, patch: Partial<CardState>) {
+    cards[id] = { ...card(id), ...patch };
+  }
+
   // Set by each successful fetch; the empty state waits for the first one and
   // stays hidden while a gallery gate card covers the pending question.
   let loaded = $state(false);
@@ -31,6 +49,7 @@
   $effect(() => {
     const id = runId;
     questionStore.reset();
+    cards = {};
     loaded = false;
     galleryGateShowing = false;
     const pollFailure = pollFailureNotifier(`questions-poll:${id}`, 'Failed to load questions');
@@ -59,14 +78,19 @@
   });
 
   async function handleAnswer(questionId: string, answer: string) {
+    if (!answer.trim() || card(questionId).submitting) return;
+    update(questionId, { submitting: true });
     try {
       const result = await questionsApi.answerQuestion(runId, questionId, answer);
       // The server reports some rejections (e.g. an unknown question) as a 200.
       if (!result.success) throw new Error(result.error ?? '');
       questionStore.answer(questionId, answer);
+      update(questionId, { text: '', choice: null });
     } catch (err) {
-      // The question stays pending so it can be answered again.
+      // The question stays pending, with its text, so it can be answered again.
       notifyError(err, 'Failed to answer question');
+    } finally {
+      update(questionId, { submitting: false });
     }
   }
 </script>
@@ -84,19 +108,27 @@
           <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
 
           {#if question.kind === 'free_form'}
-            <div class="answer-form">
+            <!-- A form, so Enter in the input submits too. -->
+            <form
+              class="answer-form flex gap-2"
+              onsubmit={(e) => {
+                e.preventDefault();
+                handleAnswer(question.id, card(question.id).text);
+              }}
+            >
               <Input
                 type="text"
                 placeholder="Enter your answer"
-                onkeydown={(e) => {
-                  if (e.key === 'Enter') {
-                    const target = e.target as HTMLInputElement;
-                    handleAnswer(question.id, target.value);
-                    target.value = '';
-                  }
-                }}
+                bind:value={() => card(question.id).text, (text) => update(question.id, { text })}
+                disabled={card(question.id).submitting}
               />
-            </div>
+              <Button
+                type="submit"
+                disabled={!card(question.id).text.trim() || card(question.id).submitting}
+              >
+                Submit
+              </Button>
+            </form>
           {:else if question.kind === 'approval'}
             <div class="button-group flex flex-wrap gap-2">
               <!-- Yes/No colors carry semantic meaning (approve/reject). -->

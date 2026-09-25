@@ -86,6 +86,21 @@ function countQuestionFetches(runId: string): { done: () => number; restore: () 
   return { done: () => n, restore: () => (globalThis.fetch = realFetch) };
 }
 
+// Holds each answer POST for one run until release() is called, then lets it
+// through to the real server unchanged.
+function holdAnswers(runId: string): { release: () => void; restore: () => void } {
+  const realFetch = globalThis.fetch;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes(`/runs/${runId}/questions/`) && String(input).endsWith('/answer')) {
+      await gate;
+    }
+    return realFetch(input, init);
+  }) as typeof fetch;
+  return { release, restore: () => (globalThis.fetch = realFetch) };
+}
+
 describe('QuestionCard', () => {
   beforeEach(() => {
     questionStore.clear();
@@ -142,6 +157,57 @@ describe('QuestionCard', () => {
       fetches.restore();
     }
   }, 15000);
+
+  it('disables Submit while the free-text answer is blank', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(ANONYMOUS_GATE);
+
+    render(QuestionCard, { props: { runId } });
+    const input = await screen.findByPlaceholderText('Enter your answer');
+    const submit = screen.getByRole('button', { name: 'Submit' });
+
+    expect(submit).toBeDisabled();
+    await user.type(input, '   ');
+    expect(submit).toBeDisabled();
+    await user.type(input, 'x');
+    expect(submit).toBeEnabled();
+  });
+
+  it('answers a real free-text question with the Submit button', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(ANONYMOUS_GATE);
+
+    render(QuestionCard, { props: { runId } });
+    await user.type(await screen.findByPlaceholderText('Enter your answer'), 'by button');
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    await waitFor(() => expect(screen.getByText('Answer: by button')).toBeTruthy());
+    expect(screen.queryByPlaceholderText('Enter your answer')).toBeNull();
+    await waitForRunStatus(runId, 'Completed');
+  });
+
+  it('disables the input and Submit while the answer is in flight', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(ANONYMOUS_GATE);
+    const answers = holdAnswers(runId);
+
+    try {
+      render(QuestionCard, { props: { runId } });
+      const input = await screen.findByPlaceholderText('Enter your answer');
+      await user.type(input, 'held');
+      const submit = screen.getByRole('button', { name: 'Submit' });
+      await user.click(submit);
+
+      await waitFor(() => expect(submit).toBeDisabled());
+      expect(input).toBeDisabled();
+
+      answers.release();
+      await waitFor(() => expect(screen.getByText('Answer: held')).toBeTruthy());
+    } finally {
+      answers.release();
+      answers.restore();
+    }
+  });
 
   it("drops the first run's answered questions when the run changes", async () => {
     const user = userEvent.setup();
@@ -285,6 +351,30 @@ describe('QuestionCard', () => {
       expect(screen.getByText('Stale question?')).toBeTruthy();
       expect(screen.queryByText('Answer: yes')).toBeNull();
       expect(questionStore.answered).toHaveLength(0);
+    });
+
+    it('keeps the typed text and re-enables Submit when a free-text answer is rejected', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(ANONYMOUS_GATE);
+      await waitForRunStatus(runId, 'Running');
+      render(Toaster);
+      render(QuestionCard, { props: { runId } });
+      // Let the first fetch land, so it can't replace the stale question below.
+      await screen.findByText('x');
+      // A question the real run doesn't have, so the server rejects the answer.
+      questionStore.setPending([
+        { id: 'no-such-q', question: 'Stale text?', choices: [], kind: 'free_form' },
+      ]);
+
+      await screen.findByText('Stale text?');
+      const input = screen.getByPlaceholderText('Enter your answer');
+      await user.type(input, 'keep me');
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+      expect(await screen.findByText('question not found: no-such-q')).toBeTruthy();
+      await waitFor(() => expect(toasts()).toHaveLength(1));
+      expect(input).toHaveValue('keep me');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled());
     });
 
     it('toasts a failing poll once, not on every tick', async () => {
