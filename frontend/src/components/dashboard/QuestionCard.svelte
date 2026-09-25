@@ -3,7 +3,10 @@
   // ABOUTME: Critical for Phase 3 E2E critical path
 
   import { questionStore } from '../../stores/questions.svelte';
+  import { eventStore } from '../../stores/events.svelte';
   import * as questionsApi from '../../lib/api/questions';
+  import * as runsApi from '../../lib/api/runs';
+  import { buildExchanges } from '../../lib/exchanges';
   import { notifyError, pollFailureNotifier } from '$lib/notify';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -44,6 +47,19 @@
   let loaded = $state(false);
   let galleryGateShowing = $state(false);
 
+  // Answered Questions comes from the run's events (filled by the run page's
+  // EventLog), so it survives a reload. Gallery picks are left out: Decision
+  // History shows them. Nothing shows until the run's gallery gates are known,
+  // so a gallery pick never flashes up first.
+  let galleryGates = $state<string[] | null>(null);
+  const answered = $derived(
+    galleryGates === null
+      ? []
+      : buildExchanges(eventStore.events).filter(
+          (exchange) => exchange.answer !== null && !galleryGates!.includes(exchange.nodeId)
+        )
+  );
+
   // Per run: start from an empty store, fetch now, then every 2s. The store is
   // a singleton, so it's reset again on cleanup so answers don't leak to the next run.
   // Derived, so setting the same runId again doesn't reset the card (a derived
@@ -56,6 +72,7 @@
     cards = {};
     loaded = false;
     galleryGateShowing = false;
+    galleryGates = null;
     const pollFailure = pollFailureNotifier(`questions-poll:${id}`, 'Failed to load questions');
     let stopped = false;
 
@@ -71,6 +88,12 @@
         if (!stopped) pollFailure.fail(err);
       }
     }
+
+    // The poll reports a missing run, so a failure here just hides nothing.
+    runsApi
+      .getRun(id)
+      .then((run) => !stopped && (galleryGates = run.gallery_gates))
+      .catch(() => !stopped && (galleryGates = []));
 
     poll();
     const pollInterval = setInterval(poll, 2000);
@@ -88,7 +111,7 @@
       const result = await questionsApi.answerQuestion(runId, questionId, answer);
       // The server reports some rejections (e.g. an unknown question) as a 200.
       if (!result.success) throw new Error(result.error ?? '');
-      questionStore.answer(questionId, answer);
+      questionStore.answer(questionId);
       update(questionId, { text: '', choice: null });
     } catch (err) {
       // The question stays pending, with its text, so it can be answered again.
@@ -99,7 +122,7 @@
   }
 </script>
 
-{#if questionStore.pending.length > 0 || questionStore.answered.length > 0 || (loaded && !galleryGateShowing)}
+{#if questionStore.pending.length > 0 || answered.length > 0 || (loaded && !galleryGateShowing)}
   <div class="questions rounded-lg border border-border bg-card p-4 text-card-foreground">
     {#if questionStore.pending.length > 0}
       <h3 class="mb-4 text-base font-semibold text-foreground">Pending Questions</h3>
@@ -195,12 +218,12 @@
       <p class="p-4 text-center text-muted-foreground">No pending questions.</p>
     {/if}
 
-    {#if questionStore.answered.length > 0}
+    {#if answered.length > 0}
       <h3 class="mb-4 text-base font-semibold text-foreground">Answered Questions</h3>
-      {#each questionStore.answered as question (question.id)}
+      {#each answered as exchange, index (index)}
         <div class="answered-card mb-4 rounded border-l-4 border-green-600 bg-green-50 p-4">
-          <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
-          <p class="answer-text mt-2 italic text-green-700">Answer: {question.answer}</p>
+          <p class="question-text mb-4 font-medium text-foreground">{exchange.question}</p>
+          <p class="answer-text mt-2 italic text-green-700">Answer: {exchange.answer}</p>
         </div>
       {/each}
     {/if}

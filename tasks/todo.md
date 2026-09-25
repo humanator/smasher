@@ -157,16 +157,16 @@ and `Answer: …`, oldest first. The panel's show condition uses this list in pl
 `QuestionCard` on a real run, so the events come over real SSE.
 
 **Acceptance criteria:**
-- [ ] On a real `QUESTION_KINDS` run, each answer appears under Answered Questions once its
+- [x] On a real `QUESTION_KINDS` run, each answer appears under Answered Questions once its
       `human_response_received` arrives, oldest first
-- [ ] After unmounting and remounting both components, the same answered list appears (standing
+- [x] After unmounting and remounting both components, the same answered list appears (standing
       in for a reload)
-- [ ] On the gallery-gate run (`GALLERY_GATE` in `QuestionCard.test.ts`), the gallery answer does
+- [x] On the gallery-gate run (`GALLERY_GATE` in `QuestionCard.test.ts`), the gallery answer does
       **not** appear under Answered Questions; existing same-run and run-change tests still pass
 
 **Verification:**
-- [ ] `cd frontend && npx vitest run tests/components/dashboard/QuestionCard.test.ts tests/stores/questions.test.ts`
-- [ ] `npm run check && npm run lint`
+- [x] `cd frontend && npx vitest run tests/components/dashboard/QuestionCard.test.ts tests/stores/questions.test.ts`
+- [x] `npm run check && npm run lint`
 
 **Dependencies:** Tasks 2, 3, 4
 

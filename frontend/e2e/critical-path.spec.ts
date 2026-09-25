@@ -68,8 +68,9 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
       await freeFormInput.fill(answers[gatesAnswered]);
       await freeFormInput.press('Enter');
       gatesAnswered++;
-      // Give the poll loop (2s interval in QuestionCard) time to pick up the answer
-      // and move the question from pending to answered before checking again.
+      // Give the poll loop (2s interval in QuestionCard) time to drop the answered
+      // question from pending (its answer comes back through the run's events)
+      // before checking again.
       await page.waitForTimeout(2500);
       continue;
     }

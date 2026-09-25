@@ -1,5 +1,5 @@
 // ABOUTME: Svelte 5 rune-based store for pending human-gate questions
-// ABOUTME: Tracks unanswered and answered questions, updated via polling
+// ABOUTME: Tracks unanswered questions, updated via polling; answers come from run events
 
 export interface Question {
   id: string;
@@ -9,50 +9,26 @@ export interface Question {
   node_id?: string;
 }
 
-export interface AnsweredQuestion extends Question {
-  answer: string;
-  answeredAt: string;
-}
-
 function createQuestionStore() {
   let pending = $state<Question[]>([]);
-  let answered = $state<AnsweredQuestion[]>([]);
 
   return {
     get pending() {
       return pending;
     },
 
-    get answered() {
-      return answered;
-    },
-
-    get all() {
-      return [...pending, ...answered];
-    },
-
     setPending(questions: Question[]) {
       pending = questions;
     },
 
-    answer(questionId: string, answer: string) {
-      const q = pending.find((q) => q.id === questionId);
-      if (!q) return;
-
+    // Drops the question straight away; its answered entry arrives with the
+    // run's human_response_received event.
+    answer(questionId: string) {
       pending = pending.filter((q) => q.id !== questionId);
-      answered = [
-        ...answered,
-        {
-          ...q,
-          answer,
-          answeredAt: new Date().toISOString(),
-        },
-      ];
     },
 
     clear() {
       pending = [];
-      answered = [];
     },
 
     reset() {

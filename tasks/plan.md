@@ -73,7 +73,7 @@ T1, T3, T4 and T5 are independent. T4 and T5 can be built in parallel with Phase
 
 - [x] T4: `buildExchanges` pure function (S)
 - [x] T5: `renderMarkdown` with `marked` + `DOMPurify`, and `.markdown` styles (S)
-- [ ] T6: Answered Questions comes from events, without gallery gates, and survives a remount (M)
+- [x] T6: Answered Questions comes from events, without gallery gates, and survives a remount (M)
 - [ ] T7: Agent replies render as markdown under their answer (S)
 
 ### Checkpoint B: client
