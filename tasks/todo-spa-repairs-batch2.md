@@ -605,10 +605,10 @@ renders:
 **Scope:** S
 
 ## Checkpoint D: complete
-- [ ] Every spec success criterion is ticked in `SPEC-spa-repairs-batch2.md`.
-- [ ] The full Vitest suite passes with no new warnings, and `check` and `lint` add no new errors.
-- [ ] Every non-LLM e2e spec passes, which excludes `critical-path.spec.ts`.
-- [ ] `make ci` is green.
-- [ ] The map marks all seven modules done. `BACKLOG.md` #21 is updated to done, with the
+- [x] Every spec success criterion is ticked in `SPEC-spa-repairs-batch2.md`.
+- [x] The full Vitest suite passes with no new warnings, and `check` and `lint` add no new errors.
+- [x] Every non-LLM e2e spec passes, which excludes `critical-path.spec.ts`.
+- [x] `make ci` is green.
+- [x] The map marks all seven modules done. `BACKLOG.md` #21 is updated to done, with the
       deliberate cuts noted.
 - [ ] Review with Jobsworth.

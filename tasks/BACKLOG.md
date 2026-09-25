@@ -18,8 +18,10 @@ provider merged on 2026-09-25 with a known limitation (#23).
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
-added mid-session and ran alongside. It's now merged (#23). Next up: the SPA port repairs, #9 (candidate thumbnails and
-lightbox) + #21 (the rest of what the port dropped), as one frontend batch.
+added mid-session and ran alongside. It's now merged (#23). The SPA port repairs,
+#9 (candidate thumbnails and lightbox) + #21 (the rest of what the port
+dropped), are done on `feat/spa-port-repairs` (2026-09-25), awaiting review and
+merge.
 
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
@@ -137,7 +139,17 @@ only on request.
       providers' models (including Claude CLI), not free text.
     - Choosing a provider also sets a valid model for it.
 
-21. **Restore what the HTMX → SPA port dropped.** *Found 2026-09-25 by comparing
+21. ~~**Restore what the HTMX → SPA port dropped.**~~ **Done 2026-09-25** on
+    `feat/spa-port-repairs` (seven modules: `spa-shell`, `candidate-preview`,
+    `run-launch`, `run-summary`, `question-card`, `event-log`, `workflow-detail`;
+    see `capability-map-spa-repairs.md`). Deliberately left out, per the batch-2
+    spec: SSE reconnect after `onerror`; an event-log cap; server emits for
+    `human_prompt_issued`, `human_response_received` and `context_updated`;
+    per-id workflow and filtered-run endpoints (the workflow page filters
+    `listWorkflows()`/`listRuns()` in the browser); embedding the live run view
+    on the workflow page (it links instead); merging the question and
+    gallery-gate polls. Follow-ups are #24–#27. The original findings:
+    *Found 2026-09-25 by comparing
     the templates deleted in `0e5647c` (read them with `git show
     0e5647c^:crates/smasher-web/templates/<file>`) against the SPA.* The SPA plan
     only required parity for submitting runs, live events and questions

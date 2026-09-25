@@ -668,20 +668,20 @@ That's formatter input, not a mocked server. It's flagged here so Jobsworth can 
 
 ## Success Criteria
 
-- [ ] A failed run shows Completed, Working Directory and its Error. A running run shows none of
-      them.
-- [ ] The graph re-renders every 3s while running and stops after the terminal fetch. It shows
+- [x] A failed run shows Completed, Working Directory and its Error. A running run shows no
+      Completed or Error. (Working Directory is set at launch, so it shows while running.)
+- [x] The graph re-renders every 3s while running and stops after the terminal fetch. It shows
       its errors inline and scales to the width.
-- [ ] The token counter shows a total and polls every 3s while active.
-- [ ] Runs with no graph name read `unnamed`.
-- [ ] Question cards show their kind and id. Free text has Submit. Multiple choice uses radios and
+- [x] The token counter shows a total and polls every 3s while active.
+- [x] Runs with no graph name read `unnamed`.
+- [x] Question cards show their kind and id. Free text has Submit. Multiple choice uses radios and
       Submit. The first fetch runs straight away. An empty list says `No pending questions.`
-- [ ] Answered questions and events don't carry over to another run.
-- [ ] The event log is newest-first, colour-coded, indented and faded as in the table, and follows
+- [x] Answered questions and events don't carry over to another run.
+- [x] The event log is newest-first, colour-coded, indented and faded as in the table, and follows
       new events. All 17 kinds have a readable line.
-- [ ] `/workflows/{id}` shows the name, source, Edit and Run, the latest or active run card, and
+- [x] `/workflows/{id}` shows the name, source, Edit and Run, the latest or active run card, and
       the filtered history. Unknown ids say so, and the catalog links to the page.
-- [ ] New unit, integration and Playwright tests pass. The full Vitest suite passes. `check`,
+- [x] New unit, integration and Playwright tests pass. The full Vitest suite passes. `check`,
       `lint` and `make ci` add no new errors or warnings.
 
 ## Decisions (resolved 2026-09-25)
