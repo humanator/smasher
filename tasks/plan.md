@@ -74,7 +74,7 @@ both.
 - [x] 7. Node editor `ToolForm`: built-in tool or shell command (legacy
       editor-ui: comments only)
 - [x] 8. Docs
-- [ ] 9. Backlog updates
+- [x] 9. Backlog updates
 
 ### Checkpoint C: Complete
 - [ ] All spec success criteria met, frontend suites green against a

@@ -69,17 +69,16 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     and todo are in `archive/*-claude-cli-provider.md`. See
     `docs/config-reference.md` for setup.
 
-    **Known limitation, the fix to do first.** Tool nodes that don't name a
-    built-in tool (such as `tool_command`-only nodes: 34 across 9 examples,
-    including `A11yCheck` in the product design factory) and manager nodes fail
+    **Known limitation, manager nodes only.** Manager (`house`) nodes fail
     under claude-cli with "the claude-cli provider answers single calls and can't
-    run tools". The spec assumed `LlmToolBackend` and `LlmManagerBackend` were
-    single-turn and tool-less, but both run agent sessions with tools
+    run tools". The spec assumed `LlmManagerBackend` was single-turn and
+    tool-less, but it runs an agent session with tools
     (`smasher-web/src/backend.rs`). Fix: when the provider is claude-cli, route
     those sessions through `ClaudeCliBackend` as a `claude -p` agent, as codergen
-    is. Workaround until then: `provider="<other>"` on the node. For tool nodes
-    the real fix is #22 (decided: tool nodes run commands directly and never
-    call an LLM), so this routing is only needed for manager nodes.
+    is, once #35 has settled what manager nodes are for. Workaround until then:
+    `provider="<other>"` on the node. Tool nodes no longer have this problem:
+    they run their built-in `tool` or `tool_command` directly and never call an
+    LLM (the #22 batch, `archive/SPEC-tool-command.md`).
 
     **Checkpoints not run before merge** (Jobsworth's call):
     - the `#[ignore]` real-CLI tests, including the `curl` denial;
@@ -113,7 +112,8 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     Second run (`01m3awkpeahghg0v6d2pshnzyb`, 2026-09-25):
     - Candidate and critique steps passed. `critic-report.json` described the
       real screenshot, lint passed, and `Synthesis` said `proceed`.
-    - `A11yCheck` failed, which uncovered the limitation above.
+    - `A11yCheck` failed, which uncovered the tool-node half of the limitation
+      above (since fixed by #22).
 
 29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
     *Seen 2026-09-25 while building question replies.* In
@@ -156,6 +156,29 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     appeared. It passed 10/10 alone and wasn't seen on `main` in 5 runs.
     Suspect: `answer_question` takes `state.runs.read()` on tokio's
     write-preferring `RwLock`, so a queued writer (a run finishing) blocks it.
+35. **Decide what manager (`house`) nodes are for.** *Split out of #22,
+    2026-09-26.* The docs say they're human approval gates (README's shape
+    list, quickstart), but `ManagerHandler` runs one LLM agent session through
+    `LlmManagerBackend`, and only `old-examples/` use them. Decide which they
+    are, then make the code and those docs agree. If they stay LLM nodes, fix
+    their claude-cli routing (#23's remaining known limitation).
+36. **Fix the `_tool_fetch.status` condition example in
+    `docs/config-reference.md`.** *Found 2026-09-26 while building #22.* It can
+    never match: `_tool_<id>` holds a JSON object, and conditions compare flat
+    string values, so they can't read a nested field. Replace the example (for
+    instance with `outcome=success` or `tool.exit_code=0`), or teach conditions
+    to read nested values.
+37. **Fix the node shapes in `smasher-conformance/src/convert.rs`.** *Found
+    2026-09-26 while building #22.* It maps four node types to the wrong shapes,
+    and its test table repeats the mistakes:
+    - Tool→`component` and Parallel→`parallelogram`, the wrong way round;
+    - FanIn→`trapezium` (should be `tripleoctagon`);
+    - Generic→`ellipse`, which parses back as Interviewer.
+39. **Delete the legacy `crates/smasher-web/editor-ui/`.** *Decided
+    2026-09-26.* The `frontend/` SPA supersedes it. Remove it and its
+    `/editor-ui` mount. Its ToolForm still offers a "Custom…" tool name, which
+    now always fails, and `WorkflowCanvas.svelte` still mentions the deleted
+    `routes/pages.rs`.
 
 ## P2: Robustness (can lose data or grow without limit)
 
@@ -187,34 +210,13 @@ decides the `candidate_id` convention, and the lint override lives in the same
     a per-candidate option to skip saving the bundle.
 15. **Reuse the editor's saved layout in the run-view SVG** instead of laying the
     graph out again with Graphviz each time.
-22. **Make `tool_command` actually run its shell command.** *Raised 2026-09-25.*
-    Tool nodes in 9 examples (34 nodes) set `tool_command="..."`, but nothing in
-    the engine reads that attribute. A node with no `tool` attribute falls back to
-    its label as the tool name, and `LlmToolBackend` (`smasher-web/src/backend.rs`)
-    starts an LLM agent session with file and shell tools, asking it to
-    "execute" the tool. On API providers the agent improvises (often by running
-    the command), so these nodes seem to work, but the result is slow, costs
-    tokens, and can vary between runs. Under claude-cli they fail outright (see
-    #23). Attractor intends tool nodes to run `tool_command` directly.
-    Doing that makes them deterministic and free.
-
-    **Decided by Jobsworth 2026-09-26:** tool nodes and LLM nodes are kept
-    strictly separate, because that's easier for users to understand.
-    - A tool node runs its built-in `tool` or its `tool_command` directly, on
-      every provider. It never calls an LLM.
-    - There is no LLM fallback. A tool node with neither a `tool` nor a
-      `tool_command` is an error. `smasher lint` should flag it, and at run
-      time it should fail. `LlmToolBackend` goes. In the examples, only
-      `old-examples/parallel-fanout.dot`'s `fan_out` has neither.
-    - A user who wants an LLM fallback builds it in the graph: a codergen node
-      reached by conditional branching on the tool node's outcome.
-    - Running DOT-authored shell commands is fine while workflows are local.
-      #16 (serving remotely) must deal with it.
-
-    Still to settle in the spec: the command's timeout, working directory and
-    environment, and how stdout, stderr and the exit code map into context and
-    node success. Doing this removes #23's known limitation for tool nodes.
-    Manager nodes still need #23's `ClaudeCliBackend` routing.
+38. **Get the upstream-ported examples' scripts working.** *Split out of #22,
+    2026-09-26.* Tool nodes now run their `tool_command` as written. Several
+    examples ported from upstream Attractor (`semport`, `megaplan`,
+    `sprint_exec`, `vulnerability_analyzer`) assume its `.ai/attractor-runs/...`
+    layout or shell variables smasher doesn't set, so their commands fail when
+    run for real. Rewrite them against smasher's run layout (`SMASHER_RUN_DIR`,
+    `nodes/<id>/`, `SMASHER_CTX_<KEY>`).
 
 ## P4: Distribution and remote access (bigger, strategic)
 
@@ -223,7 +225,9 @@ comes up.
 
 16. **Serve the app remotely over HTTP.** This was the "(later)" goal in the
     desktop capability map. It needs an auth layer first, because the API has none
-    and only listens on `127.0.0.1`. Scope it with a spec before building.
+    and only listens on `127.0.0.1`. Scope it with a spec before building. Tool
+    nodes run DOT-authored shell commands (`tool_command`) on the server, which
+    is fine while workflows are local; remote serving must deal with that.
 17. **Ship a `.dmg` or portable desktop bundle.** The current `.app` only works on
     this machine because it loads the SPA, examples and design kit from the source
     checkout. These would need bundling as resources first.

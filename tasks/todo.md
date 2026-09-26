@@ -408,10 +408,10 @@ After merge, move the spec, plan and todo to `tasks/archive/` as
 `SPEC-tool-command.md`, `plan-tool-command.md` and `todo-tool-command.md`.
 
 **Acceptance criteria:**
-- [ ] BACKLOG matches the spec's "Backlog updates when done" section.
+- [x] BACKLOG matches the spec's "Backlog updates when done" section.
 
 **Verification:**
-- [ ] Read-through
+- [x] Read-through
 
 **Dependencies:** Tasks 5–8
 
