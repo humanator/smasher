@@ -10,7 +10,9 @@ use smasher_agent::environment::kill_process_group;
 use smasher_agent::environment::{DEFAULT_ENV_FILTER, env_key_is_filtered};
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
-use tokio_util::sync::CancellationToken;
+/// Re-exported because it's part of `CommandConfig`, so callers without a
+/// direct `tokio-util` dependency can build one.
+pub use tokio_util::sync::CancellationToken;
 
 use crate::state::Context;
 

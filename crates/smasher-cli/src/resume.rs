@@ -19,6 +19,8 @@ use smasher_attractor::handler::{
     CodergenBackend, CodergenHandler, HandlerError, default_registry,
 };
 use smasher_attractor::state::{Checkpoint, Context, Outcome};
+use smasher_attractor::tool_command::{CancellationToken, CommandConfig};
+use smasher_attractor::tool_handler::ToolHandler;
 
 use crate::error::CliError;
 
@@ -249,6 +251,14 @@ pub async fn run(args: ResumeArgs) -> Result<(), CliError> {
         }
     }
 
+    let run_root = PathBuf::from(&working_dir);
+    let tool_backend = crate::run::build_tool_backend(
+        Some(&client),
+        &args.model,
+        &working_dir,
+        run_root.join("artifacts"),
+    );
+    let cancellation = CancellationToken::new();
     let backend = Arc::new(AgentCodergenBackend::new(
         Arc::clone(&client),
         args.model.clone(),
@@ -256,10 +266,18 @@ pub async fn run(args: ResumeArgs) -> Result<(), CliError> {
     ));
     let mut registry = default_registry();
     registry.register(Arc::new(CodergenHandler::new(backend)));
+    registry.register(Arc::new(ToolHandler::new(tool_backend).with_commands(
+        CommandConfig {
+            working_dir: run_root.clone(),
+            run_dir: run_root,
+            cancel: cancellation.clone(),
+        },
+    )));
 
     let config = EngineConfig {
         max_steps: args.max_steps,
         enable_checkpointing: false,
+        cancellation_token: Some(cancellation),
         ..EngineConfig::default()
     };
 

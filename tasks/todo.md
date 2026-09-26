@@ -259,19 +259,19 @@ Add these, following `system_lint_e2e.rs` (`CARGO_BIN_EXE_smasher`,
   next node is a tool node.
 
 **Acceptance criteria:**
-- [ ] The fixture completes on the expected branch with no API keys set.
-- [ ] The parallel fixture's tool node runs, and `nodes/<id>/stdout.txt` exists.
-- [ ] `smasher resume` runs a pending tool node.
-- [ ] `ShellCodergenBackend` and tool commands see the same `SMASHER_CTX_` name
+- [x] The fixture completes on the expected branch with no API keys set.
+- [x] The parallel fixture's tool node runs, and `nodes/<id>/stdout.txt` exists.
+- [x] `smasher resume` runs a pending tool node.
+- [x] `ShellCodergenBackend` and tool commands see the same `SMASHER_CTX_` name
       for a key such as `design.brief`.
-- [ ] Existing CLI fixtures `render_capture` and `system_lint` still pass.
+- [x] Existing CLI fixtures `render_capture` and `system_lint` still pass.
       (`critique_loop_e2e` is `#[ignore]` because it spends tokens, so it isn't
       run.)
-- [ ] `grep -rn LlmToolBackend crates/*/src` finds nothing.
+- [x] `grep -rn LlmToolBackend crates/*/src` finds nothing.
 
 **Verification:**
-- [ ] `cargo test -p smasher-cli`
-- [ ] `cargo run -p smasher-cli -- run crates/smasher-cli/tests/fixtures/tool_command.dot --backend shell`
+- [x] `cargo test -p smasher-cli`
+- [x] `cargo run -p smasher-cli -- run crates/smasher-cli/tests/fixtures/tool_command.dot --backend shell`
 
 **Dependencies:** Tasks 1, 2, 4
 
@@ -286,9 +286,9 @@ Add these, following `system_lint_e2e.rs` (`CARGO_BIN_EXE_smasher`,
 **Estimated scope:** Medium
 
 ## Checkpoint B: after tasks 5–6
-- [ ] `make pre-commit` is green (fmt-check, clippy, `cargo test --workspace`)
-- [ ] Manual: the CLI fixture run above shows the branch taken and the output files
-- [ ] `grep -rn LlmToolBackend crates/*/src` finds nothing
+- [x] `make pre-commit` is green (fmt-check, clippy, `cargo test --workspace`)
+- [x] Manual: the CLI fixture run above shows the branch taken and the output files
+- [x] `grep -rn LlmToolBackend crates/*/src` finds nothing
 
 ## Phase 3: Editor and docs
 

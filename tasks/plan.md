@@ -63,11 +63,11 @@ both.
 
 ### Phase 2: Wiring
 - [x] 5. Web: remove `LlmToolBackend`, wire the runner, integration test
-- [ ] 6. CLI: remove `LlmToolBackend`, always register `ToolHandler` (main,
+- [x] 6. CLI: remove `LlmToolBackend`, always register `ToolHandler` (main,
       parallel child, resume), cancel token, shared env-name helper, e2e test
 
 ### Checkpoint B
-- [ ] `make pre-commit` green; `smasher run --backend shell` on the fixture
+- [x] `make pre-commit` green; `smasher run --backend shell` on the fixture
       works with no API keys
 
 ### Phase 3: Editor and docs

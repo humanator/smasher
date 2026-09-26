@@ -1,0 +1,17 @@
+// ABOUTME: Fixture for tool_command_e2e: tool_command nodes as the branches of a
+// ABOUTME: Parallel fan-out, joined by a fan-in node.
+digraph ToolCommandParallel {
+  start [shape=Mdiamond];
+  fan [shape=component, label="Fan out"];
+  BranchA [shape=parallelogram, tool_command="echo branch-a"];
+  BranchB [shape=parallelogram, tool_command="echo branch-b"];
+  join [shape=tripleoctagon, label="Join"];
+  done [shape=Msquare];
+
+  start -> fan;
+  fan -> BranchA;
+  fan -> BranchB;
+  BranchA -> join;
+  BranchB -> join;
+  join -> done;
+}
