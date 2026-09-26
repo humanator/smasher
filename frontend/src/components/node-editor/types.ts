@@ -1,12 +1,9 @@
 // ABOUTME: Node-editor data model types
 // ABOUTME: EditorNode/EditorEdge/EditorGraph imported from workflows API client; other types defined here
 
-import type { EditorEdge, EditorGraph, EditorNode } from '$lib/api/workflows';
+import type { AttrValue, EditorEdge, EditorGraph, EditorNode } from '$lib/api/workflows';
 
-export type { EditorEdge, EditorGraph, EditorNode };
-
-// AttrValue mirrors smasher-attractor's scalar attribute values
-export type AttrValue = string | number | boolean;
+export type { AttrValue, EditorEdge, EditorGraph, EditorNode };
 
 // The exact capitalized strings smasher-attractor's NodeType enum
 // round-trips through (graph/mod.rs's node_type_to_str/node_type_from_str,

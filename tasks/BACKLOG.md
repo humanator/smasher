@@ -23,13 +23,11 @@ batch, `feat/claude-cli-provider` and `feat/spa-port-repairs` are all merged int
 added mid-session and ran alongside. It's now merged (#23). The SPA port repairs,
 #9 (candidate thumbnails and lightbox) + #21 (the rest of what the port
 dropped), were reviewed by Jobsworth and merged to `main` on 2026-09-25. Their
-specs, plans and todos are in `archive/`. Still open from the agreed order: #2
-and #6.
+specs, plans and todos are in `archive/`. #2 (frontend CI, with #27, #30 and
+#31) merged to `main` on 2026-09-26. Still open from the agreed order: #6.
 
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
-- #2: whether CI installs Chromium (for Playwright and `render-capture`'s
-  integration test).
 - #6: the default artifact retention policy.
 - #28: review `feat/question-replies` and decide whether to merge it.
 
@@ -52,7 +50,9 @@ graphs in `frontend/tests/fixtures/graphs.ts` (`RUN_FAIL_CHECK`, `QUESTION_KINDS
 LLM. The two critical-path tests
 (`tests/critical-path.test.ts`, `e2e/critical-path.spec.ts`) run real Codergen nodes
 and spend tokens, so they're skipped unless `SMASHER_LLM_TESTS=1` is set. Run them
-only on request.
+only on request. CI's `Frontend` job does all of this for you on every PR:
+fake-claude server, shared data dir, and a check that the fake's log stays empty
+(see "Frontend Tests and CI" in [`docs/quickstart.md`](../docs/quickstart.md)).
 
 ## P1: Do next (small, and each one fixes something real)
 
@@ -71,17 +71,26 @@ only on request.
    - Test fixtures still use `claude-sonnet-4-20250514` on purpose, as sample
      data. Leave them.
 
-2. **Run the frontend in CI.** `.github/workflows/ci.yml` runs only cargo. The
-   SPA's ~450 Vitest tests, `svelte-check`, lint, and the 12 Playwright spec files never
-   run in CI, even though they're the main guard for the SPA and desktop. Add a
-   Node job, and decide at the same time whether Chromium gets installed for
-   Playwright and `render-capture`'s integration test. That Chromium question has
-   never been decided on purpose. *Source: DEFERRED `render-capture`, desktop
-   Checkpoint C waiver.*
-   Because of the gotcha above, the CI job has to build and start `smasher serve`
-   before running Vitest.
-   `svelte-check --threshold error` already fails with 5 errors on `main`, so do
-   #30 first or the new job starts red.
+2. ~~**Run the frontend in CI.**~~ **Done 2026-09-26**, merged to `main` via
+   PR humanator/smasher#1. Spec, plan and todo are in `archive/`
+   (`SPEC-frontend-ci.md`, `plan-frontend-ci.md`, `todo-frontend-ci.md`).
+   `ci.yml`'s new `Frontend` job runs svelte-check, eslint, `build:check`,
+   Vitest and Playwright against a fake-claude `smasher serve`. It fails if the
+   fake's log isn't empty. Batched with it:
+   - **#30:** `npm run check` is at 0 errors and 0 warnings. The fixes were
+     type-only.
+   - **#31:** the node editor is lazy-loaded. The entry chunk is 321 kB (was
+     567 kB), and `build:check` fails on any chunk over 500 kB.
+     `vite.config.ts` pre-bundles `@xyflow/svelte` and dagre, or a cold dev
+     server reloads mid-test.
+   - **Chromium, decided by Jobsworth:** Playwright installs its own in CI.
+     `render-capture`'s integration test uses the Google Chrome preinstalled
+     on `ubuntu-latest`.
+   - **Found in CI:** the job needs Graphviz (`apt install graphviz`) for run
+     graph SVGs. `run-launch.spec.ts` needed its brief assertion scoped to the
+     question card, because Linux Graphviz puts the same text in the SVG.
+   Red/green proof: run `36212664157` went red on a deliberately failing
+   assertion; the reverted branch went green (see the PR).
 
 3. ~~**Fix where dropped nodes land after pan or zoom in the node editor.**~~
    **Done 2026-09-24** (merged to `main`). A small
@@ -276,12 +285,11 @@ only on request.
     and also accepts `Mdiamond`/`Msquare` for start/exit. `CLAUDE.md` says
     `parallelogram` is parallel fan-out, `hexagon` is tool and `component` is a
     sub-pipeline.
-27. **Fix a cleanup race in `CandidatePreview.test.ts`.** *Seen once
-    2026-09-25.* Its `afterEach` removes each run's artifacts directory with
-    `rmSync(..., { recursive: true, force: true })` straight after the run is
-    cancelled, while the server may still be writing that run's `events/`.
-    It failed once with `ENOTEMPTY` and passed on a re-run. Wait for the run
-    to reach `Aborted` (or retry the removal) before deleting.
+27. ~~**Fix a cleanup race in `CandidatePreview.test.ts`.**~~ **Done
+    2026-09-26** with #2, after it failed CI run `36212841475`.
+    The `afterEach` now waits for `Aborted`, then removes the directory with
+    `rmSync`'s `maxRetries`. `Aborted` alone isn't enough: the JSONL event
+    writer drains on its own task after the status is set.
 28. ~~**Show the agent's replies under the question they answer.**~~ **Done
     2026-09-25** on `feat/question-replies`, not yet merged. Web runs emit
     `human_prompt_issued` / `human_response_received`, the run summary lists
@@ -314,31 +322,31 @@ only on request.
     known, make the test wait for `pipeline_completed` again. If it isn't
     harness-only, finished runs reloaded from disk would be missing their final
     events.
-30. **Clear the errors `npm run check` already reports.** *Seen 2026-09-25;
-    they're on `main` too, not from #28.* `svelte-check --threshold error`
-    reports 5 errors, so the "check passes" line in every plan is currently
-    false:
-    - `src/components/node-editor/WorkflowCanvas.svelte:527`:
-      `Record<string, unknown>` isn't assignable to `Record<string, AttrValue>`.
-    - `tests/setup.ts:14`: the `EventSource` redeclaration doesn't match the
-      DOM lib's type.
-    - `e2e/gallery-gate.spec.ts:87-89` (3 errors): `string | undefined` is
-      passed where `string` is expected.
-
-    Do this before #2, so its frontend CI job (which should run `npm run
-    check`) doesn't start red.
-
-31. **Split the SPA bundle so the build stops warning about chunk size.**
-    *Seen 2026-09-25.* `npm run build` puts all the JS into one chunk and warns
-    that it's over 500 kB. It's 643 kB minified (201 kB gzipped); it was
-    567 kB before #28, whose `marked` + `dompurify` added about 76 kB. Nothing
-    in `src/` uses a dynamic `import()`. Low urgency: the SPA is served locally
-    (`smasher serve`, the desktop app), so it costs little load time. But the
-    warning hides any real regression. Likely fix: lazy-load the node editor,
-    which is the only user of `@xyflow/svelte` and `@dagrejs/dagre`, with a
-    dynamic `import()` from `App.svelte`. Maybe also lazy-load `lib/markdown`,
-    used only by `QuestionCard`. Then rebuild and check the warning is gone,
-    rather than raising `build.chunkSizeWarningLimit`.
+32. **Find why the Rust CI jobs time out.** *Seen 2026-09-26 while speccing #2.*
+    On `myfork` (humanator/smasher), the last two pushes to `main` failed
+    (runs `36006298587` and `35957900741`, 2026-09-24). `Test` and `MSRV` ran
+    ~50 min and died inside `cargo test --workspace`, and no logs were kept.
+    Format, Check, Clippy, Docs and Test Summary pass. The cause isn't known.
+    One suspect is render-capture's `captures_a_real_png_of_the_fixture_candidate`,
+    which launches the runner image's Chrome and isn't `#[ignore]`d. Start by
+    adding a `timeout-minutes` and `--nocapture`-style progress so the next
+    run shows which test hangs. Kept out of the frontend CI batch
+    (`archive/SPEC-frontend-ci.md`) by Jobsworth's call.
+    New lead, 2026-09-26: on PR humanator/smasher#1 (run `36215653694`), MSRV
+    failed after 1.5 min, not 50. Four `smasher-desktop` `settings::tests`
+    Keychain tests panicked (`settings.rs:564`, `:621`, `:640`); Linux runners
+    have no macOS Keychain. Gate them to macOS or fake the store.
+33. **Fix the lightbox-resize race in `candidate-preview.spec.ts:81`.** *Seen
+    2026-09-26.* It polls until the iframe starts shrinking, then asserts its
+    final bounds (`<= 800`) while the resize may still be running (got 963).
+    It failed about 1 in 5 full local runs, on `main` too. CI's `retries: 2`
+    hides it. Poll on the final bounds instead.
+34. **Find why a question answer can stall.** *Seen once 2026-09-26*, in a
+    full CI-mode local run. In `question-card.spec.ts`, the Approval answer's
+    POST didn't return within 5s (buttons stayed disabled), so Free Form never
+    appeared. It passed 10/10 alone and wasn't seen on `main` in 5 runs.
+    Suspect: `answer_question` takes `state.runs.read()` on tokio's
+    write-preferring `RwLock`, so a queued writer (a run finishing) blocks it.
 
 ## P2: Robustness (can lose data or grow without limit)
 

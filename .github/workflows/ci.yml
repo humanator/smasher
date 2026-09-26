@@ -1,4 +1,4 @@
-# ABOUTME: Main CI workflow for smasher workspace — check, test, clippy, fmt, MSRV, docs.
+# ABOUTME: Main CI workflow for smasher workspace — check, test, clippy, fmt, MSRV, docs, frontend.
 # ABOUTME: Uses Swatinem/rust-cache for Cargo caching and uploads test/lint artifacts.
 name: CI
 on:
@@ -144,6 +144,106 @@ jobs:
         with:
           name: doc-build-log
           path: doc-build.log
+          retention-days: 14
+
+  # ── Frontend: check, lint, build, Vitest, Playwright ──────────────
+  # Vitest's real-API tests and Playwright both talk to a real
+  # `smasher serve` on 127.0.0.1:21541, so the job builds and starts one.
+  # It runs on the fake `claude` (SMASHER_PROVIDER=claude-cli), which logs
+  # every call to FAKE_CLAUDE_LOG and fails; the job's last check fails if
+  # that log isn't empty, so no test can spend LLM tokens unnoticed.
+  # SMASHER_LLM_TESTS stays unset: the critical-path tests stay skipped.
+  # Playwright gets its own Chromium; render-capture's integration test (in
+  # `test` above) uses the Google Chrome preinstalled on ubuntu-latest.
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    needs: [fmt]
+    env:
+      SMASHER_PROVIDER: claude-cli
+      SMASHER_CLAUDE_CLI: ${{ github.workspace }}/frontend/tests/fixtures/fake-claude.sh
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      # The `runner` context isn't available in job-level `env`, so these
+      # two are set here instead. The server and the gallery tests must
+      # share one data dir: the tests write candidate manifests into it.
+      - name: Point the data dir and fake-claude log at the runner's temp dir
+        working-directory: .
+        run: |
+          echo "SMASHER_DATA_DIR=$RUNNER_TEMP/smasher-data" >> "$GITHUB_ENV"
+          echo "FAKE_CLAUDE_LOG=$RUNNER_TEMP/fake-claude.log" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "ci-frontend"
+          cache-on-failure: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: svelte-check
+        run: npm run check
+      # `npm run lint` passes --fix and would rewrite files; CI only reports.
+      - name: ESLint
+        run: npx eslint .
+      - name: Build (fails on a chunk over 500 kB)
+        run: npm run build:check
+      - name: Build smasher-cli
+        working-directory: .
+        run: cargo build -p smasher-cli
+      # The server shells out to Graphviz's `dot` to render run graphs as
+      # SVG; RunDetail's tests assert on that SVG.
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+      - name: Start smasher serve
+        working-directory: .
+        run: |
+          mkdir -p "$SMASHER_DATA_DIR" frontend-logs
+          : > "$FAKE_CLAUDE_LOG"
+          nohup ./target/debug/smasher serve > frontend-logs/serve.log 2>&1 &
+          for _ in $(seq 1 60); do
+            curl -sf http://127.0.0.1:21541/api/workflows > /dev/null && exit 0
+            sleep 1
+          done
+          echo "smasher serve didn't answer on :21541 within 60s" >&2
+          cat frontend-logs/serve.log >&2
+          exit 1
+      - name: Vitest
+        run: |
+          set -o pipefail
+          npx vitest run 2>&1 | tee ../frontend-logs/vitest.log
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+        run: |
+          set -o pipefail
+          npx playwright test 2>&1 | tee ../frontend-logs/playwright.log
+      - name: Assert no test invoked claude
+        if: always()
+        working-directory: .
+        run: |
+          if [ -s "$FAKE_CLAUDE_LOG" ]; then
+            echo "A frontend test invoked claude (LLM spend). Calls:" >&2
+            cat "$FAKE_CLAUDE_LOG" >&2
+            exit 1
+          fi
+      - name: Upload frontend logs and Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-logs
+          path: |
+            frontend-logs/
+            frontend/playwright-report/
           retention-days: 14
 
   # ── Per-crate test report with summary ─────────────────────────────

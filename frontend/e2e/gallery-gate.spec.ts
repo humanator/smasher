@@ -75,7 +75,8 @@ test('submit a gallery-gate pipeline, select a candidate, and complete via the r
     const submitResponse = await page.request.post(`${base}/api/runs`, {
       data: { dot_source: galleryGateDot, variables: {} },
     });
-    ({ run_id: runId } = await submitResponse.json());
+    const submitted: { run_id: string } = await submitResponse.json();
+    runId = submitted.run_id;
     expect(runId).toBeTruthy();
 
     await page.goto(`${base}/runs/${runId}`);

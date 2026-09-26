@@ -4,7 +4,7 @@
 import dagre from '@dagrejs/dagre';
 import { MarkerType, type Edge as FlowEdge, type Node as FlowNode } from '@xyflow/svelte';
 import { nodeStyleFor } from './nodeConfig';
-import type { EditorEdge, EditorGraph, EditorNode } from './types';
+import type { AttrValue, EditorEdge, EditorGraph, EditorNode } from './types';
 
 // Matches rendering.rs's own `rankdir` graph_attr default -- kept in sync so
 // a graph that never sets `rankdir` explicitly lays out the same direction
@@ -96,7 +96,7 @@ function dagreLayout(
 export interface WorkflowNodeData extends Record<string, unknown> {
   label: string;
   nodeType: string;
-  attrs: Record<string, unknown>;
+  attrs: Record<string, AttrValue>;
 }
 
 export interface WorkflowEdgeData extends Record<string, unknown> {
