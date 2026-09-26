@@ -20,9 +20,12 @@
 //! | E001  | Error    | No start node            |
 //! | E002  | Error    | Multiple start nodes     |
 //! | E003  | Error    | No exit node             |
+//! | E004  | Error    | Tool node sets neither `tool` nor `tool_command` |
+//! | E005  | Error    | Tool node sets both `tool` and `tool_command` |
 //! | W001  | Warning  | Unreachable node         |
 //! | W002  | Warning  | Dead-end non-exit node   |
 //! | W003  | Warning  | Missing condition on edge |
+//! | W004  | Warning  | `args` set on a `tool_command` node |
 //! | I001  | Info     | Edge without label       |
 //!
 //! # Examples
@@ -61,7 +64,8 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::graph::{Graph, NodeType};
+use crate::graph::{Graph, GraphNode, NodeType};
+use crate::tool_handler::{tool_attr, tool_command_attr};
 
 /// Severity level for a diagnostic produced by a lint rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -153,6 +157,9 @@ impl LintRunner {
         runner.add_rule(Box::new(DeadEndNodeRule));
         runner.add_rule(Box::new(MissingConditionRule));
         runner.add_rule(Box::new(EmptyLabelEdgeRule));
+        runner.add_rule(Box::new(ToolNodeMissingToolRule));
+        runner.add_rule(Box::new(ToolNodeBothToolsRule));
+        runner.add_rule(Box::new(ToolCommandArgsRule));
         runner
     }
 
@@ -425,6 +432,101 @@ impl LintRule for EmptyLabelEdgeRule {
                 suggestion: Some(format!(
                     "Add a label to the edge from '{}' to '{}' for clarity",
                     e.from, e.to
+                )),
+            })
+            .collect()
+    }
+}
+
+/// Tool nodes in the graph.
+fn tool_nodes(graph: &Graph) -> impl Iterator<Item = &GraphNode> {
+    graph.nodes.iter().filter(|n| n.node_type == NodeType::Tool)
+}
+
+/// E004: Tool node sets neither `tool` nor `tool_command`.
+pub struct ToolNodeMissingToolRule;
+
+impl LintRule for ToolNodeMissingToolRule {
+    fn name(&self) -> &str {
+        "tool_node_missing_tool"
+    }
+
+    fn description(&self) -> &str {
+        "Checks that every tool node sets a tool or tool_command attribute"
+    }
+
+    fn check(&self, graph: &Graph) -> Vec<Diagnostic> {
+        tool_nodes(graph)
+            .filter(|n| tool_attr(n).is_none() && tool_command_attr(n).is_none())
+            .map(|n| Diagnostic {
+                severity: Severity::Error,
+                code: "E004".to_string(),
+                message: format!(
+                    "Tool node '{}' needs a tool or tool_command attribute",
+                    n.id
+                ),
+                node_id: Some(n.id.clone()),
+                suggestion: Some(format!(
+                    "Set tool=\"<built-in>\" or tool_command=\"<shell command>\" on '{}'",
+                    n.id
+                )),
+            })
+            .collect()
+    }
+}
+
+/// E005: Tool node sets both `tool` and `tool_command`.
+pub struct ToolNodeBothToolsRule;
+
+impl LintRule for ToolNodeBothToolsRule {
+    fn name(&self) -> &str {
+        "tool_node_both_tools"
+    }
+
+    fn description(&self) -> &str {
+        "Checks that no tool node sets both tool and tool_command"
+    }
+
+    fn check(&self, graph: &Graph) -> Vec<Diagnostic> {
+        tool_nodes(graph)
+            .filter(|n| tool_attr(n).is_some() && tool_command_attr(n).is_some())
+            .map(|n| Diagnostic {
+                severity: Severity::Error,
+                code: "E005".to_string(),
+                message: format!("Tool node '{}' sets both tool and tool_command", n.id),
+                node_id: Some(n.id.clone()),
+                suggestion: Some(format!(
+                    "Remove either tool or tool_command from '{}'",
+                    n.id
+                )),
+            })
+            .collect()
+    }
+}
+
+/// W004: Tool node sets `args` together with `tool_command`.
+pub struct ToolCommandArgsRule;
+
+impl LintRule for ToolCommandArgsRule {
+    fn name(&self) -> &str {
+        "tool_command_args"
+    }
+
+    fn description(&self) -> &str {
+        "Checks for args on tool_command nodes, where it has no effect"
+    }
+
+    fn check(&self, graph: &Graph) -> Vec<Diagnostic> {
+        tool_nodes(graph)
+            .filter(|n| tool_command_attr(n).is_some() && n.attrs.contains_key("args"))
+            .map(|n| Diagnostic {
+                severity: Severity::Warning,
+                code: "W004".to_string(),
+                message: format!("Tool node '{}': args is ignored for tool_command", n.id),
+                node_id: Some(n.id.clone()),
+                suggestion: Some(format!(
+                    "Remove args from '{}', or pass the values in the command itself",
+                    n.id
                 )),
             })
             .collect()
@@ -1173,6 +1275,9 @@ mod tests {
             Box::new(DeadEndNodeRule),
             Box::new(MissingConditionRule),
             Box::new(EmptyLabelEdgeRule),
+            Box::new(ToolNodeMissingToolRule),
+            Box::new(ToolNodeBothToolsRule),
+            Box::new(ToolCommandArgsRule),
         ];
 
         for rule in &rules {
@@ -1183,5 +1288,130 @@ mod tests {
                 rule.name()
             );
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Tool node rules: E004, E005, W004
+    // ---------------------------------------------------------------
+
+    fn tool_node(id: &str, attrs: &[(&str, &str)]) -> GraphNode {
+        let mut node = make_node(id, NodeType::Tool);
+        for (key, value) in attrs {
+            node.attrs.insert(
+                key.to_string(),
+                crate::graph::NodeAttrValue::String(value.to_string()),
+            );
+        }
+        node
+    }
+
+    fn graph_with_tool(node: GraphNode) -> Graph {
+        make_graph(
+            vec![
+                make_node("start", NodeType::Start),
+                node,
+                make_node("exit", NodeType::Exit),
+            ],
+            vec![make_edge("start", "check"), make_edge("check", "exit")],
+        )
+    }
+
+    #[test]
+    fn tool_node_missing_tool_rule_flags_neither_attribute() {
+        let graph = graph_with_tool(tool_node("check", &[]));
+        let diags = ToolNodeMissingToolRule.check(&graph);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "E004");
+        assert_eq!(diags[0].severity, Severity::Error);
+        assert_eq!(diags[0].node_id.as_deref(), Some("check"));
+        assert!(diags[0].message.contains("tool_command"));
+    }
+
+    #[test]
+    fn tool_node_missing_tool_rule_treats_blank_as_missing() {
+        let graph = graph_with_tool(tool_node("check", &[("tool", " "), ("tool_command", "")]));
+        assert_eq!(ToolNodeMissingToolRule.check(&graph).len(), 1);
+    }
+
+    #[test]
+    fn tool_node_missing_tool_rule_ignores_label() {
+        let mut node = tool_node("check", &[]);
+        node.label = Some("system_lint".to_string());
+        assert_eq!(
+            ToolNodeMissingToolRule.check(&graph_with_tool(node)).len(),
+            1
+        );
+    }
+
+    #[test]
+    fn tool_node_missing_tool_rule_silent_with_either_attribute() {
+        for attrs in [[("tool", "system_lint")], [("tool_command", "make test")]] {
+            let graph = graph_with_tool(tool_node("check", &attrs));
+            assert!(
+                ToolNodeMissingToolRule.check(&graph).is_empty(),
+                "{attrs:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn tool_node_missing_tool_rule_ignores_other_node_types() {
+        let graph = clean_graph();
+        assert!(ToolNodeMissingToolRule.check(&graph).is_empty());
+    }
+
+    #[test]
+    fn tool_node_both_tools_rule_flags_both_attributes() {
+        let graph = graph_with_tool(tool_node(
+            "check",
+            &[("tool", "system_lint"), ("tool_command", "make test")],
+        ));
+        let diags = ToolNodeBothToolsRule.check(&graph);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "E005");
+        assert_eq!(diags[0].severity, Severity::Error);
+        assert_eq!(diags[0].node_id.as_deref(), Some("check"));
+    }
+
+    #[test]
+    fn tool_node_both_tools_rule_silent_with_one_attribute() {
+        for attrs in [[("tool", "system_lint")], [("tool_command", "make test")]] {
+            let graph = graph_with_tool(tool_node("check", &attrs));
+            assert!(ToolNodeBothToolsRule.check(&graph).is_empty(), "{attrs:?}");
+        }
+    }
+
+    #[test]
+    fn tool_command_args_rule_flags_args_with_tool_command() {
+        let graph = graph_with_tool(tool_node(
+            "check",
+            &[("tool_command", "make test"), ("args", "{}")],
+        ));
+        let diags = ToolCommandArgsRule.check(&graph);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, "W004");
+        assert_eq!(diags[0].severity, Severity::Warning);
+        assert!(
+            diags[0]
+                .message
+                .contains("args is ignored for tool_command")
+        );
+    }
+
+    #[test]
+    fn tool_command_args_rule_silent_for_args_with_tool() {
+        let graph = graph_with_tool(tool_node(
+            "check",
+            &[("tool", "system_lint"), ("args", "{}")],
+        ));
+        assert!(ToolCommandArgsRule.check(&graph).is_empty());
+    }
+
+    #[test]
+    fn lint_runner_with_builtins_includes_tool_rules() {
+        let graph = graph_with_tool(tool_node("check", &[]));
+        let report = LintRunner::with_builtins().run(&graph);
+        assert!(report.has_errors());
+        assert!(report.errors().iter().any(|d| d.code == "E004"));
     }
 }

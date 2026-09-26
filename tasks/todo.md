@@ -127,15 +127,15 @@ comment. Two example fixes:
 `old-examples/` files by hand.
 
 **Acceptance criteria:**
-- [ ] Each rule fires on a bad node and stays silent on a good one.
-- [ ] `all_examples_pass_lint` stays green.
-- [ ] `smasher lint` is clean on `old-examples/parallel-fanout.dot`.
-- [ ] The web API rejects a graph with E004 (existing lint gate, `routes/api.rs:226`).
+- [x] Each rule fires on a bad node and stays silent on a good one.
+- [x] `all_examples_pass_lint` stays green.
+- [x] `smasher lint` is clean on `old-examples/parallel-fanout.dot`.
+- [x] The web API rejects a graph with E004 (existing lint gate, `routes/api.rs:226`).
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor lint`
-- [ ] `cargo test -p smasher-attractor --test example_lint`
-- [ ] `cargo run -p smasher-cli -- lint examples/old-examples/parallel-fanout.dot`
+- [x] `cargo test -p smasher-attractor lint`
+- [x] `cargo test -p smasher-attractor --test example_lint`
+- [x] `cargo run -p smasher-cli -- lint examples/old-examples/parallel-fanout.dot`
 
 **Dependencies:** None
 
