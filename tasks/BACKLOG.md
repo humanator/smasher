@@ -77,8 +77,9 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     single-turn and tool-less, but both run agent sessions with tools
     (`smasher-web/src/backend.rs`). Fix: when the provider is claude-cli, route
     those sessions through `ClaudeCliBackend` as a `claude -p` agent, as codergen
-    is. Workaround until then: `provider="<other>"` on the node. The deeper fix
-    for `tool_command` is #22.
+    is. Workaround until then: `provider="<other>"` on the node. For tool nodes
+    the real fix is #22 (decided: tool nodes run commands directly and never
+    call an LLM), so this routing is only needed for manager nodes.
 
     **Checkpoints not run before merge** (Jobsworth's call):
     - the `#[ignore]` real-CLI tests, including the `curl` denial;
@@ -195,13 +196,25 @@ decides the `candidate_id` convention, and the lint override lives in the same
     the command), so these nodes seem to work, but the result is slow, costs
     tokens, and can vary between runs. Under claude-cli they fail outright (see
     #23). Attractor intends tool nodes to run `tool_command` directly.
-    Doing that makes them deterministic and free. Decide first:
-    - It changes behaviour for every provider.
-    - It runs shell commands written in the DOT file. Workflows are
-      user-authored and local today, but #16 (serving remotely) would change
-      that.
-    - Whether `LlmToolBackend` stays as the fallback for tool nodes with neither
-      a `tool` nor a `tool_command`.
+    Doing that makes them deterministic and free.
+
+    **Decided by Jobsworth 2026-09-26:** tool nodes and LLM nodes are kept
+    strictly separate, because that's easier for users to understand.
+    - A tool node runs its built-in `tool` or its `tool_command` directly, on
+      every provider. It never calls an LLM.
+    - There is no LLM fallback. A tool node with neither a `tool` nor a
+      `tool_command` is an error. `smasher lint` should flag it, and at run
+      time it should fail. `LlmToolBackend` goes. In the examples, only
+      `old-examples/parallel-fanout.dot`'s `fan_out` has neither.
+    - A user who wants an LLM fallback builds it in the graph: a codergen node
+      reached by conditional branching on the tool node's outcome.
+    - Running DOT-authored shell commands is fine while workflows are local.
+      #16 (serving remotely) must deal with it.
+
+    Still to settle in the spec: the command's timeout, working directory and
+    environment, and how stdout, stderr and the exit code map into context and
+    node success. Doing this removes #23's known limitation for tool nodes.
+    Manager nodes still need #23's `ClaudeCliBackend` routing.
 
 ## P4: Distribution and remote access (bigger, strategic)
 
