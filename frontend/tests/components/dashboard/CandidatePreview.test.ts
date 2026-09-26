@@ -98,7 +98,20 @@ describe('CandidatePreview', () => {
     // unmounts; reset it so the next test's clicks aren't blocked.
     document.body.style.pointerEvents = '';
     await Promise.all(launched.map((id) => runsApi.cancelRun(id).catch(() => {})));
-    for (const id of launched) rmSync(join(artifactsRoot, id), { recursive: true, force: true });
+    // Deleting straight after cancel raced the server's writes (backlog #27,
+    // ENOTEMPTY in CI). Aborted is set once the engine stops and the run's
+    // metadata is written, but the JSONL event writer drains on its own task
+    // and can still add to events/, so the removal also retries on ENOTEMPTY.
+    await Promise.all(
+      launched.map((id) =>
+        waitFor(async () => expect((await runsApi.getRun(id)).status).toBe('Aborted'), {
+          timeout: 5000,
+        })
+      )
+    );
+    for (const id of launched) {
+      rmSync(join(artifactsRoot, id), { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    }
     launched = [];
   });
 
