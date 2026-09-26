@@ -15,18 +15,26 @@ The `shape` attribute on a DOT node determines its semantic type:
 |------------------|---------------|------------------------------------------|
 | `circle`         | Start         | Pipeline entry point                     |
 | `point`          | Start         | Alternative start marker                 |
+| `Mdiamond`       | Start         | Alternative start marker                 |
 | `doublecircle`   | Exit          | Pipeline terminal node                   |
+| `Msquare`        | Exit          | Alternative exit marker                  |
 | `diamond`        | Conditional   | Branch based on variable conditions      |
 | `box`            | Codergen      | Run an LLM agent session                 |
 | `rectangle`      | Codergen      | Alternative codergen marker              |
-| `hexagon`        | Tool          | Execute a registered tool                |
-| `oval`           | Interviewer   | Human interaction node (free-form input) |
+| `parallelogram`  | Tool          | Execute a registered tool                |
+| `hexagon`        | Interviewer   | Human interaction node                   |
+| `oval`           | Interviewer   | Alternative interviewer marker           |
 | `ellipse`        | Interviewer   | Alternative interviewer marker           |
-| `parallelogram`  | Parallel      | Fan-out concurrent execution             |
-| `house`          | Manager       | Human gate / coordinator node            |
+| `component`      | Parallel      | Fan-out concurrent execution             |
+| `tripleoctagon`  | FanIn         | Join parallel branches                   |
+| `house`          | Manager       | Coordinator node                         |
+| `folder`         | SubPipeline   | Nested DOT file                          |
 | *(any other)*    | Generic       | Passthrough processing node              |
 
-### Start (circle / point)
+A node with no `shape` at all is Codergen. The mapping lives in
+`node_type_from_shape` (`crates/smasher-attractor/src/graph/mod.rs`).
+
+### Start (circle / point / Mdiamond)
 
 Entry point for the pipeline. Every pipeline must have exactly one Start node.
 
@@ -34,7 +42,7 @@ Entry point for the pipeline. Every pipeline must have exactly one Start node.
 start [shape=circle, label="Begin"];
 ```
 
-### Exit (doublecircle)
+### Exit (doublecircle / Msquare)
 
 Terminal node. The pipeline stops when it reaches an Exit node. A pipeline can
 have multiple Exit nodes for different outcomes.
@@ -67,33 +75,41 @@ generate [
 ];
 ```
 
-### Tool (hexagon)
+### Tool (parallelogram)
 
 Executes a registered tool. The tool name is determined by the `tool` attribute,
 falling back to the node's label.
 
 ```dot
-lint [shape=hexagon, tool="linter", args="{\"strict\": true}"];
+lint [shape=parallelogram, tool="linter", args="{\"strict\": true}"];
 
 // Or using label as the tool name:
-lint [shape=hexagon, label="linter"];
+lint [shape=parallelogram, label="linter"];
 ```
 
-### Interviewer (oval / ellipse)
+### Interviewer (hexagon / oval / ellipse)
 
 Human interaction node. Pauses the pipeline and asks the user a question.
 Supports free-form input, predefined options, and yes/no approval.
 
 ```dot
-ask_user [shape=oval, label="What should we name this?", question="Pick a name"];
+ask_user [shape=hexagon, label="What should we name this?", question="Pick a name"];
 ```
 
-### Parallel (parallelogram)
+### Parallel (component)
 
 Fan-out node that dispatches downstream branches concurrently.
 
 ```dot
-fan_out [shape=parallelogram, label="Fan Out", max_concurrency=3];
+fan_out [shape=component, label="Fan Out", max_concurrency=3];
+```
+
+### FanIn (tripleoctagon)
+
+Join node that collects the results of parallel branches.
+
+```dot
+join [shape=tripleoctagon, label="Join"];
 ```
 
 ### Manager (house)
@@ -106,7 +122,7 @@ operator.
 gate [shape=house, label="Approval Gate", question="Do you approve?"];
 ```
 
-### SubPipeline (component)
+### SubPipeline (folder)
 
 References an external DOT file for inline composition.
 

@@ -463,6 +463,7 @@
         bind:nodes
         bind:edges
         fitView
+        minZoom={0.1}
         {nodeTypes}
         {edgeTypes}
         connectionMode={ConnectionMode.Loose}

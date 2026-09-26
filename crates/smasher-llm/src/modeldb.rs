@@ -1150,9 +1150,9 @@ mod tests {
     #[test]
     fn lookup_with_dynamic_resolves_aliases() {
         let dynamic = vec![];
-        // "claude-opus" is an alias for claude-opus-4-6 in the static catalog
+        // "claude-opus" is an alias for claude-opus-5 in the static catalog
         let result = lookup_with_dynamic("claude-opus", &dynamic).unwrap();
-        assert_eq!(result.id, "claude-opus-4-6");
+        assert_eq!(result.id, "claude-opus-5");
     }
 
     // ── 12. Empty response handling ─────────────────────────────────────

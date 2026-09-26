@@ -645,10 +645,10 @@ impl Engine {
             });
 
             // Emit NodeCompleted or NodeFailed event.
-            if outcome.is_failure() {
+            if let Outcome::Failure { error, .. } = &outcome {
                 self.emit(PipelineEvent::NodeFailed {
                     node_id: current_node_id.clone(),
-                    error: format!("{:?}", outcome),
+                    error: error.clone(),
                     duration_ms: node_duration_ms,
                     timestamp: Utc::now(),
                 });
@@ -843,10 +843,10 @@ impl Engine {
                         outcome_kind: branch_outcome_kind,
                     });
 
-                    if branch_outcome.is_failure() {
+                    if let Outcome::Failure { error, .. } = &branch_outcome {
                         self.emit(PipelineEvent::NodeFailed {
                             node_id: branch_id.clone(),
-                            error: format!("{:?}", branch_outcome),
+                            error: error.clone(),
                             duration_ms: branch_duration_ms,
                             timestamp: Utc::now(),
                         });
@@ -2518,6 +2518,11 @@ mod tests {
             .collect();
         // start node should produce a NodeFailed since AlwaysFailHandler returns Outcome::failure
         assert!(!failed_events.is_empty());
+        // The event carries the handler's message, not the outcome's Debug form.
+        assert!(matches!(
+            failed_events[0],
+            PipelineEvent::NodeFailed { error, .. } if error == "handler always fails"
+        ));
     }
 
     // ---------------------------------------------------------------

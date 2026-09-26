@@ -286,7 +286,7 @@ fn render_graph_preamble(graph: &Graph) -> Vec<String> {
         .graph_attrs
         .get("rankdir")
         .map(format_attr_value)
-        .unwrap_or_else(|| "TB".to_string());
+        .unwrap_or_else(|| dot_escape("TB"));
     let bgcolor = graph
         .graph_attrs
         .get("bgcolor")
@@ -1110,7 +1110,7 @@ mod tests {
         let dot = render_to_dot(&graph);
         assert!(dot.starts_with("digraph  {"));
         assert!(dot.ends_with("}"));
-        assert!(dot.contains("rankdir=TB"));
+        assert!(dot.contains("rankdir=\"TB\""));
     }
 
     #[test]
@@ -1714,7 +1714,7 @@ mod tests {
         let statuses = HashMap::new();
         let dot = render_to_dot_with_status(&graph, &statuses);
 
-        assert!(dot.contains("rankdir=TB"));
+        assert!(dot.contains("rankdir=\"TB\""));
         assert!(dot.contains("bgcolor=\"#FAFAFA\""));
         assert!(dot.contains("fontname=\"Helvetica\""));
         assert!(dot.starts_with("digraph"));
@@ -2194,11 +2194,9 @@ digraph {
             );
         }
 
-        // Once rendered, re-parsing and rendering again gives the same bytes.
-        // (Compared from the second render on: a graph that never set
-        // `rankdir` gets a bare `rankdir=TB` first, then a quoted one.)
-        let second = render_to_dot(&g2);
-        assert_eq!(render_to_dot(&parse_resolve(&second)), second);
+        // Once rendered, re-parsing and rendering again gives the same bytes,
+        // even for a graph that never set `rankdir`.
+        assert_eq!(render_to_dot(&g2), rendered);
     }
 
     #[test]

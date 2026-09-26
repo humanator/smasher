@@ -54,7 +54,7 @@
       if (!file) return;
       const name = file instanceof File ? file.name.replace(/\.(dot|gv)$/i, '') : 'imported';
       const { id } = await workflowsApi.importWorkflowDot(name, await file.text());
-      window.location.href = `/workflows/${id}/edit`;
+      window.location.href = `/workflows/${encodeURIComponent(id)}/edit`;
     } catch (err) {
       importError = err instanceof Error ? err.message : 'Failed to import workflow';
     }
@@ -104,7 +104,7 @@
               <Table.Cell>{workflow.source_dir}</Table.Cell>
               <Table.Cell>
                 <div class="flex gap-2">
-                  <Button href="/workflows/{workflow.id}/edit" variant="secondary" size="sm">
+                  <Button href="/workflows/{encodeURIComponent(workflow.id)}/edit" variant="secondary" size="sm">
                     Edit
                   </Button>
                   <Button size="sm" onclick={() => handleRunWorkflow(workflow)}>Run Workflow</Button>

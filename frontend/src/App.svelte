@@ -98,13 +98,18 @@
       return;
     }
 
-    // /workflows/{id}/edit -> edit existing
-    const editWorkflowMatch = path.match(/^\/workflows\/([a-z0-9_-]+)\/edit$/);
+    // /workflows/{id}/edit -> edit existing. Matched and decoded like the
+    // workflow page below.
+    const editWorkflowMatch = path.match(/^\/workflows\/([^/]+)\/edit$/);
     if (editWorkflowMatch) {
-      runId = null;
-      workflowPageType = 'edit';
-      workflowId = editWorkflowMatch[1];
-      return;
+      try {
+        workflowId = decodeURIComponent(editWorkflowMatch[1]);
+        runId = null;
+        workflowPageType = 'edit';
+        return;
+      } catch {
+        // Not a valid escape; show the catalog.
+      }
     }
 
     // /workflows/{id} -> the workflow's page. Ids can have uppercase letters,

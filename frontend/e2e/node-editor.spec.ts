@@ -222,3 +222,23 @@ test('the canvas fills the viewport below the header on the edit and new pages',
     rmSync(path, { force: true });
   }
 });
+
+test('a wide graph fits inside the canvas on first load', async ({ page, baseURL }) => {
+  const base = baseURL || 'http://127.0.0.1:5173';
+  // consensus_task.dot is wide enough that Svelte Flow's default minZoom of
+  // 0.5 stopped fitView short, leaving nodes off both edges.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`${base}/workflows/examples__consensus_task/edit`);
+  const nodes = page.locator('.svelte-flow__node');
+  await expect(nodes.first()).toBeVisible({ timeout: 10000 });
+
+  const flow = (await page.locator('.svelte-flow').boundingBox())!;
+  for (const node of await nodes.all()) {
+    const box = (await node.boundingBox())!;
+    const id = await node.getAttribute('data-id');
+    expect(box.x, `${id} left`).toBeGreaterThanOrEqual(flow.x);
+    expect(box.x + box.width, `${id} right`).toBeLessThanOrEqual(flow.x + flow.width);
+    expect(box.y, `${id} top`).toBeGreaterThanOrEqual(flow.y);
+    expect(box.y + box.height, `${id} bottom`).toBeLessThanOrEqual(flow.y + flow.height);
+  }
+});
