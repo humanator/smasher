@@ -56,10 +56,10 @@ both.
 - [x] 1. `CommandRunner`: run, timeout, cancel, environment
 - [x] 2. `ToolHandler` node contract, context keys, output files, `UnknownToolBackend`
 - [x] 3. Lint rules E004, E005, W004
-- [ ] 4. Conditions accept a `context.` prefix
+- [x] 4. Conditions accept a `context.` prefix
 
 ### Checkpoint A
-- [ ] `cargo test -p smasher-attractor`, clippy and fmt clean
+- [x] `cargo test -p smasher-attractor`, clippy and fmt clean
 
 ### Phase 2: Wiring
 - [ ] 5. Web: remove `LlmToolBackend`, wire the runner, integration test

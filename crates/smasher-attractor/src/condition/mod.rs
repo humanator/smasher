@@ -68,6 +68,17 @@ pub fn validate(expr: &str) -> Result<(), ConditionError> {
     parse_condition(expr).map(|_| ())
 }
 
+/// Look up a condition key. A key that isn't found as written is tried again
+/// without a leading `context.`, so `context.tool.output` and `tool.output`
+/// are equivalent (as in upstream Attractor), while a literal `context.foo`
+/// key still wins.
+fn lookup<'a>(context: &'a HashMap<String, String>, key: &str) -> Option<&'a String> {
+    context.get(key).or_else(|| {
+        key.strip_prefix("context.")
+            .and_then(|bare| context.get(bare))
+    })
+}
+
 /// Evaluate a condition strictly, returning an error for undefined variables.
 ///
 /// Unlike `evaluate_condition` which silently treats missing keys as false,
@@ -82,20 +93,17 @@ pub fn evaluate_condition_strict(
         Condition::True => Ok(true),
         Condition::False => Ok(false),
         Condition::Equals { key, value } => {
-            let ctx_val = context
-                .get(key)
+            let ctx_val = lookup(context, key)
                 .ok_or_else(|| ConditionError::UndefinedVariable { name: key.clone() })?;
             Ok(ctx_val == value)
         }
         Condition::NotEquals { key, value } => {
-            let ctx_val = context
-                .get(key)
+            let ctx_val = lookup(context, key)
                 .ok_or_else(|| ConditionError::UndefinedVariable { name: key.clone() })?;
             Ok(ctx_val != value)
         }
         Condition::GreaterThan { key, value } => {
-            let ctx_val = context
-                .get(key)
+            let ctx_val = lookup(context, key)
                 .ok_or_else(|| ConditionError::UndefinedVariable { name: key.clone() })?;
             let numeric = ctx_val
                 .parse::<f64>()
@@ -108,8 +116,7 @@ pub fn evaluate_condition_strict(
             Ok(numeric > *value)
         }
         Condition::LessThan { key, value } => {
-            let ctx_val = context
-                .get(key)
+            let ctx_val = lookup(context, key)
                 .ok_or_else(|| ConditionError::UndefinedVariable { name: key.clone() })?;
             let numeric = ctx_val
                 .parse::<f64>()
@@ -356,14 +363,12 @@ pub fn evaluate_condition(condition: &Condition, context: &HashMap<String, Strin
     match condition {
         Condition::True => true,
         Condition::False => false,
-        Condition::Equals { key, value } => context.get(key) == Some(value),
-        Condition::NotEquals { key, value } => context.get(key).is_some_and(|v| v != value),
-        Condition::GreaterThan { key, value } => context
-            .get(key)
+        Condition::Equals { key, value } => lookup(context, key) == Some(value),
+        Condition::NotEquals { key, value } => lookup(context, key).is_some_and(|v| v != value),
+        Condition::GreaterThan { key, value } => lookup(context, key)
             .and_then(|v| v.parse::<f64>().ok())
             .is_some_and(|v| v > *value),
-        Condition::LessThan { key, value } => context
-            .get(key)
+        Condition::LessThan { key, value } => lookup(context, key)
             .and_then(|v| v.parse::<f64>().ok())
             .is_some_and(|v| v < *value),
         Condition::And(a, b) => evaluate_condition(a, context) && evaluate_condition(b, context),
@@ -977,5 +982,72 @@ mod tests {
             msg,
             "undefined variable 'status' referenced in condition; provide a value for 'status' in the context"
         );
+    }
+
+    // ---------------------------------------------------------------
+    // `context.` prefix
+    // ---------------------------------------------------------------
+
+    fn ctx(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn context_prefix_resolves_to_the_bare_key() {
+        let context = ctx(&[("tool.output", "clean"), ("tool.exit_code", "0")]);
+        for expr in [
+            "context.tool.output=clean",
+            "tool.output=clean",
+            "context.tool.output!=dirty",
+            "context.tool.exit_code<1",
+            "context.tool.exit_code>-1",
+        ] {
+            let cond = parse_condition(expr).unwrap();
+            assert!(evaluate_condition(&cond, &context), "{expr}");
+            assert!(
+                evaluate_condition_strict(&cond, &context).unwrap(),
+                "{expr}"
+            );
+        }
+        let cond = parse_condition("context.tool.output=dirty").unwrap();
+        assert!(!evaluate_condition(&cond, &context));
+        assert!(!evaluate_condition_strict(&cond, &context).unwrap());
+    }
+
+    #[test]
+    fn context_prefix_literal_key_wins() {
+        let context = ctx(&[("context.mode", "literal"), ("mode", "bare")]);
+        let cond = parse_condition("context.mode=literal").unwrap();
+        assert!(evaluate_condition(&cond, &context));
+        assert!(evaluate_condition_strict(&cond, &context).unwrap());
+    }
+
+    #[test]
+    fn context_prefix_missing_key_is_still_false() {
+        // As used by consensus_task*.dot: the key is unset either way.
+        let cond = parse_condition("context.internal.loop_restart_count=0").unwrap();
+        let context = ctx(&[("outcome", "success")]);
+        assert!(!evaluate_condition(&cond, &context));
+        match evaluate_condition_strict(&cond, &context) {
+            Err(ConditionError::UndefinedVariable { name }) => {
+                assert_eq!(name, "context.internal.loop_restart_count");
+            }
+            other => panic!("expected UndefinedVariable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn context_prefix_is_only_stripped_once_and_only_as_a_prefix() {
+        let context = ctx(&[("tool.output", "clean")]);
+        for expr in [
+            "context.context.tool.output=clean",
+            "contexttool.output=clean",
+        ] {
+            let cond = parse_condition(expr).unwrap();
+            assert!(!evaluate_condition(&cond, &context), "{expr}");
+        }
     }
 }

@@ -155,16 +155,16 @@ comment. Two example fixes:
 copy.
 
 **Acceptance criteria:**
-- [ ] `context.tool.output=x` matches when `tool.output` is `x`, in both
+- [x] `context.tool.output=x` matches when `tool.output` is `x`, in both
       evaluators.
-- [ ] A literal key `context.foo` still wins over `foo`.
-- [ ] A missing key is still false. For example,
+- [x] A literal key `context.foo` still wins over `foo`.
+- [x] A missing key is still false. For example,
       `context.internal.loop_restart_count=0`, as used by
       `consensus_task*.dot`, behaves as before.
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor condition`
-- [ ] `cargo test -p smasher-attractor --test example_dot_parse`
+- [x] `cargo test -p smasher-attractor condition`
+- [x] `cargo test -p smasher-attractor --test example_dot_parse`
 
 **Dependencies:** None
 
@@ -176,9 +176,9 @@ copy.
 **Estimated scope:** Small
 
 ## Checkpoint A: after tasks 1–4
-- [ ] `cargo test -p smasher-attractor` passes
-- [ ] `cargo clippy --workspace -- -D warnings` and `cargo fmt --all -- --check` are clean
-- [ ] Commit each task separately
+- [x] `cargo test -p smasher-attractor` passes
+- [x] `cargo clippy --workspace -- -D warnings` and `cargo fmt --all -- --check` are clean
+- [x] Commit each task separately
 
 ## Phase 2: Wiring
 
