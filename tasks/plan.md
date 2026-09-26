@@ -18,17 +18,34 @@ both.
   it through a builder (`with_commands(CommandConfig { working_dir, run_dir,
   cancel })`). The `Handler` trait is not changed.
 - **A new runner rather than `exec_command`.** `LocalExecutionEnvironment::exec_command`
-  can't expose the child's PID, so it can't kill the command on cancel. The
-  runner copies `ShellCodergenBackend`'s process-group handling and reuses the
-  agent's secret-variable filter.
+  can't expose the child's PID, so it can't kill the command on cancel.
+  - **Process group:** the runner uses `Command::process_group(0)` and the
+    agent's `kill_process_group`, made a `pub` free function. That avoids adding
+    libc to `smasher-attractor`.
+  - **Secrets:** it reuses the agent's secret-variable filter, extracted from
+    `LocalExecutionEnvironment::new` into a `pub` const and a `pub fn`.
+- **The handler writes context itself.** The engine never applies
+  `Outcome.context_updates`, so `ToolHandler` sets `tool.*` with `context.set`,
+  as it already does for `_tool_<id>`. This also makes the keys available on
+  failure.
+- **One env-name helper.** `SMASHER_CTX_<KEY>` normalisation is a `pub fn` in
+  `tool_command.rs`. The CLI's `ShellCodergenBackend` uses it too, so both see
+  the same names.
 - **Only the chain's last link changes.** `UnknownToolBackend` in
   `tool_handler.rs` replaces `LlmToolBackend`. Built-in backends keep their
   `fallback` parameter.
-- **Cancellation.** The web app already makes a `CancellationToken` per run
-  (`run_launch.rs:134`); it's passed to both tool registries (main and
-  parallel-child). The CLI passes its token if `smasher run` has one; otherwise
-  it passes a fresh token that is never cancelled, and Ctrl-C kills the process
-  group through the terminal as today.
+- **Cancellation.** The engine checks the token only between nodes, so the
+  runner races the command against it.
+  - **Web app:** it already makes a `CancellationToken` per run
+    (`run_launch.rs:134`). That token is moved into `EngineConfig`, so it's
+    cloned for both tool registries (main and parallel-child) first.
+  - **CLI:** `smasher run` has no token today. It creates one and shares it
+    between `EngineConfig` and `CommandConfig`, so the stall watchdog's cancel
+    reaches running commands. Ctrl-C still kills the process group through the
+    terminal.
+- **The CLI registers `ToolHandler` everywhere.** It builds the tool chain once
+  and registers it in three places: the main registry, the `ParallelHandler`
+  child registry (empty today), and `smasher resume` (Codergen only today).
 - **Order.** The engine core comes first, since the runner's process-group
   kill is the riskiest part. Then the two apps are wired up, each with its own
   end-to-end test. Frontend and docs come last.
@@ -46,14 +63,16 @@ both.
 
 ### Phase 2: Wiring
 - [ ] 5. Web: remove `LlmToolBackend`, wire the runner, integration test
-- [ ] 6. CLI: remove `LlmToolBackend`, always register `ToolHandler`, e2e test
+- [ ] 6. CLI: remove `LlmToolBackend`, always register `ToolHandler` (main,
+      parallel child, resume), cancel token, shared env-name helper, e2e test
 
 ### Checkpoint B
 - [ ] `make pre-commit` green; `smasher run --backend shell` on the fixture
       works with no API keys
 
 ### Phase 3: Editor and docs
-- [ ] 7. Node editor `ToolForm`: built-in tool or shell command
+- [ ] 7. Node editor `ToolForm`: built-in tool or shell command (legacy
+      editor-ui: comments only)
 - [ ] 8. Docs
 - [ ] 9. Backlog updates
 
@@ -70,6 +89,9 @@ both.
 | Some upstream-ported example scripts fail once run for real | Med | Out of scope by the spec; a backlog item covers it. Lint on examples stays green. |
 | A test deleted along with its behaviour hides a regression | Low | Each deletion is listed in its commit message. The remaining behaviour gets new tests. |
 | Frontend suites fail because the desktop app holds port 21541 | Low | Follow the BACKLOG test gotcha: quit the app and serve from this branch with the fake `claude`. |
+| Flat `tool.*` keys overwrite each other when tool nodes run in parallel branches (one shared `Context`) | Low | Documented in the spec and dot-reference. Per-node results stay in `_tool_<id>` and `nodes/<id>/`. |
+| Normalising `SMASHER_CTX_` names changes what `--backend shell` codergen scripts see | Low | No example uses the raw names. The change is called out in Task 6's commit message. |
+| A timeout written as `30s` is parsed as a `Duration` and silently ignored | Med | Task 2 accepts `Duration` alongside a number or numeric string, with a test for each. |
 
 ## Open Questions
 
