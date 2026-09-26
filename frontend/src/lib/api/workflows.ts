@@ -71,14 +71,14 @@ export async function listWorkflows(): Promise<WorkflowsListResponse> {
 export async function getWorkflowGraph(
   id: string
 ): Promise<{ graph: EditorGraph; etag: string | null }> {
-  const response = await fetch(getApiUrl(`/workflows/${id}/graph`));
+  const response = await fetch(getApiUrl(`/workflows/${encodeURIComponent(id)}/graph`));
   const graph = await handleResponse<EditorGraph>(response);
   return { graph, etag: response.headers.get('ETag') };
 }
 
 /** The workflow's DOT source exactly as it is on disk. */
 export async function getWorkflowDot(id: string): Promise<string> {
-  const response = await fetch(getApiUrl(`/workflows/${id}/dot`));
+  const response = await fetch(getApiUrl(`/workflows/${encodeURIComponent(id)}/dot`));
   if (!response.ok) throw await errorFromResponse(response);
   return response.text();
 }
@@ -96,7 +96,7 @@ export async function updateWorkflowGraph(
 ): Promise<string | null> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (etag) headers['If-Match'] = etag;
-  const response = await fetch(getApiUrl(`/workflows/${id}/graph`), {
+  const response = await fetch(getApiUrl(`/workflows/${encodeURIComponent(id)}/graph`), {
     method: 'PUT',
     headers,
     body: JSON.stringify(graph),

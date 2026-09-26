@@ -258,5 +258,31 @@ describe('App workflow detail route', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Smasher Pipelines' })).toBeTruthy();
   });
+
+  it('opens the editor for an id with uppercase letters and dots', async () => {
+    const name = `test_AppEdit.v1_${Date.now()}`;
+    const { id } = await workflowsApi.importWorkflowDot(
+      name,
+      readFileSync(join(process.cwd(), '..', 'examples', 'run_launch_check.dot'), 'utf-8')
+    );
+    imported = (await workflowsApi.listWorkflows()).workflows.find((w) => w.id === id)?.path;
+
+    visit(`/workflows/${encodeURIComponent(id)}/edit`);
+    render(App);
+
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 1, name: 'Edit Workflow' })).toBeTruthy();
+    // Save only appears once the real graph has loaded for the decoded id.
+    await waitFor(() => expect(within(header).getByTestId('save-button')).toBeTruthy(), {
+      timeout: 5000,
+    });
+  });
+
+  it('falls back to the catalog for a malformed escape in an edit path', () => {
+    visit('/workflows/%E0%A4%A/edit');
+    render(App);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Smasher Pipelines' })).toBeTruthy();
+  });
 });
 

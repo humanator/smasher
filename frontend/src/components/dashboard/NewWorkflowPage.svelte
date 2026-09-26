@@ -33,7 +33,7 @@
       );
 
       // Navigate to the edit page for the newly created workflow
-      window.location.href = `/workflows/${result.id}/edit`;
+      window.location.href = `/workflows/${encodeURIComponent(result.id)}/edit`;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to save workflow';
     }
