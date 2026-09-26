@@ -23,8 +23,8 @@ batch, `feat/claude-cli-provider` and `feat/spa-port-repairs` are all merged int
 added mid-session and ran alongside. It's now merged (#23). The SPA port repairs,
 #9 (candidate thumbnails and lightbox) + #21 (the rest of what the port
 dropped), were reviewed by Jobsworth and merged to `main` on 2026-09-25. Their
-specs, plans and todos are in `archive/`. #2 is done on `feat/frontend-ci`
-(PR humanator/smasher#1), waiting to merge. Still open from the agreed order: #6.
+specs, plans and todos are in `archive/`. #2 (frontend CI, with #27, #30 and
+#31) merged to `main` on 2026-09-26. Still open from the agreed order: #6.
 
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
@@ -71,9 +71,9 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
    - Test fixtures still use `claude-sonnet-4-20250514` on purpose, as sample
      data. Leave them.
 
-2. ~~**Run the frontend in CI.**~~ **Done 2026-09-26** on `feat/frontend-ci`
-   (PR humanator/smasher#1, not yet merged). Spec, plan and todo:
-   `SPEC-frontend-ci.md`, `plan.md`, `todo.md`; archive them once merged.
+2. ~~**Run the frontend in CI.**~~ **Done 2026-09-26**, merged to `main` via
+   PR humanator/smasher#1. Spec, plan and todo are in `archive/`
+   (`SPEC-frontend-ci.md`, `plan-frontend-ci.md`, `todo-frontend-ci.md`).
    `ci.yml`'s new `Frontend` job runs svelte-check, eslint, `build:check`,
    Vitest and Playwright against a fake-claude `smasher serve`. It fails if the
    fake's log isn't empty. Batched with it:
@@ -286,7 +286,7 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     `parallelogram` is parallel fan-out, `hexagon` is tool and `component` is a
     sub-pipeline.
 27. ~~**Fix a cleanup race in `CandidatePreview.test.ts`.**~~ **Done
-    2026-09-26** on `feat/frontend-ci`, after it failed CI run `36212841475`.
+    2026-09-26** with #2, after it failed CI run `36212841475`.
     The `afterEach` now waits for `Aborted`, then removes the directory with
     `rmSync`'s `maxRetries`. `Aborted` alone isn't enough: the JSONL event
     writer drains on its own task after the status is set.
@@ -312,7 +312,7 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     which launches the runner image's Chrome and isn't `#[ignore]`d. Start by
     adding a `timeout-minutes` and `--nocapture`-style progress so the next
     run shows which test hangs. Kept out of the frontend CI batch
-    (`SPEC-frontend-ci.md`) by Jobsworth's call.
+    (`archive/SPEC-frontend-ci.md`) by Jobsworth's call.
     New lead, 2026-09-26: on PR humanator/smasher#1 (run `36215653694`), MSRV
     failed after 1.5 min, not 50. Four `smasher-desktop` `settings::tests`
     Keychain tests panicked (`settings.rs:564`, `:621`, `:640`); Linux runners

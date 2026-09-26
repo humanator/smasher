@@ -1,6 +1,6 @@
 # Todo: Frontend CI
 
-Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
+Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan-frontend-ci.md`](plan-frontend-ci.md)
 
 ## Phase 1: #30
 
