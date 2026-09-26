@@ -162,15 +162,19 @@ jobs:
     env:
       SMASHER_PROVIDER: claude-cli
       SMASHER_CLAUDE_CLI: ${{ github.workspace }}/frontend/tests/fixtures/fake-claude.sh
-      # The server and the gallery tests must share one data dir: the tests
-      # write candidate manifests into it directly.
-      SMASHER_DATA_DIR: ${{ runner.temp }}/smasher-data
-      FAKE_CLAUDE_LOG: ${{ runner.temp }}/fake-claude.log
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      # The `runner` context isn't available in job-level `env`, so these
+      # two are set here instead. The server and the gallery tests must
+      # share one data dir: the tests write candidate manifests into it.
+      - name: Point the data dir and fake-claude log at the runner's temp dir
+        working-directory: .
+        run: |
+          echo "SMASHER_DATA_DIR=$RUNNER_TEMP/smasher-data" >> "$GITHUB_ENV"
+          echo "FAKE_CLAUDE_LOG=$RUNNER_TEMP/fake-claude.log" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
