@@ -28,5 +28,6 @@ pub mod state;
 pub mod stats;
 pub mod status;
 pub mod stylesheet;
+pub mod tool_command;
 pub mod tool_handler;
 pub mod transforms;

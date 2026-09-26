@@ -31,17 +31,17 @@ whose key doesn't start with `_`. A `pub fn ctx_env_name(key)` builds the
 become `_`.
 
 **Acceptance criteria:**
-- [ ] The exit code and both streams are captured.
-- [ ] On timeout or cancellation, the whole process group is SIGKILLed: a forked
+- [x] The exit code and both streams are captured.
+- [x] On timeout or cancellation, the whole process group is SIGKILLed: a forked
       grandchild is gone afterwards.
-- [ ] A planted `FOO_API_KEY` isn't visible to the command. The `SMASHER_*`
+- [x] A planted `FOO_API_KEY` isn't visible to the command. The `SMASHER_*`
       variables are, with keys normalised.
-- [ ] `smasher-agent`'s environment tests still pass.
+- [x] `smasher-agent`'s environment tests still pass.
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor tool_command`
-- [ ] `cargo test -p smasher-agent environment`
-- [ ] `cargo clippy -p smasher-attractor -p smasher-agent -- -D warnings`
+- [x] `cargo test -p smasher-attractor tool_command`
+- [x] `cargo test -p smasher-agent environment`
+- [x] `cargo clippy -p smasher-attractor -p smasher-agent -- -D warnings`
 
 **Dependencies:** None
 

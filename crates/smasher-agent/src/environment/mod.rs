@@ -138,13 +138,7 @@ impl LocalExecutionEnvironment {
     pub fn new(working_directory: String) -> Self {
         Self {
             working_directory,
-            env_filter: vec![
-                "AWS_SECRET".to_string(),
-                "API_KEY".to_string(),
-                "TOKEN".to_string(),
-                "PASSWORD".to_string(),
-                "SECRET".to_string(),
-            ],
+            env_filter: DEFAULT_ENV_FILTER.iter().map(|f| f.to_string()).collect(),
             allowed_external_roots: Vec::new(),
         }
     }
@@ -239,10 +233,7 @@ impl LocalExecutionEnvironment {
 
     /// Determine whether an env var key should be filtered out.
     fn should_filter_env(&self, key: &str) -> bool {
-        let key_upper = key.to_uppercase();
-        self.env_filter
-            .iter()
-            .any(|f| key_upper.contains(&f.to_uppercase()))
+        env_key_is_filtered(key, &self.env_filter)
     }
 
     /// Collect files to search for grep, honoring recursive and file_pattern options.
@@ -322,16 +313,29 @@ impl LocalExecutionEnvironment {
         }
         Ok(files)
     }
+}
 
-    /// Kill a process group given the leader's PID.
-    #[cfg(unix)]
-    fn kill_process_group(pid: u32) {
-        use std::process::Command as StdCommand;
-        // Use kill to send SIGKILL to the process group (negative PID).
-        let _ = StdCommand::new("kill")
-            .args(["-9", &format!("-{pid}")])
-            .output();
-    }
+/// Environment variable key substrings that mark a variable as secret.
+/// Inherited variables whose key contains one (ignoring case) are not passed
+/// to commands.
+pub const DEFAULT_ENV_FILTER: &[&str] = &["AWS_SECRET", "API_KEY", "TOKEN", "PASSWORD", "SECRET"];
+
+/// Whether an env var key contains any of `filter`'s substrings, ignoring case.
+pub fn env_key_is_filtered(key: &str, filter: &[impl AsRef<str>]) -> bool {
+    let key_upper = key.to_uppercase();
+    filter
+        .iter()
+        .any(|f| key_upper.contains(&f.as_ref().to_uppercase()))
+}
+
+/// Kill a process group given the leader's PID.
+#[cfg(unix)]
+pub fn kill_process_group(pid: u32) {
+    use std::process::Command as StdCommand;
+    // Use kill to send SIGKILL to the process group (negative PID).
+    let _ = StdCommand::new("kill")
+        .args(["-9", &format!("-{pid}")])
+        .output();
 }
 
 /// Map std::io::Error to EnvironmentError, distinguishing not-found and permission errors.
@@ -530,7 +534,7 @@ impl ExecutionEnvironment for LocalExecutionEnvironment {
                     // Timeout: kill the process group using the saved PID.
                     if let Some(pid) = child_pid {
                         #[cfg(unix)]
-                        Self::kill_process_group(pid);
+                        kill_process_group(pid);
                     }
                     Err(EnvironmentError::CommandTimeout { timeout_ms })
                 }
@@ -592,6 +596,49 @@ mod tests {
     /// Remove a temporary directory after a test.
     fn cleanup(dir: &Path) {
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn env_key_is_filtered_matches_default_secret_substrings() {
+        assert!(env_key_is_filtered("FOO_API_KEY", DEFAULT_ENV_FILTER));
+        assert!(env_key_is_filtered("github_token", DEFAULT_ENV_FILTER));
+        assert!(env_key_is_filtered("DB_PASSWORD", DEFAULT_ENV_FILTER));
+        assert!(env_key_is_filtered(
+            "AWS_SECRET_ACCESS_KEY",
+            DEFAULT_ENV_FILTER
+        ));
+        assert!(!env_key_is_filtered("PATH", DEFAULT_ENV_FILTER));
+        assert!(!env_key_is_filtered("SMASHER_RUN_DIR", DEFAULT_ENV_FILTER));
+    }
+
+    #[test]
+    fn env_key_is_filtered_uses_the_given_filter() {
+        assert!(env_key_is_filtered("MY_CUSTOM", &["custom"]));
+        assert!(!env_key_is_filtered("FOO_API_KEY", &["custom"]));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn kill_process_group_kills_leader_and_children() {
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c").arg("sleep 30 & sleep 30");
+        cmd.process_group(0);
+        let mut child = cmd.spawn().unwrap();
+        let pid = child.id().unwrap();
+
+        kill_process_group(pid);
+
+        let status = tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
+            .await
+            .expect("leader should exit after the group is killed")
+            .unwrap();
+        assert!(!status.success());
+        // No process remains in the group.
+        let alive = std::process::Command::new("pgrep")
+            .args(["-g", &pid.to_string()])
+            .output()
+            .unwrap();
+        assert!(alive.stdout.is_empty(), "group {pid} still has processes");
     }
 
     #[tokio::test]
