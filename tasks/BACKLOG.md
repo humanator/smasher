@@ -16,7 +16,7 @@ deferred decisions. [`Vision.md`](Vision.md) is still the product north star.
 **Branches.** `chore/tasks-triage`, `fix/default-model` (item #1), the editor
 batch, `feat/claude-cli-provider` and `feat/spa-port-repairs` are all merged into
 `main`. The Claude CLI provider merged on 2026-09-25 with a known limitation
-(#23). `feat/question-replies` has #28 built and waiting for review.
+(#23). `feat/question-replies` (#28) was reviewed and merged on 2026-09-26.
 
 **Agreed order.** #2, then the editor batch (#3 + #4 + #5, merged to `main`
 2026-09-24), then #6. The Claude CLI provider was
@@ -29,7 +29,6 @@ specs, plans and todos are in `archive/`. #2 (frontend CI, with #27, #30 and
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
 - #6: the default artifact retention policy.
-- #28: review `feat/question-replies` and decide whether to merge it.
 
 **Frontend test gotcha.** The Vitest suite's "real API" tests (gallery, gate,
 decision history, new-workflow) call whatever server is listening on
@@ -291,22 +290,25 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     `rmSync`'s `maxRetries`. `Aborted` alone isn't enough: the JSONL event
     writer drains on its own task after the status is set.
 28. ~~**Show the agent's replies under the question they answer.**~~ **Done
-    2026-09-25** on `feat/question-replies`, not yet merged. Web runs emit
+    2026-09-25**, reviewed and merged to `main` 2026-09-26. Web runs emit
     `human_prompt_issued` / `human_response_received`, the run summary lists
     `gallery_gates`, and Answered Questions is rebuilt from events (oldest
     first, gallery picks left out), with replies rendered as markdown. Found
-    along the way: #29 and #30. *Raised by
+    along the way: #29, and #30 (fixed with #2). The review moved the
+    `human_response_received` emit into the gate (`await_answer`), so a run
+    cancelled mid-answer can't log an answer the gate never got. *Raised by
     Jobsworth 2026-09-25* from run `01m3c6t5exbbr6b2jps2w3wnj7`
     (`human_gate_showcase.dot`). Each gate answer leads into an LLM node whose
     `agent_message` replies to it, but the reply only shows as a cut-off line in
-    the event log. Spec, plan and todo: `SPEC-question-replies.md`,
-    `plan.md` and `todo.md` in `tasks/`. Archive them once the branch merges.
+    the event log. Spec, plan and todo are in `archive/`
+    (`SPEC-question-replies.md`, `plan-question-replies.md`,
+    `todo-question-replies.md`).
     Decided by Jobsworth: a reply belongs to the last answer until the next
     question is asked; the log keeps a one-line entry; replies render as
     markdown (`marked` + `DOMPurify`); the answered list is rebuilt from
     events; gallery-gate answers are left out; oldest first. The plan's review
-    pauses after Checkpoints A and B were skipped in the `/build auto` run, so
-    the branch review covers both.
+    pauses after Checkpoints A and B were skipped in the `/build auto` run; the
+    branch review covered both.
 
 29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
     *Seen 2026-09-25 while building #28.* In `crates/smasher-web/tests/events_test.rs`,
@@ -321,7 +323,8 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     works around it by waiting for Exit's `node_completed`. Once the cause is
     known, make the test wait for `pipeline_completed` again. If it isn't
     harness-only, finished runs reloaded from disk would be missing their final
-    events.
+    events. Lead from #27: the JSONL event writer drains on its own task after
+    the run's status is set, so the test may simply read the file too early.
 32. **Find why the Rust CI jobs time out.** *Seen 2026-09-26 while speccing #2.*
     On `myfork` (humanator/smasher), the last two pushes to `main` failed
     (runs `36006298587` and `35957900741`, 2026-09-24). `Test` and `MSRV` ran

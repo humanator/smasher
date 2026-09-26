@@ -1,7 +1,7 @@
 # Implementation Plan: agent replies under the answered question
 
 Spec: [`SPEC-question-replies.md`](SPEC-question-replies.md). Branch: `feat/question-replies`.
-Task list: [`todo.md`](todo.md).
+Task list: [`todo-question-replies.md`](todo-question-replies.md).
 
 ## Overview
 

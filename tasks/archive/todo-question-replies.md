@@ -1,6 +1,6 @@
 # Todo: agent replies under the answered question
 
-Plan: [`plan.md`](plan.md). Spec: [`SPEC-question-replies.md`](SPEC-question-replies.md).
+Plan: [`plan-question-replies.md`](plan-question-replies.md). Spec: [`SPEC-question-replies.md`](SPEC-question-replies.md).
 TDD for every task: write the failing test first. No test may reach an LLM, and the fake claude
 stays failing.
 
@@ -89,7 +89,7 @@ exchanges without parsing DOT.
 
 - [x] `cargo test --workspace` and `make ci` green
 - [x] A `QUESTION_KINDS` run's `events.jsonl` shows prompt → response → `node_completed` per gate
-- [ ] (Skipped in the /build auto run; review at the end) Commit, then review with Jobsworth before starting the client
+- [x] (Skipped in the /build auto run; covered by the branch review, 2026-09-26) Commit, then review with Jobsworth before starting the client
 
 ## Phase 2: Client builds exchanges
 
@@ -210,7 +210,7 @@ labelled with its node id, and its body is `{@html renderMarkdown(reply.text)}` 
       reaches an LLM
 - [x] Manual: `cargo run -p smasher-cli -- serve`, answer a `QUESTION_KINDS` run, reload; the
       answered list stays, and the log shows `Awaiting input` / `Input received`
-- [ ] (Skipped in the /build auto run; review at the end) Commit, then review with Jobsworth
+- [x] (Skipped in the /build auto run; covered by the branch review, 2026-09-26) Commit, then review with Jobsworth
 
 ## Phase 3: End to end and docs
 

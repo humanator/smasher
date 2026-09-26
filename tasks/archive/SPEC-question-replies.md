@@ -1,6 +1,6 @@
 # Spec: agent replies under the answered question
 
-Status: **done, 2026-09-25** (built on `feat/question-replies`, not yet merged). Branch: `feat/question-replies`, from `feat/spa-port-repairs`.
+Status: **done, 2026-09-25**; reviewed and merged to `main` 2026-09-26. Branch: `feat/question-replies`, from `feat/spa-port-repairs`.
 
 Raised by Jobsworth on run `01m3c6t5exbbr6b2jps2w3wnj7` (`human_gate_showcase.dot`): the agent's
 reply to each gate answer shows only as a cut-off line in the event log. It should read as a reply
