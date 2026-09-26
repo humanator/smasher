@@ -34,11 +34,11 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
   - Acceptance: the job matches the plan's step list, with the fake-claude env and the empty-log assertion.
   - Verify: `actionlint` if available, otherwise a YAML parse; a local dry run of the same commands in a fresh temp data dir passes.
   - Files: `.nvmrc`, `.github/workflows/ci.yml`.
-- [ ] **Task 6: prove it on `myfork`** *(pushes, so confirm with Jobsworth first)*
+- [x] **Task 6: prove it on `myfork`** *(pushes, so confirm with Jobsworth first)*
   - Acceptance: `Frontend` is green on the PR against `myfork/main`.
   - Verify: `gh run watch -R humanator/smasher`.
   - Files: none new (fixes only if CI shows a real difference).
-- [ ] **Task 7: red/green proof**
+- [x] **Task 7: red/green proof**
   - Acceptance: a deliberately failing Vitest assertion turns `Frontend` red, and the revert turns it green.
   - Verify: the two run URLs, recorded in the PR description.
   - Files: one test file, temporarily.
@@ -47,7 +47,7 @@ Spec: [`SPEC-frontend-ci.md`](SPEC-frontend-ci.md) · Plan: [`plan.md`](plan.md)
 
 ## Phase 4: close-out
 
-- [ ] **Task 8: docs and backlog**
+- [x] **Task 8: docs and backlog**
   - Acceptance: the backlog gotcha notes CI handles the server; #2/#30/#31 are marked done with the Chromium decision; the docs say how CI runs the SPA.
   - Verify: read it through.
   - Files: `tasks/BACKLOG.md`, `docs/quickstart.md` (or a CI section).

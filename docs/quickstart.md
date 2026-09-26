@@ -478,6 +478,35 @@ app shows a "Smasher couldn't start" dialog and exits.
 port, debug builds use 21541. The API has no auth, so it is never reachable
 from another machine.
 
+## Frontend Tests and CI
+
+Vitest's real-API tests and the Playwright specs talk to whatever server is
+listening on `127.0.0.1:21541`; they don't start one. The server needs
+Graphviz's `dot` on `PATH` to render run graphs (`brew install graphviz`).
+Quit the desktop app, then start a server on the fake `claude`, so nothing
+can spend LLM tokens:
+
+```bash
+export SMASHER_DATA_DIR=$(mktemp -d) FAKE_CLAUDE_LOG=$(mktemp)
+SMASHER_PROVIDER=claude-cli SMASHER_CLAUDE_CLI=frontend/tests/fixtures/fake-claude.sh \
+  cargo run -p smasher-cli -- serve
+```
+
+Then, from `frontend/` in a shell with the same `SMASHER_DATA_DIR` exported:
+
+```bash
+npm run check          # svelte-check, 0 errors expected
+npx eslint .
+npm run build:check    # vite build, then fails on any JS chunk over 500 kB
+npx vitest run
+npx playwright test    # starts Vite on :5173 itself
+```
+
+CI's `Frontend` job (`.github/workflows/ci.yml`) runs the same sequence on
+every PR to `main`. It fails if `FAKE_CLAUDE_LOG` isn't empty at the end.
+Playwright installs its own Chromium there. `SMASHER_LLM_TESTS` is never set
+in CI, so the two critical-path tests, which spend real tokens, stay skipped.
+
 ## Next Steps
 
 - [DOT Format Reference](dot-reference.md) -- node shapes, attributes, edge conditions, stylesheets
