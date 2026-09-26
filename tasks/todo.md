@@ -421,7 +421,9 @@ After merge, move the spec, plan and todo to `tasks/archive/` as
 **Estimated scope:** XS
 
 ## Checkpoint C: Complete
-- [ ] Spec success criteria 1–10 are each checked off with evidence
-- [ ] Frontend suites pass against a fake-claude `smasher serve` from this
+- [x] Spec success criteria 1–10 are each checked off with evidence
+- [x] Frontend suites pass against a fake-claude `smasher serve` from this
       branch (BACKLOG test gotcha), and `FAKE_CLAUDE_LOG` is empty
+      (2026-09-26: Vitest 458 passed / 1 skipped, Playwright 19 passed /
+      1 skipped; the log was never created)
 - [ ] Review with Jobsworth before merging to `main`

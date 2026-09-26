@@ -77,8 +77,9 @@ both.
 - [x] 9. Backlog updates
 
 ### Checkpoint C: Complete
-- [ ] All spec success criteria met, frontend suites green against a
-      fake-claude server, and a review with Jobsworth before merging
+- [x] All spec success criteria met, frontend suites green against a
+      fake-claude server
+- [ ] A review with Jobsworth before merging
 
 ## Risks and Mitigations
 
