@@ -395,7 +395,7 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/workflows` | List all discovered workflow files from configured directories. |
 | `GET` | `/api/workflows/{id}/dot` | Return a workflow's raw on-disk DOT source (used by the editor's "Export .dot"). |
 | `POST` | `/api/workflows/import` | Save raw DOT as a new workflow under `{data_dir}/workflows` (used by the catalog's "Import .dot"). |
-| `POST` | `/editor/workflows` | Save a new workflow (used by node-editor). |
+| `POST` | `/api/workflows/new` | Save a new workflow from editor JSON (used by node-editor). |
 | `GET` | `/api/workflows/{id}/graph` | Return a workflow's graph as editor JSON, with an `ETag` (used by node-editor). |
 | `PUT` | `/api/workflows/{id}/graph` | Update an existing workflow's graph; `If-Match` refuses a stale save with 409 (used by node-editor). |
 | `POST` | `/api/runs/{id}/gallery/{qid}/decision` | Submit a gallery-gate decision (used by gallery-gate component). |
@@ -746,17 +746,20 @@ Response body (200 OK):
 | 400 | `name` is blank or not a valid id, or `dot` fails to parse or resolve (`invalid DOT: ...`). |
 | 409 | A workflow file with that name already exists. Import never overwrites. |
 
-### POST /editor/workflows -- Create Workflow
+### POST /api/workflows/new -- Create Workflow
 
-Create a new workflow file via the node-editor. Used by the editor UI to save newly-created pipelines.
+Renders an editor graph to DOT and writes it to `{target_dir}/{name}.dot`. Used
+by the node editor's New Workflow page. An existing file of that name is
+overwritten.
 
-Request body:
+Request body (`graph` has the same shape as `GET /api/workflows/{id}/graph`
+returns):
 
 ```json
 {
-  "dot_source": "digraph { ... }",
   "name": "my_workflow",
-  "target_dir": "examples"
+  "target_dir": "examples",
+  "graph": { "name": "my_workflow", "nodes": [], "edges": [], "graph_attrs": {} }
 }
 ```
 
@@ -764,12 +767,13 @@ Response body (200 OK):
 
 ```json
 {
-  "id": "examples__my_workflow",
-  "name": "my_workflow.dot",
-  "source_dir": "examples",
-  "path": "examples/my_workflow.dot"
+  "id": "examples__my_workflow"
 }
 ```
+
+| Status | When |
+|---|---|
+| 400 | `name` is blank or not a valid id, `target_dir` isn't one of the configured workflow directories, or the graph has an unknown `node_type` or an unsupported attribute value. |
 
 ### GET /api/workflows/{id}/graph -- Load Workflow Graph
 
