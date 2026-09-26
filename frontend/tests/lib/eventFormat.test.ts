@@ -66,7 +66,7 @@ describe('formatEvent', () => {
       line({
         kind: 'node_failed',
         node_id: 'bad',
-        error: 'Failure { error: "invalid JSON", retryable: false, notes: None }',
+        error: 'invalid JSON',
         duration_ms: 3,
       })
     ).toMatchObject({
@@ -186,19 +186,9 @@ describe('formatEvent', () => {
     expect(line({ ...base, cost_usd: 0.0123 }).detail).toBe('code · in:10 out:5 · $0.0123');
   });
 
-  it('unescapes the quoted error out of a Debug failure', () => {
-    const failed = line({
-      kind: 'node_failed',
-      node_id: 'bad',
-      error: 'Failure { error: "boom \\"x\\"", retryable: false, notes: None }',
-      duration_ms: 1,
-    });
+  it('shows the failure message as sent, quotes and all', () => {
+    const failed = line({ kind: 'node_failed', node_id: 'bad', error: 'boom "x"', duration_ms: 1 });
     expect(failed.detail).toBe('bad · 1ms · boom "x"');
-  });
-
-  it('passes a plain failure string through', () => {
-    const failed = line({ kind: 'node_failed', node_id: 'bad', error: 'plain', duration_ms: 1 });
-    expect(failed.detail).toBe('bad · 1ms · plain');
   });
 
   it('falls back to the raw kind, muted, for an unknown kind', () => {

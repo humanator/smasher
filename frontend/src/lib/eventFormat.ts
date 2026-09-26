@@ -26,15 +26,6 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
 }
 
-// node_failed.error is the Rust Debug form of the outcome, e.g.
-// `Failure { error: "…", retryable: false, notes: None }`. Pull out the quoted
-// error and unescape it; anything else passes through.
-function failureMessage(error: string): string {
-  const match = error.match(/error: "((?:[^"\\]|\\.)*)"/);
-  if (!match) return error;
-  return match[1].replace(/\\(["\\n])/g, (_, c: string) => (c === 'n' ? '\n' : c));
-}
-
 function join(...parts: (string | undefined)[]): string {
   return parts.filter((p) => p !== undefined && p !== '').join(' · ');
 }
@@ -84,7 +75,7 @@ export function formatEvent(event: PipelineEvent): EventLine {
         ...base,
         icon: '✕',
         label: 'Node failed',
-        detail: join(event.node_id, formatDuration(event.duration_ms), failureMessage(event.error)),
+        detail: join(event.node_id, formatDuration(event.duration_ms), event.error),
         tone: 'red',
       };
     case 'edge_traversed':
