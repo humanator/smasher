@@ -12,8 +12,6 @@
   import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
-  import NewWorkflowPage from './components/dashboard/NewWorkflowPage.svelte';
-  import WorkflowEditorPage from './components/dashboard/WorkflowEditorPage.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import PageHeader from './components/dashboard/PageHeader.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
@@ -154,15 +152,26 @@
   />
 
   <main>
+    <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
+         so they load as their own chunk on demand; bundling them kept the
+         entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
     {#if workflowPageType === 'new'}
       <!-- New Workflow Page: the canvas fills everything below the 3.5rem header -->
       <div class="h-[calc(100dvh-3.5rem)]">
-        <NewWorkflowPage />
+        {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}
+          <NewWorkflowPage />
+        {:catch}
+          <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
+        {/await}
       </div>
     {:else if workflowPageType === 'edit' && workflowId}
       <!-- Edit Workflow Page: the canvas fills everything below the 3.5rem header -->
       <div class="h-[calc(100dvh-3.5rem)]">
-        <WorkflowEditorPage {workflowId} />
+        {#await import('./components/dashboard/WorkflowEditorPage.svelte') then { default: WorkflowEditorPage }}
+          <WorkflowEditorPage {workflowId} />
+        {:catch}
+          <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
+        {/await}
       </div>
     {:else if workflowPageType === 'detail' && workflowId}
       <div class="max-w-6xl mx-auto p-8">

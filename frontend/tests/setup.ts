@@ -8,11 +8,6 @@ import '@testing-library/jest-dom/vitest';
 import '@testing-library/svelte/vitest';
 
 // Make EventSource available globally for all tests
-// eslint-disable-next-line no-var
-declare global {
-  // eslint-disable-next-line no-var
-  var EventSource: typeof EventSourcePolyfill;
-}
 globalThis.EventSource = EventSourcePolyfill;
 
 // jsdom implements neither ResizeObserver nor real layout -- Svelte Flow

@@ -26,9 +26,11 @@ test('launches the typed brief, model and variable, then shows them on the run p
     runId = new URL(page.url()).pathname.split('/')[2];
 
     // The fixture's gate label echoes the launch values; the question card polls every 2s.
-    await expect(page.getByText('Brief: e2e brief | Model: m-e2e | Colour: blue')).toBeVisible({
-      timeout: 10000,
-    });
+    // Scoped to the card: the run graph's SVG node label carries the same text
+    // on Linux Graphviz, which made the bare getByText match twice in CI.
+    await expect(
+      page.locator('.question-card').getByText('Brief: e2e brief | Model: m-e2e | Colour: blue')
+    ).toBeVisible({ timeout: 10000 });
   } finally {
     // The run parks at its gate; don't leave it running on the dev server.
     if (runId) await page.request.post(`/api/runs/${runId}/cancel`);

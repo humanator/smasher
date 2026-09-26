@@ -9,6 +9,13 @@ export default defineConfig({
       $lib: path.resolve('./src/lib'),
     },
   },
+  // App.svelte lazy-loads the node editor, so the dev server's startup scan
+  // no longer sees these two. Left to runtime discovery, the first editor
+  // visit re-optimizes them and force-reloads every open page -- which
+  // breaks whatever Playwright tests are mid-flight on a cold cache (CI).
+  optimizeDeps: {
+    include: ['@xyflow/svelte', '@dagrejs/dagre'],
+  },
   server: {
     host: '127.0.0.1',
     proxy: {
