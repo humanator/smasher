@@ -34,22 +34,11 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
 
 ## P1: Do next (small, and each one fixes something real)
 
-1. **Default-model loose ends.** `DEFAULT_MODEL` is `claude-sonnet-5`
-   (`smasher_llm::types`), with adaptive thinking for models that need it
-   (`provider/anthropic/types.rs`, `is_adaptive_only_model`). Still to do:
-   - **Not tested against the live API.** Tests use mocks, so run one real
-     pipeline on Sonnet 5 before relying on it.
-   - **Stale catalog aliases.** In `smasher-llm/src/types/catalog.rs`, the
-     `claude-sonnet`/`claude-opus` aliases and `get_latest_model()` still point at
-     the 4.6 models. The catalog also has no Opus 5, Opus 5.5 or Fable entries.
-     Unknown models fall back to conservative limits (8k max output, no thinking).
-   - Test fixtures still use `claude-sonnet-4-20250514` on purpose, as sample
-     data. Leave them.
-
-3. **Fit wide graphs on first load in the node editor.**
-   `examples/consensus_task.dot` runs off both edges. Probably `fitView` stopping
-   at Svelte Flow's default `minZoom` of 0.5. Setting a lower `minZoom` on the
-   canvas would likely fix it.
+1. **Run one real pipeline on Sonnet 5.** `DEFAULT_MODEL` is `claude-sonnet-5`,
+   with adaptive thinking for models that need it
+   (`provider/anthropic/types.rs`, `is_adaptive_only_model`), but tests use
+   mocks. Spends tokens, so only on request. (Test fixtures still use
+   `claude-sonnet-4-20250514` on purpose, as sample data. Leave them.)
 
 20. **Model selection everywhere, and per node.** *Raised by Jobsworth
     2026-09-25.* Bigger than the rest of P1, so write a spec first. Today:
@@ -125,23 +114,6 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
       real screenshot, lint passed, and `Synthesis` said `proceed`.
     - `A11yCheck` failed, which uncovered the limitation above.
 
-24. **Send a readable `node_failed.error`.** *Raised 2026-09-25 (SPA repairs,
-    batch 2).* The engine puts the outcome's Rust Debug form into the event
-    (`engine.rs:651`), e.g. `Failure { error: "…", retryable: false, notes: None }`.
-    The SPA's `eventFormat.ts` digs the quoted message out with a regex. The
-    server should send the message itself, and the client regex can then go.
-25. **Widen the edit route's id pattern.** *Raised 2026-09-25.* `App.svelte`
-    matches `/workflows/{id}/edit` with `[a-z0-9_-]+`, but workflow ids can have
-    uppercase letters, dots and spaces (`workflows.rs`, `valid_id`). Such a
-    workflow's Edit link falls through to the catalog. Match one segment and
-    `decodeURIComponent` it, as the `/workflows/{id}` route now does.
-26. **Fix `CLAUDE.md`'s DOT shape table.** *Raised 2026-09-25.* The code
-    (`smasher-attractor/src/graph/mod.rs`, `node_type_from_shape`) has
-    `parallelogram` as Tool, `hexagon`/`oval`/`ellipse` as Interviewer,
-    `component` as Parallel, `folder` as SubPipeline and `tripleoctagon` as FanIn,
-    and also accepts `Mdiamond`/`Msquare` for start/exit. `CLAUDE.md` says
-    `parallelogram` is parallel fan-out, `hexagon` is tool and `component` is a
-    sub-pipeline.
 29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
     *Seen 2026-09-25 while building question replies.* In
     `crates/smasher-web/tests/events_test.rs`, a gated run (`Start → Gate → Exit`, data dir a `tempfile` dir) reaches
@@ -185,16 +157,6 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     write-preferring `RwLock`, so a queued writer (a run finishing) blocks it.
 
 ## P2: Robustness (can lose data or grow without limit)
-
-4. **Fix the stale `POST /editor/workflows` docs.** That section of
-   `docs/api-reference.md` (and its row in the route table) describes a route and
-   body that no longer exist. The real route is `POST /api/workflows/new` with
-   `{name, target_dir, graph}`.
-
-5. **Make `rankdir` quoting stable between saves.** A graph with no `rankdir` is
-   written as `rankdir=TB` on the first save and `rankdir="TB"` on later ones,
-   because the renderer's fallback is unquoted but a re-parsed value is quoted.
-   Harmless, but the first two saves aren't byte-identical.
 
 6. **Prune artifacts automatically.** `smasher prune-artifacts` exists but nothing
    runs it. The desktop app now keeps its data in `~/Documents/smasher`, so run
