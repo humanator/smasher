@@ -18,12 +18,11 @@ History already covers them.
   question is enqueued and answered, and the CLI already emits these events its own way.
   `with_emitter` is an opt-in builder like `with_cancellation`, so the ~15 other
   `HttpInterviewer::new()` call sites (tests, rehydrate, placeholder records) are untouched.
-- **Response event before the answer is delivered.** `answer_question` takes the pending
-  question and checks `tx.is_closed()`. If the receiver is still there, it emits
-  `HumanResponseReceived` and then calls `tx.send`. Emitting after `send` would race the gate's
-  task, which can emit `node_completed` on another worker thread first. A receiver dropped
-  between the check and the send leaves a stray response event. That's harmless, and far less
-  likely than the reorder.
+- **Response event emitted by the gate.** *Changed in review, 2026-09-26.* It was first
+  emitted by `answer_question` before `tx.send`, but a cancel between the check and the send
+  logged an answer the gate never got. The gate now emits `HumanResponseReceived` in
+  `await_answer` once the answer arrives. That's only when it really has the answer, and still
+  before its own `node_completed`.
 - **`buildExchanges` stays pure, and gallery filtering happens after it.** A gallery prompt
   still counts as "a question asked since", so replies after a gallery pick attach to the
   gallery exchange. That exchange is then hidden, so they attach to nothing visible. This keeps

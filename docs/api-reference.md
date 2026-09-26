@@ -906,9 +906,9 @@ All events are emitted on `/api/runs/{id}/events` as SSE with JSON data payloads
 | `agent_token_usage` | `node_id`, `input_tokens`, `output_tokens`, `cost_usd`, `timestamp` | LLM token usage recorded. |
 
 On web runs, `HttpInterviewer` emits `human_prompt_issued` when a gate asks its question and
-`human_response_received` when the answer is accepted. That covers gallery gates too, whose
-response is the selection JSON. The response event is emitted before the answer reaches the
-waiting node, so it always comes before that gate's `node_completed`. Both go to the run's
+`human_response_received` when the waiting gate receives the answer. That covers gallery gates
+too, whose response is the selection JSON. The gate emits the response event before it finishes,
+so it always comes before that gate's `node_completed`. Both go to the run's
 `events.jsonl` and the SSE stream, so the SPA can rebuild the answered questions after a reload.
 A failed answer (unknown question, or a node that stopped waiting) emits nothing.
 

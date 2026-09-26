@@ -237,8 +237,8 @@ impl HttpInterviewer {
     }
 
     /// Emit `HumanPromptIssued` when a question with a node id is enqueued,
-    /// and `HumanResponseReceived` when it is answered, so the run's event
-    /// log records every web question and its answer.
+    /// and `HumanResponseReceived` when the gate receives its answer, so the
+    /// run's event log records every web question and its answer.
     pub fn with_emitter(mut self, emitter: Arc<PipelineEventEmitter>) -> Self {
         self.emitter = Some(emitter);
         self
@@ -265,18 +265,9 @@ impl HttpInterviewer {
         match self.queue.take(question_id) {
             Some(mut pending) => {
                 if let Some(tx) = pending.answer_tx.take() {
-                    // Emit before sending: once the answer is delivered the
-                    // gate's task may emit `node_completed` on another worker,
-                    // and the response must not trail it.
-                    if !tx.is_closed()
-                        && let (Some(emitter), Some(node_id)) = (&self.emitter, &pending.node_id)
-                    {
-                        emitter.emit(PipelineEvent::HumanResponseReceived {
-                            node_id: node_id.clone(),
-                            response: answer.to_string(),
-                            timestamp: chrono::Utc::now(),
-                        });
-                    }
+                    // `HumanResponseReceived` is emitted by the gate in
+                    // `await_answer`, not here: the gate may be cancelled
+                    // after this send, and then never gets the answer.
                     match tx.send(answer.to_string()) {
                         Ok(()) => AnswerQuestionResponse {
                             success: true,
@@ -353,22 +344,35 @@ impl HttpInterviewer {
     /// cancellation, removes the now-orphaned question from the queue (so a
     /// dashboard polling `list_questions` doesn't keep showing a gate card
     /// for a run that's no longer running) and returns `Cancelled`.
+    ///
+    /// Emits `HumanResponseReceived` only once the answer has arrived, so the
+    /// event log never records an answer the gate didn't get, and the event
+    /// comes before the gate's `node_completed`.
     async fn await_answer(
         &self,
         question_id: &str,
+        node_id: Option<String>,
         rx: oneshot::Receiver<String>,
     ) -> Result<String, InterviewerError> {
         let closed = || InterviewerError::Other("answer channel closed".to_string());
-        let Some(token) = &self.cancellation else {
-            return rx.await.map_err(|_| closed());
+        let answer = match &self.cancellation {
+            None => rx.await.map_err(|_| closed())?,
+            Some(token) => tokio::select! {
+                result = rx => result.map_err(|_| closed())?,
+                _ = token.cancelled() => {
+                    self.queue.take(question_id);
+                    return Err(InterviewerError::Cancelled);
+                }
+            },
         };
-        tokio::select! {
-            result = rx => result.map_err(|_| closed()),
-            _ = token.cancelled() => {
-                self.queue.take(question_id);
-                Err(InterviewerError::Cancelled)
-            }
+        if let (Some(emitter), Some(node_id)) = (&self.emitter, node_id) {
+            emitter.emit(PipelineEvent::HumanResponseReceived {
+                node_id,
+                response: answer.clone(),
+                timestamp: chrono::Utc::now(),
+            });
         }
+        Ok(answer)
     }
 }
 
@@ -382,8 +386,8 @@ impl Default for HttpInterviewer {
 impl Interviewer for HttpInterviewer {
     async fn ask(&self, question: &str, context: &Context) -> Result<String, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let (id, rx) = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id);
-        self.await_answer(&id, rx).await
+        let (id, rx) = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id.clone());
+        self.await_answer(&id, node_id, rx).await
     }
 
     async fn ask_with_options(
@@ -397,15 +401,15 @@ impl Interviewer for HttpInterviewer {
             question,
             options.to_vec(),
             QuestionKind::MultipleChoice,
-            node_id,
+            node_id.clone(),
         );
-        self.await_answer(&id, rx).await
+        self.await_answer(&id, node_id, rx).await
     }
 
     async fn approve(&self, message: &str, context: &Context) -> Result<bool, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let (id, rx) = self.enqueue(message, vec![], QuestionKind::Approval, node_id);
-        let answer = self.await_answer(&id, rx).await?;
+        let (id, rx) = self.enqueue(message, vec![], QuestionKind::Approval, node_id.clone());
+        let answer = self.await_answer(&id, node_id, rx).await?;
         let normalized = answer.trim().to_lowercase();
         Ok(normalized == "yes" || normalized == "y" || normalized == "true")
     }
@@ -1485,14 +1489,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn answer_question_emits_human_response_received() {
+    async fn ask_emits_human_response_received_once_the_answer_arrives() {
         let emitter = Arc::new(PipelineEventEmitter::new(16));
         let mut events = emitter.subscribe();
         let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
-        let rx = push_gate_question(&iv, "q-1", "gate");
 
-        let response = iv.answer_question("q-1", "blue");
-        assert!(response.success);
+        let iv_clone = iv.clone();
+        let handle =
+            tokio::spawn(async move { iv_clone.ask("Which colour?", &gate_context("gate")).await });
+        let id = first_question_id(&iv).await;
+        assert!(matches!(
+            events.try_recv().unwrap(),
+            PipelineEvent::HumanPromptIssued { .. }
+        ));
+
+        assert!(iv.answer_question(&id, "blue").success);
+        // Emitted by the gate before `ask` returns, so it can't trail the
+        // gate's `node_completed`.
+        assert_eq!(handle.await.unwrap().unwrap(), "blue");
 
         assert!(matches!(
             events.try_recv().unwrap(),
@@ -1500,7 +1514,20 @@ mod tests {
             if node_id == "gate" && response == "blue"
         ));
         assert!(events.try_recv().is_err(), "exactly one response event");
-        assert_eq!(rx.await.unwrap(), "blue");
+    }
+
+    #[tokio::test]
+    async fn answer_question_emits_nothing_until_the_gate_receives_it() {
+        // Stands in for a gate cancelled after the answer was sent: the
+        // answer is delivered to the channel, but no gate ever takes it.
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+        let rx = push_gate_question(&iv, "q-1", "gate");
+
+        assert!(iv.answer_question("q-1", "blue").success);
+        assert!(events.try_recv().is_err(), "the gate never received it");
+        drop(rx);
     }
 
     #[test]
