@@ -88,10 +88,61 @@ static CATALOG: LazyLock<Vec<ModelInfo>> = LazyLock::new(|| {
     vec![
         // ── Anthropic models ──────────────────────────────────────────
         ModelInfo {
+            id: "claude-fable-5-1",
+            provider: Provider::Anthropic,
+            display_name: "Claude Fable 5.1",
+            aliases: &["claude-fable"],
+            context_window: 1_000_000,
+            max_output_tokens: 128_000,
+            supports_images: true,
+            supports_tool_use: true,
+            supports_streaming: true,
+            supports_thinking: true,
+            supports_reasoning: true,
+            supports_json_mode: true,
+            supports_system_prompt: true,
+            input_cost_per_million: Some(10.0),
+            output_cost_per_million: Some(50.0),
+        },
+        ModelInfo {
+            id: "claude-opus-5-5",
+            provider: Provider::Anthropic,
+            display_name: "Claude Opus 5.5",
+            aliases: &[],
+            context_window: 1_000_000,
+            max_output_tokens: 128_000,
+            supports_images: true,
+            supports_tool_use: true,
+            supports_streaming: true,
+            supports_thinking: true,
+            supports_reasoning: true,
+            supports_json_mode: true,
+            supports_system_prompt: true,
+            input_cost_per_million: Some(4.0),
+            output_cost_per_million: Some(20.0),
+        },
+        ModelInfo {
+            id: "claude-opus-5",
+            provider: Provider::Anthropic,
+            display_name: "Claude Opus 5",
+            aliases: &["claude-opus"],
+            context_window: 1_000_000,
+            max_output_tokens: 128_000,
+            supports_images: true,
+            supports_tool_use: true,
+            supports_streaming: true,
+            supports_thinking: true,
+            supports_reasoning: true,
+            supports_json_mode: true,
+            supports_system_prompt: true,
+            input_cost_per_million: Some(5.0),
+            output_cost_per_million: Some(25.0),
+        },
+        ModelInfo {
             id: "claude-sonnet-5",
             provider: Provider::Anthropic,
             display_name: "Claude Sonnet 5",
-            aliases: &[],
+            aliases: &["claude-sonnet"],
             context_window: 1_000_000,
             max_output_tokens: 128_000,
             supports_images: true,
@@ -108,7 +159,7 @@ static CATALOG: LazyLock<Vec<ModelInfo>> = LazyLock::new(|| {
             id: "claude-opus-4-6",
             provider: Provider::Anthropic,
             display_name: "Claude Opus 4.6",
-            aliases: &["claude-opus"],
+            aliases: &[],
             context_window: 1_000_000,
             max_output_tokens: 128_000,
             supports_images: true,
@@ -125,7 +176,7 @@ static CATALOG: LazyLock<Vec<ModelInfo>> = LazyLock::new(|| {
             id: "claude-sonnet-4-6",
             provider: Provider::Anthropic,
             display_name: "Claude Sonnet 4.6",
-            aliases: &["claude-sonnet"],
+            aliases: &[],
             context_window: 1_000_000,
             max_output_tokens: 64_000,
             supports_images: true,
@@ -542,7 +593,7 @@ pub fn infer_provider(model_id: &str) -> Option<Provider> {
 /// - Gemini: Gemini 2.5 Pro
 pub fn get_latest_model(provider: Provider) -> Option<&'static ModelInfo> {
     let target_id = match provider {
-        Provider::Anthropic => "claude-opus-4-6",
+        Provider::Anthropic => "claude-opus-5",
         Provider::OpenAi => "gpt-5.2",
         Provider::Gemini => "gemini-2.5-pro",
         // Ollama serves whatever the user has pulled or has cloud access to —
@@ -879,15 +930,41 @@ mod tests {
     #[test]
     fn lookup_by_alias_claude_opus() {
         let info = lookup_model("claude-opus").unwrap();
-        assert_eq!(info.id, "claude-opus-4-6");
+        assert_eq!(info.id, "claude-opus-5");
         assert_eq!(info.provider, Provider::Anthropic);
     }
 
     #[test]
     fn lookup_by_alias_claude_sonnet() {
         let info = lookup_model("claude-sonnet").unwrap();
-        assert_eq!(info.id, "claude-sonnet-4-6");
+        assert_eq!(info.id, "claude-sonnet-5");
         assert_eq!(info.provider, Provider::Anthropic);
+    }
+
+    #[test]
+    fn lookup_by_alias_claude_fable() {
+        let info = lookup_model("claude-fable").unwrap();
+        assert_eq!(info.id, "claude-fable-5-1");
+        assert_eq!(info.provider, Provider::Anthropic);
+    }
+
+    #[test]
+    fn current_anthropic_models_are_catalogued() {
+        // (id, input $/M, output $/M): all 1M context, 128K output, adaptive thinking.
+        for (id, input, output) in [
+            ("claude-fable-5-1", 10.0, 50.0),
+            ("claude-opus-5-5", 4.0, 20.0),
+            ("claude-opus-5", 5.0, 25.0),
+            ("claude-sonnet-5", 2.0, 10.0),
+        ] {
+            let info = lookup_model(id).unwrap_or_else(|| panic!("{id} missing"));
+            assert_eq!(info.provider, Provider::Anthropic, "{id}");
+            assert_eq!(info.context_window, 1_000_000, "{id}");
+            assert_eq!(info.max_output_tokens, 128_000, "{id}");
+            assert!(info.supports_thinking, "{id}");
+            assert_eq!(info.input_cost_per_million, Some(input), "{id}");
+            assert_eq!(info.output_cost_per_million, Some(output), "{id}");
+        }
     }
 
     #[test]
@@ -926,8 +1003,8 @@ mod tests {
     #[test]
     fn get_latest_model_anthropic() {
         let info = get_latest_model(Provider::Anthropic).unwrap();
-        assert_eq!(info.id, "claude-opus-4-6");
-        assert_eq!(info.display_name, "Claude Opus 4.6");
+        assert_eq!(info.id, "claude-opus-5");
+        assert_eq!(info.display_name, "Claude Opus 5");
     }
 
     #[test]
@@ -957,7 +1034,7 @@ mod tests {
     #[test]
     fn lookup_model_or_default_returns_catalog_entry_via_alias() {
         let info = lookup_model_or_default("claude-sonnet");
-        assert_eq!(info.id, "claude-sonnet-4-6");
+        assert_eq!(info.id, "claude-sonnet-5");
         assert_eq!(info.provider, Provider::Anthropic);
     }
 
@@ -1050,7 +1127,7 @@ mod tests {
     #[test]
     fn models_for_provider_anthropic() {
         let models = models_for_provider(Provider::Anthropic);
-        assert_eq!(models.len(), 7);
+        assert_eq!(models.len(), 10);
         assert!(models.iter().all(|m| m.provider == Provider::Anthropic));
     }
 
