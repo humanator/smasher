@@ -209,14 +209,14 @@ Add `crates/smasher-web/tests/tool_command_test.rs`, following
    example.
 
 **Acceptance criteria:**
-- [ ] All three runs complete on the expected route, with
+- [x] All three runs complete on the expected route, with
       `nodes/<id>/stdout.txt` written.
-- [ ] The fake `claude` was never called: its log doesn't exist.
-- [ ] `grep -rn LlmToolBackend crates/smasher-web/src crates/smasher-render-capture`
+- [x] The fake `claude` was never called: its log doesn't exist.
+- [x] `grep -rn LlmToolBackend crates/smasher-web/src crates/smasher-render-capture`
       finds nothing.
 
 **Verification:**
-- [ ] `cargo test -p smasher-web`
+- [x] `cargo test -p smasher-web`
 
 **Dependencies:** Tasks 2, 4
 

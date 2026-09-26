@@ -26,10 +26,11 @@ use smasher_attractor::log_sink::LogSink;
 use smasher_attractor::manager_handler::ManagerHandler;
 use smasher_attractor::parallel::ParallelHandler;
 use smasher_attractor::state::{Checkpoint, Context, RunStatus};
-use smasher_attractor::tool_handler::{ToolBackend, ToolHandler};
+use smasher_attractor::tool_command::CommandConfig;
+use smasher_attractor::tool_handler::{ToolBackend, ToolHandler, UnknownToolBackend};
 use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
 
-use crate::backend::{AgentCodergenBackend, ClaudeCliRouter, LlmManagerBackend, LlmToolBackend};
+use crate::backend::{AgentCodergenBackend, ClaudeCliRouter, LlmManagerBackend};
 use crate::error::WebError;
 use crate::state::{AppState, RunRecord};
 
@@ -231,15 +232,16 @@ pub async fn launch_pipeline(
             provider.clone(),
             spawn_working_dir.clone(),
         ));
-        let llm_tool_backend = Arc::new(LlmToolBackend::new(
-            Arc::clone(&client),
-            model.clone(),
-            provider.clone(),
-            spawn_working_dir.clone(),
+        // The built-in tool chain ends at UnknownToolBackend: a tool node never
+        // reaches an LLM unless it names task_critic or synthesis.
+        let unknown_tool_backend = Arc::new(UnknownToolBackend::new(
+            ["task_critic", "synthesis", "system_lint", "render_capture"]
+                .map(String::from)
+                .to_vec(),
         ));
         let render_capture_backend =
             Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
-                llm_tool_backend as Arc<dyn ToolBackend>,
+                unknown_tool_backend as Arc<dyn ToolBackend>,
                 candidate_artifacts_dir.clone(),
                 PathBuf::from(&spawn_working_dir),
             ));
@@ -266,6 +268,12 @@ pub async fn launch_pipeline(
             manager_backend.clone();
         let child_tool: Arc<dyn smasher_attractor::tool_handler::ToolBackend> =
             tool_backend.clone();
+        // tool_command nodes run in the run directory and stop with the run.
+        let command_config = CommandConfig {
+            working_dir: PathBuf::from(&spawn_working_dir),
+            run_dir: PathBuf::from(&spawn_working_dir),
+            cancel: cancellation.clone(),
+        };
         // Shared with InterviewerHandler below so a hexagon gate's
         // `question_source` attribute can pull a prior Codergen node's
         // response text out of the same store the engine records into.
@@ -279,7 +287,9 @@ pub async fn launch_pipeline(
                 .build(),
         ));
         child_registry.register(Arc::new(ManagerHandler::new(child_manager)));
-        child_registry.register(Arc::new(ToolHandler::new(child_tool)));
+        child_registry.register(Arc::new(
+            ToolHandler::new(child_tool).with_commands(command_config.clone()),
+        ));
 
         let mut registry = default_registry();
         registry.register(Arc::new(CodergenHandler::new(backend)));
@@ -289,7 +299,9 @@ pub async fn launch_pipeline(
                 .build(),
         ));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
-        registry.register(Arc::new(ToolHandler::new(tool_backend)));
+        registry.register(Arc::new(
+            ToolHandler::new(tool_backend).with_commands(command_config),
+        ));
         registry.register(Arc::new(ParallelHandler::new(Arc::new(child_registry))));
 
         let config = EngineConfig {

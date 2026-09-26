@@ -1,5 +1,5 @@
 // ABOUTME: HybridToolBackend: dispatches `render_capture` natively, falls back
-// ABOUTME: to a wrapped `ToolBackend` (e.g. `LlmToolBackend`) for every other tool.
+// ABOUTME: to a wrapped `ToolBackend` (e.g. `UnknownToolBackend`) for every other tool.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

@@ -62,7 +62,7 @@ both.
 - [x] `cargo test -p smasher-attractor`, clippy and fmt clean
 
 ### Phase 2: Wiring
-- [ ] 5. Web: remove `LlmToolBackend`, wire the runner, integration test
+- [x] 5. Web: remove `LlmToolBackend`, wire the runner, integration test
 - [ ] 6. CLI: remove `LlmToolBackend`, always register `ToolHandler` (main,
       parallel child, resume), cancel token, shared env-name helper, e2e test
 
