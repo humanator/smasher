@@ -1,6 +1,6 @@
 # Spec: Tool nodes run commands directly (backlog #22)
 
-Status: draft, 2026-09-26. Awaiting Jobsworth's approval.
+Status: approved by Jobsworth 2026-09-26.
 
 ## Objective
 
