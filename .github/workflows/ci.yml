@@ -196,6 +196,12 @@ jobs:
       - name: Build smasher-cli
         working-directory: .
         run: cargo build -p smasher-cli
+      # The server shells out to Graphviz's `dot` to render run graphs as
+      # SVG; RunDetail's tests assert on that SVG.
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
       - name: Start smasher serve
         working-directory: .
         run: |
