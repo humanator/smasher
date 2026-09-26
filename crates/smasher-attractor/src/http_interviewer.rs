@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
+use crate::events::{PipelineEvent, PipelineEventEmitter};
 use crate::interviewer::{Interviewer, InterviewerError, NODE_ID_CONTEXT_KEY};
 use crate::server::{HttpMethod, Route};
 use crate::state::Context;
@@ -203,6 +204,7 @@ pub struct AnswerQuestionResponse {
 pub struct HttpInterviewer {
     queue: QuestionQueue,
     cancellation: Option<CancellationToken>,
+    emitter: Option<Arc<PipelineEventEmitter>>,
 }
 
 impl HttpInterviewer {
@@ -211,6 +213,7 @@ impl HttpInterviewer {
         Self {
             queue: QuestionQueue::new(),
             cancellation: None,
+            emitter: None,
         }
     }
 
@@ -219,6 +222,7 @@ impl HttpInterviewer {
         Self {
             queue,
             cancellation: None,
+            emitter: None,
         }
     }
 
@@ -229,6 +233,14 @@ impl HttpInterviewer {
     /// blocked.
     pub fn with_cancellation(mut self, token: CancellationToken) -> Self {
         self.cancellation = Some(token);
+        self
+    }
+
+    /// Emit `HumanPromptIssued` when a question with a node id is enqueued,
+    /// and `HumanResponseReceived` when the gate receives its answer, so the
+    /// run's event log records every web question and its answer.
+    pub fn with_emitter(mut self, emitter: Arc<PipelineEventEmitter>) -> Self {
+        self.emitter = Some(emitter);
         self
     }
 
@@ -253,6 +265,9 @@ impl HttpInterviewer {
         match self.queue.take(question_id) {
             Some(mut pending) => {
                 if let Some(tx) = pending.answer_tx.take() {
+                    // `HumanResponseReceived` is emitted by the gate in
+                    // `await_answer`, not here: the gate may be cancelled
+                    // after this send, and then never gets the answer.
                     match tx.send(answer.to_string()) {
                         Ok(()) => AnswerQuestionResponse {
                             success: true,
@@ -304,6 +319,13 @@ impl HttpInterviewer {
         kind: QuestionKind,
         node_id: Option<String>,
     ) -> (String, oneshot::Receiver<String>) {
+        if let (Some(emitter), Some(node_id)) = (&self.emitter, &node_id) {
+            emitter.emit(PipelineEvent::HumanPromptIssued {
+                node_id: node_id.clone(),
+                question: question.to_string(),
+                timestamp: chrono::Utc::now(),
+            });
+        }
         let (tx, rx) = oneshot::channel();
         let pending = PendingQuestion {
             id: uuid::Uuid::new_v4().to_string(),
@@ -322,22 +344,35 @@ impl HttpInterviewer {
     /// cancellation, removes the now-orphaned question from the queue (so a
     /// dashboard polling `list_questions` doesn't keep showing a gate card
     /// for a run that's no longer running) and returns `Cancelled`.
+    ///
+    /// Emits `HumanResponseReceived` only once the answer has arrived, so the
+    /// event log never records an answer the gate didn't get, and the event
+    /// comes before the gate's `node_completed`.
     async fn await_answer(
         &self,
         question_id: &str,
+        node_id: Option<String>,
         rx: oneshot::Receiver<String>,
     ) -> Result<String, InterviewerError> {
         let closed = || InterviewerError::Other("answer channel closed".to_string());
-        let Some(token) = &self.cancellation else {
-            return rx.await.map_err(|_| closed());
+        let answer = match &self.cancellation {
+            None => rx.await.map_err(|_| closed())?,
+            Some(token) => tokio::select! {
+                result = rx => result.map_err(|_| closed())?,
+                _ = token.cancelled() => {
+                    self.queue.take(question_id);
+                    return Err(InterviewerError::Cancelled);
+                }
+            },
         };
-        tokio::select! {
-            result = rx => result.map_err(|_| closed()),
-            _ = token.cancelled() => {
-                self.queue.take(question_id);
-                Err(InterviewerError::Cancelled)
-            }
+        if let (Some(emitter), Some(node_id)) = (&self.emitter, node_id) {
+            emitter.emit(PipelineEvent::HumanResponseReceived {
+                node_id,
+                response: answer.clone(),
+                timestamp: chrono::Utc::now(),
+            });
         }
+        Ok(answer)
     }
 }
 
@@ -351,8 +386,8 @@ impl Default for HttpInterviewer {
 impl Interviewer for HttpInterviewer {
     async fn ask(&self, question: &str, context: &Context) -> Result<String, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let (id, rx) = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id);
-        self.await_answer(&id, rx).await
+        let (id, rx) = self.enqueue(question, vec![], QuestionKind::FreeForm, node_id.clone());
+        self.await_answer(&id, node_id, rx).await
     }
 
     async fn ask_with_options(
@@ -366,15 +401,15 @@ impl Interviewer for HttpInterviewer {
             question,
             options.to_vec(),
             QuestionKind::MultipleChoice,
-            node_id,
+            node_id.clone(),
         );
-        self.await_answer(&id, rx).await
+        self.await_answer(&id, node_id, rx).await
     }
 
     async fn approve(&self, message: &str, context: &Context) -> Result<bool, InterviewerError> {
         let node_id = context.get_string(NODE_ID_CONTEXT_KEY);
-        let (id, rx) = self.enqueue(message, vec![], QuestionKind::Approval, node_id);
-        let answer = self.await_answer(&id, rx).await?;
+        let (id, rx) = self.enqueue(message, vec![], QuestionKind::Approval, node_id.clone());
+        let answer = self.await_answer(&id, node_id, rx).await?;
         let normalized = answer.trim().to_lowercase();
         Ok(normalized == "yes" || normalized == "y" || normalized == "true")
     }
@@ -1332,5 +1367,215 @@ mod tests {
                 .unwrap()
                 .contains("receiver dropped")
         );
+    }
+
+    // ---------------------------------------------------------------
+    // Event emission (with_emitter)
+    // ---------------------------------------------------------------
+
+    fn gate_context(node_id: &str) -> Context {
+        Context::new().with_extra(NODE_ID_CONTEXT_KEY, serde_json::json!(node_id))
+    }
+
+    /// Wait until the spawned interviewer call has enqueued its question.
+    async fn first_question_id(iv: &HttpInterviewer) -> String {
+        while iv.queue().is_empty() {
+            tokio::task::yield_now().await;
+        }
+        iv.list_questions().questions[0].id.clone()
+    }
+
+    fn push_gate_question(
+        iv: &HttpInterviewer,
+        id: &str,
+        node_id: &str,
+    ) -> oneshot::Receiver<String> {
+        let (tx, rx) = oneshot::channel();
+        iv.queue().push(PendingQuestion {
+            id: id.to_string(),
+            question: "Pick one?".to_string(),
+            choices: vec![],
+            kind: QuestionKind::FreeForm,
+            node_id: Some(node_id.to_string()),
+            created_at: Instant::now(),
+            answer_tx: Some(tx),
+        });
+        rx
+    }
+
+    #[tokio::test]
+    async fn ask_emits_human_prompt_issued_with_node_id_and_question() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+
+        let iv_clone = iv.clone();
+        let handle =
+            tokio::spawn(async move { iv_clone.ask("Which colour?", &gate_context("gate")).await });
+        let id = first_question_id(&iv).await;
+
+        assert!(matches!(
+            events.try_recv().unwrap(),
+            PipelineEvent::HumanPromptIssued { ref node_id, ref question, .. }
+            if node_id == "gate" && question == "Which colour?"
+        ));
+        assert!(events.try_recv().is_err(), "exactly one prompt event");
+
+        iv.answer_question(&id, "blue");
+        handle.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn ask_with_options_emits_human_prompt_issued() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move {
+            let options = vec!["A".to_string(), "B".to_string()];
+            iv_clone
+                .ask_with_options("A or B?", &options, &gate_context("choose"))
+                .await
+        });
+        let id = first_question_id(&iv).await;
+
+        assert!(matches!(
+            events.try_recv().unwrap(),
+            PipelineEvent::HumanPromptIssued { ref node_id, ref question, .. }
+            if node_id == "choose" && question == "A or B?"
+        ));
+
+        iv.answer_question(&id, "A");
+        handle.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn approve_emits_human_prompt_issued() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+
+        let iv_clone = iv.clone();
+        let handle =
+            tokio::spawn(
+                async move { iv_clone.approve("Ship it?", &gate_context("approve")).await },
+            );
+        let id = first_question_id(&iv).await;
+
+        assert!(matches!(
+            events.try_recv().unwrap(),
+            PipelineEvent::HumanPromptIssued { ref node_id, ref question, .. }
+            if node_id == "approve" && question == "Ship it?"
+        ));
+
+        iv.answer_question(&id, "yes");
+        assert!(handle.await.unwrap().unwrap());
+    }
+
+    #[tokio::test]
+    async fn ask_without_node_id_emits_no_prompt_event() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+
+        let iv_clone = iv.clone();
+        let handle = tokio::spawn(async move { iv_clone.ask("Anyone?", &Context::new()).await });
+        let id = first_question_id(&iv).await;
+        iv.answer_question(&id, "me");
+        handle.await.unwrap().unwrap();
+
+        assert!(events.try_recv().is_err(), "no node id, no events");
+    }
+
+    #[tokio::test]
+    async fn ask_emits_human_response_received_once_the_answer_arrives() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+
+        let iv_clone = iv.clone();
+        let handle =
+            tokio::spawn(async move { iv_clone.ask("Which colour?", &gate_context("gate")).await });
+        let id = first_question_id(&iv).await;
+        assert!(matches!(
+            events.try_recv().unwrap(),
+            PipelineEvent::HumanPromptIssued { .. }
+        ));
+
+        assert!(iv.answer_question(&id, "blue").success);
+        // Emitted by the gate before `ask` returns, so it can't trail the
+        // gate's `node_completed`.
+        assert_eq!(handle.await.unwrap().unwrap(), "blue");
+
+        assert!(matches!(
+            events.try_recv().unwrap(),
+            PipelineEvent::HumanResponseReceived { ref node_id, ref response, .. }
+            if node_id == "gate" && response == "blue"
+        ));
+        assert!(events.try_recv().is_err(), "exactly one response event");
+    }
+
+    #[tokio::test]
+    async fn answer_question_emits_nothing_until_the_gate_receives_it() {
+        // Stands in for a gate cancelled after the answer was sent: the
+        // answer is delivered to the channel, but no gate ever takes it.
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+        let rx = push_gate_question(&iv, "q-1", "gate");
+
+        assert!(iv.answer_question("q-1", "blue").success);
+        assert!(events.try_recv().is_err(), "the gate never received it");
+        drop(rx);
+    }
+
+    #[test]
+    fn answer_question_for_unknown_id_emits_nothing() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+
+        assert!(!iv.answer_question("missing", "blue").success);
+        assert!(events.try_recv().is_err());
+    }
+
+    #[test]
+    fn answer_question_with_dropped_receiver_emits_nothing() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+        drop(push_gate_question(&iv, "q-1", "gate"));
+
+        let response = iv.answer_question("q-1", "too late");
+        assert!(!response.success);
+        assert!(
+            response
+                .error
+                .as_ref()
+                .unwrap()
+                .contains("receiver dropped")
+        );
+        assert!(events.try_recv().is_err());
+    }
+
+    #[test]
+    fn answer_question_without_node_id_emits_nothing() {
+        let emitter = Arc::new(PipelineEventEmitter::new(16));
+        let mut events = emitter.subscribe();
+        let iv = HttpInterviewer::new().with_emitter(Arc::clone(&emitter));
+        let (tx, _rx) = oneshot::channel();
+        iv.queue().push(PendingQuestion {
+            id: "q-1".to_string(),
+            question: "Pick one?".to_string(),
+            choices: vec![],
+            kind: QuestionKind::FreeForm,
+            node_id: None,
+            created_at: Instant::now(),
+            answer_tx: Some(tx),
+        });
+
+        assert!(iv.answer_question("q-1", "blue").success);
+        assert!(events.try_recv().is_err());
     }
 }

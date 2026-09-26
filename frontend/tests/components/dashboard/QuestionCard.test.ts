@@ -1,14 +1,18 @@
 // ABOUTME: Tests for QuestionCard component
 // ABOUTME: Answers real human-gate questions on runs against the real smasher-web API, no mocking
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import QuestionCard from '../../../src/components/dashboard/QuestionCard.svelte';
+import EventLog from '../../../src/components/dashboard/EventLog.svelte';
 import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import * as runsApi from '../../../src/lib/api/runs';
 import { questionStore } from '../../../src/stores/questions.svelte';
+import { eventStore } from '../../../src/stores/events.svelte';
+import * as native from '../../../src/lib/native';
+import { submitGalleryDecision } from '../../../src/lib/api/gallery';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as questionsApi from '../../../src/lib/api/questions';
 import { mkdirSync, writeFileSync } from 'fs';
@@ -101,14 +105,48 @@ function holdAnswers(runId: string): { release: () => void; restore: () => void 
   return { release, restore: () => (globalThis.fetch = realFetch) };
 }
 
+// Answered Questions comes from the run's events, which the run page's
+// EventLog streams into eventStore, so tests of the answered list mount both.
+function renderRun(runId: string) {
+  const log = render(EventLog, { props: { runId } });
+  const card = render(QuestionCard, { props: { runId } });
+  return {
+    async rerender(id: string) {
+      await log.rerender({ runId: id });
+      await card.rerender({ runId: id });
+    },
+    unmount() {
+      card.unmount();
+      log.unmount();
+    },
+  };
+}
+
+const answeredCards = () =>
+  Array.from(document.querySelectorAll('.answered-card')).map((el) => ({
+    question: el.querySelector('.question-text')?.textContent?.trim(),
+    answer: el.querySelector('.answer-text')?.textContent?.trim(),
+  }));
+
 describe('QuestionCard', () => {
+  let notifySpy: MockInstance<
+    Parameters<typeof native.showNotification>,
+    ReturnType<typeof native.showNotification>
+  >;
+
   beforeEach(() => {
     questionStore.clear();
+    eventStore.clear();
     setApiBaseUrl('http://127.0.0.1:21541/api');
+    // EventLog notifies when a run finishes; keep that out of the test output.
+    notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
+    // Unmount first, so a run finishing below can't notify after the spy is restored.
+    cleanup();
     await cancelAll();
+    notifySpy.mockRestore();
   });
 
   it('shows the kind badge and question id straight away', async () => {
@@ -177,7 +215,7 @@ describe('QuestionCard', () => {
     const user = userEvent.setup();
     const runId = await submitGraph(ANONYMOUS_GATE);
 
-    render(QuestionCard, { props: { runId } });
+    renderRun(runId);
     await user.type(await screen.findByPlaceholderText('Enter your answer'), 'by button');
     await user.click(screen.getByRole('button', { name: 'Submit' }));
 
@@ -192,7 +230,7 @@ describe('QuestionCard', () => {
     const answers = holdAnswers(runId);
 
     try {
-      render(QuestionCard, { props: { runId } });
+      renderRun(runId);
       const input = await screen.findByPlaceholderText('Enter your answer');
       await user.type(input, 'held');
       const submit = screen.getByRole('button', { name: 'Submit' });
@@ -213,7 +251,7 @@ describe('QuestionCard', () => {
     const user = userEvent.setup();
     const runId = await submitGraph(QUESTION_KINDS);
 
-    render(QuestionCard, { props: { runId } });
+    renderRun(runId);
 
     const group = await screen.findByRole('group', { name: 'Pick a colour' }, { timeout: 2000 });
     const radios = ['Red', 'Blue', 'Green'].map((name) => screen.getByRole('radio', { name }));
@@ -244,7 +282,7 @@ describe('QuestionCard', () => {
     const answers = holdAnswers(runId);
 
     try {
-      render(QuestionCard, { props: { runId } });
+      renderRun(runId);
       const yes = await screen.findByRole('button', { name: 'Yes' });
       const no = screen.getByRole('button', { name: 'No' });
       await user.click(yes);
@@ -264,11 +302,11 @@ describe('QuestionCard', () => {
     const user = userEvent.setup();
     const runId = await submitGraph(ANONYMOUS_GATE);
 
-    const { rerender } = render(QuestionCard, { props: { runId } });
+    const { rerender } = renderRun(runId);
     await user.type(await screen.findByPlaceholderText('Enter your answer'), 'kept{Enter}');
     await waitFor(() => expect(screen.getByText('Answer: kept')).toBeTruthy());
 
-    await rerender({ runId });
+    await rerender(runId);
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(screen.getByText('Answer: kept')).toBeTruthy();
@@ -279,11 +317,11 @@ describe('QuestionCard', () => {
     const firstRun = await submitGraph(ANONYMOUS_GATE);
     const secondRun = await submitGraph(ANONYMOUS_GATE);
 
-    const { rerender } = render(QuestionCard, { props: { runId: firstRun } });
+    const { rerender } = renderRun(firstRun);
     await user.type(await screen.findByPlaceholderText('Enter your answer'), 'first{Enter}');
     await waitFor(() => expect(screen.getByText('Answer: first')).toBeTruthy());
 
-    await rerender({ runId: secondRun });
+    await rerender(secondRun);
 
     await waitFor(() => expect(screen.queryByText('Answer: first')).toBeNull());
   });
@@ -318,7 +356,7 @@ describe('QuestionCard', () => {
       variables: {},
     });
 
-    render(QuestionCard, { props: { runId } });
+    renderRun(runId);
 
     // The component's own 2s poll of GET /api/runs/{id}/questions finds it.
     const input = (await screen.findByPlaceholderText(
@@ -336,25 +374,152 @@ describe('QuestionCard', () => {
     await waitForRunStatus(runId, 'Completed');
   });
 
-  it('shows answered questions', async () => {
+  it('shows answered questions from the run events', async () => {
     render(QuestionCard, { props: { runId: 'run-123' } });
+    const timestamp = new Date().toISOString();
 
-    const question = {
-      id: 'q1',
-      question: 'Complete?',
-      choices: [],
-      kind: 'free_form' as const,
-      node_id: 'gate1',
-    };
+    eventStore.add({ kind: 'human_prompt_issued', node_id: 'gate1', question: 'Complete?', timestamp });
+    eventStore.add({ kind: 'human_response_received', node_id: 'gate1', response: 'done', timestamp });
 
-    questionStore.setPending([question]);
-    questionStore.answer('q1', 'done');
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
+    expect(await screen.findByText('Answer: done')).toBeTruthy();
     expect(screen.getByText('Complete?')).toBeTruthy();
-    expect(screen.getByText('Answer: done')).toBeTruthy();
   });
+
+  it('shows no answer for a question that is only pending in the events', async () => {
+    render(QuestionCard, { props: { runId: 'run-123' } });
+    const timestamp = new Date().toISOString();
+
+    eventStore.add({ kind: 'human_prompt_issued', node_id: 'gate1', question: 'Waiting?', timestamp });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(document.querySelector('.answered-card')).toBeNull();
+  });
+
+  it('lists answers from the run events, oldest first, and keeps them after a remount', async () => {
+    const user = userEvent.setup();
+    const runId = await submitGraph(QUESTION_KINDS);
+    const expected = [
+      { question: 'Pick a colour', answer: 'Answer: Blue' },
+      { question: 'Continue?', answer: 'Answer: yes' },
+      { question: 'Say something', answer: 'Answer: hello' },
+    ];
+
+    const first = renderRun(runId);
+    await user.click(await screen.findByRole('radio', { name: 'Blue' }, { timeout: 2000 }));
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await user.click(await screen.findByRole('button', { name: 'Yes' }, { timeout: 4000 }));
+    await user.type(
+      await screen.findByPlaceholderText('Enter your answer', {}, { timeout: 4000 }),
+      'hello{Enter}'
+    );
+    await waitFor(() => expect(answeredCards()).toEqual(expected), { timeout: 4000 });
+    await waitForRunStatus(runId, 'Completed');
+
+    // Standing in for a page reload: nothing survives in the browser stores.
+    first.unmount();
+    questionStore.clear();
+    expect(eventStore.events).toEqual([]);
+
+    renderRun(runId);
+
+    await waitFor(() => expect(answeredCards()).toEqual(expected), { timeout: 4000 });
+  }, 20000);
+
+  describe('agent replies', () => {
+    const agentMessage = (node_id: string, text: string) => ({
+      kind: 'agent_message' as const,
+      node_id,
+      text,
+      timestamp: new Date().toISOString(),
+    });
+
+    it('renders a reply as markdown under its answer, labelled with its node', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(gatedPipeline('QuestionCardReply', 'label="Anything?"'));
+
+      renderRun(runId);
+      await user.type(await screen.findByPlaceholderText('Enter your answer'), 'hello{Enter}');
+      await screen.findByText('Answer: hello');
+      // The real run has answered; a reply stands in for the agent's message.
+      eventStore.add(agentMessage('EchoNode', '# Heading\n\nYou said **hello**.\n\n- one\n- two'));
+
+      const card = (await screen.findByText('Answer: hello')).closest('.answered-card')!;
+      await waitFor(() => expect(card.querySelector('.reply')).toBeTruthy());
+      const reply = card.querySelector('.reply')!;
+      expect(reply.querySelector('.reply-node')?.textContent).toBe('EchoNode');
+      expect(reply.querySelector('.markdown h1')?.textContent).toBe('Heading');
+      expect(reply.querySelector('.markdown strong')?.textContent).toBe('hello');
+      expect(Array.from(reply.querySelectorAll('.markdown li')).map((li) => li.textContent)).toEqual([
+        'one',
+        'two',
+      ]);
+    });
+
+    it('keeps the one-line event log entry for the same message', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(gatedPipeline('QuestionCardReplyLog', 'label="Anything?"'));
+
+      renderRun(runId);
+      await user.type(await screen.findByPlaceholderText('Enter your answer'), 'hi{Enter}');
+      await screen.findByText('Answer: hi');
+      eventStore.add(agentMessage('EchoNode', '**Short** reply'));
+
+      await waitFor(() => expect(document.querySelector('.reply')).toBeTruthy());
+      const logLine = Array.from(document.querySelectorAll('.event-item')).find((line) =>
+        line.textContent?.includes('EchoNode')
+      );
+      expect(logLine?.textContent).toContain('Agent');
+      expect(logLine?.textContent).toContain('**Short** reply');
+    });
+
+    it('does not put a reply sent after a later question under the earlier answer', async () => {
+      const user = userEvent.setup();
+      const runId = await submitGraph(QUESTION_KINDS);
+
+      renderRun(runId);
+      await user.click(await screen.findByRole('radio', { name: 'Blue' }, { timeout: 2000 }));
+      await user.click(screen.getByRole('button', { name: 'Submit' }));
+      await screen.findByText('Answer: Blue');
+      // Wait for the real run to ask its next question, then send a reply.
+      await waitFor(
+        () =>
+          expect(
+            eventStore.events.some((e) => e.kind === 'human_prompt_issued' && e.node_id === 'ok')
+          ).toBe(true),
+        { timeout: 4000 }
+      );
+      eventStore.add(agentMessage('Stray', 'Not for Blue'));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(screen.getByText('Answer: Blue')).toBeTruthy();
+      expect(document.querySelector('.reply')).toBeNull();
+    });
+  });
+
+  it('leaves gallery picks out of Answered Questions', async () => {
+    const runId = await submitAndWaitForGalleryGate();
+    const { gallery_gate } = await questionsApi.listQuestions(runId);
+
+    renderRun(runId);
+    await submitGalleryDecision(runId, gallery_gate!.question_id, {
+      selected: ['candidate-a'],
+      decision: 'proceed',
+      comments: {},
+    });
+
+    await waitFor(
+      () =>
+        expect(
+          eventStore.events.some(
+            (e) => e.kind === 'human_response_received' && e.node_id === 'Gate1'
+          )
+        ).toBe(true),
+      { timeout: 5000 }
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(answeredCards()).toEqual([]);
+  }, 15000);
 
   it('answers a real approval question with the Yes button', async () => {
     const user = userEvent.setup();
@@ -363,7 +528,7 @@ describe('QuestionCard', () => {
       variables: {},
     });
 
-    render(QuestionCard, { props: { runId } });
+    renderRun(runId);
 
     const yesBtn = await screen.findByText('Yes', {}, { timeout: 5000 });
     expect(screen.getByText('Continue?')).toBeTruthy();
@@ -415,7 +580,6 @@ describe('QuestionCard', () => {
       expect(await screen.findByText('question not found: no-such-q')).toBeTruthy();
       expect(screen.getByText('Stale question?')).toBeTruthy();
       expect(screen.queryByText('Answer: yes')).toBeNull();
-      expect(questionStore.answered).toHaveLength(0);
     });
 
     it('keeps the typed text and re-enables Submit when a free-text answer is rejected', async () => {

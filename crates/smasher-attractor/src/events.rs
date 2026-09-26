@@ -268,6 +268,7 @@ impl PipelineEvent {
 /// Consumers call [`subscribe`](PipelineEventEmitter::subscribe) to get a receiver,
 /// then await events as the pipeline progresses. Events emitted before any subscriber
 /// exists are silently dropped.
+#[derive(Debug)]
 pub struct PipelineEventEmitter {
     sender: broadcast::Sender<PipelineEvent>,
 }

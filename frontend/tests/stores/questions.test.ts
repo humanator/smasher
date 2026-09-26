@@ -1,5 +1,5 @@
 // ABOUTME: Tests for question store
-// ABOUTME: Verifies question tracking and answer recording
+// ABOUTME: Verifies pending-question tracking and removal on answer
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { questionStore } from '../../src/stores/questions.svelte';
@@ -9,9 +9,8 @@ describe('question store', () => {
     questionStore.reset();
   });
 
-  it('starts with empty questions', () => {
+  it('starts with no pending questions', () => {
     expect(questionStore.pending).toEqual([]);
-    expect(questionStore.answered).toEqual([]);
   });
 
   it('sets pending questions', () => {
@@ -31,7 +30,7 @@ describe('question store', () => {
     expect(questionStore.pending[0].id).toBe('q1');
   });
 
-  it('moves question from pending to answered when answered', () => {
+  it('removes an answered question from pending', () => {
     const question = {
       id: 'q2',
       question: 'Choose one',
@@ -43,35 +42,12 @@ describe('question store', () => {
     questionStore.setPending([question]);
     expect(questionStore.pending).toHaveLength(1);
 
-    questionStore.answer('q2', 'a');
+    questionStore.answer('q2');
 
     expect(questionStore.pending).toHaveLength(0);
-    expect(questionStore.answered).toHaveLength(1);
-    expect(questionStore.answered[0].answer).toBe('a');
   });
 
-  it('tracks answeredAt timestamp', () => {
-    const question = {
-      id: 'q3',
-      question: 'Continue?',
-      choices: [],
-      kind: 'approval' as const,
-      node_id: 'gate_3',
-    };
-
-    questionStore.setPending([question]);
-
-    const beforeAnswer = new Date();
-    questionStore.answer('q3', 'yes');
-    const afterAnswer = new Date();
-
-    expect(questionStore.answered).toHaveLength(1);
-    const answeredAt = new Date(questionStore.answered[0].answeredAt);
-    expect(answeredAt.getTime()).toBeGreaterThanOrEqual(beforeAnswer.getTime());
-    expect(answeredAt.getTime()).toBeLessThanOrEqual(afterAnswer.getTime());
-  });
-
-  it('provides all questions (pending + answered)', () => {
+  it('leaves other pending questions when one is answered', () => {
     const q1 = {
       id: 'q1',
       question: 'Q1?',
@@ -88,11 +64,19 @@ describe('question store', () => {
     };
 
     questionStore.setPending([q1, q2]);
-    questionStore.answer('q1', 'answer1');
+    questionStore.answer('q1');
 
-    expect(questionStore.all).toHaveLength(2);
+    expect(questionStore.pending.map((q) => q.id)).toEqual(['q2']);
+  });
+
+  it('ignores an answer for a question that is not pending', () => {
+    questionStore.setPending([
+      { id: 'q1', question: 'Q1?', choices: [], kind: 'free_form' as const, node_id: 'gate_1' },
+    ]);
+
+    questionStore.answer('missing');
+
     expect(questionStore.pending).toHaveLength(1);
-    expect(questionStore.answered).toHaveLength(1);
   });
 
   it('clears all questions', () => {
@@ -105,13 +89,9 @@ describe('question store', () => {
         node_id: 'gate_1',
       },
     ]);
-    questionStore.answer('q1', 'answer');
-
-    expect(questionStore.all).toHaveLength(1);
 
     questionStore.clear();
 
     expect(questionStore.pending).toEqual([]);
-    expect(questionStore.answered).toEqual([]);
   });
 });

@@ -87,6 +87,10 @@ pub struct RunSummary {
     pub output_tokens: u64,
     pub run_working_dir: Option<String>,
     pub workflow_id: Option<String>,
+    /// Ids of the graph's gallery gates, sorted. The SPA uses them to keep
+    /// gallery picks out of Answered Questions.
+    #[serde(default)]
+    pub gallery_gates: Vec<String>,
 }
 
 impl RunRecord {
@@ -110,7 +114,20 @@ impl RunRecord {
                     .unwrap_or_else(|| dir.clone())
             }),
             workflow_id: self.workflow_id.clone(),
+            gallery_gates: self.gallery_gates(),
         }
+    }
+
+    fn gallery_gates(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .graph
+            .nodes
+            .iter()
+            .filter(|node| node.is_gallery_gate())
+            .map(|node| node.id.clone())
+            .collect();
+        ids.sort();
+        ids
     }
 }
 
@@ -156,6 +173,7 @@ mod tests {
             output_tokens: 0,
             run_working_dir: None,
             workflow_id: None,
+            gallery_gates: vec![],
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["id"], "test-123");
@@ -176,6 +194,7 @@ mod tests {
             output_tokens: 50,
             run_working_dir: None,
             workflow_id: None,
+            gallery_gates: vec![],
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["error"], "node X failed");
@@ -249,6 +268,40 @@ mod tests {
         let record = make_test_record(RunStatus::Running, None, Some("wf-42".to_string()));
         let summary = record.to_summary();
         assert_eq!(summary.workflow_id, Some("wf-42".to_string()));
+    }
+
+    #[test]
+    fn to_summary_lists_gallery_gates_sorted() {
+        use smasher_attractor::dot::parser;
+        use smasher_attractor::graph;
+        let mut record = make_test_record(RunStatus::Running, None, None);
+        record.graph = graph::resolve(
+            &parser::parse(
+                r#"digraph {
+  start [shape=Mdiamond];
+  zeta [shape=hexagon, gallery="true"];
+  pick [shape=hexagon, gallery="true"];
+  ask [shape=hexagon];
+  exit [shape=Msquare];
+  start -> zeta -> pick -> ask -> exit;
+}"#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let summary = record.to_summary();
+        assert_eq!(
+            summary.gallery_gates,
+            vec!["pick".to_string(), "zeta".to_string()]
+        );
+    }
+
+    #[test]
+    fn to_summary_has_no_gallery_gates_for_a_graph_without_them() {
+        let record = make_test_record(RunStatus::Running, None, None);
+        let summary = record.to_summary();
+        assert!(summary.gallery_gates.is_empty());
     }
 
     #[test]

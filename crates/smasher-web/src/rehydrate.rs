@@ -228,6 +228,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rehydrated_run_summary_lists_gallery_gates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("artifacts").join("run-gallery");
+        std::fs::create_dir_all(&root).unwrap();
+        write_manifest(&root, "run-gallery", Some("Completed"));
+        std::fs::write(
+            root.join("graph.dot"),
+            r#"digraph {
+  start [shape=Mdiamond];
+  zeta [shape=hexagon, gallery="true"];
+  pick [shape=hexagon, gallery="true"];
+  ask [shape=hexagon];
+  exit [shape=Msquare];
+  start -> zeta -> pick -> ask -> exit;
+}"#,
+        )
+        .unwrap();
+
+        let rehydrated = rehydrate_runs(&tmp.path().display().to_string()).await;
+        let record = rehydrated
+            .get("run-gallery")
+            .expect("run-gallery should rehydrate");
+        assert_eq!(record.to_summary().gallery_gates, vec!["pick", "zeta"]);
+    }
+
+    #[tokio::test]
     async fn missing_graph_dot_is_skipped_without_failing_the_scan() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("artifacts").join("run-no-dot");

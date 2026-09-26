@@ -448,7 +448,8 @@ Response body — `runs` is a list of the same shape as `GET /api/runs/{id}` bel
       "input_tokens": 0,
       "output_tokens": 0,
       "run_working_dir": "artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV",
-      "workflow_id": null
+      "workflow_id": null,
+      "gallery_gates": []
     }
   ]
 }
@@ -469,9 +470,15 @@ Response body (flat `RunSummary`, no nested `metadata` wrapper):
   "input_tokens": 0,
   "output_tokens": 0,
   "run_working_dir": "artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV",
-  "workflow_id": null
+  "workflow_id": null,
+  "gallery_gates": ["ReviewCandidates"]
 }
 ```
+
+`gallery_gates` lists the ids of the run graph's gallery gates (Interviewer nodes with
+`gallery="true"`), sorted. It's `[]` when there are none. Runs reloaded from disk report it too,
+because it comes from the run's graph. The SPA uses it to keep gallery picks out of Answered
+Questions, since Decision History already shows them.
 
 `status` is one of `Running`, `Completed`, `Failed`, `Aborted` (PascalCase — it's Rust's `{:?}` `Debug` output of `RunStatus`, not a lowercase string).
 
@@ -897,6 +904,13 @@ All events are emitted on `/api/runs/{id}/events` as SSE with JSON data payloads
 | `agent_tool_call_started` | `node_id`, `tool_name`, `tool_call_id`, `input_preview`, `timestamp` | Agent invoked a tool. |
 | `agent_tool_call_completed` | `node_id`, `tool_name`, `tool_call_id`, `duration_ms`, `is_error`, `result_preview`, `timestamp` | Tool execution completed. |
 | `agent_token_usage` | `node_id`, `input_tokens`, `output_tokens`, `cost_usd`, `timestamp` | LLM token usage recorded. |
+
+On web runs, `HttpInterviewer` emits `human_prompt_issued` when a gate asks its question and
+`human_response_received` when the waiting gate receives the answer. That covers gallery gates
+too, whose response is the selection JSON. The gate emits the response event before it finishes,
+so it always comes before that gate's `node_completed`. Both go to the run's
+`events.jsonl` and the SSE stream, so the SPA can rebuild the answered questions after a reload.
+A failed answer (unknown question, or a node that stopped waiting) emits nothing.
 
 ### Event Classification
 

@@ -1044,6 +1044,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_run_lists_gallery_gates() {
+        let state = test_state();
+        let _token = insert_test_record(&state, "run-gallery-1", RunStatus::Running).await;
+        let gallery_dot = r#"digraph {
+  start [shape=Mdiamond];
+  zeta [shape=hexagon, gallery="true"];
+  pick [shape=hexagon, gallery="true"];
+  ask [shape=hexagon];
+  exit [shape=Msquare];
+  start -> zeta -> pick -> ask -> exit;
+}"#;
+        state
+            .runs
+            .write()
+            .await
+            .get_mut("run-gallery-1")
+            .unwrap()
+            .graph = graph::resolve(&parser::parse(gallery_dot).unwrap()).unwrap();
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri("/api/runs/run-gallery-1")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["gallery_gates"], serde_json::json!(["pick", "zeta"]));
+    }
+
+    #[tokio::test]
+    async fn get_run_without_gallery_gates_returns_an_empty_list() {
+        let state = test_state();
+        let _token = insert_test_record(&state, "run-plain-1", RunStatus::Running).await;
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .uri("/api/runs/run-plain-1")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["gallery_gates"], serde_json::json!([]));
+    }
+
+    #[tokio::test]
     async fn submit_lint_errors_return_bad_request() {
         let app = router().with_state(test_state());
         // A graph with no start node triggers a lint error.

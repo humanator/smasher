@@ -132,7 +132,9 @@ pub async fn launch_pipeline(
     let emitter = Arc::new(PipelineEventEmitter::default());
     let event_log = Arc::new(PipelineEventLog::new());
     let cancellation = CancellationToken::new();
-    let interviewer = HttpInterviewer::new().with_cancellation(cancellation.clone());
+    let interviewer = HttpInterviewer::new()
+        .with_cancellation(cancellation.clone())
+        .with_emitter(Arc::clone(&emitter));
     let input_tokens = Arc::new(AtomicU64::new(0));
     let output_tokens = Arc::new(AtomicU64::new(0));
 
