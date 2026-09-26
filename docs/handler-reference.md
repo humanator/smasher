@@ -46,7 +46,7 @@ Handles `Start` nodes. Sets a context flag to mark the pipeline as started.
 |----------|-------|
 | **Name** | `start` |
 | **Node type** | `Start` |
-| **DOT shape** | `circle` |
+| **DOT shape** | `circle`, `point` or `Mdiamond` |
 | **Attributes** | None |
 | **Context key** | `_started` = `true` |
 | **Outcome** | Always `Success` |
@@ -59,7 +59,7 @@ Handles `Exit` nodes. Sets a context flag to mark the pipeline as completed.
 |----------|-------|
 | **Name** | `exit` |
 | **Node type** | `Exit` |
-| **DOT shape** | `doublecircle` |
+| **DOT shape** | `doublecircle` or `Msquare` |
 | **Attributes** | None |
 | **Context key** | `_completed` = `true` |
 | **Outcome** | Always `Success` |
@@ -91,7 +91,7 @@ which manages the actual LLM interaction.
 |----------|-------|
 | **Name** | `codergen` |
 | **Node type** | `Codergen` |
-| **DOT shape** | `box` |
+| **DOT shape** | `box` or `rectangle` (also the default when `shape` is omitted) |
 
 ### Attributes
 
@@ -115,23 +115,43 @@ If neither `prompt` nor label is present, returns `Failure("no prompt specified"
 
 ## ToolHandler
 
-Handles `Tool` nodes. Delegates tool execution to a pluggable `ToolBackend`.
+Handles `Tool` nodes. Runs a built-in tool through a pluggable `ToolBackend`
+chain, or a shell command through `CommandRunner`. It never falls back to an
+LLM.
 
 | Property | Value |
 |----------|-------|
 | **Name** | `tool` |
 | **Node type** | `Tool` |
-| **DOT shape** | `hexagon` |
-| **Context key** | `_tool_{node_id}` |
+| **DOT shape** | `parallelogram` |
+| **Context keys** | `_tool_{node_id}`; `tool.output`, `tool.stderr`, `tool.exit_code` for commands |
 
 ### Attributes
 
+A tool node sets exactly one of `tool` or `tool_command`. The node label is
+never used as a tool name.
+
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `tool` | String | No | Name of the tool to invoke. Falls back to node label if absent. |
-| `args` | String (JSON) | No | JSON-encoded arguments for the tool. Defaults to `{}`. |
+| `tool` | String | One of these two | Built-in tool to run: `render_capture`, `system_lint`, `task_critic` or `synthesis`. |
+| `tool_command` | String | One of these two | Shell command, run with `sh -c` in the run's working directory. |
+| `args` | String (JSON) | No | JSON-encoded arguments for a built-in `tool`. Defaults to `{}`. Ignored for `tool_command` (lint W004). |
+| `timeout` | Number, numeric string or duration | No | How long a `tool_command` may run: `600`, `"600"` or `"30s"`. Defaults to 600 seconds. |
 
-### Backend Trait
+### Built-in tools
+
+`tool` is dispatched down a chain of `ToolBackend`s, each handling its own
+names and passing the rest on:
+
+```
+TaskCriticSynthesisToolBackend  (task_critic, synthesis; only when an LLM client exists)
+  -> SystemLintToolBackend      (system_lint)
+  -> HybridToolBackend          (render_capture)
+  -> UnknownToolBackend         (anything else: Failure("unknown tool 'x'; built-in tools are: ..."))
+```
+
+`task_critic` and `synthesis` make one LLM call each. No other tool node
+reaches an LLM.
 
 ```
 trait ToolBackend: Send + Sync {
@@ -141,9 +161,37 @@ trait ToolBackend: Send + Sync {
 }
 ```
 
+### Shell commands
+
+`ToolHandler::with_commands(CommandConfig { working_dir, run_dir, cancel })`
+enables `tool_command`. The web app and the CLI both pass the run's working
+directory, run directory and cancellation token. The command:
+
+- runs in its own process group with stdin empty, and stdout and stderr read
+  concurrently;
+- inherits the environment minus secret-looking variables, plus
+  `SMASHER_RUN_DIR`, `SMASHER_NODE_ID` and `SMASHER_CTX_<KEY>` (see the
+  [DOT reference](dot-reference.md#tool-parallelogram));
+- is killed, with its whole process group, on timeout or when the run is
+  cancelled.
+
+| Result | Outcome |
+|--------|---------|
+| Exit 0 | `Success` with data `{stdout, stderr, exit_code}` |
+| Non-zero exit | `Failure("exit code N: <last 2,000 bytes of stderr>")` |
+| Timeout | `Failure("timed out after Ns")` |
+| Cancelled | `Failure("cancelled")` |
+| Shell couldn't start | `Failure` with the OS error |
+
+None of these failures is retryable. Whatever the result, `tool.output`
+(stdout, trailing whitespace trimmed), `tool.stderr` and `tool.exit_code`
+(`-1` after a timeout or cancel) are set in context, each capped at 100,000
+bytes, and the full streams are written to `nodes/{node_id}/stdout.txt` and
+`stderr.txt` in the run directory.
+
 ### Context Storage
 
-The handler stores the outcome in context under `_tool_{node_id}`:
+The handler also stores the outcome in context under `_tool_{node_id}`:
 
 ```json
 // On success:
@@ -159,8 +207,15 @@ The handler stores the outcome in context under `_tool_{node_id}`:
 ### Error Handling
 
 - If `args` contains invalid JSON, returns `Failure("invalid JSON in args attribute: ...")`.
-- If neither `tool` attribute nor label is present, returns `Failure("no tool specified")`.
-- If the backend returns a `HandlerError`, it propagates upward.
+  This is checked first.
+- If neither `tool` nor `tool_command` is set, returns
+  `Failure("tool node '<id>' needs a tool or tool_command attribute")`.
+- If both are set, returns `Failure("tool node '<id>' sets both tool and tool_command; use one")`.
+- If `timeout` isn't a positive number or duration, returns
+  `Failure("tool node '<id>' has an invalid timeout; ...")`.
+- If a backend returns a `HandlerError`, it propagates upward. So does a
+  `tool_command` on a handler built without `with_commands`, which is a
+  wiring bug.
 
 ---
 
@@ -210,8 +265,8 @@ concurrency and configurable failure behavior.
 | Property | Value |
 |----------|-------|
 | **Name** | `parallel` |
-| **Node type** | `Parallel` |
-| **DOT shape** | `parallelogram` |
+| **Node type** | `Parallel` and `FanIn` |
+| **DOT shape** | `component` (Parallel), `tripleoctagon` (FanIn) |
 
 ### Attributes
 
@@ -256,7 +311,7 @@ its answer as a structured gallery decision on gates authored with
 |----------|-------|
 | **Name** | `interviewer` |
 | **Node type** | `Interviewer` |
-| **DOT shape** | `oval` or `ellipse` |
+| **DOT shape** | `hexagon`, `oval` or `ellipse` |
 | **Context key** | `{node_id}` |
 
 ### Attributes
@@ -342,7 +397,7 @@ current pipeline's context.
 | Property | Value |
 |----------|-------|
 | **Node type** | `SubPipeline` |
-| **DOT shape** | `component` |
+| **DOT shape** | `folder` |
 
 ### Attributes
 
@@ -358,13 +413,16 @@ The node type is determined by the `shape` attribute in the DOT file:
 
 | DOT Shape | Node Type |
 |-----------|-----------|
-| `circle` | Start |
-| `doublecircle` | Exit |
-| `box` | Codergen |
+| `circle`, `point` or `Mdiamond` | Start |
+| `doublecircle` or `Msquare` | Exit |
+| `box` or `rectangle` (or no shape) | Codergen |
 | `diamond` | Conditional |
-| `hexagon` | Tool |
-| `oval` or `ellipse` | Interviewer |
-| `parallelogram` | Parallel |
+| `hexagon`, `oval` or `ellipse` | Interviewer |
+| `parallelogram` | Tool |
+| `component` | Parallel |
+| `tripleoctagon` | FanIn |
 | `house` | Manager |
-| `component` | SubPipeline |
+| `folder` | SubPipeline |
 | (anything else) | Generic |
+
+The mapping lives in `node_type_from_shape` (`crates/smasher-attractor/src/graph/mod.rs`).

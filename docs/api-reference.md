@@ -1145,7 +1145,7 @@ determines their `NodeType`.
 | `box`, `rectangle` | `Codergen` | Code generation node (runs an agent session). |
 | `diamond` | `Conditional` | Conditional branching node. |
 | `hexagon`, `oval`, `ellipse` | `Interviewer` | Human-gate node — pauses the pipeline for a question/answer round trip via `GET /api/runs/{id}/questions` + `POST .../answer`. |
-| `parallelogram` | `Tool` | Tool execution node (e.g. `render_capture`). |
+| `parallelogram` | `Tool` | Runs a built-in `tool` (e.g. `render_capture`) or a shell `tool_command`, never an LLM fallback. |
 | `component` | `Parallel` | Parallel fan-out node. |
 | `tripleoctagon` | `FanIn` | Parallel fan-in join node. |
 | `house` | `Manager` | Manager/coordinator node. |

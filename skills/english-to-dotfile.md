@@ -31,14 +31,16 @@ Smasher maps DOT node shapes to handler types:
 
 | Shape | Smasher Type | Purpose |
 |-------|-------------|---------|
-| `circle` or `Mdiamond` | **Start** | Entry point of the pipeline. Exactly one per graph. |
+| `circle`, `point` or `Mdiamond` | **Start** | Entry point of the pipeline. Exactly one per graph. |
 | `doublecircle` or `Msquare` | **Exit** | Terminal node. At least one per graph. Can have multiple for different outcomes. |
-| `box` or `rectangle` | **Codergen** | LLM agent session. The workhorse node for code generation, analysis, writing. |
+| `box` or `rectangle` (or no `shape`) | **Codergen** | LLM agent session. The workhorse node for code generation, analysis, writing. |
 | `diamond` | **Conditional** | Branching node that evaluates a condition against the pipeline context. |
 | `hexagon` or `ellipse` or `oval` | **Interviewer** | Human interaction node for Q&A or approval. |
-| `parallelogram` or `tripleoctagon` | **Parallel** | Fan-out node that runs downstream branches concurrently. |
+| `parallelogram` | **Tool** | Runs without an LLM. Set exactly one of `tool="<built-in>"` (`render_capture`, `system_lint`, `task_critic`, `synthesis`) or `tool_command="<shell command>"` (optional `timeout`, seconds or e.g. `"30s"`). Its stdout lands in `tool.output` for edge conditions. Use it for tests, builds, linters and scripts. |
+| `component` | **Parallel** | Fan-out node that runs downstream branches concurrently. |
+| `tripleoctagon` | **FanIn** | Joins the branches of a Parallel node. |
 | `house` | **Manager** | Coordinator node for human-in-the-loop decisions. |
-| `component` | **SubPipeline** | Delegates to another DOT file for composition. |
+| `folder` | **SubPipeline** | Delegates to another DOT file for composition. |
 
 ## Node Attributes
 

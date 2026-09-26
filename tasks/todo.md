@@ -367,13 +367,13 @@ the stale comments only. Don't rebuild its checked-in `dist/`.
   `tool_command`.
 
 **Acceptance criteria:**
-- [ ] No doc says a tool node falls back to its label or to an LLM.
-- [ ] Every shape table agrees with `graph/mod.rs`.
+- [x] No doc says a tool node falls back to its label or to an LLM.
+- [x] Every shape table agrees with `graph/mod.rs`.
 
 **Verification:**
-- [ ] `grep -rn "falls back to\|hexagon\|LlmToolBackend\|no tool specified" docs README.md skills`
+- [x] `grep -rn "falls back to\|hexagon\|LlmToolBackend\|no tool specified" docs README.md skills`
       is reviewed by hand.
-- [ ] `cargo test -p smasher-cli ingest`, since the skill file is `include_str!`ed.
+- [x] `cargo test -p smasher-cli ingest`, since the skill file is `include_str!`ed.
 
 **Dependencies:** Tasks 2–6
 

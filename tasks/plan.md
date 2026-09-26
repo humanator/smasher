@@ -73,7 +73,7 @@ both.
 ### Phase 3: Editor and docs
 - [x] 7. Node editor `ToolForm`: built-in tool or shell command (legacy
       editor-ui: comments only)
-- [ ] 8. Docs
+- [x] 8. Docs
 - [ ] 9. Backlog updates
 
 ### Checkpoint C: Complete

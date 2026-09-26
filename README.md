@@ -65,15 +65,16 @@ smasher run examples/old-examples/multi-step.dot --var model=claude-sonnet-5
 
 Pipelines are standard DOT digraphs. Node shapes tell the engine what each node does:
 
-- `circle` / `point` = start
-- `doublecircle` = exit
-- `box` / `rectangle` = codergen (runs an LLM agent)
+- `circle` / `point` / `Mdiamond` = start
+- `doublecircle` / `Msquare` = exit
+- `box` / `rectangle` = codergen (runs an LLM agent); also the default when `shape` is omitted
 - `diamond` = conditional (branches on variables)
-- `oval` / `ellipse` = interviewer (asks a human, captures response)
+- `hexagon` / `oval` / `ellipse` = interviewer (asks a human, captures response)
 - `house` = manager (human approval gate)
-- `parallelogram` = parallel fan-out
-- `hexagon` = tool
-- `component` = sub-pipeline (nested DOT file)
+- `parallelogram` = tool (runs a built-in `tool` or a shell `tool_command`; never an LLM fallback)
+- `component` = parallel fan-out
+- `tripleoctagon` = fan-in (joins parallel branches)
+- `folder` = sub-pipeline (nested DOT file)
 
 See [`examples/`](examples/) for working pipelines and [`docs/dot-reference.md`](docs/dot-reference.md) for the full spec.
 
