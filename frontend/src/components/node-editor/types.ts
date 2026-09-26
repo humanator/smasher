@@ -32,8 +32,8 @@ export type NodeType =
 // (WorkflowCanvasInner.svelte's applyNodeFormChange) applies each entry
 // key-by-key instead of spreading. `label` is deliberately NOT part of
 // this patch shape: it's common to every node kind (and is itself every
-// handler's own fallback value -- Codergen's `prompt`, Tool's `tool`,
-// Manager's `task`, Interviewer's `question` all fall back to it), so it's
+// handler's own fallback value -- Codergen's `prompt`, Manager's `task`,
+// Interviewer's `question` all fall back to it; Tool's `tool` doesn't), so it's
 // edited once via a shared field in the side panel, not duplicated across
 // six per-kind forms.
 export type NodeAttrsPatch = Record<string, AttrValue | undefined>;

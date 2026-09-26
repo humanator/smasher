@@ -361,7 +361,7 @@ const multiKindGraph: EditorGraph = {
     { id: 'start', node_type: 'Start', label: 'Begin', attrs: {} },
     { id: 'gen', node_type: 'Codergen', label: 'Generate', attrs: { prompt: 'write code', model: 'gpt-5' } },
     { id: 'ask', node_type: 'Interviewer', label: 'Ask', attrs: { question: 'ok?' } },
-    { id: 'run', node_type: 'Tool', label: 'Run', attrs: { tool: 'shell' } },
+    { id: 'run', node_type: 'Tool', label: 'Run', attrs: { tool_command: 'make test' } },
     { id: 'mgr', node_type: 'Manager', label: 'Coordinate', attrs: { task: 'sync' } },
     { id: 'sub', node_type: 'SubPipeline', label: 'Delegate', attrs: { pipeline: 'sub.dot' } },
   ],
@@ -414,7 +414,7 @@ describe('node inspector (Task 7 side panel)', () => {
     await clickNodeByLabel('Run');
 
     expect(screen.getByTestId('tool-form')).toBeInTheDocument();
-    expect(screen.getByTestId('tool-name')).toHaveValue('shell');
+    expect(screen.getByTestId('tool-command')).toHaveValue('make test');
   });
 
   it('shows ManagerForm for a Manager node', async () => {

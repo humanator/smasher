@@ -71,7 +71,7 @@ both.
       works with no API keys
 
 ### Phase 3: Editor and docs
-- [ ] 7. Node editor `ToolForm`: built-in tool or shell command (legacy
+- [x] 7. Node editor `ToolForm`: built-in tool or shell command (legacy
       editor-ui: comments only)
 - [ ] 8. Docs
 - [ ] 9. Backlog updates

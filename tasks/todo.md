@@ -314,18 +314,18 @@ In the legacy `crates/smasher-web/editor-ui/src/nodeForms/ToolForm.svelte`, fix
 the stale comments only. Don't rebuild its checked-in `dist/`.
 
 **Acceptance criteria:**
-- [ ] A node with `tool_command` opens in shell mode, and one with `tool` opens
+- [x] A node with `tool_command` opens in shell mode, and one with `tool` opens
       in built-in mode.
-- [ ] Switching modes writes and clears the right attributes.
-- [ ] The "Custom…" option no longer exists, and the Custom tests at :26 and :48
+- [x] Switching modes writes and clears the right attributes.
+- [x] The "Custom…" option no longer exists, and the Custom tests at :26 and :48
       are rewritten.
-- [ ] `grep -rn "LlmToolBackend\|pages.rs" frontend/src crates/smasher-web/editor-ui/src`
+- [x] `grep -rn "LlmToolBackend\|pages.rs" frontend/src crates/smasher-web/editor-ui/src`
       finds nothing.
 
 **Verification:**
-- [ ] `cd frontend && npm run check && npm run lint`. `lint` runs
+- [x] `cd frontend && npm run check && npm run lint`. `lint` runs
       `eslint --fix`, so check `git status` for rewrites.
-- [ ] `npx vitest run tests/components/node-editor`
+- [x] `npx vitest run tests/components/node-editor`
 
 **Dependencies:** None (can run alongside Phase 2)
 
