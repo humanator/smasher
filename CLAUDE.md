@@ -70,15 +70,19 @@ cargo run -p smasher-cli -- serve   # web dashboard on http://127.0.0.1:21541
 
 `smasher-attractor` resolves node behavior from the DOT node's shape attribute:
 
-- `circle` / `point` — start
-- `doublecircle` — exit
-- `box` / `rectangle` — codergen (runs an LLM agent)
+- `circle` / `point` / `Mdiamond` — start
+- `doublecircle` / `Msquare` — exit
+- `box` / `rectangle` — codergen (runs an LLM agent); also the type when `shape` is omitted
 - `diamond` — conditional (branches on variables)
-- `oval` / `ellipse` — interviewer (asks a human, captures response)
-- `house` — manager (human approval gate)
-- `parallelogram` — parallel fan-out
-- `hexagon` — tool
-- `component` — sub-pipeline (nested DOT file)
+- `hexagon` / `oval` / `ellipse` — interviewer (asks a human, captures response)
+- `parallelogram` — tool
+- `component` — parallel fan-out
+- `tripleoctagon` — fan-in (joins parallel branches)
+- `house` — manager (coordinator, delegates to a manager backend)
+- `folder` — sub-pipeline (nested DOT file)
+- any other shape — generic
+
+The mapping lives in `node_type_from_shape` (`smasher-attractor/src/graph/mod.rs`).
 
 Handler dispatch is a registry (`smasher-attractor::handler::HandlerRegistry`): the engine visits
 each node and delegates to the first `Handler` whose `handles()` matches the node type.
