@@ -620,11 +620,32 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn kill_process_group_kills_leader_and_children() {
+        let group_members = |pid: u32| {
+            let out = std::process::Command::new("pgrep")
+                .args(["-g", &pid.to_string()])
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout).lines().count()
+        };
+
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg("sleep 30 & sleep 30");
         cmd.process_group(0);
         let mut child = cmd.spawn().unwrap();
         let pid = child.id().unwrap();
+
+        // Wait until the shell has forked both sleeps, so the kill can't race
+        // the fork.
+        for _ in 0..100 {
+            if group_members(pid) >= 3 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(
+            group_members(pid) >= 3,
+            "group {pid} never had its children"
+        );
 
         kill_process_group(pid);
 
@@ -633,12 +654,15 @@ mod tests {
             .expect("leader should exit after the group is killed")
             .unwrap();
         assert!(!status.success());
-        // No process remains in the group.
-        let alive = std::process::Command::new("pgrep")
-            .args(["-g", &pid.to_string()])
-            .output()
-            .unwrap();
-        assert!(alive.stdout.is_empty(), "group {pid} still has processes");
+        // No process remains in the group. The orphaned sleep is reaped by init
+        // shortly after it dies, so poll briefly.
+        for _ in 0..100 {
+            if group_members(pid) == 0 {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        panic!("group {pid} still has processes");
     }
 
     #[tokio::test]
