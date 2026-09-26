@@ -54,7 +54,7 @@ both.
 
 ### Phase 1: Engine
 - [x] 1. `CommandRunner`: run, timeout, cancel, environment
-- [ ] 2. `ToolHandler` node contract, context keys, output files, `UnknownToolBackend`
+- [x] 2. `ToolHandler` node contract, context keys, output files, `UnknownToolBackend`
 - [ ] 3. Lint rules E004, E005, W004
 - [ ] 4. Conditions accept a `context.` prefix
 

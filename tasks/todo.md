@@ -89,18 +89,18 @@ run dir, creating the directory. Add `UnknownToolBackend`, which returns
 `failure("unknown tool 'x'; built-in tools are: …")`.
 
 **Acceptance criteria:**
-- [ ] Each of the four attribute combinations gives the specified outcome.
-- [ ] The context keys and output files are right on success and on failure.
-- [ ] `timeout` works as a number, a numeric string and a `Duration`.
-- [ ] Invalid `args` JSON still fails with the existing message.
-- [ ] These tests are deleted: `tool_handler_falls_back_to_label` and
+- [x] Each of the four attribute combinations gives the specified outcome.
+- [x] The context keys and output files are right on success and on failure.
+- [x] `timeout` works as a number, a numeric string and a `Duration`.
+- [x] Invalid `args` JSON still fails with the existing message.
+- [x] These tests are deleted: `tool_handler_falls_back_to_label` and
       `tool_attribute_takes_precedence_over_label`.
-- [ ] `tool_handler_no_tool_returns_failure` is rewritten for the new message.
-- [ ] New tests show the label is never used as a tool name.
-- [ ] The doc comment saying "Falls back to node label" is gone.
+- [x] `tool_handler_no_tool_returns_failure` is rewritten for the new message.
+- [x] New tests show the label is never used as a tool name.
+- [x] The doc comment saying "Falls back to node label" is gone.
 
 **Verification:**
-- [ ] `cargo test -p smasher-attractor tool_handler`
+- [x] `cargo test -p smasher-attractor tool_handler`
 
 **Dependencies:** Task 1
 
