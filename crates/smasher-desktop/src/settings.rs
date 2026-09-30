@@ -130,27 +130,51 @@ pub fn save(data_dir: &Path, settings: &StoredSettings) -> Result<(), SettingsEr
 }
 
 /// API keys in the macOS Keychain: one generic-password entry per provider id
-/// under `service`.
+/// under `service`. Tests use an in-memory store instead, because off macOS
+/// `keyring` falls back to a mock store that forgets a key as soon as the
+/// entry that set it is dropped.
 pub struct Keychain {
-    service: String,
+    store: Store,
+}
+
+enum Store {
+    Native {
+        service: String,
+    },
+    #[cfg(test)]
+    Memory(std::sync::Mutex<BTreeMap<String, String>>),
 }
 
 impl Keychain {
     pub fn new(service: impl Into<String>) -> Self {
         Self {
-            service: service.into(),
+            store: Store::Native {
+                service: service.into(),
+            },
         }
     }
 
-    fn entry(&self, provider: &str) -> Result<keyring::Entry, SettingsError> {
-        keyring::Entry::new(&self.service, provider).map_err(|source| SettingsError::Keychain {
+    #[cfg(test)]
+    fn in_memory() -> Self {
+        Self {
+            store: Store::Memory(Default::default()),
+        }
+    }
+
+    fn entry(service: &str, provider: &str) -> Result<keyring::Entry, SettingsError> {
+        keyring::Entry::new(service, provider).map_err(|source| SettingsError::Keychain {
             provider: provider.into(),
             source,
         })
     }
 
     pub fn get(&self, provider: &str) -> Result<Option<String>, SettingsError> {
-        match self.entry(provider)?.get_password() {
+        let service = match &self.store {
+            Store::Native { service } => service,
+            #[cfg(test)]
+            Store::Memory(keys) => return Ok(keys.lock().unwrap().get(provider).cloned()),
+        };
+        match Self::entry(service, provider)?.get_password() {
             Ok(key) => Ok(Some(key)),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(source) => Err(SettingsError::Keychain {
@@ -161,7 +185,15 @@ impl Keychain {
     }
 
     pub fn set(&self, provider: &str, key: &str) -> Result<(), SettingsError> {
-        self.entry(provider)?
+        let service = match &self.store {
+            Store::Native { service } => service,
+            #[cfg(test)]
+            Store::Memory(keys) => {
+                keys.lock().unwrap().insert(provider.into(), key.into());
+                return Ok(());
+            }
+        };
+        Self::entry(service, provider)?
             .set_password(key)
             .map_err(|source| SettingsError::Keychain {
                 provider: provider.into(),
@@ -171,7 +203,15 @@ impl Keychain {
 
     /// Remove the key; removing one that isn't there is fine.
     pub fn delete(&self, provider: &str) -> Result<(), SettingsError> {
-        match self.entry(provider)?.delete_credential() {
+        let service = match &self.store {
+            Store::Native { service } => service,
+            #[cfg(test)]
+            Store::Memory(keys) => {
+                keys.lock().unwrap().remove(provider);
+                return Ok(());
+            }
+        };
+        match Self::entry(service, provider)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(source) => Err(SettingsError::Keychain {
                 provider: provider.into(),
@@ -439,9 +479,12 @@ mod tests {
     use super::*;
 
     /// A real Keychain under a throwaway service name, emptied on drop so
-    /// tests never touch the app's own keys.
+    /// tests never touch the app's own keys. macOS only: elsewhere `keyring`
+    /// has no Keychain, so the other tests use `Keychain::in_memory()`.
+    #[cfg(target_os = "macos")]
     struct TestKeychain(Keychain);
 
+    #[cfg(target_os = "macos")]
     impl TestKeychain {
         fn new() -> Self {
             let service = format!("{KEYCHAIN_SERVICE}.test.{}", uuid::Uuid::new_v4());
@@ -449,6 +492,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "macos")]
     impl Drop for TestKeychain {
         fn drop(&mut self) {
             for spec in &PROVIDERS {
@@ -556,6 +600,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn keychain_round_trips_a_key_and_deletes_it() {
         let keychain = TestKeychain::new();
 
@@ -570,6 +615,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
     fn deleting_a_missing_keychain_key_is_ok() {
         let keychain = TestKeychain::new();
 
@@ -579,10 +625,10 @@ mod tests {
     #[test]
     fn view_lists_every_provider_without_exposing_keys() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
-        keychain.0.set("gemini", "secret-gemini-key").unwrap();
+        let keychain = Keychain::in_memory();
+        keychain.set("gemini", "secret-gemini-key").unwrap();
 
-        let view = view(dir.path(), &keychain.0).unwrap();
+        let view = view(dir.path(), &keychain).unwrap();
 
         let ids: Vec<_> = view.providers.iter().map(|p| p.id.as_str()).collect();
         assert_eq!(ids, ["anthropic", "openai", "gemini", "ollama"]);
@@ -598,11 +644,11 @@ mod tests {
     #[test]
     fn update_writes_settings_and_keys_then_returns_the_new_view() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
 
         let view = update(
             dir.path(),
-            &keychain.0,
+            &keychain,
             settings_update(
                 " gemma4:31b-cloud ",
                 "ollama",
@@ -619,7 +665,7 @@ mod tests {
         let ollama = view.providers.iter().find(|p| p.id == "ollama").unwrap();
         assert_eq!(ollama.base_url, "http://localhost:11434");
         assert_eq!(
-            keychain.0.get("anthropic").unwrap().as_deref(),
+            keychain.get("anthropic").unwrap().as_deref(),
             Some("sk-ant-new")
         );
     }
@@ -627,46 +673,43 @@ mod tests {
     #[test]
     fn update_with_no_api_key_leaves_the_stored_key_alone() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
-        keychain.0.set("openai", "sk-keep").unwrap();
+        let keychain = Keychain::in_memory();
+        keychain.set("openai", "sk-keep").unwrap();
 
         update(
             dir.path(),
-            &keychain.0,
+            &keychain,
             settings_update("", "", vec![provider_update("openai", "", None)]),
         )
         .unwrap();
 
-        assert_eq!(
-            keychain.0.get("openai").unwrap().as_deref(),
-            Some("sk-keep")
-        );
+        assert_eq!(keychain.get("openai").unwrap().as_deref(), Some("sk-keep"));
     }
 
     #[test]
     fn update_with_an_empty_api_key_removes_the_stored_key() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
-        keychain.0.set("openai", "sk-remove").unwrap();
+        let keychain = Keychain::in_memory();
+        keychain.set("openai", "sk-remove").unwrap();
 
         update(
             dir.path(),
-            &keychain.0,
+            &keychain,
             settings_update("", "", vec![provider_update("openai", "", Some(""))]),
         )
         .unwrap();
 
-        assert_eq!(keychain.0.get("openai").unwrap(), None);
+        assert_eq!(keychain.get("openai").unwrap(), None);
     }
 
     #[test]
     fn update_rejects_an_unknown_default_provider_and_writes_nothing() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
 
         let err = update(
             dir.path(),
-            &keychain.0,
+            &keychain,
             settings_update(
                 "m",
                 "mistral",
@@ -677,17 +720,17 @@ mod tests {
 
         assert!(err.to_string().contains("mistral"));
         assert!(!settings_path(dir.path()).exists());
-        assert_eq!(keychain.0.get("openai").unwrap(), None);
+        assert_eq!(keychain.get("openai").unwrap(), None);
     }
 
     #[test]
     fn update_rejects_a_base_url_without_an_http_scheme() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
 
         let err = update(
             dir.path(),
-            &keychain.0,
+            &keychain,
             settings_update(
                 "",
                 "",
@@ -703,11 +746,11 @@ mod tests {
     #[test]
     fn update_rejects_an_unknown_provider_id() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
 
         let err = update(
             dir.path(),
-            &keychain.0,
+            &keychain,
             settings_update("", "", vec![provider_update("mistral", "", None)]),
         )
         .unwrap_err();
@@ -794,13 +837,13 @@ mod tests {
     #[test]
     fn update_accepts_claude_cli_without_a_key_and_round_trips_path_and_allowlist() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
         let binary = fake_claude(dir.path(), "2.1.281 (Claude Code)");
         let mut update = settings_update("sonnet", "claude-cli", vec![]);
         update.claude_cli_path = binary.display().to_string();
         update.claude_cli_allowed_tools = vec![" Read ".into(), "".into(), "Write".into()];
 
-        let view = super::update(dir.path(), &keychain.0, update).unwrap();
+        let view = super::update(dir.path(), &keychain, update).unwrap();
 
         let stored = load(dir.path()).unwrap();
         assert_eq!(stored.default_provider.as_deref(), Some("claude-cli"));
@@ -817,11 +860,11 @@ mod tests {
     #[test]
     fn default_allowlist_is_not_stored_so_it_tracks_future_defaults() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
         let mut update = settings_update("", "claude-cli", vec![]);
         update.claude_cli_allowed_tools = DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec();
 
-        let view = super::update(dir.path(), &keychain.0, update).unwrap();
+        let view = super::update(dir.path(), &keychain, update).unwrap();
 
         assert_eq!(load(dir.path()).unwrap().claude_cli_allowed_tools, None);
         assert_eq!(
@@ -833,11 +876,11 @@ mod tests {
     #[test]
     fn update_rejects_a_claude_cli_path_that_does_not_exist() {
         let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
+        let keychain = Keychain::in_memory();
         let mut update = settings_update("", "claude-cli", vec![]);
         update.claude_cli_path = dir.path().join("nope").display().to_string();
 
-        let err = super::update(dir.path(), &keychain.0, update).unwrap_err();
+        let err = super::update(dir.path(), &keychain, update).unwrap_err();
 
         assert!(err.to_string().contains("Claude CLI"), "{err}");
         assert!(!settings_path(dir.path()).exists());

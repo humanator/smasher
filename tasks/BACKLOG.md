@@ -143,7 +143,10 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     New lead, 2026-09-26: on PR humanator/smasher#1 (run `36215653694`), MSRV
     failed after 1.5 min, not 50. Four `smasher-desktop` `settings::tests`
     Keychain tests panicked (`settings.rs:564`, `:621`, `:640`); Linux runners
-    have no macOS Keychain. Gate them to macOS or fake the store.
+    have no macOS Keychain. *Fixed 2026-09-30:* off macOS `keyring` falls back
+    to a mock store that forgets a key once the entry that set it is dropped.
+    The settings tests now use `Keychain::in_memory()`, and the two tests of
+    the real Keychain run on macOS only. The ~50 min timeout is still open.
 33. **Fix the lightbox-resize race in `candidate-preview.spec.ts:81`.** *Seen
     2026-09-26.* It polls until the iframe starts shrinking, then asserts its
     final bounds (`<= 800`) while the resize may still be running (got 963).
