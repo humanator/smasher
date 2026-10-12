@@ -23,8 +23,8 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Depends on: T2
 
 ### Checkpoint A: model-catalog
-- [ ] `cargo test -p smasher-llm -p smasher-web`, clippy, fmt all clean
-- [ ] Manual: `curl 127.0.0.1:21541/api/models` on a real `smasher serve` lists the configured providers
+- [x] `cargo test -p smasher-llm -p smasher-web`, clippy, fmt all clean
+- [x] Manual: `curl 127.0.0.1:21541/api/models` on a real `smasher serve` lists the configured providers
 - [ ] Review with Jobsworth
 
 ## Phase 2a: node-model-picker (T7 first, as the risk check)
@@ -68,8 +68,8 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Depends on: T5
 
 ### Checkpoint B: settings and picker
-- [ ] Full `cargo test --workspace` and frontend Vitest (fake-claude server, desktop app quit) pass
-- [ ] Settings change applies to the next run with no restart; picker choices survive save/reload
+- [x] Full `cargo test --workspace` and frontend Vitest (fake-claude server, desktop app quit) pass
+- [x] Settings change applies to the next run with no restart; picker choices survive save/reload
 - [ ] Review with Jobsworth
 
 ## Phase 3: settings-ui
@@ -93,7 +93,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Depends on: T11
 
 ### Checkpoint C: complete
-- [ ] All four specs' success criteria met
-- [ ] `make ci` and the Playwright suite pass
+- [x] All four specs' success criteria met (desktop in-place key swap is covered by unit tests only; see manual QA)
+- [x] `make ci` and the Playwright suite pass
 - [ ] Manual desktop QA done (settings change, no restart)
 - [ ] Ready for review and merge
