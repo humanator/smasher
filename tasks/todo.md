@@ -55,7 +55,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Files: `crates/smasher-web/src/settings.rs` (new), `routes/settings.rs` (new), `routes/mod.rs`, `server.rs`, `tests/settings_test.rs` (new)
   - Depends on: T3
 
-- [ ] **T5 (M): Hot-apply to new runs; `SubmitRequest.provider`**
+- [x] **T5 (M): Hot-apply to new runs; `SubmitRequest.provider`**
   - Acceptance: `AppState` default lives behind a lock; each run snapshots it at submit; PUT affects the next run, not one in flight; `SubmitRequest` accepts `provider`.
   - Verify: `cargo test -p smasher-web` (submit a gate-only run, PUT mid-run, assert old pair on it and new pair on the next)
   - Files: `crates/smasher-web/src/{state.rs or server.rs},routes/api.rs,run_launch.rs`, `tests/settings_test.rs`

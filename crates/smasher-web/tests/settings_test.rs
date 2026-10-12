@@ -258,3 +258,104 @@ async fn responses_never_contain_api_keys() {
 
     assert!(!put_text.contains(SECRET) && !get_text.contains(SECRET));
 }
+
+/// A gate-only pipeline whose question shows the model it was launched with.
+const MODEL_ECHO_DOT: &str = r#"digraph ModelEcho {
+    Start [shape=Mdiamond];
+    Exit [shape=Msquare];
+    Gate [shape=hexagon, label="Model: {{model}}", mode="freeform"];
+    Start -> Gate -> Exit;
+}"#;
+
+/// Submit the echo pipeline with no model of its own and return the model it was given.
+async fn launched_model(base: &str, provider: Option<&str>) -> String {
+    let mut body = json!({"dot_source": MODEL_ECHO_DOT, "variables": {}});
+    if let Some(p) = provider {
+        body["provider"] = json!(p);
+    }
+    let submit: Value = reqwest::Client::new()
+        .post(format!("{base}/api/runs"))
+        .json(&body)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let run_id = submit["run_id"].as_str().expect("run_id").to_string();
+    pending_question(base, &run_id).await
+}
+
+async fn pending_question(base: &str, run_id: &str) -> String {
+    for _ in 0..100 {
+        let body: Value = reqwest::get(format!("{base}/api/runs/{run_id}/questions"))
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        if let Some(q) = body["questions"].as_array().and_then(|qs| qs.first()) {
+            let text = q["question"].as_str().unwrap();
+            return text.trim_start_matches("Model: ").to_string();
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    panic!("run {run_id} never reached its gate");
+}
+
+#[tokio::test]
+async fn a_settings_change_applies_to_the_next_run_and_not_one_in_flight() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = boot(dir.path()).await;
+    put(
+        &base,
+        json!({"provider": "claude-cli", "model": "claude-sonnet"}),
+    )
+    .await;
+    let first = launched_model(&base, None).await;
+    assert_eq!(first, "claude-sonnet");
+
+    // Park a second run at its gate, change the default under it, then start a third.
+    let in_flight: Value = reqwest::Client::new()
+        .post(format!("{base}/api/runs"))
+        .json(&json!({"dot_source": MODEL_ECHO_DOT, "variables": {}}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let in_flight_id = in_flight["run_id"].as_str().unwrap().to_string();
+    assert_eq!(
+        pending_question(&base, &in_flight_id).await,
+        "claude-sonnet"
+    );
+
+    put(
+        &base,
+        json!({"provider": "claude-cli", "model": "claude-opus"}),
+    )
+    .await;
+
+    assert_eq!(
+        pending_question(&base, &in_flight_id).await,
+        "claude-sonnet"
+    );
+    assert_eq!(launched_model(&base, None).await, "claude-opus");
+}
+
+#[tokio::test]
+async fn a_run_that_names_its_own_pair_ignores_the_saved_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = boot(dir.path()).await;
+    put(
+        &base,
+        json!({"provider": "claude-cli", "model": "claude-opus"}),
+    )
+    .await;
+
+    let model = launched_model(&base, Some("anthropic")).await;
+
+    // The request named a provider but no model: that provider's own default applies.
+    assert_eq!(model, "claude-opus-5");
+}
