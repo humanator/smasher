@@ -605,6 +605,40 @@ pub fn get_latest_model(provider: Provider) -> Option<&'static ModelInfo> {
     CATALOG.iter().find(|m| m.id == target_id)
 }
 
+/// Default model for `provider`, or `None` when it has no fixed default (Ollama).
+pub fn default_model_for(provider: Provider) -> Option<&'static str> {
+    match provider {
+        Provider::ClaudeCli => Some("claude-sonnet"),
+        Provider::Ollama => None,
+        _ => get_latest_model(provider).map(|m| m.id),
+    }
+}
+
+/// Check that `model` can be served by `provider`. Catalog models must belong to the
+/// provider; unlisted names pass when their naming matches the provider, so newly
+/// released models aren't rejected. Ollama accepts any non-empty name.
+pub fn validate_pair(provider: Provider, model: &str) -> Result<(), String> {
+    let model = model.trim();
+    if model.is_empty() {
+        return Err(format!("model name is empty for provider {provider}"));
+    }
+    let belongs = match provider {
+        Provider::Ollama => true,
+        Provider::ClaudeCli => crate::provider::claude_cli::process::is_claude_model(model),
+        _ => match lookup_model(model) {
+            Some(info) => info.provider == provider,
+            None => infer_provider(model) == Some(provider),
+        },
+    };
+    if belongs {
+        Ok(())
+    } else {
+        Err(format!(
+            "model {model} is not served by provider {provider}"
+        ))
+    }
+}
+
 /// Look up a model, returning a default ModelInfo for unknown models based on provider inference.
 ///
 /// If the model ID is found in the catalog, returns a clone of that entry.
@@ -1373,6 +1407,84 @@ mod tests {
             let s = provider.to_string();
             let back: Provider = s.parse().unwrap();
             assert_eq!(provider, back);
+        }
+    }
+
+    // ── Defaults and pair validation ──────────────────────────────────
+
+    const ALL_PROVIDERS: [Provider; 5] = [
+        Provider::Anthropic,
+        Provider::OpenAi,
+        Provider::Gemini,
+        Provider::Ollama,
+        Provider::ClaudeCli,
+    ];
+
+    #[test]
+    fn default_model_exists_for_every_provider_but_ollama() {
+        for provider in ALL_PROVIDERS {
+            let default = default_model_for(provider);
+            if provider == Provider::Ollama {
+                assert_eq!(default, None);
+            } else {
+                assert!(default.is_some(), "{provider} has no default");
+            }
+        }
+    }
+
+    #[test]
+    fn every_default_passes_validate_pair() {
+        for provider in ALL_PROVIDERS {
+            if let Some(model) = default_model_for(provider) {
+                assert_eq!(validate_pair(provider, model), Ok(()), "{provider}/{model}");
+            }
+        }
+    }
+
+    #[test]
+    fn claude_cli_defaults_to_an_alias() {
+        assert_eq!(
+            default_model_for(Provider::ClaudeCli),
+            Some("claude-sonnet")
+        );
+    }
+
+    #[test]
+    fn validate_pair_rejects_ollama_model_on_claude_cli() {
+        let err = validate_pair(Provider::ClaudeCli, "gemma4:31b-cloud").unwrap_err();
+        assert!(err.contains("gemma4:31b-cloud"), "{err}");
+        assert!(err.contains("claude-cli"), "{err}");
+    }
+
+    #[test]
+    fn validate_pair_rejects_cross_provider_catalog_models() {
+        assert!(validate_pair(Provider::OpenAi, "claude-opus-5").is_err());
+        assert!(validate_pair(Provider::Anthropic, "gpt-5.2").is_err());
+        assert!(validate_pair(Provider::Gemini, "claude-sonnet-5").is_err());
+    }
+
+    #[test]
+    fn validate_pair_accepts_unlisted_models_that_look_right() {
+        assert_eq!(
+            validate_pair(Provider::Anthropic, "claude-future-9"),
+            Ok(())
+        );
+        assert_eq!(validate_pair(Provider::OpenAi, "gpt-9"), Ok(()));
+        assert_eq!(validate_pair(Provider::Gemini, "gemini-9-pro"), Ok(()));
+        assert_eq!(validate_pair(Provider::ClaudeCli, "opus"), Ok(()));
+    }
+
+    #[test]
+    fn validate_pair_accepts_any_non_empty_ollama_name() {
+        assert_eq!(validate_pair(Provider::Ollama, "gemma4:31b-cloud"), Ok(()));
+        assert!(validate_pair(Provider::Ollama, "").is_err());
+        assert!(validate_pair(Provider::Ollama, "   ").is_err());
+    }
+
+    #[test]
+    fn validate_pair_rejects_empty_model_for_every_provider() {
+        for provider in ALL_PROVIDERS {
+            assert!(validate_pair(provider, "").is_err(), "{provider}");
         }
     }
 }
