@@ -165,6 +165,16 @@ impl ModelCatalog {
         }
     }
 
+    /// The built-in list for a provider that has no reachable list API.
+    pub fn static_list(&self, provider: Provider) -> ModelList {
+        ModelList {
+            provider,
+            models: static_models(provider),
+            source: ListSource::Static,
+            error: None,
+        }
+    }
+
     /// Models for the endpoint's provider: its own list, else OpenRouter's, else the
     /// static catalog. Never fails; `error` says why a fallback was used.
     pub async fn list(&self, endpoint: &ProviderEndpoint) -> ModelList {

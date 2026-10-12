@@ -16,7 +16,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Files: `crates/smasher-llm/src/models_list.rs` (new), `src/lib.rs`, `src/modeldb.rs`, `src/types/catalog.rs`
   - Depends on: T1
 
-- [ ] **T3 (M): `GET /api/models`**
+- [x] **T3 (M): `GET /api/models`**
   - Acceptance: returns `{provider, label, default_model, models[], source, error?}` for configured providers only; Ollama `default_model` null; list-API failure still returns 200.
   - Verify: `cargo test -p smasher-web --test models_test` against a real booted server with a partial provider set
   - Files: `crates/smasher-web/src/routes/models.rs` (new), `routes/mod.rs`, `routes/api.rs`, `tests/models_test.rs` (new)

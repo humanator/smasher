@@ -4,5 +4,6 @@
 pub mod api;
 pub mod editor_api;
 pub mod gallery;
+pub mod models;
 pub mod questions;
 pub mod static_files;

@@ -30,6 +30,10 @@ pub struct AppState {
     /// Held by `PUT /api/workflows/{id}/graph` across its If-Match check and
     /// the write, so two saves in this process can't both pass the check.
     pub graph_save_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Cached per-provider model lists behind `GET /api/models`.
+    pub models: Arc<smasher_llm::models_list::ModelCatalog>,
+    /// Where to reach each provider's list API (read from the environment at boot).
+    pub model_endpoints: Arc<Vec<smasher_llm::models_list::ProviderEndpoint>>,
 }
 
 impl AppState {
@@ -48,8 +52,36 @@ impl AppState {
             data_dir,
             workflow_dirs,
             graph_save_lock: Arc::new(tokio::sync::Mutex::new(())),
+            models: Arc::new(smasher_llm::models_list::ModelCatalog::new(
+                smasher_llm::models_list::DEFAULT_LIST_TTL,
+            )),
+            model_endpoints: Arc::new(env_model_endpoints()),
         }
     }
+
+    /// Replace the list-API endpoints (tests point them at local servers).
+    pub fn with_model_endpoints(
+        mut self,
+        endpoints: Vec<smasher_llm::models_list::ProviderEndpoint>,
+    ) -> Self {
+        self.model_endpoints = Arc::new(endpoints);
+        self
+    }
+}
+
+/// Endpoints for every provider that has a key in the environment.
+fn env_model_endpoints() -> Vec<smasher_llm::models_list::ProviderEndpoint> {
+    use smasher_llm::models_list::ProviderEndpoint;
+    use smasher_llm::types::Provider;
+    [
+        Provider::Anthropic,
+        Provider::OpenAi,
+        Provider::Gemini,
+        Provider::Ollama,
+    ]
+    .into_iter()
+    .filter_map(ProviderEndpoint::from_env)
+    .collect()
 }
 
 /// A single pipeline execution record.
