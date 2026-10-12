@@ -61,7 +61,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Files: `crates/smasher-web/src/{state.rs or server.rs},routes/api.rs,run_launch.rs`, `tests/settings_test.rs`
   - Depends on: T4
 
-- [ ] **T6 (M): Desktop uses the shared store; no restart**
+- [x] **T6 (M): Desktop uses the shared store; no restart**
   - Acceptance: desktop provider/model go through the shared store; key changes re-export env and rebuild the `Client` atomically behind the same lock; `restart_app` no longer needed for settings.
   - Verify: `cargo test -p smasher-desktop settings` (Keychain tests stay; any new ones macOS-gated); manual desktop run
   - Files: `crates/smasher-desktop/src/{settings.rs,commands.rs,bootstrap.rs}`, `crates/smasher-web/src/settings.rs`

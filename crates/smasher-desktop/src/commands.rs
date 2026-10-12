@@ -1,4 +1,4 @@
-// ABOUTME: Tauri commands the SPA's settings modal invokes: read/save LLM settings and restart to apply them.
+// ABOUTME: Tauri commands the SPA's settings modal invokes: read/save LLM settings and detect the Claude CLI.
 // ABOUTME: Thin wrappers over `settings`; errors cross the IPC boundary as display strings.
 
 use std::path::PathBuf;
@@ -23,6 +23,10 @@ pub struct SettingsLocation {
     pub data_dir: PathBuf,
 }
 
+/// The running embedded server, managed as Tauri state so a saved key can be
+/// applied to it in place.
+pub struct ServerHandle(pub smasher_web::state::AppState);
+
 #[tauri::command]
 pub fn get_llm_settings(location: tauri::State<SettingsLocation>) -> Result<SettingsView, String> {
     settings::view(&location.data_dir, &Keychain::new(KEYCHAIN_SERVICE)).map_err(|e| e.to_string())
@@ -31,10 +35,17 @@ pub fn get_llm_settings(location: tauri::State<SettingsLocation>) -> Result<Sett
 #[tauri::command]
 pub fn save_llm_settings(
     location: tauri::State<SettingsLocation>,
+    server: tauri::State<ServerHandle>,
     update: SettingsUpdate,
 ) -> Result<SettingsView, String> {
-    settings::update(&location.data_dir, &Keychain::new(KEYCHAIN_SERVICE), update)
-        .map_err(|e| e.to_string())
+    let keychain = Keychain::new(KEYCHAIN_SERVICE);
+    let view =
+        settings::update(&location.data_dir, &keychain, update).map_err(|e| e.to_string())?;
+    // New keys, base URLs and the Claude CLI path apply to the next run, no restart.
+    let (client, endpoints) =
+        settings::reload_client(&location.data_dir, &keychain).map_err(|e| e.to_string())?;
+    server.0.reconfigure(client, endpoints);
+    Ok(view)
 }
 
 /// Find the `claude` binary the app would use (`path` first; empty searches the

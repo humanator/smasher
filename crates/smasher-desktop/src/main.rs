@@ -4,9 +4,9 @@
 use std::path::PathBuf;
 
 use smasher_desktop::bootstrap;
-use smasher_desktop::commands::{self, SettingsLocation};
+use smasher_desktop::commands::{self, ServerHandle, SettingsLocation};
 use smasher_desktop::settings::{self, KEYCHAIN_SERVICE, Keychain};
-use tauri::{RunEvent, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
@@ -57,6 +57,7 @@ fn main() {
             ));
             match started {
                 Ok(server) => {
+                    app.manage(ServerHandle(server.state.clone()));
                     // `cargo tauri dev` points the window at Vite for HMR;
                     // Vite proxies `/api` and `/events` to our fixed debug port.
                     let dev_server = if tauri::is_dev() {

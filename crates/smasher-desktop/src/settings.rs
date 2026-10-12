@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use smasher_attractor::claude_cli_backend::{ALLOWED_TOOLS_ENV, DEFAULT_ALLOWED_TOOLS};
+use smasher_llm::client::Client;
+use smasher_llm::models_list::ProviderEndpoint;
 use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
+use smasher_llm::types::Provider;
 
 /// Keychain service that holds the API keys, one entry per provider id.
 pub const KEYCHAIN_SERVICE: &str = "com.smasher.desktop";
@@ -192,23 +195,18 @@ impl Keychain {
     }
 }
 
-/// The env vars that make `Client::from_env()` and `ServerConfig::default()`
-/// see these settings. A local Ollama (base URL set, no key) gets a
-/// placeholder key so its adapter still registers. With Claude CLI as the
-/// default provider, `claude_binary` (as resolved at boot) is exported, or `1`
-/// to let the client search when none was found.
+/// The env vars that make `Client::from_env()` see these settings. A local Ollama
+/// (base URL set, no key) gets a placeholder key so its adapter still registers.
+/// A `claude_binary` found at boot is exported so the Claude CLI can be chosen as a
+/// provider; with Claude CLI as the saved default but no binary found, `1` lets the
+/// client search. The default model and provider are not exported: the web server
+/// reads them from `settings.json` itself.
 pub fn env_vars(
     settings: &StoredSettings,
     keys: &BTreeMap<String, String>,
     claude_binary: Option<&Path>,
 ) -> Vec<(&'static str, String)> {
     let mut vars = Vec::new();
-    if let Some(model) = &settings.default_model {
-        vars.push(("SMASHER_MODEL", model.clone()));
-    }
-    if let Some(provider) = &settings.default_provider {
-        vars.push(("SMASHER_PROVIDER", provider.clone()));
-    }
     for spec in &PROVIDERS {
         let base_url = settings.base_urls.get(spec.id);
         match keys.get(spec.id) {
@@ -222,14 +220,54 @@ pub fn env_vars(
             vars.push((spec.base_url_var, url.clone()));
         }
     }
-    if settings.default_provider.as_deref() == Some(CLAUDE_CLI_ID) {
-        let binary = claude_binary.map_or_else(|| "1".into(), |p| p.display().to_string());
+    let claude_cli = match claude_binary {
+        Some(binary) => Some(binary.display().to_string()),
+        None if settings.default_provider.as_deref() == Some(CLAUDE_CLI_ID) => Some("1".into()),
+        None => None,
+    };
+    if let Some(binary) = claude_cli {
         vars.push(("SMASHER_CLAUDE_CLI", binary));
         if let Some(tools) = &settings.claude_cli_allowed_tools {
             vars.push((ALLOWED_TOOLS_ENV, tools.join(",")));
         }
     }
     vars
+}
+
+/// A client and model-list endpoints built from these settings and keys, for swapping
+/// into a running server. Anything the settings leave unset falls back to the process
+/// environment (the `.env` the app loaded at boot). Nothing here touches the
+/// environment, so it is safe to call while other threads run.
+pub fn client_for(
+    settings: &StoredSettings,
+    keys: &BTreeMap<String, String>,
+    claude_binary: Option<&Path>,
+) -> (Client, Vec<ProviderEndpoint>) {
+    let vars: BTreeMap<&str, String> = env_vars(settings, keys, claude_binary)
+        .into_iter()
+        .collect();
+    let lookup = |name: &str| vars.get(name).cloned().or_else(|| std::env::var(name).ok());
+    let endpoints = [
+        Provider::Anthropic,
+        Provider::OpenAi,
+        Provider::Gemini,
+        Provider::Ollama,
+    ]
+    .into_iter()
+    .filter_map(|p| ProviderEndpoint::from_vars(p, lookup))
+    .collect();
+    (Client::from_vars(lookup), endpoints)
+}
+
+/// Rebuild the client from what is saved now (settings file and Keychain).
+pub fn reload_client(
+    data_dir: &Path,
+    keychain: &Keychain,
+) -> Result<(Client, Vec<ProviderEndpoint>), SettingsError> {
+    let settings = load(data_dir)?;
+    let keys = keychain.all()?;
+    let claude_binary = resolve_binary_from_env(settings.claude_cli_path.as_deref());
+    Ok(client_for(&settings, &keys, claude_binary.as_deref()))
 }
 
 /// Load the settings and keys and export them as env vars, overriding any
@@ -317,13 +355,10 @@ pub struct ProviderUpdate {
     pub api_key: Option<String>,
 }
 
-/// What the settings modal saves. Empty strings mean "not set".
+/// What the settings modal saves. Empty strings mean "not set". The default provider
+/// and model are saved through `PUT /api/settings`, and kept as they are here.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SettingsUpdate {
-    #[serde(default)]
-    pub default_model: String,
-    #[serde(default)]
-    pub default_provider: String,
     #[serde(default)]
     pub providers: Vec<ProviderUpdate>,
     /// Path to the `claude` binary; empty searches the usual locations.
@@ -374,13 +409,7 @@ pub fn update(
     keychain: &Keychain,
     update: SettingsUpdate,
 ) -> Result<SettingsView, SettingsError> {
-    let default_provider = non_empty(&update.default_provider);
-    if let Some(id) = &default_provider
-        && id != CLAUDE_CLI_ID
-        && provider(id).is_none()
-    {
-        return Err(SettingsError::Invalid(format!("unknown provider \"{id}\"")));
-    }
+    let existing = load(data_dir)?;
 
     let mut base_urls = BTreeMap::new();
     for p in &update.providers {
@@ -417,8 +446,8 @@ pub fn update(
     save(
         data_dir,
         &StoredSettings {
-            default_model: non_empty(&update.default_model),
-            default_provider,
+            default_model: existing.default_model,
+            default_provider: existing.default_provider,
             base_urls,
             claude_cli_path,
             claude_cli_allowed_tools,
@@ -465,14 +494,8 @@ mod tests {
         }
     }
 
-    fn settings_update(
-        model: &str,
-        provider: &str,
-        providers: Vec<ProviderUpdate>,
-    ) -> SettingsUpdate {
+    fn settings_update(providers: Vec<ProviderUpdate>) -> SettingsUpdate {
         SettingsUpdate {
-            default_model: model.into(),
-            default_provider: provider.into(),
             providers,
             claude_cli_path: String::new(),
             claude_cli_allowed_tools: Vec::new(),
@@ -514,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn env_vars_export_model_provider_keys_and_base_urls() {
+    fn env_vars_export_keys_and_base_urls_but_not_the_default_model() {
         let settings = StoredSettings {
             default_model: Some("gpt-5".into()),
             default_provider: Some("openai".into()),
@@ -526,8 +549,6 @@ mod tests {
         assert_eq!(
             env_vars(&settings, &keys, None),
             vec![
-                ("SMASHER_MODEL", "gpt-5".to_string()),
-                ("SMASHER_PROVIDER", "openai".to_string()),
                 ("OPENAI_API_KEY", "sk-test".to_string()),
                 ("OPENAI_BASE_URL", "https://proxy.example".to_string()),
             ]
@@ -603,19 +624,13 @@ mod tests {
         let view = update(
             dir.path(),
             &keychain.0,
-            settings_update(
-                " gemma4:31b-cloud ",
-                "ollama",
-                vec![
-                    provider_update("ollama", "http://localhost:11434/", None),
-                    provider_update("anthropic", "", Some(" sk-ant-new ")),
-                ],
-            ),
+            settings_update(vec![
+                provider_update("ollama", "http://localhost:11434/", None),
+                provider_update("anthropic", "", Some(" sk-ant-new ")),
+            ]),
         )
         .unwrap();
 
-        assert_eq!(view.default_model, "gemma4:31b-cloud");
-        assert_eq!(view.default_provider, "ollama");
         let ollama = view.providers.iter().find(|p| p.id == "ollama").unwrap();
         assert_eq!(ollama.base_url, "http://localhost:11434");
         assert_eq!(
@@ -633,7 +648,7 @@ mod tests {
         update(
             dir.path(),
             &keychain.0,
-            settings_update("", "", vec![provider_update("openai", "", None)]),
+            settings_update(vec![provider_update("openai", "", None)]),
         )
         .unwrap();
 
@@ -652,31 +667,10 @@ mod tests {
         update(
             dir.path(),
             &keychain.0,
-            settings_update("", "", vec![provider_update("openai", "", Some(""))]),
+            settings_update(vec![provider_update("openai", "", Some(""))]),
         )
         .unwrap();
 
-        assert_eq!(keychain.0.get("openai").unwrap(), None);
-    }
-
-    #[test]
-    fn update_rejects_an_unknown_default_provider_and_writes_nothing() {
-        let dir = tempfile::tempdir().unwrap();
-        let keychain = TestKeychain::new();
-
-        let err = update(
-            dir.path(),
-            &keychain.0,
-            settings_update(
-                "m",
-                "mistral",
-                vec![provider_update("openai", "", Some("sk-x"))],
-            ),
-        )
-        .unwrap_err();
-
-        assert!(err.to_string().contains("mistral"));
-        assert!(!settings_path(dir.path()).exists());
         assert_eq!(keychain.0.get("openai").unwrap(), None);
     }
 
@@ -688,11 +682,7 @@ mod tests {
         let err = update(
             dir.path(),
             &keychain.0,
-            settings_update(
-                "",
-                "",
-                vec![provider_update("ollama", "localhost:11434", None)],
-            ),
+            settings_update(vec![provider_update("ollama", "localhost:11434", None)]),
         )
         .unwrap_err();
 
@@ -708,7 +698,7 @@ mod tests {
         let err = update(
             dir.path(),
             &keychain.0,
-            settings_update("", "", vec![provider_update("mistral", "", None)]),
+            settings_update(vec![provider_update("mistral", "", None)]),
         )
         .unwrap_err();
 
@@ -735,16 +725,13 @@ mod tests {
     }
 
     #[test]
-    fn claude_cli_default_exports_provider_and_binary_and_no_keys() {
+    fn a_found_claude_binary_is_exported_and_no_keys() {
         let settings = claude_cli_settings(Some("/saved/claude"), None);
         let binary = PathBuf::from("/resolved/claude");
 
         assert_eq!(
             env_vars(&settings, &BTreeMap::new(), Some(&binary)),
-            vec![
-                ("SMASHER_PROVIDER", "claude-cli".to_string()),
-                ("SMASHER_CLAUDE_CLI", "/resolved/claude".to_string()),
-            ]
+            vec![("SMASHER_CLAUDE_CLI", "/resolved/claude".to_string())]
         );
     }
 
@@ -754,10 +741,7 @@ mod tests {
 
         assert_eq!(
             env_vars(&settings, &BTreeMap::new(), None),
-            vec![
-                ("SMASHER_PROVIDER", "claude-cli".to_string()),
-                ("SMASHER_CLAUDE_CLI", "1".to_string()),
-            ]
+            vec![("SMASHER_CLAUDE_CLI", "1".to_string())]
         );
     }
 
@@ -775,19 +759,26 @@ mod tests {
     }
 
     #[test]
-    fn claude_cli_is_not_exported_when_another_provider_is_default() {
+    fn claude_cli_is_not_asked_to_search_when_another_provider_is_default() {
         let settings = StoredSettings {
             default_provider: Some("anthropic".into()),
-            claude_cli_path: Some("/saved/claude".into()),
+            ..Default::default()
+        };
+
+        assert!(env_vars(&settings, &BTreeMap::new(), None).is_empty());
+    }
+
+    #[test]
+    fn a_found_claude_binary_is_exported_whatever_the_default_provider() {
+        let settings = StoredSettings {
+            default_provider: Some("anthropic".into()),
             ..Default::default()
         };
         let binary = PathBuf::from("/resolved/claude");
 
-        let vars = env_vars(&settings, &BTreeMap::new(), Some(&binary));
-
-        assert!(
-            vars.iter()
-                .all(|(name, _)| !name.starts_with("SMASHER_CLAUDE_CLI"))
+        assert_eq!(
+            env_vars(&settings, &BTreeMap::new(), Some(&binary)),
+            vec![("SMASHER_CLAUDE_CLI", "/resolved/claude".to_string())]
         );
     }
 
@@ -796,20 +787,18 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let keychain = TestKeychain::new();
         let binary = fake_claude(dir.path(), "2.1.281 (Claude Code)");
-        let mut update = settings_update("sonnet", "claude-cli", vec![]);
+        let mut update = settings_update(vec![]);
         update.claude_cli_path = binary.display().to_string();
         update.claude_cli_allowed_tools = vec![" Read ".into(), "".into(), "Write".into()];
 
         let view = super::update(dir.path(), &keychain.0, update).unwrap();
 
         let stored = load(dir.path()).unwrap();
-        assert_eq!(stored.default_provider.as_deref(), Some("claude-cli"));
         assert_eq!(stored.claude_cli_path, Some(binary.display().to_string()));
         assert_eq!(
             stored.claude_cli_allowed_tools,
             Some(vec!["Read".to_string(), "Write".to_string()])
         );
-        assert_eq!(view.default_provider, "claude-cli");
         assert_eq!(view.claude_cli.path, binary.display().to_string());
         assert_eq!(view.claude_cli.allowed_tools, vec!["Read", "Write"]);
     }
@@ -818,7 +807,7 @@ mod tests {
     fn default_allowlist_is_not_stored_so_it_tracks_future_defaults() {
         let dir = tempfile::tempdir().unwrap();
         let keychain = TestKeychain::new();
-        let mut update = settings_update("", "claude-cli", vec![]);
+        let mut update = settings_update(vec![]);
         update.claude_cli_allowed_tools = DEFAULT_ALLOWED_TOOLS.map(String::from).to_vec();
 
         let view = super::update(dir.path(), &keychain.0, update).unwrap();
@@ -834,7 +823,7 @@ mod tests {
     fn update_rejects_a_claude_cli_path_that_does_not_exist() {
         let dir = tempfile::tempdir().unwrap();
         let keychain = TestKeychain::new();
-        let mut update = settings_update("", "claude-cli", vec![]);
+        let mut update = settings_update(vec![]);
         update.claude_cli_path = dir.path().join("nope").display().to_string();
 
         let err = super::update(dir.path(), &keychain.0, update).unwrap_err();
@@ -860,5 +849,72 @@ mod tests {
 
         assert_eq!(detected.path, None);
         assert_eq!(detected.version, None);
+    }
+
+    // ---- shared defaults and live reconfiguration ----
+
+    #[test]
+    fn update_keeps_the_default_model_and_provider_saved_through_the_web_api() {
+        let dir = tempfile::tempdir().unwrap();
+        let keychain = TestKeychain::new();
+        save(
+            dir.path(),
+            &StoredSettings {
+                default_model: Some("claude-opus".into()),
+                default_provider: Some("claude-cli".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let view = update(
+            dir.path(),
+            &keychain.0,
+            settings_update(vec![provider_update(
+                "ollama",
+                "http://localhost:11434",
+                None,
+            )]),
+        )
+        .unwrap();
+
+        let stored = load(dir.path()).unwrap();
+        assert_eq!(stored.default_model.as_deref(), Some("claude-opus"));
+        assert_eq!(stored.default_provider.as_deref(), Some("claude-cli"));
+        assert_eq!(view.default_model, "claude-opus");
+        assert_eq!(view.default_provider, "claude-cli");
+    }
+
+    #[test]
+    fn a_client_built_from_settings_registers_the_keyed_providers_with_their_base_urls() {
+        let settings = StoredSettings {
+            base_urls: BTreeMap::from([("openai".into(), "https://proxy.example".into())]),
+            ..Default::default()
+        };
+        let keys = BTreeMap::from([
+            ("openai".to_string(), "sk-openai".to_string()),
+            ("anthropic".to_string(), "sk-ant".to_string()),
+        ]);
+
+        let (client, endpoints) = client_for(&settings, &keys, None);
+
+        assert!(client.has_provider(&Provider::OpenAi));
+        assert!(client.has_provider(&Provider::Anthropic));
+        let openai = endpoints
+            .iter()
+            .find(|e| e.provider == Provider::OpenAi)
+            .expect("openai endpoint");
+        assert_eq!(openai.base_url, "https://proxy.example");
+        assert_eq!(openai.api_key, "sk-openai");
+    }
+
+    #[test]
+    fn a_client_built_from_settings_registers_a_found_claude_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = fake_claude(dir.path(), "2.1.281 (Claude Code)");
+
+        let (client, _) = client_for(&StoredSettings::default(), &BTreeMap::new(), Some(&binary));
+
+        assert!(client.has_provider(&Provider::ClaudeCli));
     }
 }
