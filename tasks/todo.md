@@ -74,13 +74,13 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
 
 ## Phase 3: settings-ui
 
-- [ ] **T10 (M): Settings dialog on the web API, icon in the global nav**
+- [x] **T10 (M): Settings dialog on the web API, icon in the global nav**
   - Acceptance: a "Settings" icon button at the top right of the global navigation bar on every page, in both apps; dialog has provider + model (reusing `ModelPicker`), shows `source` and API errors, saves via `PUT /api/settings`; web shows a note that keys come from env/`.env`.
   - Verify: `npx vitest run tests/components/dashboard/SettingsDialog.test.ts`; Playwright: change provider/model, submit a gate-only run, confirm recorded pair
   - Files: `frontend/src/components/dashboard/SettingsDialog.svelte`, `frontend/src/App.svelte` (or nav component), `frontend/src/lib/api`, `frontend/e2e/settings.spec.ts` (new), `SettingsDialog.test.ts`
   - Depends on: T4, T8
 
-- [ ] **T11 (S): Desktop-only fields and no restart prompt**
+- [x] **T11 (S): Desktop-only fields and no restart prompt**
   - Acceptance: key, base-URL and Claude CLI fields remain on desktop only, saved via Tauri commands; "restart to apply" removed.
   - Verify: Vitest with the Tauri mock used by existing tests; manual desktop QA
   - Files: `SettingsDialog.svelte`, `frontend/src/lib/native/index.ts`, tests

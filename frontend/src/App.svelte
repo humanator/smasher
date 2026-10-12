@@ -18,7 +18,6 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
   import { providePageHeader } from '$lib/page-header.svelte';
-  import { isTauri } from '$lib/native';
 
   let runId = $state<string | null>(null);
   let workflowPageType = $state<'new' | 'edit' | 'detail' | null>(null);
@@ -28,8 +27,6 @@
   const pageHeader = providePageHeader();
   const catalogCrumbs = [{ label: 'Smasher Pipelines', href: '/' }];
   const isCatalog = $derived(!runId && !workflowPageType);
-  // LLM settings live in smasher-desktop (Keychain + data dir), so only there.
-  const hasSettings = isTauri();
   const pageTitle = $derived(
     workflowPageType === 'new'
       ? 'Create New Workflow'
@@ -144,16 +141,14 @@
   {:else}
     {@render pageHeader.actions?.()}
   {/if}
-  {#if hasSettings}
-    <SettingsDialog />
-  {/if}
+  <SettingsDialog />
 {/snippet}
 
 <div class="min-h-screen bg-muted/40 text-foreground">
   <PageHeader
     title={pageTitle}
     crumbs={isCatalog ? [] : catalogCrumbs}
-    actions={isCatalog || hasSettings ? headerActions : pageHeader.actions}
+    actions={headerActions}
   />
 
   <main>

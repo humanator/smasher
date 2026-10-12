@@ -18,6 +18,7 @@
     onChange,
     models: providedModels,
     idPrefix,
+    blankLabel = 'Server default',
   }: {
     provider?: string;
     model?: string;
@@ -26,6 +27,8 @@
     models?: ProviderModels[];
     /** Prefix for the test ids: `<prefix>-provider` and `<prefix>-model`. */
     idPrefix: string;
+    /** Label of the option that clears the provider (and so the model). */
+    blankLabel?: string;
   } = $props();
   const uid = $props.id();
 
@@ -79,7 +82,7 @@
       value={shownProvider}
       onchange={handleProviderChange}
     >
-      <NativeSelect.Option value="">Server default</NativeSelect.Option>
+      <NativeSelect.Option value="">{blankLabel}</NativeSelect.Option>
       {#each providers as p (p.provider)}
         <NativeSelect.Option value={p.provider}>{p.label}</NativeSelect.Option>
       {/each}

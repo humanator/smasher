@@ -14,7 +14,6 @@
     "fs:allow-read-text-file",
     "allow-get-llm-settings",
     "allow-save-llm-settings",
-    "allow-detect-claude-cli",
-    "allow-restart-app"
+    "allow-detect-claude-cli"
   ]
 }

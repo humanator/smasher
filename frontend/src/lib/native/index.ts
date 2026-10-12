@@ -172,10 +172,11 @@ export interface ClaudeCliDetection {
   version: string | null;
 }
 
-/** The desktop app's LLM settings, as `get_llm_settings` returns them. */
+/**
+ * The desktop app's key, base URL and Claude CLI settings, as `get_llm_settings` returns
+ * them. The default provider and model are not here: they live behind `/api/settings`.
+ */
 export interface LlmSettings {
-  default_model: string;
-  default_provider: string;
   providers: ProviderSettings[];
   claude_cli: ClaudeCliSettings;
   settings_path: string;
@@ -192,8 +193,6 @@ export interface ProviderSettingsUpdate {
 }
 
 export interface LlmSettingsUpdate {
-  default_model: string;
-  default_provider: string;
   providers: ProviderSettingsUpdate[];
   claude_cli_path: string;
   claude_cli_allowed_tools: string[];
@@ -213,7 +212,7 @@ export function getLlmSettings(): Promise<LlmSettings> {
   return invoke<LlmSettings>('get_llm_settings');
 }
 
-/** Save the desktop app's LLM settings; they take effect after a restart. */
+/** Save the desktop app's key, base URL and Claude CLI settings; new runs use them at once. */
 export function saveLlmSettings(update: LlmSettingsUpdate): Promise<LlmSettings> {
   return invoke<LlmSettings>('save_llm_settings', { update });
 }
@@ -221,9 +220,4 @@ export function saveLlmSettings(update: LlmSettingsUpdate): Promise<LlmSettings>
 /** Find the `claude` binary (`path` first; empty searches) and report its version. */
 export function detectClaudeCli(path: string): Promise<ClaudeCliDetection> {
   return invoke<ClaudeCliDetection>('detect_claude_cli', { path });
-}
-
-/** Relaunch the desktop app so saved settings take effect. */
-export function restartApp(): Promise<void> {
-  return invoke<void>('restart_app');
 }

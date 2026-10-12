@@ -49,6 +49,12 @@ describe('ModelPicker', () => {
     expect(providerSelect().value).toBe('');
   });
 
+  it('labels the blank provider option as asked', () => {
+    renderPicker({ blankLabel: 'Choose a provider…' } as never);
+
+    expect(providerSelect().options[0].textContent?.trim()).toBe('Choose a provider…');
+  });
+
   it('shows the saved provider and model', () => {
     renderPicker({ provider: 'anthropic', model: 'claude-sonnet-5' });
 

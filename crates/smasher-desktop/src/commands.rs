@@ -11,12 +11,7 @@ use crate::settings::{
 
 /// Commands the served origin may invoke. `build.rs` turns each into an
 /// `allow-<name>` permission, which `capabilities/served-origin.json` grants.
-pub const COMMANDS: [&str; 4] = [
-    "get_llm_settings",
-    "save_llm_settings",
-    "detect_claude_cli",
-    "restart_app",
-];
+pub const COMMANDS: [&str; 3] = ["get_llm_settings", "save_llm_settings", "detect_claude_cli"];
 
 /// Where the settings live, managed as Tauri state.
 pub struct SettingsLocation {
@@ -53,10 +48,4 @@ pub fn save_llm_settings(
 #[tauri::command]
 pub fn detect_claude_cli(path: String) -> ClaudeCliDetection {
     settings::detect_claude_cli(resolve_binary_from_env(Some(&path)))
-}
-
-/// Relaunch the app so saved settings take effect at boot.
-#[tauri::command]
-pub fn restart_app(app: tauri::AppHandle) {
-    app.restart();
 }

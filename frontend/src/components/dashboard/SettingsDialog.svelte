@@ -1,19 +1,20 @@
 <script lang="ts">
-  // ABOUTME: Desktop-only LLM settings modal: default model/provider, each provider's API key and base URL, and the Claude CLI
-  // ABOUTME: Reads/writes via smasher-desktop's Tauri commands; keys go to the Keychain and never come back
+  // ABOUTME: Settings modal: the default provider/model for new runs, plus (desktop only) API keys, base URLs and the Claude CLI
+  // ABOUTME: The default goes through PUT /api/settings; desktop keys go to the Keychain via Tauri commands and never come back
 
   import SettingsIcon from '@lucide/svelte/icons/settings';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
-  import * as NativeSelect from '$lib/components/ui/native-select/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { getSettings, putSettings, type LlmDefaults } from '$lib/api/settings';
+  import ModelPicker from '../node-editor/nodeForms/ModelPicker.svelte';
   import {
     getLlmSettings,
     saveLlmSettings,
     detectClaudeCli,
-    restartApp,
+    isTauri,
     type ClaudeCliDetection,
     type LlmSettings,
     type ProviderSettingsUpdate,
@@ -39,17 +40,43 @@
   let saved = $state(false);
   let error = $state<string | null>(null);
   let settingsPath = $state('');
-  let defaultModel = $state('');
-  let defaultProvider = $state('');
+  // The server's default as last loaded or saved, and the pair being edited.
+  let defaults = $state<LlmDefaults | null>(null);
+  let pickedProvider = $state('');
+  let pickedModel = $state('');
+  let dirty = $state(false);
+  // The picker reads its starting values once, so a reload remounts it (and refetches the lists).
+  let pickerKey = $state(0);
+  // Keys, base URLs and the Claude CLI live in the desktop app only.
+  const desktop = isTauri();
   let providers = $state<ProviderForm[]>([]);
   let claudeCliPath = $state('');
   let allowedTools = $state('');
   let defaultAllowedTools = $state<string[]>([]);
   let detection = $state<ClaudeCliDetection | null>(null);
 
+  const SOURCE_TEXT: Record<LlmDefaults['source'], string> = {
+    settings: 'Saved in the settings file.',
+    env: 'Set by the SMASHER_MODEL / SMASHER_PROVIDER environment variables.',
+    default: 'The built-in default.',
+  };
+
+  function pick(patch: { provider?: string; model?: string }) {
+    if ('provider' in patch) pickedProvider = patch.provider ?? '';
+    if ('model' in patch) pickedModel = patch.model ?? '';
+    dirty = true;
+    saved = false;
+  }
+
+  function showDefaults(next: LlmDefaults) {
+    defaults = next;
+    pickedProvider = next.provider ?? '';
+    pickedModel = next.model;
+    dirty = false;
+    pickerKey++;
+  }
+
   function fill(settings: LlmSettings) {
-    defaultModel = settings.default_model;
-    defaultProvider = settings.default_provider;
     settingsPath = settings.settings_path;
     providers = settings.providers.map((p) => ({
       id: p.id,
@@ -81,8 +108,11 @@
     saved = false;
     error = null;
     try {
-      fill(await getLlmSettings());
-      detect();
+      showDefaults(await getSettings());
+      if (desktop) {
+        fill(await getLlmSettings());
+        detect();
+      }
     } catch (e) {
       error = message(e);
     } finally {
@@ -101,31 +131,30 @@
     saving = true;
     error = null;
     try {
-      fill(
-        await saveLlmSettings({
-          default_model: defaultModel,
-          default_provider: defaultProvider,
-          providers: providers.map((p) => ({ id: p.id, base_url: p.baseUrl, ...keyUpdate(p) })),
-          claude_cli_path: claudeCliPath,
-          claude_cli_allowed_tools: allowedTools
-            .split('\n')
-            .map((t) => t.trim())
-            .filter(Boolean),
-        })
-      );
+      // Keys first: saving them makes a newly keyed provider available to choose.
+      if (desktop) {
+        fill(
+          await saveLlmSettings({
+            providers: providers.map((p) => ({ id: p.id, base_url: p.baseUrl, ...keyUpdate(p) })),
+            claude_cli_path: claudeCliPath,
+            claude_cli_allowed_tools: allowedTools
+              .split('\n')
+              .map((t) => t.trim())
+              .filter(Boolean),
+          })
+        );
+      }
+      if (dirty) {
+        if (!pickedProvider) throw new Error('Choose a provider for the default model.');
+        showDefaults(await putSettings({ provider: pickedProvider, model: pickedModel }));
+      } else if (desktop) {
+        pickerKey++;
+      }
       saved = true;
     } catch (e) {
       error = message(e);
     } finally {
       saving = false;
-    }
-  }
-
-  async function restart() {
-    try {
-      await restartApp();
-    } catch (e) {
-      error = message(e);
     }
   }
 
@@ -145,9 +174,15 @@
   </Dialog.Trigger>
   <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
     <Dialog.Header>
-      <Dialog.Title>LLM settings</Dialog.Title>
+      <Dialog.Title>Settings</Dialog.Title>
       <Dialog.Description>
-        API keys are stored in the macOS Keychain. Changes apply after Smasher restarts.
+        {#if desktop}
+          API keys are stored in the macOS Keychain. Changes apply to new runs; runs already
+          started keep what they had.
+        {:else}
+          The default for new runs. API keys come from the server's environment or <code>.env</code>
+          file, not from this page.
+        {/if}
       </Dialog.Description>
     </Dialog.Header>
 
@@ -155,29 +190,25 @@
       <p class="text-muted-foreground">Loading…</p>
     {:else}
       <form class="grid gap-6" onsubmit={save}>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="grid gap-2">
-            <Label for="settings-default-model">Default model</Label>
-            <Input
-              id="settings-default-model"
-              bind:value={defaultModel}
-              placeholder="claude-sonnet-5"
-              autocomplete="off"
-              spellcheck={false}
+        <div class="grid gap-3">
+          <h3 class="text-sm font-semibold">Default model</h3>
+          {#key pickerKey}
+            <ModelPicker
+              idPrefix="settings"
+              blankLabel="Choose a provider…"
+              provider={defaults?.provider ?? undefined}
+              model={defaults?.model}
+              onChange={pick}
             />
-          </div>
-          <div class="grid gap-2">
-            <Label for="settings-default-provider">Default provider</Label>
-            <NativeSelect.Root id="settings-default-provider" bind:value={defaultProvider} class="w-full">
-              <NativeSelect.Option value="">Infer from model name</NativeSelect.Option>
-              {#each providers as p (p.id)}
-                <NativeSelect.Option value={p.id}>{p.label}</NativeSelect.Option>
-              {/each}
-              <NativeSelect.Option value="claude-cli">Claude CLI</NativeSelect.Option>
-            </NativeSelect.Root>
-          </div>
+          {/key}
+          {#if defaults}
+            <p class="text-xs text-muted-foreground" data-testid="settings-source">
+              {SOURCE_TEXT[defaults.source]}
+            </p>
+          {/if}
         </div>
 
+        {#if desktop}
         {#each providers as p (p.id)}
           <fieldset class="grid gap-3 border-t border-border pt-4">
             <legend class="text-sm font-semibold">{p.label}</legend>
@@ -271,6 +302,7 @@
             </p>
           </div>
         </fieldset>
+        {/if}
 
         {#if error}
           <p role="alert" class="text-sm text-destructive">{error}</p>
@@ -278,12 +310,13 @@
 
         <Dialog.Footer class="items-center">
           {#if saved}
-            <p class="mr-auto text-sm" role="status">Saved. Restart Smasher to apply.</p>
-            <Button variant="outline" onclick={restart}>Restart now</Button>
-          {:else if settingsPath}
+            <p class="mr-auto text-sm" role="status">Saved. New runs use these settings.</p>
+          {:else if desktop && settingsPath}
             <p class="mr-auto truncate text-xs text-muted-foreground" title={settingsPath}>{settingsPath}</p>
           {/if}
-          <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button type="submit" disabled={saving || (!desktop && !dirty)}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
         </Dialog.Footer>
       </form>
     {/if}

@@ -143,10 +143,18 @@ describe('App settings button', () => {
     visit('/');
   });
 
-  it('has no Settings button in a plain browser, where there are no desktop settings', () => {
+  it('puts a Settings button in the page header in a plain browser', () => {
     visit('/');
     render(App);
-    expect(screen.queryByRole('button', { name: 'Settings' })).toBeNull();
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('button', { name: 'Settings' })).toBeTruthy();
+  });
+
+  it('keeps the Settings button in the header on a run page, which has no catalog actions', () => {
+    visit('/runs/some-run');
+    render(App);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('button', { name: 'Settings' })).toBeTruthy();
   });
 
   it('puts a Settings button in the page header in the desktop app', () => {

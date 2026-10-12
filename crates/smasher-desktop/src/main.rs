@@ -38,8 +38,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::get_llm_settings,
             commands::save_llm_settings,
-            commands::detect_claude_cli,
-            commands::restart_app
+            commands::detect_claude_cli
         ])
         .setup(move |app| {
             // Start even with no provider configured, so the settings modal

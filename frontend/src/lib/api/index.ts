@@ -8,3 +8,4 @@ export * from './questions';
 export * from './gallery';
 export * from './workflows';
 export * from './models';
+export * from './settings';
