@@ -40,6 +40,19 @@ describe('buildRunRequest', () => {
     });
   });
 
+  describe('provider', () => {
+    it('is sent with the model when chosen', () => {
+      const req = request({ provider: 'claude-cli', model: 'claude-opus' });
+      expect(req.provider).toBe('claude-cli');
+      expect(req.model).toBe('claude-opus');
+    });
+
+    it('is left out when blank, so the server default applies', () => {
+      expect('provider' in request({ provider: '  ' })).toBe(false);
+      expect('provider' in request({})).toBe(false);
+    });
+  });
+
   describe('variables', () => {
     it('parses several lines, skipping blank ones and trimming keys and values', () => {
       expect(request({ variables: ' colour = blue \n\n   \nsize=10\n' }).variables).toEqual({

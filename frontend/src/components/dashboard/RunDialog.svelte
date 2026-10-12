@@ -5,10 +5,10 @@
   import { untrack } from 'svelte';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { formatWorkflowName } from '$lib/utils';
+  import ModelPicker from '../node-editor/nodeForms/ModelPicker.svelte';
   import * as runsApi from '../../lib/api/runs';
   import { errorMessage } from '../../lib/notify';
   import { buildRunRequest, type RunFormErrors, type RunFormValues } from '../../lib/runRequest';
@@ -23,6 +23,8 @@
   let errors = $state<RunFormErrors>({});
   let serverError = $state<string | null>(null);
   let starting = $state(false);
+  // The picker reads its starting values once, so restoring a draft remounts it.
+  let pickerKey = $state(0);
 
   // Each opening restores the workflow's last values, but never its old errors.
   $effect(() => {
@@ -30,6 +32,7 @@
     const id = workflow.id;
     untrack(() => {
       values = getDraft(id);
+      pickerKey++;
       errors = {};
       serverError = null;
     });
@@ -39,6 +42,12 @@
     saveDraft(workflow.id, values);
     if (field === 'variables' || field === 'nodeOverrides') delete errors[field];
     serverError = null;
+  }
+
+  function pickModel(patch: { provider?: string; model?: string }) {
+    if ('provider' in patch) values.provider = patch.provider ?? '';
+    if ('model' in patch) values.model = patch.model ?? '';
+    edited('model');
   }
 
   // A launch isn't aborted when the dialog closes: the run already exists on
@@ -66,21 +75,18 @@
   <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
     <Dialog.Header>
       <Dialog.Title>Run {formatWorkflowName(workflow.name)}</Dialog.Title>
-      <Dialog.Description>Leave Model blank to use the server's default.</Dialog.Description>
+      <Dialog.Description>Leave Provider on Server default to use the server's model.</Dialog.Description>
     </Dialog.Header>
 
     <form class="grid gap-4" onsubmit={submit}>
-      <div class="grid gap-2">
-        <Label for="run-model">Model</Label>
-        <Input
-          id="run-model"
-          bind:value={values.model}
-          oninput={() => edited('model')}
-          placeholder="(default)"
-          autocomplete="off"
-          spellcheck={false}
+      {#key pickerKey}
+        <ModelPicker
+          idPrefix="run"
+          provider={values.provider}
+          model={values.model}
+          onChange={pickModel}
         />
-      </div>
+      {/key}
 
       <div class="grid gap-2">
         <Label for="run-variables">Variables</Label>

@@ -47,6 +47,8 @@ pub struct SubmitRequest {
     #[serde(default)]
     pub variables: HashMap<String, String>,
     pub model: Option<String>,
+    /// Provider for the run-wide `model`; the server default when omitted.
+    pub provider: Option<String>,
     /// Per-node model/provider overrides, keyed by node id. Each node defaults
     /// to the pipeline-wide `model`/`state.default_provider` unless listed here.
     #[serde(default)]
@@ -197,6 +199,33 @@ async fn list_graph_nodes(
     Ok(Json(GraphNodesResponse { nodes }))
 }
 
+/// The model and provider a run uses. Without a `provider` the server defaults apply
+/// (and a bare `model` is taken as-is). With one, the pair must belong together; a
+/// provider with no `model` gets its default, or is rejected if it has none (Ollama).
+fn resolve_run_model(
+    state: &AppState,
+    model: Option<String>,
+    provider: Option<String>,
+) -> Result<(String, Option<String>), WebError> {
+    let Some(provider_name) = provider else {
+        let model = model.unwrap_or_else(|| state.default_model.clone());
+        return Ok((model, state.default_provider.clone()));
+    };
+    let provider: smasher_llm::types::Provider = provider_name
+        .parse()
+        .map_err(|e: String| WebError::BadRequest(e))?;
+    let model = match model {
+        Some(model) => model,
+        None => smasher_llm::types::catalog::default_model_for(provider)
+            .map(str::to_string)
+            .ok_or_else(|| {
+                WebError::BadRequest(format!("provider {provider} needs an explicit model"))
+            })?,
+    };
+    smasher_llm::types::catalog::validate_pair(provider, &model).map_err(WebError::BadRequest)?;
+    Ok((model, Some(provider.to_string())))
+}
+
 /// Shared by `submit_pipeline` (raw pasted DOT, `workflow_id: None`) and
 /// `run_workflow` (an on-disk workflow's own `.dot`, `workflow_id: Some(id)`)
 /// -- parse/resolve/lint/launch/record is identical either way, only where
@@ -207,6 +236,7 @@ async fn launch_and_record(
     dot_source: String,
     variables: HashMap<String, String>,
     model: Option<String>,
+    provider: Option<String>,
     node_overrides: HashMap<String, transforms::NodeOverride>,
     workflow_id: Option<String>,
 ) -> Result<Json<SubmitResponse>, WebError> {
@@ -215,8 +245,7 @@ async fn launch_and_record(
     let mut resolved = graph::resolve(&dot_graph)?;
 
     let mut variables = variables;
-    let model = model.unwrap_or_else(|| state.default_model.clone());
-    let provider = state.default_provider.clone();
+    let (model, provider) = resolve_run_model(state, model, provider)?;
     variables.insert("model".into(), model.clone());
 
     transforms::apply_node_overrides(&mut resolved, &node_overrides);
@@ -281,6 +310,7 @@ async fn submit_pipeline(
         req.dot_source,
         req.variables,
         req.model,
+        req.provider,
         req.node_overrides,
         None,
     )
@@ -292,6 +322,8 @@ pub struct RunWorkflowRequest {
     #[serde(default)]
     pub variables: HashMap<String, String>,
     pub model: Option<String>,
+    /// Provider for the run-wide `model`; the server default when omitted.
+    pub provider: Option<String>,
     #[serde(default)]
     pub node_overrides: HashMap<String, transforms::NodeOverride>,
 }
@@ -318,6 +350,7 @@ async fn run_workflow(
         dot_source,
         req.variables,
         req.model,
+        req.provider,
         req.node_overrides,
         Some(id),
     )

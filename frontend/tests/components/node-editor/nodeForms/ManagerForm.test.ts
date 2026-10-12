@@ -2,7 +2,8 @@
 // ABOUTME: form for task/config attributes (grounded in manager_handler.rs).
 
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { setApiBaseUrl } from '../../../../src/lib/api/client-config';
 import ManagerForm from '../../../../src/components/node-editor/nodeForms/ManagerForm.svelte';
 
 // Grounded in manager_handler.rs:49-90: `task` (falls back to node label)
@@ -62,5 +63,18 @@ describe('ManagerForm', () => {
     const options = document.querySelectorAll('#manager-task-suggestions option');
     const values = Array.from(options).map((o) => o.getAttribute('value'));
     expect(values).toContain('coordinate-review');
+  });
+
+  it('shows the provider and model pickers and writes their changes as attrs', async () => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+    const onChange = vi.fn();
+    render(ManagerForm, { props: { attrs: { provider: 'claude-cli', model: 'claude-opus' }, onChange } });
+
+    const model = screen.getByTestId('manager-model') as HTMLSelectElement;
+    expect(screen.getByTestId('manager-provider')).toBeTruthy();
+    await waitFor(() => expect(model.querySelector('option[value="claude-sonnet"]')).toBeTruthy());
+    await fireEvent.change(model, { target: { value: 'claude-sonnet' } });
+
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { model: 'claude-sonnet' } });
   });
 });

@@ -1,19 +1,21 @@
 <script lang="ts">
   // ABOUTME: Manager node-kind side-panel form component
-  // ABOUTME: Edits task/config attributes
+  // ABOUTME: Edits task/config attributes and the provider/model that runs it
 
   import { untrack } from 'svelte';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { NodeFormProps } from '../types';
+  import ModelPicker from './ModelPicker.svelte';
+  import { usesLlm } from './usesLlm';
 
   // Grounded in manager_handler.rs:49-90 (ManagerHandler::execute): `task`
   // (falls back to node label when absent) and `config`, a JSON-encoded
   // string (`serde_json::from_str::<Value>`, invalid JSON fails the run
   // with "invalid JSON in config attribute") -- same treatment as
-  // ToolForm's tool/args. `model`/`provider` fold-in is also real but out
-  // of this task's scope (task/config only, per the plan).
+  // ToolForm's tool/args. `model`/`provider` are edited by the shared
+  // ModelPicker.
   //
   // Unlike Tool's `tool` attr (a closed set of real, differently-behaving
   // Rust backends -- see ToolForm's own comment), `task` has no fixed
@@ -87,5 +89,13 @@
   </div>
   {#if configError}
     <p class="m-0 text-xs text-destructive" role="alert" data-testid="manager-config-error">Invalid JSON: {configError}</p>
+  {/if}
+  {#if usesLlm('Manager', attrs)}
+    <ModelPicker
+      idPrefix="manager"
+      provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
+      model={typeof attrs.model === 'string' ? attrs.model : undefined}
+      onChange={(patch) => onChange({ attrs: patch })}
+    />
   {/if}
 </div>

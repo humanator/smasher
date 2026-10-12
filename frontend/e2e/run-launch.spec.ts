@@ -18,7 +18,8 @@ test('launches the typed brief, model and variable, then shows them on the run p
     await openRunLaunchCheckDialog(page);
 
     await page.getByLabel('Brief').fill('e2e brief');
-    await page.getByLabel('Model').fill('m-e2e');
+    await page.getByLabel('Provider').selectOption('claude-cli');
+    await page.getByLabel('Model').selectOption('claude-opus');
     await page.getByLabel('Variables').fill('colour=blue');
     await page.getByRole('button', { name: 'Run', exact: true }).click();
 
@@ -29,7 +30,7 @@ test('launches the typed brief, model and variable, then shows them on the run p
     // Scoped to the card: the run graph's SVG node label carries the same text
     // on Linux Graphviz, which made the bare getByText match twice in CI.
     await expect(
-      page.locator('.question-card').getByText('Brief: e2e brief | Model: m-e2e | Colour: blue')
+      page.locator('.question-card').getByText('Brief: e2e brief | Model: claude-opus | Colour: blue')
     ).toBeVisible({ timeout: 10000 });
   } finally {
     // The run parks at its gate; don't leave it running on the dev server.

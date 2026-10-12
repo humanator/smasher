@@ -129,6 +129,7 @@ export async function listRuns(): Promise<ListRunsResponse> {
 export interface RunWorkflowRequest {
   variables?: Record<string, string>;
   model?: string;
+  provider?: string;
   node_overrides?: Record<string, unknown>;
 }
 

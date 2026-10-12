@@ -5,6 +5,8 @@ import type { RunWorkflowRequest } from './api/runs';
 
 export interface RunFormValues {
   model: string;
+  /** Provider for `model`; blank means the server default. */
+  provider?: string;
   variables: string;
   brief: string;
   nodeOverrides: string;
@@ -30,6 +32,8 @@ export function buildRunRequest(values: RunFormValues): RunRequestResult {
   const request: RunWorkflowRequest = { variables };
   const model = values.model.trim();
   if (model) request.model = model; // "" would replace the server default, not fall back to it
+  const provider = values.provider?.trim();
+  if (provider) request.provider = provider;
   if (nodeOverrides) request.node_overrides = nodeOverrides;
   return { ok: true, request };
 }

@@ -92,4 +92,44 @@ describe('ToolForm', () => {
     expect(screen.queryByTestId('tool-args-error')).toBe(null);
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { args: undefined } });
   });
+
+  describe('model picker', () => {
+    it('shows for the tools that call a model', () => {
+      render(ToolForm, { props: { attrs: { tool: 'task_critic' }, onChange: vi.fn() } });
+
+      expect(screen.getByTestId('tool-provider')).toBeTruthy();
+      expect(screen.getByTestId('tool-model')).toBeTruthy();
+    });
+
+    it('shows for a custom tool with no tool_command', () => {
+      render(ToolForm, { props: { attrs: { tool: 'http_fetch' }, onChange: vi.fn() } });
+
+      expect(screen.getByTestId('tool-model')).toBeTruthy();
+    });
+
+    it('is absent for a native tool such as render_capture', () => {
+      render(ToolForm, { props: { attrs: { tool: 'render_capture' }, onChange: vi.fn() } });
+
+      expect(screen.queryByTestId('tool-model')).toBe(null);
+    });
+
+    it('is absent for a tool that has a tool_command', () => {
+      render(ToolForm, {
+        props: { attrs: { tool: 'shell', tool_command: 'ls' }, onChange: vi.fn() },
+      });
+
+      expect(screen.queryByTestId('tool-model')).toBe(null);
+    });
+
+    it('appears and disappears as the selected tool changes', async () => {
+      render(ToolForm, { props: { attrs: { tool: 'render_capture' }, onChange: vi.fn() } });
+      expect(screen.queryByTestId('tool-model')).toBe(null);
+
+      await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'synthesis' } });
+      expect(screen.getByTestId('tool-model')).toBeTruthy();
+
+      await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'system_lint' } });
+      expect(screen.queryByTestId('tool-model')).toBe(null);
+    });
+  });
 });

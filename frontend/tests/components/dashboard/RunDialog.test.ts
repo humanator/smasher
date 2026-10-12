@@ -54,6 +54,14 @@ function field(label: string): HTMLInputElement | HTMLTextAreaElement {
   return screen.getByLabelText(label) as HTMLInputElement | HTMLTextAreaElement;
 }
 
+// The test server always has the claude-cli provider, whose models are the Claude aliases.
+async function pickModel(user: ReturnType<typeof userEvent.setup>, model: string) {
+  const provider = (await screen.findByLabelText('Provider')) as HTMLSelectElement;
+  await waitFor(() => expect(provider.querySelector('option[value="claude-cli"]')).toBeTruthy());
+  await user.selectOptions(provider, 'claude-cli');
+  await user.selectOptions(screen.getByLabelText('Model'), model);
+}
+
 async function waitForLaunch(): Promise<string> {
   await waitFor(() => expect(location.href).toMatch(/^\/runs\/[a-zA-Z0-9-]+$/), { timeout: 5000 });
   const runId = location.href.split('/')[2];
@@ -92,11 +100,12 @@ describe('RunDialog', () => {
     }
   });
 
-  it('renders the old form\'s four labelled fields under a "Run {name}" title', async () => {
+  it('renders provider and model selects plus the old form\'s other fields under a "Run {name}" title', async () => {
     openDialog(await runLaunchCheck());
 
     expect(await screen.findByRole('heading', { name: 'Run Run Launch Check' })).toBeTruthy();
-    expect(field('Model').getAttribute('placeholder')).toBe('(default)');
+    expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('');
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('');
     expect(field('Variables').getAttribute('placeholder')).toBe('key=value');
     expect(field('Brief').getAttribute('placeholder')).toBeNull();
     expect(field('Node Overrides (JSON)').getAttribute('placeholder')).toBe(
@@ -201,14 +210,14 @@ describe('RunDialog', () => {
       const workflow = await runLaunchCheck();
       const { user } = openDialog(workflow);
 
-      await user.type(await screen.findByLabelText('Model'), 'm-1');
+      await pickModel(user, 'claude-opus');
       await user.type(field('Variables'), 'colour=blue');
       await user.type(field('Brief'), 'hello');
       await user.click(screen.getByRole('button', { name: 'Run' }));
 
       const runId = await waitForLaunch();
       expect((await runsApi.getRun(runId)).workflow_id).toBe(workflow.id);
-      expect(await pendingQuestion(runId)).toBe('Brief: hello | Model: m-1 | Colour: blue');
+      expect(await pendingQuestion(runId)).toBe('Brief: hello | Model: claude-opus | Colour: blue');
     });
 
     it('leaves a blank Model out so the server default applies', async () => {
@@ -239,14 +248,14 @@ describe('RunDialog', () => {
       const workflow = await importWorkflow(lintFailingDot);
       const { user } = openDialog(workflow);
 
-      await user.type(await screen.findByLabelText('Model'), 'm-1');
+      await pickModel(user, 'claude-opus');
       await user.type(field('Brief'), 'kept');
       await user.click(screen.getByRole('button', { name: 'Run' }));
 
       const alert = await screen.findByRole('alert', {}, { timeout: 5000 });
       expect(alert.textContent).toContain('Pipeline lint errors: Graph has no exit node');
       expect(location.href).toBe('');
-      expect(field('Model').value).toBe('m-1');
+      expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('claude-opus');
       expect(field('Brief').value).toBe('kept');
       expect((screen.getByRole('button', { name: 'Run' }) as HTMLButtonElement).disabled).toBe(
         false
@@ -262,7 +271,7 @@ describe('RunDialog', () => {
     const workflow = await importWorkflow(fixtureDot);
     const { user, rerender } = openDialog(workflow);
 
-    await user.type(await screen.findByLabelText('Model'), 'kept-model');
+    await pickModel(user, 'claude-opus');
     await user.type(field('Variables'), 'bad line');
     await user.type(field('Brief'), 'kept brief');
     await user.type(field('Node Overrides (JSON)'), '{{}');
@@ -276,7 +285,10 @@ describe('RunDialog', () => {
     await rerender({ workflow, open: false });
     await rerender({ workflow, open: true });
 
-    expect(field('Model').value).toBe('kept-model');
+    await waitFor(() =>
+      expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('claude-cli')
+    );
+    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('claude-opus');
     expect(field('Variables').value).toBe('bad line');
     expect(field('Brief').value).toBe('kept brief');
     expect(field('Node Overrides (JSON)').value).toBe('{}');

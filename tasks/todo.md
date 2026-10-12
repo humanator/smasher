@@ -41,7 +41,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Files: `frontend/src/components/node-editor/nodeForms/{ModelPicker.svelte,CodergenForm.svelte}`, `frontend/src/lib/api` models client, `frontend/tests/components/node-editor/...`, `frontend/e2e/node-model.spec.ts` (new)
   - Depends on: T3
 
-- [ ] **T9 (M): Picker everywhere an LLM is used**
+- [x] **T9 (M): Picker everywhere an LLM is used**
   - Acceptance: one `usesLlm(node)` helper drives the picker in `ManagerForm`, `ToolForm` (`task_critic`, `synthesis`, tools with no `tool_command`) and `RunDialog`; Claude CLI lists aliases only; non-LLM tool nodes show no picker.
   - Verify: Vitest for each form, including a non-LLM tool node
   - Files: `ToolForm.svelte`, `ManagerForm.svelte`, `RunDialog.svelte`, `usesLlm.ts` (new), tests

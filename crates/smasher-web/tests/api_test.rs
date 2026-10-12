@@ -119,3 +119,72 @@ async fn test_api_submit_and_poll_completion() {
         final_status
     );
 }
+
+#[tokio::test]
+async fn test_api_submit_rejects_a_model_from_another_provider() {
+    let (base_url, _server) = start_test_server().await;
+
+    let response = Client::new()
+        .post(format!("{}/api/runs", base_url))
+        .json(&json!({
+            "dot_source": simple_workflow_dot(),
+            "provider": "claude-cli",
+            "model": "gemma4:31b-cloud"
+        }))
+        .send()
+        .await
+        .expect("failed to submit pipeline");
+
+    assert_eq!(response.status(), 400);
+    let body: serde_json::Value = response.json().await.unwrap();
+    let message = body["error"].as_str().unwrap();
+    assert!(message.contains("gemma4:31b-cloud"), "{message}");
+}
+
+#[tokio::test]
+async fn test_api_submit_rejects_a_provider_without_a_model_when_it_has_no_default() {
+    let (base_url, _server) = start_test_server().await;
+
+    let response = Client::new()
+        .post(format!("{}/api/runs", base_url))
+        .json(&json!({"dot_source": simple_workflow_dot(), "provider": "ollama"}))
+        .send()
+        .await
+        .expect("failed to submit pipeline");
+
+    assert_eq!(response.status(), 400);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert!(body["error"].as_str().unwrap().contains("ollama"), "{body}");
+}
+
+#[tokio::test]
+async fn test_api_submit_accepts_a_matching_provider_and_model() {
+    let (base_url, _server) = start_test_server().await;
+
+    let response = Client::new()
+        .post(format!("{}/api/runs", base_url))
+        .json(&json!({
+            "dot_source": simple_workflow_dot(),
+            "provider": "anthropic",
+            "model": "claude-opus-5"
+        }))
+        .send()
+        .await
+        .expect("failed to submit pipeline");
+
+    assert_eq!(response.status(), 200);
+}
+
+#[tokio::test]
+async fn test_api_submit_rejects_an_unknown_provider() {
+    let (base_url, _server) = start_test_server().await;
+
+    let response = Client::new()
+        .post(format!("{}/api/runs", base_url))
+        .json(&json!({"dot_source": simple_workflow_dot(), "provider": "nope", "model": "x"}))
+        .send()
+        .await
+        .expect("failed to submit pipeline");
+
+    assert_eq!(response.status(), 400);
+}

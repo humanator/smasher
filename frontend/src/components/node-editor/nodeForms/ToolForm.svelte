@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Tool node-kind side-panel form component
-  // ABOUTME: Edits tool/args attributes with JSON validation
+  // ABOUTME: Edits tool/args attributes with JSON validation, plus a model picker for LLM tools
 
   import { untrack } from 'svelte';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -8,15 +8,16 @@
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { NodeFormProps } from '../types';
+  import ModelPicker from './ModelPicker.svelte';
+  import { usesLlm } from './usesLlm';
 
   // Grounded in tool_handler.rs:53-92 (ToolHandler::execute): `tool` (falls
   // back to node label when absent -- same "blank clears the attr, not
   // writes empty string" treatment as CodergenForm's prompt) and `args`, a
   // JSON-encoded string (`serde_json::from_str::<Value>`, invalid JSON
   // fails the run with "invalid JSON in args attribute"). `model`/
-  // `provider` are also folded into `args` by the real handler but are
-  // power-user overrides out of this task's scope (tool/args only, per the
-  // plan).
+  // `provider` are also folded into `args` by the real handler; the shared
+  // ModelPicker edits them for tools that call a model (see usesLlm).
   //
   // `tool` is a real closed-ish set, unlike Manager's `task` (see
   // ManagerForm's own comment): the actual backend chain assembled in
@@ -55,6 +56,7 @@
   let selectValue = $state(untrack(() => (tool && !isKnownTool(tool) ? CUSTOM_VALUE : tool)));
   let showCustomInput = $derived(selectValue === CUSTOM_VALUE);
   let selectedKnownTool = $derived(KNOWN_TOOLS.find((t) => t.value === selectValue));
+  let showModelPicker = $derived(usesLlm('Tool', { ...attrs, tool }));
 
   function validateArgs(text: string): string | null {
     const trimmed = text.trim();
@@ -145,5 +147,13 @@
   </div>
   {#if argsError}
     <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-args-error">Invalid JSON: {argsError}</p>
+  {/if}
+  {#if showModelPicker}
+    <ModelPicker
+      idPrefix="tool"
+      provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
+      model={typeof attrs.model === 'string' ? attrs.model : undefined}
+      onChange={(patch) => onChange({ attrs: patch })}
+    />
   {/if}
 </div>
