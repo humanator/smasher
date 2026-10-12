@@ -1,6 +1,6 @@
 # Spec: model-catalog
 
-Part of [SPEC.md](SPEC.md). No dependencies.
+Part of [SPEC-model-selection.md](SPEC-model-selection.md). No dependencies.
 
 ## Objective
 

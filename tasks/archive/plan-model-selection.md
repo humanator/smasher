@@ -1,6 +1,6 @@
 # Implementation Plan: Model selection everywhere, and per node (backlog #20)
 
-Specs: [`SPEC.md`](../SPEC.md) (capability map and decisions) and the four `SPEC-<module>.md` files. Tasks are in [`todo.md`](todo.md).
+Specs: [`SPEC-model-selection.md`](SPEC-model-selection.md) (capability map and decisions) and the four `SPEC-<module>.md` files. Tasks are in [`todo-model-selection.md`](todo-model-selection.md).
 
 ## Overview
 

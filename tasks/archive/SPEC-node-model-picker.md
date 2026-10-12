@@ -1,6 +1,6 @@
 # Spec: node-model-picker
 
-Part of [SPEC.md](SPEC.md). Depends on `model-catalog`.
+Part of [SPEC-model-selection.md](SPEC-model-selection.md). Depends on `model-catalog`.
 
 ## Objective
 

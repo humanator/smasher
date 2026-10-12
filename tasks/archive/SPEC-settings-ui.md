@@ -1,6 +1,6 @@
 # Spec: settings-ui
 
-Part of [SPEC.md](SPEC.md). Depends on `llm-settings` and `model-catalog`.
+Part of [SPEC-model-selection.md](SPEC-model-selection.md). Depends on `llm-settings` and `model-catalog`.
 
 ## Objective
 

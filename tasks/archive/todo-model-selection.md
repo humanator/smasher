@@ -1,6 +1,6 @@
 # Todo: Model selection everywhere, and per node (backlog #20)
 
-Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: tests first, `cargo clippy --workspace -- -D warnings` and `cargo fmt --all` clean, commit when green. No test spends LLM tokens.
+Plan: [`plan-model-selection.md`](plan-model-selection.md). Specs: `SPEC-model-selection.md`, `SPEC-<module>.md`. Every task: tests first, `cargo clippy --workspace -- -D warnings` and `cargo fmt --all` clean, commit when green. No test spends LLM tokens.
 
 ## Phase 1: model-catalog
 
