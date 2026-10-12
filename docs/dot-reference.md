@@ -21,7 +21,7 @@ The `shape` attribute on a DOT node determines its semantic type:
 | `diamond`        | Conditional   | Branch based on variable conditions      |
 | `box`            | Codergen      | Run an LLM agent session                 |
 | `rectangle`      | Codergen      | Alternative codergen marker              |
-| `parallelogram`  | Tool          | Execute a registered tool                |
+| `parallelogram`  | Tool          | Run a built-in tool or a shell command   |
 | `hexagon`        | Interviewer   | Human interaction node                   |
 | `oval`           | Interviewer   | Alternative interviewer marker           |
 | `ellipse`        | Interviewer   | Alternative interviewer marker           |
@@ -77,14 +77,63 @@ generate [
 
 ### Tool (parallelogram)
 
-Executes a registered tool. The tool name is determined by the `tool` attribute,
-falling back to the node's label.
+Runs a built-in tool or a shell command. A tool node sets exactly one of:
+
+- `tool`: a built-in tool (`render_capture`, `system_lint`, `task_critic`,
+  `synthesis`), with optional JSON `args`.
+- `tool_command`: a shell command, run with `sh -c` in the run's working
+  directory (the run directory, or the worktree under `smasher run
+  --worktree`), with an optional `timeout`.
 
 ```dot
-lint [shape=parallelogram, tool="linter", args="{\"strict\": true}"];
+lint [shape=parallelogram, tool="system_lint", args="{\"candidate_dir\": \"candidates/a\"}"];
 
-// Or using label as the tool name:
-lint [shape=parallelogram, label="linter"];
+test [shape=parallelogram, tool_command="npm test", timeout="5m"];
+```
+
+A tool node never calls an LLM itself. Only `task_critic` and `synthesis`
+make an LLM call, and only because the node names them. Setting neither
+attribute, or both, fails the node, and `smasher lint` reports it (E004,
+E005). The node's label is not used as a tool name. An unknown `tool` name
+fails with a list of the built-ins.
+
+A command succeeds when it exits 0. Any other exit code fails the node with
+`exit code N: <end of stderr>`, and a timeout or cancellation kills the
+command's whole process group. On success or failure, the command's result
+is written to context for later conditions and nodes:
+
+| Key              | Value                                                  |
+|------------------|--------------------------------------------------------|
+| `tool.output`    | stdout, trailing whitespace trimmed                    |
+| `tool.stderr`    | stderr                                                 |
+| `tool.exit_code` | the exit code as a string (`-1` after a timeout or cancel) |
+
+Each value is capped at 100,000 bytes. The full streams are written to
+`nodes/<id>/stdout.txt` and `stderr.txt` in the run directory. Branches of a
+`Parallel` node share one context, so when several tool nodes run in a
+fan-out, `tool.*` holds whichever finished last; each node's own result is
+still in `_tool_<id>` and `nodes/<id>/`.
+
+The command inherits the server's environment, minus variables whose names
+look secret (containing `API_KEY`, `TOKEN`, `PASSWORD`, `SECRET` or
+`AWS_SECRET`), plus:
+
+| Variable              | Value                                             |
+|-----------------------|---------------------------------------------------|
+| `SMASHER_RUN_DIR`     | the run directory                                 |
+| `SMASHER_NODE_ID`     | the node's id                                     |
+| `SMASHER_CTX_<KEY>`   | each context value whose key doesn't start with `_`; the key is upper-cased, with every character outside `A-Z`, `0-9` and `_` replaced by `_` (`design.brief` → `SMASHER_CTX_DESIGN_BRIEF`) |
+
+stdin is empty. A command that starts a background process should redirect
+that process's output (`server > server.log 2>&1 &`); otherwise the node
+waits for it until the timeout.
+
+To fall back to an LLM when a command fails, say so in the graph:
+
+```dot
+check -> report [label="ok", condition="outcome=success"];
+check -> fix    [label="failed", condition="outcome=fail"];
+fix [shape=box, prompt="The checks failed. Read nodes/check/stderr.txt and fix the cause."];
 ```
 
 ### Interviewer (hexagon / oval / ellipse)
@@ -221,8 +270,10 @@ All nodes support these common attributes:
 
 | Attribute              | Type     | Description                                          |
 |------------------------|----------|------------------------------------------------------|
-| `tool`                 | string   | Name of the tool to invoke (falls back to label)     |
-| `args`                 | string   | JSON-encoded arguments for the tool                  |
+| `tool`                 | string   | Built-in tool to run. Set this or `tool_command`, not both |
+| `args`                 | string   | JSON-encoded arguments for a built-in `tool` (lint W004 if set with `tool_command`) |
+| `tool_command`         | string   | Shell command to run with `sh -c` in the run's working directory |
+| `timeout`              | number or duration | Seconds a `tool_command` may run: `600`, `"600"` or `"30s"`. Default 600 |
 
 ### Manager Attributes
 
@@ -330,7 +381,21 @@ gate [shape=diamond, condition="auth=valid && quota=ok"];
 
 // Numeric comparison
 limit [shape=diamond, condition="count>10"];
+
+// Branch on a tool command's output
+check -> clean [condition="context.tool.output=clean"];
 ```
+
+### Keys and the `context.` prefix
+
+A key is looked up in the pipeline context as written. If it isn't there and
+starts with `context.`, the prefix is dropped and the key is looked up again,
+so `context.tool.output=clean` and `tool.output=clean` are equivalent. A key
+literally named `context.foo` still wins over `foo`. A key that isn't set
+makes a comparison false.
+
+After each node, `outcome` holds its result: `success` (including partial
+success), `fail`, `retry` or `skip`.
 
 ## Stylesheets
 

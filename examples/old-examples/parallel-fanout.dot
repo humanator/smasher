@@ -1,24 +1,20 @@
 // ABOUTME: Pipeline demonstrating the parallel fan-out graph structure.
-// ABOUTME: Shows how parallelogram nodes model concurrent branch execution.
+// ABOUTME: Shows how component nodes model concurrent branch execution.
 
-// The parallel node (shape=parallelogram) represents a fan-out point where
+// The parallel node (shape=component) represents a fan-out point where
 // the engine dispatches downstream branches concurrently. Optional attributes
 // control behavior:
 //   max_concurrency=N  — limit concurrent branches (default 10)
 //   fail_fast=true     — abort all branches on first failure
 //
-// NOTE: Running this example requires the ParallelHandler to be registered.
-// The default CLI registry does not include it. This file documents the
-// graph structure for reference and programmatic use via the Engine API.
-//
-// For a runnable multi-path example, see conditional.dot or multi-step.dot.
+// Don't confuse it with shape=parallelogram, which is a tool node.
 
 digraph ParallelFanout {
     // Entry
     start [shape=circle, label="Start"];
 
     // Parallel dispatch node — signals concurrent execution
-    fan_out [shape=parallelogram, label="Fan Out", max_concurrency=3];
+    fan_out [shape=component, label="Fan Out", max_concurrency=3];
 
     // Parallel branches — in a real pipeline these would be codergen or
     // tool nodes performing independent work.

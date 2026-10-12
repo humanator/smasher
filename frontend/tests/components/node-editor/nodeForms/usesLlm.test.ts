@@ -20,13 +20,13 @@ describe('usesLlm', () => {
     expect(usesLlm('Tool', { tool: 'system_lint' })).toBe(false);
   });
 
-  it('is true for other tools without a tool_command (they fall back to an LLM)', () => {
-    expect(usesLlm('Tool', {})).toBe(true);
-    expect(usesLlm('Tool', { tool: 'http_fetch' })).toBe(true);
+  it('is false for a tool with no name or an unknown name, which no longer fall back to an LLM', () => {
+    expect(usesLlm('Tool', {})).toBe(false);
+    expect(usesLlm('Tool', { tool: 'http_fetch' })).toBe(false);
   });
 
   it('is false for a tool that has a tool_command', () => {
-    expect(usesLlm('Tool', { tool: 'shell', tool_command: 'ls -la' })).toBe(false);
+    expect(usesLlm('Tool', { tool_command: 'ls -la' })).toBe(false);
   });
 
   it('is false for node kinds that never call a model', () => {

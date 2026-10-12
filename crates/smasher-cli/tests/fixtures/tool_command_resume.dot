@@ -1,0 +1,10 @@
+// ABOUTME: Fixture for tool_command_e2e: Gate fails until a `go` file exists in the
+// ABOUTME: run directory; with no fail edge the run stops there and `smasher resume` re-runs it.
+digraph ToolCommandResume {
+  start [shape=Mdiamond];
+  Gate [shape=parallelogram, tool_command="test -f \"$SMASHER_RUN_DIR/go\" && echo resumed"];
+  done [shape=Msquare];
+
+  start -> Gate;
+  Gate -> done [label="ok", condition="outcome=success"];
+}

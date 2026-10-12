@@ -1,61 +1,127 @@
-// ABOUTME: Tests for ToolForm.svelte, the Task 17b tool node-kind side-panel
-// ABOUTME: form for tool/args attributes (grounded in tool_handler.rs).
+// ABOUTME: Tests for ToolForm.svelte, the tool node-kind side-panel form: a built-in
+// ABOUTME: tool (tool/args) or a shell command (tool_command/timeout), grounded in tool_handler.rs.
 
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import ToolForm from '../../../../src/components/node-editor/nodeForms/ToolForm.svelte';
 
-// Grounded in tool_handler.rs:53-92: `tool` (falls back to node label) and
-// `args`, a JSON-encoded string parsed via serde_json::from_str -- invalid
-// JSON fails the *run*, not this panel, so the form must show a visible
-// error without crashing or blocking further edits.
+// Grounded in tool_handler.rs (ToolHandler::execute): a tool node sets
+// exactly one of `tool` (a built-in, with optional JSON `args`) or
+// `tool_command` (a shell command, with optional `timeout`). Neither or
+// both fails the run, and the label is never used as a tool name.
 describe('ToolForm', () => {
-  it('pre-selects the matching option for a known tool and hides the custom field', () => {
+  it('opens a node with a tool in built-in mode with the tool pre-selected', () => {
     render(ToolForm, {
       props: { attrs: { tool: 'render_capture', args: '{"cmd":"ls"}' }, onChange: vi.fn() },
     });
 
-    const selectInput = screen.getByTestId('tool-select') as HTMLSelectElement;
-    const argsInput = screen.getByTestId('tool-args') as HTMLTextAreaElement;
-    expect(selectInput.value).toBe('render_capture');
-    expect(argsInput.value).toBe('{"cmd":"ls"}');
-    expect(screen.queryByTestId('tool-name')).toBe(null);
+    expect((screen.getByTestId('tool-mode') as HTMLSelectElement).value).toBe('builtin');
+    expect((screen.getByTestId('tool-select') as HTMLSelectElement).value).toBe('render_capture');
+    expect((screen.getByTestId('tool-args') as HTMLTextAreaElement).value).toBe('{"cmd":"ls"}');
+    expect(screen.queryByTestId('tool-command')).toBe(null);
+    expect(screen.queryByTestId('tool-timeout')).toBe(null);
     expect(screen.queryByTestId('tool-args-error')).toBe(null);
   });
 
-  it('falls back to Custom for an unrecognized tool name and shows it in the text field', () => {
+  it('opens a node with a tool_command in shell mode showing the command and timeout', () => {
     render(ToolForm, {
-      props: { attrs: { tool: 'shell' }, onChange: vi.fn() },
+      props: { attrs: { tool_command: 'npm test', timeout: '30s' }, onChange: vi.fn() },
     });
 
-    const selectInput = screen.getByTestId('tool-select') as HTMLSelectElement;
-    const customInput = screen.getByTestId('tool-name') as HTMLInputElement;
-    expect(selectInput.value).toBe('__custom__');
-    expect(customInput.value).toBe('shell');
+    expect((screen.getByTestId('tool-mode') as HTMLSelectElement).value).toBe('command');
+    expect((screen.getByTestId('tool-command') as HTMLTextAreaElement).value).toBe('npm test');
+    expect((screen.getByTestId('tool-timeout') as HTMLInputElement).value).toBe('30s');
+    expect(screen.queryByTestId('tool-select')).toBe(null);
+    expect(screen.queryByTestId('tool-args')).toBe(null);
   });
 
-  it('selecting a known tool calls onChange and hides the custom field', async () => {
+  it('shows a numeric timeout as text', () => {
+    render(ToolForm, {
+      props: { attrs: { tool_command: 'make', timeout: 120 }, onChange: vi.fn() },
+    });
+
+    expect((screen.getByTestId('tool-timeout') as HTMLInputElement).value).toBe('120');
+  });
+
+  it('a new node with no attributes starts in built-in mode with nothing selected', () => {
+    render(ToolForm, { props: { attrs: {}, onChange: vi.fn() } });
+
+    expect((screen.getByTestId('tool-mode') as HTMLSelectElement).value).toBe('builtin');
+    expect((screen.getByTestId('tool-select') as HTMLSelectElement).value).toBe('');
+  });
+
+  it('offers only the four built-in tools, with no Custom option', () => {
+    render(ToolForm, { props: { attrs: {}, onChange: vi.fn() } });
+
+    const values = Array.from((screen.getByTestId('tool-select') as HTMLSelectElement).options).map(
+      (o) => o.value,
+    );
+    expect(values).toEqual(['', 'render_capture', 'system_lint', 'task_critic', 'synthesis']);
+    expect(screen.queryByText(/Custom/)).toBe(null);
+    expect(screen.queryByTestId('tool-name')).toBe(null);
+  });
+
+  it('keeps an unrecognized tool name visible and warns that it is not a built-in', () => {
+    render(ToolForm, { props: { attrs: { tool: 'shell' }, onChange: vi.fn() } });
+
+    expect((screen.getByTestId('tool-select') as HTMLSelectElement).value).toBe('shell');
+    expect(screen.getByTestId('tool-unknown-warning').textContent).toMatch(/not a built-in tool/);
+  });
+
+  it('selecting a built-in tool calls onChange and shows its description', async () => {
     const onChange = vi.fn();
     render(ToolForm, { props: { attrs: {}, onChange } });
 
     await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'system_lint' } });
 
     expect(onChange).toHaveBeenCalledWith({ attrs: { tool: 'system_lint' } });
-    expect(screen.queryByTestId('tool-name')).toBe(null);
     expect(screen.getByText(/design-system lint/)).toBeTruthy();
   });
 
-  it('selecting Custom reveals a text field, and typing calls onChange with the typed name', async () => {
+  it('switching to shell command clears tool and args and shows the command field', async () => {
     const onChange = vi.fn();
-    render(ToolForm, { props: { attrs: {}, onChange } });
+    render(ToolForm, { props: { attrs: { tool: 'system_lint', args: '{}' }, onChange } });
 
-    await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: '__custom__' } });
-    const customInput = screen.getByTestId('tool-name') as HTMLInputElement;
-    expect(customInput.value).toBe('');
+    await fireEvent.change(screen.getByTestId('tool-mode'), { target: { value: 'command' } });
 
-    await fireEvent.input(screen.getByTestId('tool-name'), { target: { value: 'http_fetch' } });
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { tool: undefined, args: undefined } });
+    expect((screen.getByTestId('tool-command') as HTMLTextAreaElement).value).toBe('');
+    expect(screen.queryByTestId('tool-select')).toBe(null);
+  });
 
-    expect(onChange).toHaveBeenLastCalledWith({ attrs: { tool: 'http_fetch' } });
+  it('switching to built-in tool clears tool_command and timeout', async () => {
+    const onChange = vi.fn();
+    render(ToolForm, { props: { attrs: { tool_command: 'make', timeout: '60' }, onChange } });
+
+    await fireEvent.change(screen.getByTestId('tool-mode'), { target: { value: 'builtin' } });
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      attrs: { tool_command: undefined, timeout: undefined },
+    });
+    expect((screen.getByTestId('tool-select') as HTMLSelectElement).value).toBe('');
+    expect(screen.queryByTestId('tool-command')).toBe(null);
+  });
+
+  it('typing a command writes tool_command, and clearing it removes the attr', async () => {
+    const onChange = vi.fn();
+    render(ToolForm, { props: { attrs: { tool_command: 'x' }, onChange } });
+
+    await fireEvent.input(screen.getByTestId('tool-command'), { target: { value: 'make test' } });
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { tool_command: 'make test' } });
+
+    await fireEvent.input(screen.getByTestId('tool-command'), { target: { value: '  ' } });
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { tool_command: undefined } });
+  });
+
+  it('typing a timeout writes it, and clearing it removes the attr', async () => {
+    const onChange = vi.fn();
+    render(ToolForm, { props: { attrs: { tool_command: 'make' }, onChange } });
+
+    await fireEvent.input(screen.getByTestId('tool-timeout'), { target: { value: '30s' } });
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { timeout: '30s' } });
+
+    await fireEvent.input(screen.getByTestId('tool-timeout'), { target: { value: '' } });
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { timeout: undefined } });
   });
 
   it('valid JSON in args calls onChange and shows no error', async () => {
@@ -101,10 +167,10 @@ describe('ToolForm', () => {
       expect(screen.getByTestId('tool-model')).toBeTruthy();
     });
 
-    it('shows for a custom tool with no tool_command', () => {
+    it('is absent for an unknown tool, which no longer falls back to an LLM', () => {
       render(ToolForm, { props: { attrs: { tool: 'http_fetch' }, onChange: vi.fn() } });
 
-      expect(screen.getByTestId('tool-model')).toBeTruthy();
+      expect(screen.queryByTestId('tool-model')).toBe(null);
     });
 
     it('is absent for a native tool such as render_capture', () => {
@@ -113,9 +179,9 @@ describe('ToolForm', () => {
       expect(screen.queryByTestId('tool-model')).toBe(null);
     });
 
-    it('is absent for a tool that has a tool_command', () => {
+    it('is absent for a shell command node', () => {
       render(ToolForm, {
-        props: { attrs: { tool: 'shell', tool_command: 'ls' }, onChange: vi.fn() },
+        props: { attrs: { tool_command: 'ls' }, onChange: vi.fn() },
       });
 
       expect(screen.queryByTestId('tool-model')).toBe(null);

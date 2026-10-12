@@ -40,7 +40,7 @@ export const NODE_KIND_CONFIG: Record<NodeType, NodeKindConfig> = {
     title: 'Tool',
     theme: 'green',
     paletteGroup: 'pipeline-steps',
-    description: 'Runs a registered tool (render/capture, lint, critique, etc.) against the working directory.',
+    description: 'Runs a built-in tool (render/capture, lint, critique, etc.) or a shell command in the run directory.',
   },
   Manager: {
     icon: 'MGR',

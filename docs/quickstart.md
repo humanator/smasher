@@ -200,16 +200,20 @@ The engine determines each node's role from its `shape` attribute:
 |------------------|---------------|------------------------------------------|
 | `circle`         | Start         | Pipeline entry point                     |
 | `point`          | Start         | Alternative start marker                 |
+| `Mdiamond`       | Start         | Alternative start marker                 |
 | `doublecircle`   | Exit          | Pipeline terminal node                   |
+| `Msquare`        | Exit          | Alternative exit marker                  |
 | `diamond`        | Conditional   | Branch based on variable conditions      |
-| `box`            | Codergen      | Run an LLM agent session                 |
+| `box`            | Codergen      | Run an LLM agent session (also the default with no `shape`) |
 | `rectangle`      | Codergen      | Alternative codergen marker              |
-| `hexagon`        | Tool          | Execute a tool                           |
-| `oval`           | Interviewer   | Human interaction node                   |
+| `parallelogram`  | Tool          | Run a built-in `tool` or a shell `tool_command` |
+| `hexagon`        | Interviewer   | Human interaction node                   |
+| `oval`           | Interviewer   | Alternative interviewer marker           |
 | `ellipse`        | Interviewer   | Alternative interviewer marker           |
-| `parallelogram`  | Parallel      | Fan-out concurrent execution             |
+| `component`      | Parallel      | Fan-out concurrent execution             |
+| `tripleoctagon`  | FanIn         | Join parallel branches                   |
 | `house`          | Manager       | Coordinator node                         |
-| `component`      | SubPipeline   | Nested pipeline reference                |
+| `folder`         | SubPipeline   | Nested pipeline reference                |
 | *(anything else)*| Generic       | Passthrough processing node              |
 
 ### Run Options

@@ -3,26 +3,20 @@
   import './nodeForms.css';
   import type { NodeFormProps } from '../types';
 
-  // Grounded in tool_handler.rs:53-92 (ToolHandler::execute): `tool` (falls
-  // back to node label when absent -- same "blank clears the attr, not
-  // writes empty string" treatment as CodergenForm's prompt) and `args`, a
-  // JSON-encoded string (`serde_json::from_str::<Value>`, invalid JSON
-  // fails the run with "invalid JSON in args attribute"). `model`/
-  // `provider` are also folded into `args` by the real handler but are
-  // power-user overrides out of this task's scope (tool/args only, per the
-  // plan).
+  // Legacy editor-ui form, superseded by frontend/'s ToolForm (only these
+  // comments are kept current; its checked-in dist/ isn't rebuilt).
   //
-  // `tool` is a real closed-ish set, unlike Manager's `task` (see
-  // ManagerForm's own comment): the actual backend chain assembled in
-  // crates/smasher-web/src/routes/pages.rs (TaskCriticSynthesisToolBackend
-  // -> SystemLintToolBackend -> HybridToolBackend -> LlmToolBackend) routes
-  // each of these four names to a materially different Rust implementation
-  // (render_capture drives a headless-Chromium capture, system_lint runs a
-  // static design-system lint, task_critic/synthesis run persona-based LLM
-  // critique passes) -- picking the wrong one changes what actually runs,
-  // not just a label. Anything else still falls through to LlmToolBackend,
-  // which executes *any* tool name via a raw LLM prompt, so "Custom…" keeps
-  // that escape hatch rather than locking the field to only these four.
+  // Grounded in tool_handler.rs (ToolHandler::execute): a tool node sets
+  // exactly one of `tool` (a built-in, plus `args`, a JSON-encoded string;
+  // invalid JSON fails the run with "invalid JSON in args attribute") or
+  // `tool_command` (a shell command, which this legacy form can't edit).
+  // The node label is never used as a tool name.
+  //
+  // The built-in chain is assembled in crates/smasher-web/src/run_launch.rs
+  // (TaskCriticSynthesisToolBackend -> SystemLintToolBackend ->
+  // HybridToolBackend -> UnknownToolBackend) and routes each of these four
+  // names to a different Rust implementation. Any other name, including one
+  // typed into "Custom…" below, reaches UnknownToolBackend and fails the run.
   const KNOWN_TOOLS: { value: string; description: string }[] = [
     { value: 'render_capture', description: 'Render a candidate and capture a screenshot/manifest.' },
     { value: 'system_lint', description: 'Run the design-system lint check against a candidate.' },

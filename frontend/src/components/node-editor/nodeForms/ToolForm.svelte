@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Tool node-kind side-panel form component
-  // ABOUTME: Edits tool/args attributes with JSON validation, plus a model picker for LLM tools
+  // ABOUTME: Edits a built-in tool (tool/args, plus a model for LLM tools) or a shell command (tool_command/timeout)
 
   import { untrack } from 'svelte';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -11,52 +11,60 @@
   import ModelPicker from './ModelPicker.svelte';
   import { usesLlm } from './usesLlm';
 
-  // Grounded in tool_handler.rs:53-92 (ToolHandler::execute): `tool` (falls
-  // back to node label when absent -- same "blank clears the attr, not
-  // writes empty string" treatment as CodergenForm's prompt) and `args`, a
-  // JSON-encoded string (`serde_json::from_str::<Value>`, invalid JSON
-  // fails the run with "invalid JSON in args attribute"). `model`/
-  // `provider` are also folded into `args` by the real handler; the shared
-  // ModelPicker edits them for tools that call a model (see usesLlm).
+  // Grounded in tool_handler.rs (ToolHandler::execute): a tool node sets
+  // exactly one of `tool` or `tool_command`. Neither or both fails the run
+  // (lint E004/E005), and the node label is never used as a tool name.
+  // Blank fields clear their attr rather than writing an empty string, the
+  // same treatment as CodergenForm's prompt.
   //
-  // `tool` is a real closed-ish set, unlike Manager's `task` (see
-  // ManagerForm's own comment): the actual backend chain assembled in
-  // crates/smasher-web/src/routes/pages.rs (TaskCriticSynthesisToolBackend
-  // -> SystemLintToolBackend -> HybridToolBackend -> LlmToolBackend) routes
-  // each of these four names to a materially different Rust implementation
+  // - Built-in tool: `tool` plus `args`, a JSON-encoded string
+  //   (`serde_json::from_str::<Value>`; invalid JSON fails the run with
+  //   "invalid JSON in args attribute"). `model`/`provider` are also folded
+  //   into `args` by the handler; the shared ModelPicker edits them for the
+  //   tools that call a model (see usesLlm).
+  // - Shell command: `tool_command`, run with `sh -c` in the run directory,
+  //   plus `timeout` (seconds, or a duration such as `30s`; 600 by default).
+  //
+  // `tool` is a closed set: the chain built in
+  // crates/smasher-web/src/run_launch.rs (TaskCriticSynthesisToolBackend ->
+  // SystemLintToolBackend -> HybridToolBackend -> UnknownToolBackend) routes
+  // each of these four names to a different Rust implementation
   // (render_capture drives a headless-Chromium capture, system_lint runs a
   // static design-system lint, task_critic/synthesis run persona-based LLM
-  // critique passes) -- picking the wrong one changes what actually runs,
-  // not just a label. Anything else still falls through to LlmToolBackend,
-  // which executes *any* tool name via a raw LLM prompt, so "Custom…" keeps
-  // that escape hatch rather than locking the field to only these four.
+  // critique passes). Any other name reaches UnknownToolBackend and fails
+  // the run, so there's no free-text tool name; a node loaded with one keeps
+  // it visible with a warning rather than silently dropping it.
   const KNOWN_TOOLS: { value: string; description: string }[] = [
     { value: 'render_capture', description: 'Render a candidate and capture a screenshot/manifest.' },
     { value: 'system_lint', description: 'Run the design-system lint check against a candidate.' },
     { value: 'task_critic', description: 'Run a persona-based usability critique of a candidate.' },
     { value: 'synthesis', description: 'Synthesise prior critiques into a single summary.' },
   ];
-  const CUSTOM_VALUE = '__custom__';
+
+  type Mode = 'builtin' | 'command';
 
   function isKnownTool(name: string): boolean {
     return KNOWN_TOOLS.some((t) => t.value === name);
   }
 
+  function attrText(value: unknown): string {
+    return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+  }
+
   let { attrs, onChange }: NodeFormProps = $props();
   const uid = $props.id();
 
-  let tool = $state(untrack(() => (typeof attrs.tool === 'string' ? attrs.tool : '')));
-  let argsText = $state(untrack(() => (typeof attrs.args === 'string' ? attrs.args : '')));
+  // Seeded once on mount (the parent's {#key node.id} remounts this
+  // component when the selected node changes).
+  let mode = $state<Mode>(untrack(() => (attrText(attrs.tool_command).trim() ? 'command' : 'builtin')));
+  let tool = $state(untrack(() => attrText(attrs.tool)));
+  let argsText = $state(untrack(() => attrText(attrs.args)));
   let argsError = $state(untrack(() => validateArgs(argsText)));
-  // Seeded once from the loaded tool name (same one-time-read-on-mount
-  // convention as `tool`/`argsText` above -- the parent's {#key node.id}
-  // remounts this component on node selection change): an unrecognized
-  // (or blank) tool starts in "Custom" mode so its real value stays
-  // visible/editable instead of silently disappearing behind the select.
-  let selectValue = $state(untrack(() => (tool && !isKnownTool(tool) ? CUSTOM_VALUE : tool)));
-  let showCustomInput = $derived(selectValue === CUSTOM_VALUE);
-  let selectedKnownTool = $derived(KNOWN_TOOLS.find((t) => t.value === selectValue));
-  let showModelPicker = $derived(usesLlm('Tool', { ...attrs, tool }));
+  let command = $state(untrack(() => attrText(attrs.tool_command)));
+  let timeoutText = $state(untrack(() => attrText(attrs.timeout)));
+  let selectedKnownTool = $derived(KNOWN_TOOLS.find((t) => t.value === tool));
+  let unknownTool = $derived(tool !== '' && !isKnownTool(tool));
+  let showModelPicker = $derived(mode === 'builtin' && usesLlm('Tool', { tool }));
 
   function validateArgs(text: string): string | null {
     const trimmed = text.trim();
@@ -69,25 +77,24 @@
     }
   }
 
-  function commitTool(next: string) {
-    tool = next;
-    onChange({ attrs: { tool: tool || undefined } });
-  }
-
-  function handleSelectChange(event: Event) {
-    const value = (event.target as HTMLSelectElement).value;
-    selectValue = value;
-    if (value === CUSTOM_VALUE) {
-      // Keep whatever custom text was already there (e.g. switching back
-      // from a known tool and then back to Custom); otherwise start blank.
-      commitTool(tool && !isKnownTool(tool) ? tool : '');
+  function handleModeChange(event: Event) {
+    mode = (event.target as HTMLSelectElement).value as Mode;
+    // A node runs one or the other, so switching drops the other mode's attrs.
+    if (mode === 'command') {
+      tool = '';
+      argsText = '';
+      argsError = null;
+      onChange({ attrs: { tool: undefined, args: undefined } });
     } else {
-      commitTool(value);
+      command = '';
+      timeoutText = '';
+      onChange({ attrs: { tool_command: undefined, timeout: undefined } });
     }
   }
 
-  function handleCustomToolInput(event: Event) {
-    commitTool((event.target as HTMLInputElement).value);
+  function handleToolChange(event: Event) {
+    tool = (event.target as HTMLSelectElement).value;
+    onChange({ attrs: { tool: tool || undefined } });
   }
 
   function handleArgsInput(event: Event) {
@@ -99,61 +106,109 @@
     // surfaces at run time, same as it would for a hand-edited .dot file.
     onChange({ attrs: { args: argsText.trim() ? argsText : undefined } });
   }
+
+  function handleCommandInput(event: Event) {
+    command = (event.target as HTMLTextAreaElement).value;
+    onChange({ attrs: { tool_command: command.trim() ? command : undefined } });
+  }
+
+  function handleTimeoutInput(event: Event) {
+    timeoutText = (event.target as HTMLInputElement).value;
+    onChange({ attrs: { timeout: timeoutText.trim() ? timeoutText.trim() : undefined } });
+  }
 </script>
 
 <div class="flex flex-col gap-3" data-testid="tool-form">
   <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-tool">Tool</Label>
+    <Label for="{uid}-mode">Runs</Label>
     <NativeSelect.Root
-      id="{uid}-tool"
+      id="{uid}-mode"
       class="w-full"
-      data-testid="tool-select"
-      value={selectValue}
-      onchange={handleSelectChange}
+      data-testid="tool-mode"
+      value={mode}
+      onchange={handleModeChange}
     >
-      <NativeSelect.Option value="">Select a tool…</NativeSelect.Option>
-      {#each KNOWN_TOOLS as opt (opt.value)}
-        <NativeSelect.Option value={opt.value}>{opt.value}</NativeSelect.Option>
-      {/each}
-      <NativeSelect.Option value={CUSTOM_VALUE}>Custom…</NativeSelect.Option>
+      <NativeSelect.Option value="builtin">Built-in tool</NativeSelect.Option>
+      <NativeSelect.Option value="command">Shell command</NativeSelect.Option>
     </NativeSelect.Root>
   </div>
-  {#if selectedKnownTool}
-    <p class="m-0 text-xs text-muted-foreground">{selectedKnownTool.description}</p>
-  {/if}
-  {#if showCustomInput}
+
+  {#if mode === 'builtin'}
     <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-custom-tool">Custom tool name</Label>
-      <Input
-        id="{uid}-custom-tool"
-        type="text"
-        data-testid="tool-name"
+      <Label for="{uid}-tool">Tool</Label>
+      <NativeSelect.Root
+        id="{uid}-tool"
+        class="w-full"
+        data-testid="tool-select"
         value={tool}
-        oninput={handleCustomToolInput}
-        placeholder="e.g. shell"
+        onchange={handleToolChange}
+      >
+        <NativeSelect.Option value="">Select a tool…</NativeSelect.Option>
+        {#each KNOWN_TOOLS as opt (opt.value)}
+          <NativeSelect.Option value={opt.value}>{opt.value}</NativeSelect.Option>
+        {/each}
+        {#if unknownTool}
+          <NativeSelect.Option value={tool}>{tool}</NativeSelect.Option>
+        {/if}
+      </NativeSelect.Root>
+    </div>
+    {#if selectedKnownTool}
+      <p class="m-0 text-xs text-muted-foreground">{selectedKnownTool.description}</p>
+    {/if}
+    {#if unknownTool}
+      <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-unknown-warning">
+        "{tool}" is not a built-in tool, so this node will fail. Pick a built-in, or switch to a shell command.
+      </p>
+    {/if}
+    <div class="flex flex-col gap-1.5">
+      <Label for="{uid}-args">Args (JSON)</Label>
+      <Textarea
+        id="{uid}-args"
+        class="font-mono text-xs"
+        data-testid="tool-args"
+        rows={4}
+        value={argsText}
+        oninput={handleArgsInput}
       />
     </div>
-  {/if}
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-args">Args (JSON)</Label>
-    <Textarea
-      id="{uid}-args"
-      class="font-mono text-xs"
-      data-testid="tool-args"
-      rows={4}
-      value={argsText}
-      oninput={handleArgsInput}
-    />
-  </div>
-  {#if argsError}
-    <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-args-error">Invalid JSON: {argsError}</p>
-  {/if}
-  {#if showModelPicker}
-    <ModelPicker
-      idPrefix="tool"
-      provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
-      model={typeof attrs.model === 'string' ? attrs.model : undefined}
-      onChange={(patch) => onChange({ attrs: patch })}
-    />
+    {#if argsError}
+      <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-args-error">Invalid JSON: {argsError}</p>
+    {/if}
+    {#if showModelPicker}
+      <ModelPicker
+        idPrefix="tool"
+        provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
+        model={typeof attrs.model === 'string' ? attrs.model : undefined}
+        onChange={(patch) => onChange({ attrs: patch })}
+      />
+    {/if}
+  {:else}
+    <div class="flex flex-col gap-1.5">
+      <Label for="{uid}-command">Command</Label>
+      <Textarea
+        id="{uid}-command"
+        class="font-mono text-xs"
+        data-testid="tool-command"
+        rows={4}
+        value={command}
+        oninput={handleCommandInput}
+        placeholder="e.g. npm test"
+      />
+      <p class="m-0 text-xs text-muted-foreground">
+        Runs with <code>sh -c</code> in the run directory. Exit code 0 succeeds; its output is in
+        <code>tool.output</code>.
+      </p>
+    </div>
+    <div class="flex flex-col gap-1.5">
+      <Label for="{uid}-timeout">Timeout</Label>
+      <Input
+        id="{uid}-timeout"
+        type="text"
+        data-testid="tool-timeout"
+        value={timeoutText}
+        oninput={handleTimeoutInput}
+        placeholder="600 (seconds), or e.g. 30s"
+      />
+    </div>
   {/if}
 </div>

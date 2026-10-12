@@ -3,26 +3,22 @@
 
 import type { AttrValue } from '$lib/api/workflows';
 
-// Tools the engine runs itself, with no model call (see the backend chain in
-// smasher-web's run_launch.rs: render_capture and system_lint are native).
-const NATIVE_TOOLS = new Set(['render_capture', 'system_lint']);
+// The built-in tools that make a model call. Every other tool runs natively
+// (render_capture, system_lint), and a node with a `tool_command` runs a shell
+// command; neither falls back to an LLM any more.
+const LLM_TOOLS = new Set(['task_critic', 'synthesis']);
 
 /**
  * True when running a node of this kind can call a model. Codergen and Manager always
- * do. A Tool does unless it is one of the native tools or has a `tool_command`; any
- * other tool falls back to the LLM backend, as do `task_critic` and `synthesis`.
+ * do. A Tool does only when it is `task_critic` or `synthesis`.
  */
 export function usesLlm(nodeType: string, attrs: Record<string, AttrValue>): boolean {
   switch (nodeType) {
     case 'Codergen':
     case 'Manager':
       return true;
-    case 'Tool': {
-      const command = attrs.tool_command;
-      if (typeof command === 'string' && command.trim()) return false;
-      const tool = typeof attrs.tool === 'string' ? attrs.tool : '';
-      return !NATIVE_TOOLS.has(tool);
-    }
+    case 'Tool':
+      return typeof attrs.tool === 'string' && LLM_TOOLS.has(attrs.tool);
     default:
       return false;
   }

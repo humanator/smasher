@@ -1,0 +1,17 @@
+// ABOUTME: Fixture for tool_command_e2e: a tool node's output picks the branch, and a
+// ABOUTME: shell-backend codergen node reads it back through SMASHER_CTX_TOOL_OUTPUT.
+digraph ToolCommand {
+  start [shape=Mdiamond];
+  Check [shape=parallelogram, tool_command="echo clean"];
+  Clean [shape=parallelogram, tool_command="echo took-clean"];
+  Dirty [shape=parallelogram, tool_command="echo took-dirty"];
+  Report [shape=box, prompt="echo \"report: $SMASHER_CTX_TOOL_OUTPUT\" > report.txt"];
+  done [shape=Msquare];
+
+  start -> Check;
+  Check -> Clean [label="clean", condition="context.tool.output=clean"];
+  Check -> Dirty [label="dirty", condition="tool.output!=clean"];
+  Clean -> Report;
+  Dirty -> Report;
+  Report -> done;
+}

@@ -132,7 +132,7 @@ smasher run [OPTIONS] <PIPELINE>
 | `--model <MODEL>` | LLM model identifier | `claude-sonnet-5` |
 | `--max-steps <N>` | Maximum engine execution steps | `1000` |
 | `--stylesheet <PATH>` | Path to a stylesheet file for node configuration | |
-| `--backend <NAME>` | Codergen backend: `claude-cli`, `agent`, or `shell` | `claude-cli` |
+| `--backend <NAME>` | Codergen backend: `claude-cli`, `agent`, or `shell`. Tool nodes run on every backend, including `shell`, which needs no API key. `shell` runs each codergen node's `prompt` as a shell command, with context as `SMASHER_CTX_<KEY>` variables (key upper-cased, other characters replaced by `_`) | `claude-cli` |
 | `--claude-skip-permissions` | Let `claude-cli` codergen nodes use any tool (`--dangerously-skip-permissions`) | off |
 
 ### Codergen through `claude -p`

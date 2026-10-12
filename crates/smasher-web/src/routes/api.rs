@@ -1145,6 +1145,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn submit_tool_node_without_tool_or_tool_command_is_rejected() {
+        let app = router().with_state(test_state());
+        // E004: the label must not stand in for a tool name.
+        let body = serde_json::json!({
+            "dot_source": "digraph { s [shape=Mdiamond]; t [shape=parallelogram, label=\"system_lint\"]; e [shape=Msquare]; s -> t -> e }",
+            "variables": {}
+        });
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/runs")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&body).unwrap()))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8_lossy(&body);
+        assert!(
+            text.contains("Tool node 't' needs a tool or tool_command attribute"),
+            "{text}"
+        );
+    }
+
+    #[tokio::test]
     async fn get_tokens_for_existing_run() {
         let state = test_state();
         let _token = insert_test_record(&state, "run-tok-1", RunStatus::Running).await;

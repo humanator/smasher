@@ -35,7 +35,8 @@ use smasher_attractor::rendering::{CachedRenderer, GraphRenderer, GraphvizRender
 use smasher_attractor::state::Context;
 use smasher_attractor::state::Outcome;
 use smasher_attractor::stylesheet::Stylesheet;
-use smasher_attractor::tool_handler::{ToolBackend, ToolHandler};
+use smasher_attractor::tool_command::{CancellationToken, CommandConfig, ctx_env_name};
+use smasher_attractor::tool_handler::{ToolBackend, ToolHandler, UnknownToolBackend};
 use smasher_attractor::transforms;
 
 use std::io::IsTerminal;
@@ -176,6 +177,47 @@ impl CodergenBackend for AgentCodergenBackend {
     }
 }
 
+/// Build the built-in tool chain: `task_critic` and `synthesis` (only with an
+/// LLM client), then `system_lint` and `render_capture`, ending at
+/// `UnknownToolBackend`. No link falls back to an LLM.
+pub(crate) fn build_tool_backend(
+    client: Option<&Arc<smasher_llm::client::Client>>,
+    model: &str,
+    working_dir: &str,
+    candidate_artifacts_dir: PathBuf,
+) -> Arc<dyn ToolBackend> {
+    let mut built_ins = vec!["system_lint", "render_capture"];
+    if client.is_some() {
+        built_ins.splice(0..0, ["task_critic", "synthesis"]);
+    }
+    let unknown = Arc::new(UnknownToolBackend::new(
+        built_ins.into_iter().map(String::from).collect(),
+    ));
+    let render_capture = Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
+        unknown as Arc<dyn ToolBackend>,
+        candidate_artifacts_dir.clone(),
+        PathBuf::from(working_dir),
+    ));
+    let system_lint: Arc<dyn ToolBackend> =
+        Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
+            render_capture as Arc<dyn ToolBackend>,
+            candidate_artifacts_dir.clone(),
+            PathBuf::from(working_dir),
+        ));
+    if client.is_none() {
+        return system_lint;
+    }
+    Arc::new(
+        smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
+            system_lint,
+            model.to_string(),
+            model.to_string(),
+            None,
+            candidate_artifacts_dir,
+        ),
+    )
+}
+
 /// CodergenBackend that runs the node prompt as a shell command via `sh -c`.
 ///
 /// Designed for deterministic pipeline testing without an LLM. The `prompt`
@@ -183,7 +225,8 @@ impl CodergenBackend for AgentCodergenBackend {
 /// (stdout captured), non-zero means failure (stderr captured).
 ///
 /// Pipeline context entries (excluding underscore-prefixed internals) are
-/// exposed as `SMASHER_CTX_<key>` environment variables.
+/// exposed as environment variables named by `ctx_env_name`, the same names
+/// tool commands see (e.g. `design.brief` → `SMASHER_CTX_DESIGN_BRIEF`).
 struct ShellCodergenBackend {
     working_dir: String,
     timeout: Duration,
@@ -225,7 +268,7 @@ impl CodergenBackend for ShellCodergenBackend {
         let context_snapshot = context.to_string_map();
         for (key, value) in &context_snapshot {
             if !key.starts_with('_') {
-                cmd.env(format!("SMASHER_CTX_{key}"), value);
+                cmd.env(ctx_env_name(key), value);
             }
         }
 
@@ -639,9 +682,13 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
     };
 
     let artifact_store = ArtifactStore::new();
+    // Shared by the engine and tool commands, so a cancelled run also stops a
+    // command that's mid-flight.
+    let cancellation = CancellationToken::new();
     let config = EngineConfig {
         max_steps: args.max_steps,
         enable_checkpointing: true,
+        cancellation_token: Some(cancellation.clone()),
         checkpoint_dir: Some(run_directory.manifest().directories.checkpoints.clone()),
         artifact_store: Some(artifact_store.clone()),
         ..EngineConfig::default()
@@ -750,7 +797,7 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
             .build(),
     ));
 
-    // Register manager and tool handlers with LLM backends (skipped for shell backend).
+    // Register the manager handler with an LLM backend (skipped for shell backend).
     if let Some(ref client) = client {
         let manager_backend = Arc::new(crate::llm_backends::LlmManagerBackend::new(
             Arc::clone(client),
@@ -758,42 +805,33 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
             effective_working_dir.clone(),
         ));
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
-
-        let llm_tool_backend = Arc::new(crate::llm_backends::LlmToolBackend::new(
-            Arc::clone(client),
-            args.model.clone(),
-            effective_working_dir.clone(),
-        ));
-        let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();
-        let render_capture_backend =
-            Arc::new(smasher_render_capture::backend::HybridToolBackend::new(
-                llm_tool_backend as Arc<dyn ToolBackend>,
-                candidate_artifacts_dir.clone(),
-                PathBuf::from(&effective_working_dir),
-            ));
-        let system_lint_backend =
-            Arc::new(smasher_system_lint::backend::SystemLintToolBackend::new(
-                render_capture_backend as Arc<dyn ToolBackend>,
-                candidate_artifacts_dir.clone(),
-                PathBuf::from(&effective_working_dir),
-            ));
-        let tool_backend = Arc::new(
-            smasher_task_critic_synthesis::backend::TaskCriticSynthesisToolBackend::new(
-                system_lint_backend as Arc<dyn ToolBackend>,
-                args.model.clone(),
-                args.model.clone(),
-                None,
-                candidate_artifacts_dir.clone(),
-            ),
-        );
-        registry.register(Arc::new(ToolHandler::new(tool_backend)));
     }
+
+    // Tool nodes run on every backend, with or without an LLM client. Commands
+    // run in the working directory (the worktree under --worktree) and stop
+    // when the run is cancelled.
+    let tool_backend = build_tool_backend(
+        client.as_ref(),
+        &args.model,
+        &effective_working_dir,
+        run_directory.manifest().directories.artifacts.clone(),
+    );
+    let command_config = CommandConfig {
+        working_dir: PathBuf::from(&effective_working_dir),
+        run_dir: run_directory.manifest().directories.root.clone(),
+        cancel: cancellation.clone(),
+    };
+    registry.register(Arc::new(
+        ToolHandler::new(Arc::clone(&tool_backend)).with_commands(command_config.clone()),
+    ));
 
     // Register parallel handler. The registry parameter is reserved for future
     // engine-level parallel dispatch; the handler itself uses node attributes only.
-    registry.register(Arc::new(ParallelHandler::new(Arc::new(
-        smasher_attractor::handler::HandlerRegistry::new(),
-    ))));
+    let mut parallel_children = smasher_attractor::handler::HandlerRegistry::new();
+    parallel_children.register(Arc::new(
+        ToolHandler::new(tool_backend).with_commands(command_config),
+    ));
+    registry.register(Arc::new(ParallelHandler::new(Arc::new(parallel_children))));
 
     // Capture graph and pipeline name before `resolved` is moved into the engine,
     // so the TUI can display node state without an extra clone on the no-TUI path.
@@ -1476,12 +1514,14 @@ mod tests {
 
         let ctx = smasher_attractor::state::Context::new();
         ctx.set("project_name", serde_json::json!("my_project"));
+        ctx.set("design.brief", serde_json::json!("calm"));
         ctx.set("_internal", serde_json::json!("hidden"));
 
-        // Verify public context is exported and underscore-prefixed internals are excluded.
+        // Verify public context is exported under the same normalised names
+        // tool commands see, and underscore-prefixed internals are excluded.
         let result = backend
             .generate(
-                "echo $SMASHER_CTX_project_name; echo \"internal=${SMASHER_CTX__internal:-unset}\"",
+                "echo $SMASHER_CTX_PROJECT_NAME; echo \"internal=${SMASHER_CTX__INTERNAL:-unset}\"; echo $SMASHER_CTX_DESIGN_BRIEF",
                 None,
                 None,
                 &ctx,
@@ -1499,6 +1539,12 @@ mod tests {
                 assert_eq!(
                     lines[1], "internal=unset",
                     "_internal should not be exported"
+                );
+                assert_eq!(lines[2], "calm");
+                assert_eq!(
+                    ctx_env_name("design.brief"),
+                    "SMASHER_CTX_DESIGN_BRIEF",
+                    "tool commands see the same name"
                 );
             }
             other => panic!("expected success, got {other:?}"),

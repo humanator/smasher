@@ -57,7 +57,7 @@ Last verified: 2026-03-06 against the `tui-attractor` branch (commit 94c23df).
 | `ExitHandler` | Implemented | Marks pipeline complete |
 | `ConditionalHandler` | Implemented | Evaluates `condition` attr against context |
 | `CodergenHandler` | Implemented | Extracts model/prompt/system_prompt from attrs, stores result in context |
-| `ToolHandler` + `ToolBackend` trait | Implemented | `execute_tool(name, args)`, stores `_tool_{node_id}` in context |
+| `ToolHandler` + `ToolBackend` trait | Implemented | `tool=` dispatches to built-in `ToolBackend`s ending at `UnknownToolBackend` (no LLM fallback); `tool_command=` runs `sh -c` via `CommandRunner` with timeout, cancellation and a filtered env, setting `tool.output`/`tool.stderr`/`tool.exit_code`; stores `_tool_{node_id}` in context |
 | `ManagerHandler` + `ManagerBackend` trait | Implemented | `coordinate(task, config)`, stores `_manager_{node_id}` in context |
 | `InterviewerHandler` + `Interviewer` trait (builder pattern) | Implemented | `ask()`, `ask_with_options()`, `approve()`, timeout + default choice, node-attribute overrides |
 | `AutoApproveInterviewer` | Implemented | Always approves/returns configured response |

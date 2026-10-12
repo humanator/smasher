@@ -1,5 +1,5 @@
 // ABOUTME: Backend implementations for web-based pipeline execution handlers.
-// ABOUTME: Provides AgentCodergenBackend, ClaudeCliRouter, LlmManagerBackend, and LlmToolBackend for the web server.
+// ABOUTME: Provides AgentCodergenBackend, ClaudeCliRouter and LlmManagerBackend for the web server.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -15,7 +15,6 @@ use smasher_attractor::events::{PipelineEvent, PipelineEventEmitter};
 use smasher_attractor::handler::{CodergenBackend, HandlerError};
 use smasher_attractor::manager_handler::ManagerBackend;
 use smasher_attractor::state::{Context, Outcome};
-use smasher_attractor::tool_handler::ToolBackend;
 
 /// CodergenBackend that runs a full agent session with file/shell tools.
 ///
@@ -347,123 +346,6 @@ impl ManagerBackend for LlmManagerBackend {
     }
 }
 
-// ---------------------------------------------------------------------------
-// LlmToolBackend
-// ---------------------------------------------------------------------------
-
-/// ToolBackend that delegates tool execution to an LLM agent session.
-///
-/// Each tool invocation creates a fresh agent Session, sends the tool name
-/// and arguments as a user prompt, and returns the LLM's response as the outcome.
-pub struct LlmToolBackend {
-    client: Arc<smasher_llm::client::Client>,
-    default_model: String,
-    default_provider: Option<String>,
-    working_dir: String,
-}
-
-impl LlmToolBackend {
-    /// Create a new LlmToolBackend with the given LLM client and model.
-    pub fn new(
-        client: Arc<smasher_llm::client::Client>,
-        default_model: String,
-        default_provider: Option<String>,
-        working_dir: String,
-    ) -> Self {
-        Self {
-            client,
-            default_model,
-            default_provider,
-            working_dir,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl ToolBackend for LlmToolBackend {
-    async fn execute_tool(
-        &self,
-        tool_name: &str,
-        args: &serde_json::Value,
-        context: &Context,
-    ) -> Result<Outcome, HandlerError> {
-        // Build a prompt from the tool name, args, and any relevant context.
-        let context_summary = context.to_string_map();
-        let context_lines: Vec<String> = context_summary
-            .iter()
-            .filter(|(k, _)| !k.starts_with('_'))
-            .map(|(k, v)| format!("{k}: {v}"))
-            .collect();
-
-        let prompt = if context_lines.is_empty() {
-            format!("Execute tool '{tool_name}' with arguments: {args}")
-        } else {
-            format!(
-                "Execute tool '{tool_name}' with arguments: {args}\nContext:\n{}",
-                context_lines.join("\n")
-            )
-        };
-
-        let system_prompt = "You are an AI tool executor in a pipeline. Execute the specified tool operation and return the results.";
-
-        let env = Arc::new(
-            LocalExecutionEnvironment::new(self.working_dir.clone())
-                .with_allowed_external_root(crate::server::design_kit_dir()),
-        );
-        let mut tool_registry = ToolRegistry::new();
-        register_shared_tools(&mut tool_registry, env);
-
-        // A node's `model`/`provider` attrs (folded into `args` by ToolHandler)
-        // override this backend's pipeline-wide defaults.
-        let model = args
-            .get("model")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(&self.default_model);
-        let provider = args
-            .get("provider")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_string)
-            .or_else(|| self.default_provider.clone());
-
-        let mut session_config = SessionConfig::default()
-            .with_model(model)
-            .with_max_turns(20)
-            .with_system_prompt(system_prompt)
-            .with_working_directory(&self.working_dir);
-        if let Some(provider) = provider {
-            session_config = session_config.with_provider(provider);
-        }
-
-        let session_emitter = EventEmitter::default();
-        let mut session = Session::new(
-            session_config,
-            Arc::clone(&self.client),
-            tool_registry,
-            session_emitter,
-        );
-
-        match session.process_input(&prompt).await {
-            Ok(output) => {
-                let text = output.text.unwrap_or_default();
-                tracing::info!(
-                    model = %model,
-                    turns = output.turns_used,
-                    "tool execution completed"
-                );
-                Ok(Outcome::success_with(serde_json::json!({"response": text})))
-            }
-            Err(e) => Err(HandlerError::Other(format!(
-                "Tool agent session error: {e}"
-            ))),
-        }
-    }
-
-    fn available_tools(&self) -> Vec<String> {
-        // LLM-backed tool executor can handle any tool via prompt.
-        vec![]
-    }
-}
-
 /// Codergen routing for `SMASHER_PROVIDER=claude-cli`: nodes go to the `claude -p`
 /// backend, except nodes that name another provider (e.g. `provider="openai"`),
 /// which go to the API agent. Those fail clearly if that provider has no key.
@@ -547,26 +429,6 @@ mod tests {
         );
         assert_eq!(backend.default_model, "claude-sonnet-4-20250514");
         assert_eq!(backend.working_dir, "/tmp");
-    }
-
-    #[test]
-    fn tool_backend_creation() {
-        let client = Arc::new(smasher_llm::client::Client::from_env());
-        let backend = LlmToolBackend::new(
-            client,
-            "claude-sonnet-4-20250514".into(),
-            None,
-            "/tmp".into(),
-        );
-        assert_eq!(backend.default_model, "claude-sonnet-4-20250514");
-        assert_eq!(backend.working_dir, "/tmp");
-    }
-
-    #[test]
-    fn tool_backend_available_tools_empty() {
-        let client = Arc::new(smasher_llm::client::Client::from_env());
-        let backend = LlmToolBackend::new(client, "test".into(), None, "/tmp".into());
-        assert!(backend.available_tools().is_empty());
     }
 
     /// Records which backend a node reached.

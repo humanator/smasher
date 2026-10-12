@@ -145,7 +145,7 @@ Pipelines are standard DOT digraphs. Node shapes tell the engine what each node 
 - `diamond` = conditional (branches on variables)
 - `hexagon` / `oval` / `ellipse` = interviewer (asks a human, captures the response; a hexagon with
   `gallery="true"` is a gallery gate)
-- `parallelogram` = tool
+- `parallelogram` = tool (runs a built-in `tool` or a shell `tool_command`; never an LLM fallback)
 - `component` = parallel fan-out
 - `tripleoctagon` = fan-in (joins parallel branches)
 - `house` = manager (coordinator that delegates to a manager backend)
