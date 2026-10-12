@@ -29,7 +29,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
 
 ## Phase 2a: node-model-picker (T7 first, as the risk check)
 
-- [ ] **T7 (S): Per-node model/provider reach `task_critic` and `synthesis`**
+- [x] **T7 (S): Per-node model/provider reach `task_critic` and `synthesis`**
   - Acceptance: two nodes with different `model`/`provider` attrs each send their own; unset attrs fall back to the server default; fix `run_launch.rs:253` only if the test shows attrs are dropped.
   - Verify: `cargo test -p smasher-task-critic-synthesis -p smasher-web` (recording provider/claude-cli fake; no LLM calls)
   - Files: `crates/smasher-task-critic-synthesis/src/{backend,task_critic,synthesis}.rs`, `crates/smasher-web/src/run_launch.rs`, a test file
