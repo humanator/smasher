@@ -24,7 +24,8 @@ const PROVIDER_ORDER: [Provider; 5] = [
 
 #[derive(Debug, Serialize)]
 struct ProviderModels {
-    provider: Provider,
+    /// The id the rest of the API accepts back (`Provider`'s Display form, e.g. `openai`).
+    provider: String,
     label: &'static str,
     default_model: Option<&'static str>,
     models: Vec<ModelEntry>,
@@ -49,24 +50,22 @@ fn label(provider: Provider) -> &'static str {
 }
 
 async fn list_models(State(state): State<AppState>) -> Json<ModelsResponse> {
+    let client = state.client();
+    let endpoints = state.model_endpoints();
     let configured = PROVIDER_ORDER
         .into_iter()
-        .filter(|p| state.client.has_provider(p));
+        .filter(|p| client.has_provider(p));
 
     let lists = join_all(configured.map(|provider| {
-        let state = &state;
+        let (state, endpoints) = (&state, &endpoints);
         async move {
-            let list = match state
-                .model_endpoints
-                .iter()
-                .find(|e| e.provider == provider)
-            {
+            let list = match endpoints.iter().find(|e| e.provider == provider) {
                 _ if provider == Provider::ClaudeCli => ModelCatalog::claude_cli_list(),
                 Some(endpoint) => state.models.list(endpoint).await,
                 None => state.models.static_list(provider),
             };
             ProviderModels {
-                provider,
+                provider: provider.to_string(),
                 label: label(provider),
                 default_model: default_model_for(provider),
                 models: list.models,

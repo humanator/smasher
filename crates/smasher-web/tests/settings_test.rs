@@ -40,6 +40,10 @@ fn client() -> Client {
 
 /// Boot a server on `data_dir` (a restart when called again on the same dir).
 async fn boot(data_dir: &std::path::Path) -> String {
+    boot_server(data_dir).await.0
+}
+
+async fn boot_server(data_dir: &std::path::Path) -> (String, smasher_web::state::AppState) {
     let config = ServerConfig {
         port: 0,
         host: [127, 0, 0, 1],
@@ -51,7 +55,7 @@ async fn boot(data_dir: &std::path::Path) -> String {
     let server = start_with_client(config, client(), CancellationToken::new())
         .await
         .expect("server boots");
-    format!("http://{}", server.addr)
+    (format!("http://{}", server.addr), server.state)
 }
 
 async fn get(base: &str) -> Value {
@@ -358,4 +362,37 @@ async fn a_run_that_names_its_own_pair_ignores_the_saved_default() {
 
     // The request named a provider but no model: that provider's own default applies.
     assert_eq!(model, "claude-opus-5");
+}
+
+#[tokio::test]
+async fn reconfiguring_the_client_makes_a_new_provider_selectable_without_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let (base, state) = boot_server(dir.path()).await;
+    expect_422(put(&base, json!({"provider": "openai", "model": "gpt-5.2"})).await).await;
+
+    let mut with_openai = client();
+    with_openai.register_provider(
+        Provider::OpenAi,
+        Arc::new(smasher_llm::provider::openai::OpenAiAdapter::with_base_url(
+            SECRET.into(),
+            "http://127.0.0.1:1".into(),
+        )),
+    );
+    state.reconfigure(with_openai, vec![]);
+
+    let resp = put(&base, json!({"provider": "openai", "model": "gpt-5.2"})).await;
+    assert_eq!(resp.status(), 200);
+    let models: Value = reqwest::get(format!("{base}/api/models"))
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let names: Vec<&str> = models["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["provider"].as_str().unwrap())
+        .collect();
+    assert!(names.contains(&"openai"), "{names:?}");
 }

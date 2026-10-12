@@ -194,7 +194,7 @@ pub async fn launch_pipeline(
     // Spawn pipeline execution.
     let run_id_clone = run_id.clone();
     let runs = Arc::clone(&state.runs);
-    let client = Arc::clone(&state.client);
+    let client = state.client();
     let spawn_working_dir = run_working_dir.clone();
     let checkpoint_dir = run_directory.manifest().directories.checkpoints.clone();
     let candidate_artifacts_dir = run_directory.manifest().directories.artifacts.clone();

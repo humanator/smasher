@@ -183,6 +183,9 @@ pub struct RunningServer {
     pub addr: SocketAddr,
     /// Completes once the shutdown token is cancelled and connections drain.
     pub handle: tokio::task::JoinHandle<std::io::Result<()>>,
+    /// The server's shared state, for embedders that need to reconfigure it
+    /// (the desktop app swaps the LLM client when a key changes).
+    pub state: AppState,
 }
 
 /// Start the web server with explicit configuration.
@@ -231,7 +234,7 @@ pub async fn start_with_client(
     crate::settings::apply_stored_defaults(&state);
     let rehydrated = crate::rehydrate::rehydrate_runs(&state.data_dir).await;
     state.runs.write().await.extend(rehydrated);
-    let app = build_router(state);
+    let app = build_router(state.clone());
 
     let requested = SocketAddr::from((config.host, config.port));
     let listener = tokio::net::TcpListener::bind(requested)
@@ -252,7 +255,11 @@ pub async fn start_with_client(
             .await
     });
 
-    Ok(RunningServer { addr, handle })
+    Ok(RunningServer {
+        addr,
+        handle,
+        state,
+    })
 }
 
 async fn shutdown_signal() {

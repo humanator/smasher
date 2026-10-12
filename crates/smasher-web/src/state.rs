@@ -19,7 +19,8 @@ use smasher_attractor::state::RunStatus;
 #[derive(Clone)]
 pub struct AppState {
     pub runs: Arc<RwLock<HashMap<String, RunRecord>>>,
-    pub client: Arc<smasher_llm::client::Client>,
+    /// The LLM client; swapped by [`AppState::reconfigure`] when provider keys change.
+    client: Arc<std::sync::RwLock<Arc<smasher_llm::client::Client>>>,
     /// The model and provider new runs use when a request names none. Swapped by
     /// `PUT /api/settings`; each run copies it at submit, so runs in flight keep theirs.
     pub llm: Arc<std::sync::RwLock<crate::settings::LlmDefaults>>,
@@ -31,7 +32,7 @@ pub struct AppState {
     /// Cached per-provider model lists behind `GET /api/models`.
     pub models: Arc<smasher_llm::models_list::ModelCatalog>,
     /// Where to reach each provider's list API (read from the environment at boot).
-    pub model_endpoints: Arc<Vec<smasher_llm::models_list::ProviderEndpoint>>,
+    model_endpoints: Arc<std::sync::RwLock<Arc<Vec<smasher_llm::models_list::ProviderEndpoint>>>>,
 }
 
 impl AppState {
@@ -44,7 +45,7 @@ impl AppState {
     ) -> Self {
         Self {
             runs: Arc::new(RwLock::new(HashMap::new())),
-            client: Arc::new(client),
+            client: Arc::new(std::sync::RwLock::new(Arc::new(client))),
             llm: Arc::new(std::sync::RwLock::new(
                 crate::settings::LlmDefaults::from_boot(default_model, default_provider),
             )),
@@ -54,7 +55,7 @@ impl AppState {
             models: Arc::new(smasher_llm::models_list::ModelCatalog::new(
                 smasher_llm::models_list::DEFAULT_LIST_TTL,
             )),
-            model_endpoints: Arc::new(env_model_endpoints()),
+            model_endpoints: Arc::new(std::sync::RwLock::new(Arc::new(env_model_endpoints()))),
         }
     }
 
@@ -63,13 +64,36 @@ impl AppState {
         self.llm.read().expect("llm defaults lock").clone()
     }
 
+    /// The current LLM client. Runs keep the one they were started with.
+    pub fn client(&self) -> Arc<smasher_llm::client::Client> {
+        Arc::clone(&self.client.read().expect("client lock"))
+    }
+
+    /// Where to reach each provider's model-list API right now.
+    pub fn model_endpoints(&self) -> Arc<Vec<smasher_llm::models_list::ProviderEndpoint>> {
+        Arc::clone(&self.model_endpoints.read().expect("endpoints lock"))
+    }
+
     /// Replace the list-API endpoints (tests point them at local servers).
     pub fn with_model_endpoints(
-        mut self,
+        self,
         endpoints: Vec<smasher_llm::models_list::ProviderEndpoint>,
     ) -> Self {
-        self.model_endpoints = Arc::new(endpoints);
+        *self.model_endpoints.write().expect("endpoints lock") = Arc::new(endpoints);
         self
+    }
+
+    /// Swap in a new client and list-API endpoints, for when provider keys change.
+    /// Runs already started keep the client they have; new runs and the model lists
+    /// see the new one.
+    pub fn reconfigure(
+        &self,
+        client: smasher_llm::client::Client,
+        endpoints: Vec<smasher_llm::models_list::ProviderEndpoint>,
+    ) {
+        *self.client.write().expect("client lock") = Arc::new(client);
+        *self.model_endpoints.write().expect("endpoints lock") = Arc::new(endpoints);
+        self.models.invalidate();
     }
 }
 

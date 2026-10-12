@@ -35,7 +35,7 @@ async fn put_settings(
         .filter(|p| !p.is_empty())
         .ok_or_else(|| WebError::Unprocessable("a provider is required".into()))?;
     let provider: Provider = provider_name.parse().map_err(WebError::Unprocessable)?;
-    if !state.client.has_provider(&provider) {
+    if !state.client().has_provider(&provider) {
         return Err(WebError::Unprocessable(format!(
             "provider {provider} is not configured on this server"
         )));
@@ -46,10 +46,8 @@ async fn put_settings(
             "choose a model for provider {provider}"
         )));
     }
-    let endpoint = state
-        .model_endpoints
-        .iter()
-        .find(|e| e.provider == provider);
+    let endpoints = state.model_endpoints();
+    let endpoint = endpoints.iter().find(|e| e.provider == provider);
     state
         .models
         .validate_pair(endpoint, provider, model)
