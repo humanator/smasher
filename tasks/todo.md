@@ -35,7 +35,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Files: `crates/smasher-task-critic-synthesis/src/{backend,task_critic,synthesis}.rs`, `crates/smasher-web/src/run_launch.rs`, a test file
   - Depends on: none
 
-- [ ] **T8 (M): `ModelPicker` in the codergen form (vertical slice)**
+- [x] **T8 (M): `ModelPicker` in the codergen form (vertical slice)**
   - Acceptance: provider select (configured providers + "Server default") then model select for that provider; choosing a provider sets its default model, none for Ollama; unknown saved value shown as "custom"; legacy `model`-only nodes load unchanged; save/reload round-trips `provider` and `model` into the DOT.
   - Verify: `cd frontend && npx vitest run tests/components/node-editor`; Playwright edit, save, reload
   - Files: `frontend/src/components/node-editor/nodeForms/{ModelPicker.svelte,CodergenForm.svelte}`, `frontend/src/lib/api` models client, `frontend/tests/components/node-editor/...`, `frontend/e2e/node-model.spec.ts` (new)
