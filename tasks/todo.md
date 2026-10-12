@@ -4,13 +4,13 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
 
 ## Phase 1: model-catalog
 
-- [ ] **T1 (S): Provider defaults and `validate_pair`**
+- [x] **T1 (S): Provider defaults and `validate_pair`**
   - Acceptance: `default_model_for` returns `Some` for Anthropic/OpenAI/Gemini/ClaudeCli and `None` for Ollama; `validate_pair` rejects `claude-cli` + `gemma4:31b-cloud`, accepts any non-empty Ollama name; every default passes `validate_pair`.
   - Verify: `cargo test -p smasher-llm catalog`
   - Files: `crates/smasher-llm/src/types/catalog.rs`
   - Depends on: none
 
-- [ ] **T2 (M): Provider model-list fetchers with fallback chain**
+- [x] **T2 (M): Provider model-list fetchers with fallback chain**
   - Acceptance: per-provider list fetch (Anthropic, OpenAI, Gemini `models`; Ollama `/api/tags`) with configured key and base URL; on failure falls back to `modeldb` (OpenRouter) then static catalog; result carries `source` and `error`; Claude CLI returns aliases only; short in-memory TTL cache; `validate_pair` consults the live list first.
   - Verify: `cargo test -p smasher-llm models_list` (local HTTP server speaking each list format; a down server exercises the fallback)
   - Files: `crates/smasher-llm/src/models_list.rs` (new), `src/lib.rs`, `src/modeldb.rs`, `src/types/catalog.rs`

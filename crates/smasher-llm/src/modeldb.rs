@@ -286,7 +286,12 @@ impl ModelDb {
     /// On success, updates the in-memory model list and writes to disk cache
     /// (if a cache path is configured).
     pub async fn fetch(&mut self) -> Result<(), ModelDbError> {
-        let resp = reqwest::get(OPENROUTER_MODELS_URL)
+        self.fetch_from(OPENROUTER_MODELS_URL).await
+    }
+
+    /// Like [`fetch`](Self::fetch), but against another URL serving the OpenRouter list format.
+    pub async fn fetch_from(&mut self, url: &str) -> Result<(), ModelDbError> {
+        let resp = reqwest::get(url)
             .await?
             .json::<OpenRouterResponse>()
             .await?;

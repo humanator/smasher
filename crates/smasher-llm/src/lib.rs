@@ -4,6 +4,7 @@
 pub mod api;
 pub mod client;
 pub mod modeldb;
+pub mod models_list;
 pub mod provider;
 pub mod types;
 pub mod util;
