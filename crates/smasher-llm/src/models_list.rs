@@ -86,7 +86,12 @@ impl ProviderEndpoint {
     /// The endpoint for `provider` as configured in the environment, mirroring
     /// `Client::from_env`. `None` when the provider has no key (or has no list API).
     pub fn from_env(provider: Provider) -> Option<Self> {
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.trim().is_empty());
+        Self::from_vars(provider, |name| std::env::var(name).ok())
+    }
+
+    /// Like [`from_env`](Self::from_env), reading each variable through `var`.
+    pub fn from_vars(provider: Provider, var: impl Fn(&str) -> Option<String>) -> Option<Self> {
+        let var = |name: &str| var(name).filter(|v| !v.trim().is_empty());
         let (key, base_var, default_base) = match provider {
             Provider::Anthropic => (
                 var("ANTHROPIC_API_KEY")?,
@@ -661,6 +666,49 @@ mod tests {
                 .validate_pair(None, Provider::OpenAi, "claude-opus-5")
                 .await
                 .is_err()
+        );
+    }
+
+    fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let map: HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        move |name| map.get(name).cloned()
+    }
+
+    #[test]
+    fn endpoint_from_vars_uses_the_key_and_the_default_base_url() {
+        let ep = ProviderEndpoint::from_vars(Provider::OpenAi, lookup(&[("OPENAI_API_KEY", "k")]))
+            .unwrap();
+
+        assert_eq!(ep.api_key, "k");
+        assert_eq!(ep.base_url, "https://api.openai.com");
+    }
+
+    #[test]
+    fn endpoint_from_vars_honours_a_base_url_override() {
+        let ep = ProviderEndpoint::from_vars(
+            Provider::Ollama,
+            lookup(&[
+                ("OLLAMA_API_KEY", "k"),
+                ("OLLAMA_BASE_URL", "http://localhost:11434"),
+            ]),
+        )
+        .unwrap();
+
+        assert_eq!(ep.base_url, "http://localhost:11434");
+    }
+
+    #[test]
+    fn endpoint_from_vars_is_none_without_a_key_or_for_claude_cli() {
+        assert!(ProviderEndpoint::from_vars(Provider::Gemini, lookup(&[])).is_none());
+        assert!(
+            ProviderEndpoint::from_vars(
+                Provider::ClaudeCli,
+                lookup(&[("SMASHER_CLAUDE_CLI", "1")])
+            )
+            .is_none()
         );
     }
 

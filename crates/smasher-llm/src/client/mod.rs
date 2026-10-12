@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::provider::anthropic::AnthropicAdapter;
-use crate::provider::claude_cli::{ClaudeCliAdapter, process::resolve_binary_from_env};
+use crate::provider::claude_cli::{ClaudeCliAdapter, process::resolve_binary};
 use crate::provider::gemini::GeminiAdapter;
 use crate::provider::ollama::OllamaAdapter;
 use crate::provider::openai::OpenAiAdapter;
@@ -67,10 +67,18 @@ impl Client {
     /// - `SMASHER_CLAUDE_CLI` → registers the claude-cli adapter; `1` finds the
     ///   `claude` binary, any other value is the path to it
     pub fn from_env() -> Self {
+        Self::from_vars(|name| std::env::var(name).ok())
+    }
+
+    /// Like [`from_env`](Self::from_env), but reading each variable through `var`, so a
+    /// caller can build a client from settings it holds without touching the process
+    /// environment. Blank values count as unset.
+    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Self {
+        let var = |name: &str| var(name).filter(|v| !v.trim().is_empty());
         let mut client = Self::new();
 
-        if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-            let adapter = if let Ok(base_url) = std::env::var("ANTHROPIC_BASE_URL") {
+        if let Some(key) = var("ANTHROPIC_API_KEY") {
+            let adapter = if let Some(base_url) = var("ANTHROPIC_BASE_URL") {
                 AnthropicAdapter::with_base_url(key, base_url)
             } else {
                 AnthropicAdapter::new(key)
@@ -78,8 +86,8 @@ impl Client {
             client.register_provider(Provider::Anthropic, Arc::new(adapter));
         }
 
-        if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-            let adapter = if let Ok(base_url) = std::env::var("OPENAI_BASE_URL") {
+        if let Some(key) = var("OPENAI_API_KEY") {
+            let adapter = if let Some(base_url) = var("OPENAI_BASE_URL") {
                 OpenAiAdapter::with_base_url(key, base_url)
             } else {
                 OpenAiAdapter::new(key)
@@ -87,10 +95,8 @@ impl Client {
             client.register_provider(Provider::OpenAi, Arc::new(adapter));
         }
 
-        if let Ok(key) =
-            std::env::var("GEMINI_API_KEY").or_else(|_| std::env::var("GOOGLE_API_KEY"))
-        {
-            let adapter = if let Ok(base_url) = std::env::var("GEMINI_BASE_URL") {
+        if let Some(key) = var("GEMINI_API_KEY").or_else(|| var("GOOGLE_API_KEY")) {
+            let adapter = if let Some(base_url) = var("GEMINI_BASE_URL") {
                 GeminiAdapter::with_base_url(key, base_url)
             } else {
                 GeminiAdapter::new(key)
@@ -98,8 +104,8 @@ impl Client {
             client.register_provider(Provider::Gemini, Arc::new(adapter));
         }
 
-        if let Ok(key) = std::env::var("OLLAMA_API_KEY") {
-            let adapter = if let Ok(base_url) = std::env::var("OLLAMA_BASE_URL") {
+        if let Some(key) = var("OLLAMA_API_KEY") {
+            let adapter = if let Some(base_url) = var("OLLAMA_BASE_URL") {
                 OllamaAdapter::with_base_url(key, base_url)
             } else {
                 OllamaAdapter::new(key)
@@ -107,8 +113,10 @@ impl Client {
             client.register_provider(Provider::Ollama, Arc::new(adapter));
         }
 
-        if std::env::var("SMASHER_CLAUDE_CLI").is_ok_and(|v| !v.trim().is_empty()) {
-            match resolve_binary_from_env(None) {
+        if let Some(setting) = var("SMASHER_CLAUDE_CLI") {
+            let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+            let path_var = std::env::var_os("PATH");
+            match resolve_binary(None, Some(&setting), home.as_deref(), path_var.as_deref()) {
                 Some(binary) => {
                     client.register_provider(
                         Provider::ClaudeCli,
@@ -882,5 +890,47 @@ mod tests {
             1,
             "default on_stream_request should delegate to on_request"
         );
+    }
+
+    // ── from_vars ─────────────────────────────────────────────────────
+
+    fn vars(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let map: std::collections::HashMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        move |name| map.get(name).cloned()
+    }
+
+    #[test]
+    fn from_vars_registers_only_providers_with_a_key() {
+        let client = Client::from_vars(vars(&[("OPENAI_API_KEY", "k"), ("OLLAMA_API_KEY", "k")]));
+
+        let mut providers = client.registered_providers();
+        providers.sort_by_key(|p| p.to_string());
+        assert_eq!(providers, vec![Provider::Ollama, Provider::OpenAi]);
+    }
+
+    #[test]
+    fn from_vars_accepts_google_api_key_for_gemini() {
+        let client = Client::from_vars(vars(&[("GOOGLE_API_KEY", "k")]));
+
+        assert!(client.has_provider(&Provider::Gemini));
+    }
+
+    #[test]
+    fn from_vars_with_nothing_registers_nothing() {
+        assert!(
+            Client::from_vars(vars(&[]))
+                .registered_providers()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn from_vars_ignores_blank_keys() {
+        let client = Client::from_vars(vars(&[("ANTHROPIC_API_KEY", "  ")]));
+
+        assert!(!client.has_provider(&Provider::Anthropic));
     }
 }
