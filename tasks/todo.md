@@ -49,7 +49,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
 
 ## Phase 2b: llm-settings (parallel with 2a once T3 lands)
 
-- [ ] **T4 (M): Settings store and `GET`/`PUT /api/settings`**
+- [x] **T4 (M): Settings store and `GET`/`PUT /api/settings`**
   - Acceptance: `{provider, model, source}` read/written at `{data_dir}/settings.json`; boot precedence settings file > env > default; invalid pair, unconfigured provider, or Ollama without a model → 422; no keys in any request or response.
   - Verify: `cargo test -p smasher-web --test settings_test` (real server, temp data dir; PUT/GET round-trip and restart reload)
   - Files: `crates/smasher-web/src/settings.rs` (new), `routes/settings.rs` (new), `routes/mod.rs`, `server.rs`, `tests/settings_test.rs` (new)

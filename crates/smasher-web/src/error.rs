@@ -12,6 +12,9 @@ pub enum WebError {
     #[error("bad request: {0}")]
     BadRequest(String),
 
+    #[error("{0}")]
+    Unprocessable(String),
+
     #[error("conflict: {0}")]
     Conflict(String),
 
@@ -40,6 +43,7 @@ impl IntoResponse for WebError {
             WebError::NotFound(_) => StatusCode::NOT_FOUND,
             WebError::BadRequest(_) => StatusCode::BAD_REQUEST,
             WebError::Conflict(_) => StatusCode::CONFLICT,
+            WebError::Unprocessable(_) => StatusCode::UNPROCESSABLE_ENTITY,
             WebError::Internal(_) | WebError::Pipeline(_) | WebError::Io(_) | WebError::Json(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }

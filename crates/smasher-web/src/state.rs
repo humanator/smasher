@@ -20,11 +20,9 @@ use smasher_attractor::state::RunStatus;
 pub struct AppState {
     pub runs: Arc<RwLock<HashMap<String, RunRecord>>>,
     pub client: Arc<smasher_llm::client::Client>,
-    pub default_model: String,
-    /// Provider override for `default_model`, bypassing model-name-based
-    /// inference — needed for providers whose model names (e.g. Ollama's
-    /// `gemma4:31b-cloud`) have no recognizable prefix to infer from.
-    pub default_provider: Option<String>,
+    /// The model and provider new runs use when a request names none. Swapped by
+    /// `PUT /api/settings`; each run copies it at submit, so runs in flight keep theirs.
+    pub llm: Arc<std::sync::RwLock<crate::settings::LlmDefaults>>,
     pub data_dir: String,
     pub workflow_dirs: Vec<String>,
     /// Held by `PUT /api/workflows/{id}/graph` across its If-Match check and
@@ -47,8 +45,9 @@ impl AppState {
         Self {
             runs: Arc::new(RwLock::new(HashMap::new())),
             client: Arc::new(client),
-            default_model,
-            default_provider,
+            llm: Arc::new(std::sync::RwLock::new(
+                crate::settings::LlmDefaults::from_boot(default_model, default_provider),
+            )),
             data_dir,
             workflow_dirs,
             graph_save_lock: Arc::new(tokio::sync::Mutex::new(())),
@@ -57,6 +56,11 @@ impl AppState {
             )),
             model_endpoints: Arc::new(env_model_endpoints()),
         }
+    }
+
+    /// A copy of the current default model and provider.
+    pub fn llm_defaults(&self) -> crate::settings::LlmDefaults {
+        self.llm.read().expect("llm defaults lock").clone()
     }
 
     /// Replace the list-API endpoints (tests point them at local servers).

@@ -9,6 +9,7 @@ pub mod rehydrate;
 pub mod routes;
 pub mod run_launch;
 pub mod server;
+pub mod settings;
 pub mod sse;
 pub mod state;
 pub mod workflows;

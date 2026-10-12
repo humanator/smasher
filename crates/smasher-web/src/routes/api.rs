@@ -50,7 +50,7 @@ pub struct SubmitRequest {
     /// Provider for the run-wide `model`; the server default when omitted.
     pub provider: Option<String>,
     /// Per-node model/provider overrides, keyed by node id. Each node defaults
-    /// to the pipeline-wide `model`/`state.default_provider` unless listed here.
+    /// to the pipeline-wide `model`/the server's default provider unless listed here.
     #[serde(default)]
     pub node_overrides: HashMap<String, transforms::NodeOverride>,
 }
@@ -207,9 +207,9 @@ fn resolve_run_model(
     model: Option<String>,
     provider: Option<String>,
 ) -> Result<(String, Option<String>), WebError> {
+    let defaults = state.llm_defaults();
     let Some(provider_name) = provider else {
-        let model = model.unwrap_or_else(|| state.default_model.clone());
-        return Ok((model, state.default_provider.clone()));
+        return Ok((model.unwrap_or(defaults.model), defaults.provider));
     };
     let provider: smasher_llm::types::Provider = provider_name
         .parse()
@@ -515,11 +515,9 @@ async fn resume_run(
 
     let resumed_from_node = checkpoint.current_node.clone();
 
-    let model = variables
-        .get("model")
-        .cloned()
-        .unwrap_or_else(|| state.default_model.clone());
-    let provider = state.default_provider.clone();
+    let defaults = state.llm_defaults();
+    let model = variables.get("model").cloned().unwrap_or(defaults.model);
+    let provider = defaults.provider;
 
     let record = crate::run_launch::launch_pipeline(
         &state,

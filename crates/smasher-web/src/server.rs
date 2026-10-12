@@ -26,6 +26,7 @@ pub fn build_router(state: AppState) -> Router {
     let question_routes = crate::routes::questions::router();
     let gallery_routes = crate::routes::gallery::router();
     let models_routes = crate::routes::models::router();
+    let settings_routes = crate::routes::settings::router();
     let static_files_routes = crate::routes::static_files::router();
 
     // Resolve static dir relative to the crate manifest, not the cwd.
@@ -55,6 +56,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(question_routes)
         .merge(gallery_routes)
         .merge(models_routes)
+        .merge(settings_routes)
         // Merged (not nested under a prefix) so its fallback becomes the
         // whole router's fallback: anything not matched by the routes above
         // falls through to the SPA's serve-file-or-index.html handler at `/`.
@@ -226,6 +228,7 @@ pub async fn start_with_client(
         config.data_dir,
         workflow_dirs,
     );
+    crate::settings::apply_stored_defaults(&state);
     let rehydrated = crate::rehydrate::rehydrate_runs(&state.data_dir).await;
     state.runs.write().await.extend(rehydrated);
     let app = build_router(state);
