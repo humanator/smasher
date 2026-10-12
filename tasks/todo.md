@@ -86,7 +86,7 @@ Plan: [`plan.md`](plan.md). Specs: `SPEC.md`, `SPEC-<module>.md`. Every task: te
   - Files: `SettingsDialog.svelte`, `frontend/src/lib/native/index.ts`, tests
   - Depends on: T6, T10
 
-- [ ] **T12 (S): Docs and backlog**
+- [x] **T12 (S): Docs and backlog**
   - Acceptance: `docs/config-reference.md`, `docs/api-reference.md`, `docs/quickstart.md` cover the settings and models APIs and precedence; backlog #20 removed and #23's note about #20 updated.
   - Verify: read-through; `rg "SMASHER_MODEL" docs` shows precedence described
   - Files: the three docs, `tasks/BACKLOG.md`

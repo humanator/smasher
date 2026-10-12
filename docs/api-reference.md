@@ -163,6 +163,10 @@ The LLM client discovers providers from the environment. Set one or more:
 
 At least one provider must be configured. If none are found, the CLI exits with an error.
 
+`SMASHER_MODEL` and `SMASHER_PROVIDER` set the default model and provider. A default saved
+from the Settings dialog (in `settings.json`) overrides them; see
+[Default Model and Provider](config-reference.md#default-model-and-provider).
+
 ### .env File Support
 
 The CLI loads environment variables from `.env` files in two stages:
@@ -380,6 +384,9 @@ The default server binds to `127.0.0.1:21541`.
 |---|---|---|
 | `GET` | `/api/health` | Health check endpoint. |
 | `POST` | `/api/runs` | Submit a pipeline for execution. |
+| `GET` | `/api/models` | List the configured providers and the models each offers. |
+| `GET` | `/api/settings` | Read the default provider and model for new runs. |
+| `PUT` | `/api/settings` | Validate and save the default provider and model; applies to runs started afterwards. |
 | `GET` | `/api/runs` | List all pipeline runs. |
 | `GET` | `/api/runs/{id}` | Get status of a specific run. |
 | `POST` | `/api/runs/{id}/cancel` | Cancel a running pipeline. |
@@ -418,6 +425,10 @@ Request body:
 | `dot_source` | string | yes | DOT graph source defining the pipeline topology. |
 | `variables` | object | yes | Key-value pairs injected into the pipeline context. |
 | `model` | string | no | Optional model override for LLM nodes. |
+| `provider` | string | no | Provider for `model` (`anthropic`, `openai`, `gemini`, `ollama`, `claude-cli`). With a provider and no `model`, that provider's default is used. A mismatched pair is refused with 400. |
+| `node_overrides` | object | no | Per-node `{"model": "...", "provider": "..."}` overrides keyed by node id. |
+
+`POST /api/workflows/{id}/run` takes the same `variables`, `model`, `provider` and `node_overrides`.
 
 Response body:
 
@@ -430,6 +441,57 @@ Response body:
 ```
 
 `status` is always `"Running"` on submit (submission is synchronous only up to launch; execution continues in the background). `run_working_dir` is relative to the server's `data_dir`.
+
+### GET /api/models -- Available Models
+
+Lists the providers configured on this server and what each offers. Providers without
+a key are left out. The model list comes from the provider's own list API; if that
+fails it falls back to the OpenRouter list, then to the built-in catalog, and the
+response still succeeds with `error` saying why. Lists are cached for a few minutes.
+
+```json
+{
+  "providers": [
+    {
+      "provider": "anthropic",
+      "label": "Anthropic",
+      "default_model": "claude-opus-5",
+      "models": [{"id": "claude-opus-5", "label": "Claude Opus 5", "aliases": []}],
+      "source": "provider"
+    },
+    {"provider": "ollama", "label": "Ollama", "default_model": null, "models": [], "source": "static",
+     "error": "ollama list request failed: ..."}
+  ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `provider` | The id accepted everywhere else (`anthropic`, `openai`, `gemini`, `ollama`, `claude-cli`). |
+| `default_model` | The model to pre-select when this provider is chosen. `null` for Ollama, where the user must pick. |
+| `source` | `provider` (its own API), `openrouter`, or `static` (the built-in catalog). |
+| `error` | Present only when a fallback list was served. |
+
+Claude CLI has no list API; it lists the aliases `claude-sonnet`, `claude-opus` and `claude-fable`.
+
+### GET /api/settings -- Default Provider and Model
+
+```json
+{"provider": "claude-cli", "model": "claude-opus", "source": "settings"}
+```
+
+`provider` is `null` when only a model is set and the provider is inferred from its
+name. `source` is `settings` (the settings file), `env` or `default`; see
+[Default Model and Provider](config-reference.md#default-model-and-provider).
+
+### PUT /api/settings -- Save the Default
+
+Request body `{"provider": "claude-cli", "model": "claude-opus"}`; the response is the
+new settings, in the shape above. Refused with **422** and `{"error": "..."}` when the
+provider is unknown or not configured on this server, the model is empty (Ollama has no
+default), or the model does not belong to the provider. Nothing is saved when it is
+refused. The new default applies to runs started afterwards; runs in flight keep theirs.
+API keys are never accepted or returned.
 
 ### GET /api/runs -- List Runs
 

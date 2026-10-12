@@ -458,10 +458,14 @@ kit from this checkout, so keep the repo where it was built.
 default model and provider, plus each provider's API key and base URL
 (Anthropic, OpenAI, Gemini, Ollama). API keys are stored in the macOS
 Keychain (service `com.smasher.desktop`). Everything else goes in
-`~/Documents/smasher/settings.json`. Settings take effect when the app
-restarts, and the modal has a **Restart now** button for that. For a local
-Ollama, set its base URL to `http://localhost:11434` and leave the key
-empty.
+`~/Documents/smasher/settings.json`. Changes apply to the next run, with no
+restart. For a local Ollama, set its base URL to `http://localhost:11434`
+and leave the key empty.
+
+The web app has the same gear, for the default provider and model only. Its
+API keys come from the environment or `.env`. See
+[Default Model and Provider](config-reference.md#default-model-and-provider)
+for how the settings file, the environment and the built-in default combine.
 
 Saved settings override env vars. An app launched from Finder or the Dock
 has no shell environment and a working directory of `/`, so it can't see

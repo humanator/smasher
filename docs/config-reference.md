@@ -3,6 +3,36 @@
 
 # Configuration Reference
 
+## Default Model and Provider
+
+New runs use a default provider and model whenever the request, or a node, names
+none. Where that default comes from, highest priority first:
+
+1. **The settings file**, `{data_dir}/settings.json` (`default_provider` and
+   `default_model`). Written by the Settings dialog in the web and desktop apps, or by
+   `PUT /api/settings`. Other keys in the file (the desktop app's base URLs and Claude
+   CLI path) are left alone.
+2. **The environment**: `SMASHER_MODEL` and `SMASHER_PROVIDER`, from the shell or a
+   `.env` file.
+3. **The built-in default**, `claude-sonnet-5`, with the provider inferred from the
+   model name.
+
+`GET /api/settings` reports the current default and which of these it came from
+(`settings`, `env` or `default`). A change takes effect for runs started afterwards;
+a run already in flight keeps the pair it started with. No restart is needed.
+
+A provider and model are always saved together and checked against each other, so a
+model that belongs to another provider (for example `gemma4:31b-cloud` with
+`claude-cli`) is refused. Ollama has no default model: you must pick one.
+
+API keys are never part of this. The web app reads them from the environment or
+`.env`; the desktop app keeps them in the macOS Keychain. `smasher serve` and the
+desktop app both read `settings.json` at startup.
+
+A node can override the default with its own `provider` and `model` attributes, which
+the node editor sets from the model picker. A run can override it for the whole run
+with `provider` and `model` in the run request.
+
 ## Claude CLI Provider
 
 Runs LLM work through the local Claude Code CLI (`claude -p`) with whatever account
@@ -20,14 +50,16 @@ provider's key configured.
 | Variable | Description |
 |----------|-------------|
 | `SMASHER_CLAUDE_CLI` | Registers the `claude-cli` provider. `1` finds the binary (in `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `PATH`); any other value is the path to it. |
-| `SMASHER_PROVIDER=claude-cli` | Makes it the default provider. The web server then sends codergen nodes to `claude -p` too, except nodes with an explicit `provider="<other>"`, which use that provider's API agent. |
+| `SMASHER_PROVIDER=claude-cli` | Makes it the default provider (or choose it in Settings). The web server then sends codergen nodes to `claude -p` too, except nodes with an explicit `provider="<other>"`, which use that provider's API agent. |
 | `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` | Comma-separated tools codergen runs may use, replacing the default `Read,Edit,Write,Glob,Grep` plus `Bash(ls:*)`, `Bash(mkdir:*)`, `Bash(cp:*)`, `Bash(mv:*)`, `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(grep:*)`, `Bash(sort:*)`. Anything not listed is denied without prompting. |
 
 Every run passes `--strict-mcp-config`, `--setting-sources ""` and
 `--no-session-persistence`, so your MCP servers, settings and `~/.claude/CLAUDE.md`
 don't reach pipeline runs. A node's `model` is passed as `--model` when it names a
 Claude model (`claude-*`, `sonnet`, `opus`, `haiku`). Otherwise the default model is
-used. In the desktop app, all of this is set from **Settings → Claude CLI**.
+used. In the desktop app, the binary path and allowed tools are set from
+**Settings → Claude CLI**, and the app registers the provider whenever it finds a
+`claude` binary, so it can be picked in the model picker without any setup.
 
 ## Stylesheets
 

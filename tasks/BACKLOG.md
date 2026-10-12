@@ -40,29 +40,6 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
    mocks. Spends tokens, so only on request. (Test fixtures still use
    `claude-sonnet-4-20250514` on purpose, as sample data. Leave them.)
 
-20. **Model selection everywhere, and per node.** *Raised by Jobsworth
-    2026-09-25.* Bigger than the rest of P1, so write a spec first. Today:
-    - The model and provider are set once for the whole server, from
-      `SMASHER_MODEL`/`SMASHER_PROVIDER` (env or repo `.env`) or the desktop
-      settings dialog. That dialog only renders in the desktop app
-      (`App.svelte`, `isTauri()`), because it saves through Tauri commands and
-      the macOS Keychain. The web app has no settings UI and no settings API.
-    - The node editor's codergen form has a free-text `model` field and no
-      `provider` field. Tool nodes that call an LLM (`task_critic`, `synthesis`)
-      have no model control at all.
-    - Model and provider are set separately, so they can drift apart. On
-      2026-09-25, switching the desktop provider to Claude CLI kept the repo
-      `.env`'s `SMASHER_MODEL=gemma4:31b-cloud`, and `task_critic` sent it to
-      `claude -p`. (The claude-cli paths now ignore non-Claude names, in
-      `944c09c`, but that only hides the mismatch.)
-
-    Wanted:
-    - Provider and model settings in both the desktop and web apps. The web app
-      needs a settings API and somewhere other than the Keychain to keep keys.
-    - When editing an LLM node, pick its model from a list of the configured
-      providers' models (including Claude CLI), not free text.
-    - Choosing a provider also sets a valid model for it.
-
 23. **Claude CLI provider: known limitation and follow-ups.** *Merged to `main`
     2026-09-25* with a known limitation. The provider runs pipeline LLM calls
     through `claude -p` from the web and desktop apps, with no API key. Spec, plan
@@ -105,7 +82,9 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
         claude-cli runs cost is the useful figure.
       - `TaskCritic` sent an Ollama model name (`gemma4:31b-cloud`, from the
         repo `.env`) to `claude -p --model` (`944c09c`). The underlying problem
-        is #20.
+        (provider and model set separately) is fixed by the model-selection
+        work: a provider and model are saved together and checked against each
+        other, and each node can pick its own.
     - The gallery stays empty until all render nodes run. `IAOptions` builds
       all four candidates in one ~5 minute node. That's by design.
 
