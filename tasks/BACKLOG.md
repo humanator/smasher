@@ -49,11 +49,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     calls them human approval gates, but `ManagerHandler` runs an LLM agent
     session and only `old-examples/` use them. Pick one and make the code and
     docs agree. If they stay LLM nodes, fix their claude-cli routing (#23).
-36. **Fix the `_tool_fetch.status` condition example in
-    `docs/config-reference.md`.** It can never match, because conditions
-    compare flat strings and `_tool_<id>` holds a JSON object. Replace it (for
-    example with `outcome=success` or `tool.exit_code=0`), or teach conditions
-    to read nested values.
 39. **Delete the legacy `crates/smasher-web/editor-ui/`** and its `/editor-ui`
     mount. The `frontend/` SPA supersedes it.
 
