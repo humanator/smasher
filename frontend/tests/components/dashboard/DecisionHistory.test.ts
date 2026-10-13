@@ -19,7 +19,7 @@ const galleryGateDot = readFileSync(
   'utf-8'
 ).replace(/\[shape=box,/g, '[shape=diamond,');
 
-const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
+const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
 function writeCandidateManifest(runId: string, candidateId: string) {

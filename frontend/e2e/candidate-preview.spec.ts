@@ -6,8 +6,8 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/.smasher.
-const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
+// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/Documents/smasher.
+const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
 // Same gate-only shape as gallery-gate.spec.ts: Start goes straight to the gallery gate,

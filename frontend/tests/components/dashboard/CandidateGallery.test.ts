@@ -22,8 +22,8 @@ const gatedDot = `digraph CandidateGalleryGated {
   start -> gate -> done;
 }`;
 
-// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/.smasher.
-const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
+// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/Documents/smasher.
+const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
 function writeManifest(

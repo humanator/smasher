@@ -2,6 +2,7 @@
 // ABOUTME: Configures routes, static file serving, CORS, and listens on port 21541.
 
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 
 use axum::Router;
 use tokio_util::sync::CancellationToken;
@@ -74,16 +75,47 @@ pub struct ServerConfig {
     pub workflow_dirs: Vec<String>,
 }
 
-/// Return the default data directory for smasher (~/.smasher).
+/// Return the default data directory for smasher: `~/Documents/smasher`, so
+/// runs, workflows and settings are easy to reach from Finder. The CLI, the
+/// standalone web server and the desktop app all share it.
 ///
 /// Override with SMASHER_DATA_DIR env var.
 pub fn default_data_dir() -> String {
-    if let Ok(dir) = std::env::var("SMASHER_DATA_DIR") {
+    data_dir_from(std::env::var("SMASHER_DATA_DIR").ok(), documents_dir())
+}
+
+/// The user's Documents dir: the platform's own (XDG on Linux), else
+/// `~/Documents`.
+fn documents_dir() -> Option<PathBuf> {
+    dirs::document_dir().or_else(|| dirs::home_dir().map(|h| h.join("Documents")))
+}
+
+/// Pure core of [`default_data_dir`], taking the env override and the
+/// Documents dir as arguments so it's testable without global state.
+pub fn data_dir_from(env_override: Option<String>, documents: Option<PathBuf>) -> String {
+    if let Some(dir) = env_override {
         return dir;
     }
-    dirs::home_dir()
-        .map(|h| h.join(".smasher").display().to_string())
-        .unwrap_or_else(|| ".smasher".into())
+    documents
+        .map(|docs| docs.join("smasher").display().to_string())
+        .unwrap_or_else(|| "smasher".into())
+}
+
+/// A warning for when the pre-2026-10 data dir (`~/.smasher`) still holds
+/// runs but smasher is now using a different dir, so old runs don't seem to
+/// vanish without explanation. Nothing is moved automatically.
+pub fn legacy_data_dir_notice(data_dir: &Path, home: Option<&Path>) -> Option<String> {
+    let legacy = home?.join(".smasher");
+    if legacy == data_dir || !legacy.join("artifacts").is_dir() {
+        return None;
+    }
+    Some(format!(
+        "found runs in the old data dir {}; smasher now uses {}. Move them across \
+         (or set SMASHER_DATA_DIR={}) to see them in the dashboard",
+        legacy.display(),
+        data_dir.display(),
+        legacy.display(),
+    ))
 }
 
 /// Parse the comma-separated `SMASHER_WORKFLOWS_DIR` env var value into a
@@ -211,6 +243,11 @@ pub async fn start_with_client(
     client: smasher_llm::client::Client,
     shutdown: CancellationToken,
 ) -> Result<RunningServer, ServerError> {
+    if let Some(notice) =
+        legacy_data_dir_notice(Path::new(&config.data_dir), dirs::home_dir().as_deref())
+    {
+        tracing::warn!("{notice}");
+    }
     tracing::info!(data_dir = %config.data_dir, model = %config.model, provider = ?config.provider, "agent configuration");
 
     let workflow_dirs = effective_workflow_dirs(&config.data_dir, &config.workflow_dirs);
@@ -276,6 +313,60 @@ mod tests {
     #[test]
     fn default_port_is_21541() {
         assert_eq!(DEFAULT_PORT, 21541);
+    }
+
+    #[test]
+    fn data_dir_is_smasher_under_documents() {
+        let documents = Path::new("/Users/me/Documents");
+
+        assert_eq!(
+            data_dir_from(None, Some(documents.to_path_buf())),
+            "/Users/me/Documents/smasher"
+        );
+    }
+
+    #[test]
+    fn smasher_data_dir_env_overrides_the_default() {
+        let documents = Path::new("/Users/me/Documents");
+
+        assert_eq!(
+            data_dir_from(Some("/custom".into()), Some(documents.to_path_buf())),
+            "/custom"
+        );
+    }
+
+    #[test]
+    fn data_dir_without_a_documents_dir_is_relative() {
+        assert_eq!(data_dir_from(None, None), "smasher");
+    }
+
+    #[test]
+    fn legacy_notice_fires_when_old_dir_has_runs() {
+        let home = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(home.path().join(".smasher/artifacts")).unwrap();
+        let data_dir = home.path().join("Documents/smasher");
+
+        let notice = legacy_data_dir_notice(&data_dir, Some(home.path())).unwrap();
+
+        assert!(notice.contains(".smasher"), "{notice}");
+        assert!(notice.contains("Documents/smasher"), "{notice}");
+    }
+
+    #[test]
+    fn legacy_notice_is_silent_without_old_runs() {
+        let home = tempfile::tempdir().unwrap();
+        let data_dir = home.path().join("Documents/smasher");
+
+        assert_eq!(legacy_data_dir_notice(&data_dir, Some(home.path())), None);
+    }
+
+    #[test]
+    fn legacy_notice_is_silent_when_old_dir_is_in_use() {
+        let home = tempfile::tempdir().unwrap();
+        let legacy = home.path().join(".smasher");
+        std::fs::create_dir_all(legacy.join("artifacts")).unwrap();
+
+        assert_eq!(legacy_data_dir_notice(&legacy, Some(home.path())), None);
     }
 
     fn test_state() -> AppState {

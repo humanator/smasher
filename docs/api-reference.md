@@ -935,7 +935,7 @@ pub struct ServerConfig {
     pub host: [u8; 4],           // Default: [127, 0, 0, 1] (never binds beyond localhost)
     pub model: String,           // Default LLM model for pipeline execution
     pub provider: Option<String>,// Optional provider override, bypasses model-name inference
-    pub data_dir: String,        // Default: ~/.smasher (override: SMASHER_DATA_DIR)
+    pub data_dir: String,        // Default: ~/Documents/smasher (override: SMASHER_DATA_DIR)
     pub workflow_dirs: Vec<String>, // Additional dirs scanned for .dot/.gv workflow files
 }
 ```
