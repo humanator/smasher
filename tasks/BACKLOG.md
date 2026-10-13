@@ -49,9 +49,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     calls them human approval gates, but `ManagerHandler` runs an LLM agent
     session and only `old-examples/` use them. Pick one and make the code and
     docs agree. If they stay LLM nodes, fix their claude-cli routing (#23).
-39. **Delete the legacy `crates/smasher-web/editor-ui/`** and its `/editor-ui`
-    mount. The `frontend/` SPA supersedes it.
-
 ## P2: Robustness
 
 40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
