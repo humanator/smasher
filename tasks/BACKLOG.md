@@ -127,6 +127,11 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
     to a mock store that forgets a key once the entry that set it is dropped.
     The settings tests now use `Keychain::in_memory()`, and the two tests of
     the real Keychain run on macOS only. The ~50 min timeout is still open.
+    *Fixed 2026-10-13:* the runner was killed, not hung. `kill_process_group`
+    shelled out to `kill -9 -<pid>`, and procps-ng 4.0's `kill` reads that as
+    only the pid's first digit, so `-1234` became `kill(-1, SIGKILL)` and took
+    down every process the runner user owns. It now calls `libc::killpg`, and
+    `Test`/`MSRV` have a 30-minute `timeout-minutes`.
 33. **Fix the lightbox-resize race in `candidate-preview.spec.ts:81`.** *Seen
     2026-09-26.* It polls until the iframe starts shrinking, then asserts its
     final bounds (`<= 800`) while the resize may still be running (got 963).
