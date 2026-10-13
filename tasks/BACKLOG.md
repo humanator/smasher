@@ -1,224 +1,118 @@
 # Backlog
 
-Everything still open across smasher, prioritised. Finished work (specs, plans,
-todos and capability maps) is in [`archive/`](archive/).
-[`Vision.md`](Vision.md) is still the product north star. Item numbers are kept
-stable so cross-references still work; gaps are finished items.
+Open work on smasher, prioritised. Finished specs, plans and todos are in
+[`archive/`](archive/), and [`Vision.md`](Vision.md) is the product north star.
+Item numbers stay stable so cross-references keep working; gaps are finished
+items. For running the frontend tests, see "Frontend Tests and CI" in
+[`docs/quickstart.md`](../docs/quickstart.md).
 
-**Waiting on Jobsworth:**
-- #23: whether to run the Claude CLI checkpoints skipped before merge.
-- #6: the default artifact retention policy.
-
-**Frontend test gotcha.** The Vitest suite's "real API" tests (gallery, gate,
-decision history, new-workflow) call whatever server is listening on
-`127.0.0.1:21541`. They don't start one themselves. If the desktop app is running
-there, it stores data in `~/Documents/smasher` instead of the repo, and about 50
-tests fail for reasons unrelated to the code. Quit the app and run `cargo run -p
-smasher-cli -- serve` from the branch under test first. If the server uses a custom
-`SMASHER_DATA_DIR`, export the same value for Vitest. The gallery tests write
-candidate manifests there directly, and fail with "gallery gate never appeared"
-if the directories differ. To serve without API keys or spending anything, point
-`SMASHER_CLAUDE_CLI` at a fake `claude` script and set
-`SMASHER_PROVIDER=claude-cli`. The repo keeps one at
-`frontend/tests/fixtures/fake-claude.sh`; set `FAKE_CLAUDE_LOG` to log its calls.
-The suites start no LLM node by default. Every submitted run parks on a human
-gate or passes through non-LLM nodes only. New tests should reuse the inline
-graphs in `frontend/tests/fixtures/graphs.ts` (`RUN_FAIL_CHECK`, `QUESTION_KINDS`,
-`LOOP_CHECK`, `ANONYMOUS_GATE`), whose `graphs.test.ts` proves they never reach an
-LLM. The two critical-path tests
-(`tests/critical-path.test.ts`, `e2e/critical-path.spec.ts`) run real Codergen nodes
-and spend tokens, so they're skipped unless `SMASHER_LLM_TESTS=1` is set. Run them
-only on request. CI's `Frontend` job does all of this for you on every PR:
-fake-claude server, shared data dir, and a check that the fake's log stays empty
-(see "Frontend Tests and CI" in [`docs/quickstart.md`](../docs/quickstart.md)).
-
-## P1: Do next (small, and each one fixes something real)
+## P1: Do next
 
 1. **Run one real pipeline on Sonnet 5.** `DEFAULT_MODEL` is `claude-sonnet-5`,
-   with adaptive thinking for models that need it
-   (`provider/anthropic/types.rs`, `is_adaptive_only_model`), but tests use
-   mocks. Spends tokens, so only on request. (Test fixtures still use
-   `claude-sonnet-4-20250514` on purpose, as sample data. Leave them.)
-
-23. **Claude CLI provider: known limitation and follow-ups.** *Merged to `main`
-    2026-09-25* with a known limitation. The provider runs pipeline LLM calls
-    through `claude -p` from the web and desktop apps, with no API key. Spec, plan
-    and todo are in `archive/*-claude-cli-provider.md`. See
-    `docs/config-reference.md` for setup.
-
-    **Known limitation, manager nodes only.** Manager (`house`) nodes fail
-    under claude-cli with "the claude-cli provider answers single calls and can't
-    run tools". The spec assumed `LlmManagerBackend` was single-turn and
-    tool-less, but it runs an agent session with tools
-    (`smasher-web/src/backend.rs`). Fix: when the provider is claude-cli, route
-    those sessions through `ClaudeCliBackend` as a `claude -p` agent, as codergen
-    is, once #35 has settled what manager nodes are for. Workaround until then:
-    `provider="<other>"` on the node. Tool nodes no longer have this problem:
-    they run their built-in `tool` or `tool_command` directly and never call an
-    LLM (the #22 batch, `archive/SPEC-tool-command.md`).
-
-    **Checkpoints not run before merge** (Jobsworth's call):
-    - the `#[ignore]` real-CLI tests, including the `curl` denial;
-    - `smasher run` on hello-world and a codergen example;
-    - hello-world in the desktop app.
-
-    **Other follow-ups:**
-    - The allowlist is enough to *build* candidates but not to *check* them.
-      Codergen agents are denied the shell, so they can't run the design-kit
-      token linter or open their pages. Decide whether to allow the linter
-      command, or leave checking to the pipeline's `system_lint`/`render` nodes.
+   but tests only use mocks. Spends tokens, so only on request. (Test fixtures
+   use `claude-sonnet-4-20250514` on purpose as sample data; leave them.)
+23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
+    - Manager (`house`) nodes fail under claude-cli: `LlmManagerBackend` runs
+      an agent session with tools, which `claude -p` single calls can't do.
+      Route them through `ClaudeCliBackend` once #35 is settled. Workaround:
+      `provider="<other>"` on the node.
+    - Checkpoints skipped before merge, waiting on Jobsworth's call: the
+      `#[ignore]` real-CLI tests (including the `curl` denial), `smasher run` on
+      hello-world and a codergen example, and hello-world in the desktop app.
+    - Codergen agents are denied the shell, so they can't run the design-kit
+      linter or open their pages. Decide whether to allow the linter command,
+      or leave checking to the pipeline's `system_lint`/`render` nodes.
     - Show `permission_denials` from the CLI's result event in the run view.
-    - Make the web server's claude-cli codergen timeout configurable. It's fixed
-      at 600s (`smasher-web/src/run_launch.rs`).
-    - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path. Today it runs `claude`
+    - Make the claude-cli codergen timeout configurable (fixed at 600s in
+      `smasher-web/src/run_launch.rs`).
+    - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
       from `PATH`.
-
-    **History.** First desktop run (`01m39tb2qn0b4msk4cgdr94fry`, 2026-09-24):
-    - Reads through the `design-kit` symlink work under `dontAsk`.
-    - Two bugs, both fixed before merge:
-      - Token totals were always 0, and the streamed usage was misread
-        (`5308541`). Usage now comes from the result line, with cost. Input
-        excludes cache tokens, as with the Anthropic API adapter, so for
-        claude-cli runs cost is the useful figure.
-      - `TaskCritic` sent an Ollama model name (`gemma4:31b-cloud`, from the
-        repo `.env`) to `claude -p --model` (`944c09c`). The underlying problem
-        (provider and model set separately) is fixed by the model-selection
-        work: a provider and model are saved together and checked against each
-        other, and each node can pick its own.
-    - The gallery stays empty until all render nodes run. `IAOptions` builds
-      all four candidates in one ~5 minute node. That's by design.
-
-    Second run (`01m3awkpeahghg0v6d2pshnzyb`, 2026-09-25):
-    - Candidate and critique steps passed. `critic-report.json` described the
-      real screenshot, lint passed, and `Synthesis` said `proceed`.
-    - `A11yCheck` failed, which uncovered the tool-node half of the limitation
-      above (since fixed by #22).
-
 29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
-    *Seen 2026-09-25 while building question replies.* In
-    `crates/smasher-web/tests/events_test.rs`, a gated run (`Start → Gate → Exit`, data dir a `tempfile` dir) reaches
-    `Completed`, and SSE delivers `pipeline_completed`. But the run's
-    `events.jsonl` stops at the Exit node's `node_completed`. The Exit
-    `checkpoint_created` and `pipeline_completed` never arrive, even after 10s.
-    A real `smasher serve` run does write both (checked on run
-    `01m3cacyq1mfp5ekvv56a2kcfq`), so this may be harness-only. The cause isn't
-    known yet. The file is written by the `FileLogSink` subscriber spawned in
-    `run_launch.rs`. `test_human_gate_exchange_is_recorded_in_events_jsonl`
-    works around it by waiting for Exit's `node_completed`. Once the cause is
-    known, make the test wait for `pipeline_completed` again. If it isn't
-    harness-only, finished runs reloaded from disk would be missing their final
-    events. Lead from the `CandidatePreview.test.ts` cleanup race: the JSONL
-    event writer drains on its own task after the run's status is set, so the
-    test may simply read the file too early.
-32. **Find why the Rust CI jobs time out.** *Seen 2026-09-26 while speccing
-    frontend CI.* On `myfork` (humanator/smasher), the last two pushes to `main` failed
-    (runs `36006298587` and `35957900741`, 2026-09-24). `Test` and `MSRV` ran
-    ~50 min and died inside `cargo test --workspace`, and no logs were kept.
-    Format, Check, Clippy, Docs and Test Summary pass. The cause isn't known.
-    One suspect is render-capture's `captures_a_real_png_of_the_fixture_candidate`,
-    which launches the runner image's Chrome and isn't `#[ignore]`d. Start by
-    adding a `timeout-minutes` and `--nocapture`-style progress so the next
-    run shows which test hangs. Kept out of the frontend CI batch
-    (`archive/SPEC-frontend-ci.md`) by Jobsworth's call.
-    New lead, 2026-09-26: on PR humanator/smasher#1 (run `36215653694`), MSRV
-    failed after 1.5 min, not 50. Four `smasher-desktop` `settings::tests`
-    Keychain tests panicked (`settings.rs:564`, `:621`, `:640`); Linux runners
-    have no macOS Keychain. *Fixed 2026-09-30:* off macOS `keyring` falls back
-    to a mock store that forgets a key once the entry that set it is dropped.
-    The settings tests now use `Keychain::in_memory()`, and the two tests of
-    the real Keychain run on macOS only. The ~50 min timeout is still open.
-    *Fixed 2026-10-13:* the runner was killed, not hung. `kill_process_group`
-    shelled out to `kill -9 -<pid>`, and procps-ng 4.0's `kill` reads that as
-    only the pid's first digit, so `-1234` became `kill(-1, SIGKILL)` and took
-    down every process the runner user owns. It now calls `libc::killpg`, and
-    `Test`/`MSRV` have a 30-minute `timeout-minutes`.
-33. **Fix the lightbox-resize race in `candidate-preview.spec.ts:81`.** *Seen
-    2026-09-26.* It polls until the iframe starts shrinking, then asserts its
-    final bounds (`<= 800`) while the resize may still be running (got 963).
-    It failed about 1 in 5 full local runs, on `main` too. CI's `retries: 2`
-    hides it. Poll on the final bounds instead.
-34. **Find why a question answer can stall.** *Seen once 2026-09-26*, in a
-    full CI-mode local run. In `question-card.spec.ts`, the Approval answer's
-    POST didn't return within 5s (buttons stayed disabled), so Free Form never
-    appeared. It passed 10/10 alone and wasn't seen on `main` in 5 runs.
-    Suspect: `answer_question` takes `state.runs.read()` on tokio's
-    write-preferring `RwLock`, so a queued writer (a run finishing) blocks it.
-35. **Decide what manager (`house`) nodes are for.** *Split out of #22,
-    2026-09-26.* The docs say they're human approval gates (README's shape
-    list, quickstart), but `ManagerHandler` runs one LLM agent session through
-    `LlmManagerBackend`, and only `old-examples/` use them. Decide which they
-    are, then make the code and those docs agree. If they stay LLM nodes, fix
-    their claude-cli routing (#23's remaining known limitation).
+    In `crates/smasher-web/tests/events_test.rs`, a gated run completes, but
+    its `events.jsonl` stops at Exit's `node_completed`, without the final
+    `checkpoint_created` and `pipeline_completed`. Real `smasher serve` runs do
+    write both, so it may be harness-only. Likely lead: the `FileLogSink` in
+    `run_launch.rs` drains on its own task after the run's status is set, so
+    the test reads too early. Once fixed,
+    `test_human_gate_exchange_is_recorded_in_events_jsonl` should wait for
+    `pipeline_completed` again.
+33. **Fix the lightbox-resize race in `frontend/e2e/candidate-preview.spec.ts`.**
+    It asserts the iframe's final bounds (`<= 800`) while the resize may still
+    be running, and fails about 1 in 5 local runs. Poll on the final bounds
+    instead.
+34. **Find why a question answer can stall.** Seen once in
+    `question-card.spec.ts`: the Approval answer's POST didn't return within
+    5s. Suspect: `answer_question` (`routes/questions.rs`) takes
+    `state.runs.read()` on tokio's write-preferring `RwLock`, so a queued
+    writer (a run finishing) blocks it.
+35. **Decide what manager (`house`) nodes are for.** `docs/quickstart.md`
+    calls them human approval gates, but `ManagerHandler` runs an LLM agent
+    session and only `old-examples/` use them. Pick one and make the code and
+    docs agree. If they stay LLM nodes, fix their claude-cli routing (#23).
 36. **Fix the `_tool_fetch.status` condition example in
-    `docs/config-reference.md`.** *Found 2026-09-26 while building #22.* It can
-    never match: `_tool_<id>` holds a JSON object, and conditions compare flat
-    string values, so they can't read a nested field. Replace the example (for
-    instance with `outcome=success` or `tool.exit_code=0`), or teach conditions
+    `docs/config-reference.md`.** It can never match, because conditions
+    compare flat strings and `_tool_<id>` holds a JSON object. Replace it (for
+    example with `outcome=success` or `tool.exit_code=0`), or teach conditions
     to read nested values.
-37. **Fix the node shapes in `smasher-conformance/src/convert.rs`.** *Found
-    2026-09-26 while building #22.* It maps four node types to the wrong shapes,
-    and its test table repeats the mistakes:
-    - Tool→`component` and Parallel→`parallelogram`, the wrong way round;
-    - FanIn→`trapezium` (should be `tripleoctagon`);
-    - Generic→`ellipse`, which parses back as Interviewer.
-39. **Delete the legacy `crates/smasher-web/editor-ui/`.** *Decided
-    2026-09-26.* The `frontend/` SPA supersedes it. Remove it and its
-    `/editor-ui` mount. Its ToolForm still offers a "Custom…" tool name, which
-    now always fails, and `WorkflowCanvas.svelte` still mentions the deleted
-    `routes/pages.rs`.
+37. **Fix the node shapes in `smasher-conformance/src/convert.rs`** and its
+    test table: Tool and Parallel are swapped (`component`/`parallelogram`),
+    FanIn should be `tripleoctagon` not `trapezium`, and Generic's `ellipse`
+    parses back as Interviewer.
+39. **Delete the legacy `crates/smasher-web/editor-ui/`** and its `/editor-ui`
+    mount. The `frontend/` SPA supersedes it.
 
-## P2: Robustness (can lose data or grow without limit)
+## P2: Robustness
 
-6. **Prune artifacts automatically.** `smasher prune-artifacts` exists but nothing
-   runs it. The desktop app now keeps its data in `~/Documents/smasher`, so run
-   artifacts (bundles, screenshots) grow without limit. Decide on a default
-   retention policy and run it when the server starts. *Source:
-   `SPEC-artifact-store`.*
+40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
+    #6: there's no automatic retention policy. Every run's artifacts are kept
+    until you delete the run yourself, and `smasher prune-artifacts` stays a
+    manual tool. So the run list (`RunList.svelte`/`RunTable.svelte`) needs a
+    way to delete runs: a delete action on one run, plus checkboxes to select
+    several and delete them in one action, with a confirmation that says how
+    many runs will go. The server has no delete endpoint yet, so add one (for
+    example `DELETE /api/runs/{id}`, or a batch form taking a list of ids). It
+    removes the whole `{data_dir}/artifacts/<run_id>/` tree, as
+    `prune_artifacts` does, and the in-memory record. Refuse runs that are
+    still running. Deleting is permanent, since the desktop app keeps runs in
+    `~/Documents/smasher`.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
-When these come up, batch #7 + #8 + #11 together: several-candidate critique
-decides the `candidate_id` convention, and the lint override lives in the same
-`synthesis` code.
+Batch #7, #8 and #11 together: several-candidate critique decides the
+`candidate_id` convention, and the lint override lives in the same `synthesis`
+code.
 
-7. **Critique several candidates from one node.** Today, giving N Discover
-   candidates their own `task_critic`/`synthesis` call means writing N nodes by
-   hand. This is the most likely one to be needed first.
-8. **Let a failing lint force `synthesis` to recommend `iterate`**, whatever the
-   model says. Decide once more real runs exist.
-10. **Support two gallery gates pending on one run at the same time.** This needs a
-    mapping from node id to question in the engine first.
-11. **Document where `candidate_id` values come from** as a convention for
-    pipeline authors (today they're hardcoded as `discover-a`..`d`).
-12. **Settle the shape of `generation_params`** (currently a free-form string map).
-13. **Grow the component kit** (`select`, `checkbox`, `tabs`) **and the
+7. **Critique several candidates from one node**, instead of writing one
+   `task_critic`/`synthesis` node per candidate. Most likely to be needed first.
+8. **Let a failing lint force `synthesis` to recommend `iterate`**, whatever
+   the model says.
+10. **Support two gallery gates pending on one run at once.** Needs a mapping
+    from node id to question in the engine first.
+11. **Document where `candidate_id` values come from** for pipeline authors
+    (today they're hardcoded as `discover-a`..`d`).
+12. **Settle the shape of `generation_params`** (a free-form string map today).
+13. **Grow the design-kit components** (`select`, `checkbox`, `tabs`) **and the
     `system-lint` usage rules** to match.
-14. **Artifact extras:** a producer for the reserved `Recording` artifact kind, and
-    a per-candidate option to skip saving the bundle.
-15. **Reuse the editor's saved layout in the run-view SVG** instead of laying the
-    graph out again with Graphviz each time.
-38. **Get the upstream-ported examples' scripts working.** *Split out of #22,
-    2026-09-26.* Tool nodes now run their `tool_command` as written. Several
-    examples ported from upstream Attractor (`semport`, `megaplan`,
-    `sprint_exec`, `vulnerability_analyzer`) assume its `.ai/attractor-runs/...`
-    layout or shell variables smasher doesn't set, so their commands fail when
-    run for real. Rewrite them against smasher's run layout (`SMASHER_RUN_DIR`,
-    `nodes/<id>/`, `SMASHER_CTX_<KEY>`).
+14. **Artifact extras:** a producer for the reserved `Recording` artifact kind,
+    and a per-candidate option to skip saving the bundle.
+15. **Reuse the editor's saved layout in the run-view SVG** instead of laying
+    the graph out again with Graphviz.
+38. **Get the upstream-ported examples' scripts working.** `semport`,
+    `megaplan`, `sprint_exec` and `vulnerability_analyzer` assume Attractor's
+    `.ai/attractor-runs/...` layout and shell variables. Rewrite their tool
+    commands against smasher's (`SMASHER_RUN_DIR`, `nodes/<id>/`,
+    `SMASHER_CTX_<KEY>`).
 
-## P4: Distribution and remote access (bigger, strategic)
+## P4: Distribution and remote access
 
-#17 and #18 are both work on the Tauri app's setup, so batch them if either
-comes up.
+Batch #17 and #18 if either comes up; both change the Tauri app's setup.
 
-16. **Serve the app remotely over HTTP.** This was the "(later)" goal in the
-    desktop capability map. It needs an auth layer first, because the API has none
-    and only listens on `127.0.0.1`. Scope it with a spec before building. Tool
-    nodes run DOT-authored shell commands (`tool_command`) on the server, which
-    is fine while workflows are local; remote serving must deal with that.
-17. **Ship a `.dmg` or portable desktop bundle.** The current `.app` only works on
-    this machine because it loads the SPA, examples and design kit from the source
-    checkout. These would need bundling as resources first.
+16. **Serve the app remotely over HTTP.** Needs an auth layer first (the API has
+    none and listens on `127.0.0.1` only), and must deal with tool nodes running
+    DOT-authored shell commands on the server. Spec it before building.
+17. **Ship a `.dmg` or portable desktop bundle.** The `.app` loads the SPA,
+    examples and design kit from the source checkout, so those need bundling
+    as resources first.
 18. **Desktop tray icon.**
 19. **Desktop end-to-end tests.** Blocked: `tauri-driver` doesn't support macOS.
-    Covered for now by manual QA plus the SPA's Playwright suite.
-
+    Manual QA and the SPA's Playwright suite cover it for now.

@@ -515,6 +515,15 @@ every PR to `main`. It fails if `FAKE_CLAUDE_LOG` isn't empty at the end.
 Playwright installs its own Chromium there. `SMASHER_LLM_TESTS` is never set
 in CI, so the two critical-path tests, which spend real tokens, stay skipped.
 
+If the desktop app is left running on that port, its data lives in
+`~/Documents/smasher` instead, and about 50 tests fail for reasons unrelated
+to the code. The gallery tests write candidate manifests straight into
+`SMASHER_DATA_DIR`, so a mismatch shows up as "gallery gate never appeared".
+New tests should reuse the inline graphs in `frontend/tests/fixtures/graphs.ts`
+(`graphs.test.ts` proves they never reach an LLM). Set `SMASHER_LLM_TESTS=1`
+to run the critical-path tests (`tests/critical-path.test.ts`,
+`e2e/critical-path.spec.ts`), only when you mean to spend tokens.
+
 ## Next Steps
 
 - [DOT Format Reference](dot-reference.md) -- node shapes, attributes, edge conditions, stylesheets
