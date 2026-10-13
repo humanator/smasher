@@ -7,7 +7,6 @@ stable so cross-references still work; gaps are finished items.
 
 **Waiting on Jobsworth:**
 - #23: whether to run the Claude CLI checkpoints skipped before merge.
-- #6: the default artifact retention policy.
 
 **Frontend test gotcha.** The Vitest suite's "real API" tests (gallery, gate,
 decision history, new-workflow) call whatever server is listening on
@@ -169,11 +168,18 @@ fake-claude server, shared data dir, and a check that the fake's log stays empty
 
 ## P2: Robustness (can lose data or grow without limit)
 
-6. **Prune artifacts automatically.** `smasher prune-artifacts` exists but nothing
-   runs it. The desktop app now keeps its data in `~/Documents/smasher`, so run
-   artifacts (bundles, screenshots) grow without limit. Decide on a default
-   retention policy and run it when the server starts. *Source:
-   `SPEC-artifact-store`.*
+40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
+    #6: there's no automatic retention policy. Every run's artifacts are kept
+    until you delete the run yourself, and `smasher prune-artifacts` stays a
+    manual tool. So the run list (`RunList.svelte`/`RunTable.svelte`) needs a
+    way to delete runs: a delete action on one run, plus checkboxes to select
+    several and delete them in one action, with a confirmation that says how
+    many runs will go. The server has no delete endpoint yet, so add one (for
+    example `DELETE /api/runs/{id}`, or a batch form taking a list of ids). It
+    removes the whole `{data_dir}/artifacts/<run_id>/` tree, as
+    `prune_artifacts` does, and the in-memory record. Refuse runs that are
+    still running. Deleting is permanent, since the desktop app keeps runs in
+    `~/Documents/smasher`.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
