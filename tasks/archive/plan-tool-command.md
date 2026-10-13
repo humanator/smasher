@@ -1,7 +1,7 @@
 # Implementation Plan: Tool nodes run commands directly (#22)
 
 Spec: [`SPEC-tool-command.md`](SPEC-tool-command.md), approved 2026-09-26.
-Branch: `feat/tool-command`. Tasks and checkpoints are in [`todo.md`](todo.md).
+Branch: `feat/tool-command`. Tasks and checkpoints are in [`todo-tool-command.md`](todo-tool-command.md).
 
 ## Overview
 

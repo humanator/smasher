@@ -1,6 +1,6 @@
 # Todo: Tool nodes run commands directly (#22)
 
-Spec: [`SPEC-tool-command.md`](SPEC-tool-command.md). Plan: [`plan.md`](plan.md).
+Spec: [`SPEC-tool-command.md`](SPEC-tool-command.md). Plan: [`plan-tool-command.md`](plan-tool-command.md).
 Every task is TDD: write the test first, watch it fail, then implement. No task
 spends tokens.
 
