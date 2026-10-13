@@ -85,7 +85,7 @@ export async function getWorkflowDot(id: string): Promise<string> {
 
 /**
  * Save a workflow's graph and return the saved file's new ETag. With `etag`,
- * the server refuses the save (status 409) if the file changed on disk since
+ * the server refuses the save (status 412) if the file changed on disk since
  * that etag was read; without it, the save overwrites whatever is there.
  * Rejects with the server's message and HTTP status on failure.
  */

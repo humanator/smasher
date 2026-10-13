@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Edit existing workflow page - fetches graph and mounts canvas in edit mode
-  // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (409 -> toast with Reload / Save anyway), Export .dot to the native save shim
+  // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (412 -> toast with Reload / Save anyway), Export .dot to the native save shim
 
   import { onDestroy, onMount } from 'svelte';
   import { toast } from 'svelte-sonner';
@@ -59,7 +59,7 @@
     try {
       etag = await workflowsApi.updateWorkflowGraph(workflowId, updatedGraph, etag ?? undefined);
     } catch (err) {
-      if ((err as { status?: number }).status === 409) {
+      if ((err as { status?: number }).status === 412) {
         showConflict();
         return;
       }

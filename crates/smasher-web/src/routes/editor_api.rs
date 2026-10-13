@@ -298,7 +298,7 @@ async fn get_dot(
 }
 
 /// Overwrites the workflow with the editor's graph. With `If-Match`, the
-/// save is refused with 409 (file untouched) unless the file still has that
+/// save is refused with 412 (file untouched) unless the file still has that
 /// ETag, i.e. nobody changed it since the editor loaded it. Without
 /// `If-Match` it's last-write-wins, which is what "Save anyway" sends.
 async fn put_graph(
@@ -325,7 +325,7 @@ async fn put_graph(
     if let Some(if_match) = if_match
         && !if_match_allows(if_match, &etag_for(&existing))
     {
-        return Err(WebError::Conflict(
+        return Err(WebError::PreconditionFailed(
             "workflow changed on disk since it was loaded".into(),
         ));
     }
@@ -840,7 +840,7 @@ digraph {
     }
 
     #[tokio::test]
-    async fn put_graph_with_a_stale_if_match_is_409_and_leaves_the_file_alone() {
+    async fn put_graph_with_a_stale_if_match_is_412_and_leaves_the_file_alone() {
         let (tmp, app, id) = hello_workflow();
         let get = get_graph_resp(&app, &id).await;
         let etag = etag_of(&get);
@@ -851,7 +851,7 @@ digraph {
         write_fixture(tmp.path(), "hello.dot", &changed);
 
         let put = put_graph_if_match(&app, &id, &graph, Some(&etag)).await;
-        assert_eq!(put.status(), StatusCode::CONFLICT);
+        assert_eq!(put.status(), StatusCode::PRECONDITION_FAILED);
         let content_type = put
             .headers()
             .get(header::CONTENT_TYPE)
