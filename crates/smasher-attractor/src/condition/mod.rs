@@ -1004,6 +1004,8 @@ mod tests {
             "context.tool.output!=dirty",
             "context.tool.exit_code<1",
             "context.tool.exit_code>-1",
+            // The dotted-key example in docs/config-reference.md.
+            "tool.exit_code = 0",
         ] {
             let cond = parse_condition(expr).unwrap();
             assert!(evaluate_condition(&cond, &context), "{expr}");

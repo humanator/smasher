@@ -1,9 +1,9 @@
 // ABOUTME: Pipeline with multiple sequential human approval gates before deployment.
-// ABOUTME: Demonstrates chaining Manager nodes for multi-stage sign-off workflows.
+// ABOUTME: Demonstrates chaining Interviewer nodes for multi-stage sign-off workflows.
 
 // Complex workflows often require multiple approvals from different
-// stakeholders before proceeding. This pipeline chains two Manager
-// nodes (shape=house) in sequence, modeling a real-world approval
+// stakeholders before proceeding. This pipeline chains two Interviewer
+// nodes (shape=hexagon) in sequence, modeling a real-world approval
 // process:
 //
 //   1. Security review — checks for vulnerabilities, secrets exposure
@@ -12,7 +12,7 @@
 // Each gate can reject the pipeline independently. Only when both
 // gates approve does the pipeline proceed to deployment.
 //
-// The `question` attribute on each Manager node provides context-specific
+// The `question` attribute on each Interviewer node provides context-specific
 // prompts to the human reviewer at each stage.
 //
 // Run this pipeline:
@@ -24,14 +24,14 @@ digraph MultiGate {
 
     // First gate: Security review
     security_check [
-        shape=house,
+        shape=hexagon,
         label="Security Review",
         question="Does this change pass security review? Check for secrets, injection vulnerabilities, and auth issues."
     ];
 
     // Second gate: Compliance check
     compliance_check [
-        shape=house,
+        shape=hexagon,
         label="Compliance Check",
         question="Does this change meet compliance requirements? Verify data handling, audit logging, and access controls."
     ];
@@ -48,12 +48,12 @@ digraph MultiGate {
     start -> security_check;
 
     // Security gate routing
-    security_check -> compliance_check   [label="success"];
-    security_check -> exit_security_fail [label="failure"];
+    security_check -> compliance_check   [label="[Y] Yes"];
+    security_check -> exit_security_fail [label="[N] No"];
 
     // Compliance gate routing
-    compliance_check -> deploy                [label="success"];
-    compliance_check -> exit_compliance_fail  [label="failure"];
+    compliance_check -> deploy                [label="[Y] Yes"];
+    compliance_check -> exit_compliance_fail  [label="[N] No"];
 
     // After deployment
     deploy -> exit_deployed;

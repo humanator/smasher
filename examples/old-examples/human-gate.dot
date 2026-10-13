@@ -1,18 +1,18 @@
 // ABOUTME: Pipeline demonstrating a human approval gate before proceeding.
-// ABOUTME: Uses a Manager node (shape=house) to model human-in-the-loop decisions.
+// ABOUTME: Uses an Interviewer node (shape=hexagon) to model human-in-the-loop decisions.
 
-// Human gates are modeled as Manager nodes (shape=house). The engine pauses
-// execution at a Manager node and presents the `question` attribute to a
-// human operator. The operator's response determines which outgoing edge
-// is followed.
+// Human gates are modeled as Interviewer nodes (shape=hexagon). The engine
+// pauses execution at the node and presents the `question` attribute to a
+// human operator. The choices come from the outgoing edge labels, and the
+// operator's answer determines which edge is followed.
 //
 // This pattern is essential for:
 //   - Code review approval before deployment
 //   - Budget or resource allocation sign-off
 //   - Safety-critical operations requiring human oversight
 //
-// The Manager handler reads the `question` attribute and prompts the user
-// interactively. Their response is matched against outgoing edge labels.
+// The Interviewer handler reads the `question` attribute and prompts the
+// user interactively. Their response is matched against outgoing edge labels.
 //
 // Run this pipeline:
 //   smasher run examples/human-gate.dot
@@ -28,7 +28,7 @@ digraph HumanGate {
     // Human approval gate — the engine pauses here and asks the operator.
     // The `question` attribute is displayed to the human.
     human_gate [
-        shape=house,
+        shape=hexagon,
         label="Approval Gate",
         question="Do you approve this change?"
     ];
@@ -45,8 +45,8 @@ digraph HumanGate {
     process -> human_gate;
 
     // Gate routing: operator response determines the path
-    human_gate -> approved      [label="success"];
-    human_gate -> exit_rejected [label="failure"];
+    human_gate -> approved      [label="[Y] Yes"];
+    human_gate -> exit_rejected [label="[N] No"];
 
     // After approval, proceed to exit
     approved -> exit_success;

@@ -161,6 +161,60 @@ trait ToolBackend: Send + Sync {
 }
 ```
 
+### Candidate ids
+
+The design-factory tools work on candidates: UI builds a codergen node wrote
+to disk. Every candidate has a `candidate_id`, a name the pipeline author
+picks and writes into each tool node's `args`. Nothing generates ids for you.
+`examples/product_design_factory.dot` uses `discover-a` to `discover-d`
+because its `IAOptions` prompt tells the agent to build into
+`./candidates/discover-a/` and so on, and `define` for the built-out
+direction.
+
+An id names the candidate's artifact directory, `<run artifacts>/<candidate_id>/`,
+which every tool shares:
+
+| Tool | Reads | Writes to the candidate's artifact directory |
+|------|-------|-----------------------------------------------|
+| `render_capture` | `candidate_dir` (the candidate's source, relative to the run's working directory) | `screenshot.png`, `manifest.json`, the bundle |
+| `system_lint` | `candidate_dir` | `lint-report.json` |
+| `task_critic` | `screenshot.png`, and `index.html` if present | `critic-report.json` |
+| `synthesis` | `lint-report.json`, `critic-report.json` | `synthesis-report.json` |
+
+So a candidate is critiqued under the same id it was rendered under, and the
+gallery shows one card per directory. An id must be non-empty and contain no
+`/`, `\` or `..`.
+
+### Design-factory tool args
+
+| Tool | Args |
+|------|------|
+| `render_capture` | `candidate_dir`, `candidate_id`, optional `generation_params` (string map) |
+| `system_lint` | `candidate_dir`, `candidate_id` |
+| `task_critic` | `candidate_id` or `candidate_ids`, `persona`, `task`, optional `model`, `provider` |
+| `synthesis` | `candidate_id` or `candidate_ids`, optional `model`, `provider`, `lint_must_pass` |
+
+**Several candidates from one node.** `task_critic` and `synthesis` take
+`candidate_ids`, a list, in place of `candidate_id`. Each candidate gets its
+own LLM call (run at the same time) and its own report, exactly as if it had
+its own node; `persona`, `task`, `model` and `provider` apply to all of them.
+The node's data is `{"candidates": [{"candidate_id", "artifact_dir", "report"}]}`,
+and `synthesis` adds `"proceed"` and `"iterate"`, each a list of ids. If any
+candidate fails, the node fails with a message naming each one that failed;
+the others' reports are still written. Setting both `candidate_id` and
+`candidate_ids`, an empty list, a repeated id or an invalid id fails the node
+before any LLM call.
+
+```dot
+Critique [shape=parallelogram, tool="task_critic",
+  args="{\"candidate_ids\": [\"discover-a\", \"discover-b\", \"discover-c\"], \"persona\": \"a first-time user\", \"task\": \"start a new project\"}"];
+```
+
+**Lint must pass.** With `"lint_must_pass": true`, `synthesis` recommends
+`iterate` whenever `lint-report.json` has a failed check (or can't be read),
+whatever the model says. When that overrides the model, the first reason in
+`synthesis-report.json` names the failed checks. It's off by default.
+
 ### Shell commands
 
 `ToolHandler::with_commands(CommandConfig { working_dir, run_dir, cancel })`

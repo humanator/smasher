@@ -33,13 +33,14 @@ fn node_type_to_shape(node_type: &NodeType) -> &'static str {
         NodeType::Exit => "Msquare",
         NodeType::Codergen => "box",
         NodeType::Conditional => "diamond",
-        NodeType::Tool => "component",
+        NodeType::Tool => "parallelogram",
         NodeType::Interviewer => "hexagon",
-        NodeType::Parallel => "parallelogram",
-        NodeType::FanIn => "trapezium",
+        NodeType::Parallel => "component",
+        NodeType::FanIn => "tripleoctagon",
         NodeType::Manager => "house",
         NodeType::SubPipeline => "folder",
-        NodeType::Generic => "ellipse",
+        // Any shape the parser doesn't recognise resolves to Generic.
+        NodeType::Generic => "plaintext",
     }
 }
 
@@ -375,27 +376,30 @@ mod tests {
 
     #[test]
     fn node_type_shape_round_trip() {
-        let cases = vec![
-            (NodeType::Start, "Mdiamond"),
-            (NodeType::Exit, "Msquare"),
-            (NodeType::Codergen, "box"),
-            (NodeType::Conditional, "diamond"),
-            (NodeType::Tool, "component"),
-            (NodeType::Interviewer, "hexagon"),
-            (NodeType::Parallel, "parallelogram"),
-            (NodeType::FanIn, "trapezium"),
-            (NodeType::Manager, "house"),
-            (NodeType::SubPipeline, "folder"),
-            (NodeType::Generic, "ellipse"),
+        let node_types = [
+            NodeType::Start,
+            NodeType::Exit,
+            NodeType::Codergen,
+            NodeType::Conditional,
+            NodeType::Tool,
+            NodeType::Interviewer,
+            NodeType::Parallel,
+            NodeType::FanIn,
+            NodeType::Manager,
+            NodeType::SubPipeline,
+            NodeType::Generic,
         ];
 
-        for (node_type, expected_shape) in cases {
+        // Each shape we emit must parse back to the same node type.
+        for node_type in node_types {
+            let shape = node_type_to_shape(&node_type);
+            let source = format!("digraph g {{ n [shape={shape}] }}");
+            let dot_graph = smasher_attractor::dot::parse(&source).unwrap();
+            let graph = smasher_attractor::graph::resolve(&dot_graph).unwrap();
+            let parsed = &graph.nodes.iter().find(|n| n.id == "n").unwrap().node_type;
             assert_eq!(
-                node_type_to_shape(&node_type),
-                expected_shape,
-                "{:?} should map to shape '{}'",
-                node_type,
-                expected_shape,
+                parsed, &node_type,
+                "shape '{shape}' should parse back as {node_type:?}"
             );
         }
     }

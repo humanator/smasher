@@ -25,8 +25,8 @@ pub fn router() -> Router<AppState> {
         Ok(metadata) if metadata.is_dir() => {
             tracing::info!(path = %dist_path.display(), "serving SPA from dist directory");
             // ServeDir does real mime-type sniffing from each file's extension
-            // and its own path-traversal hardening (same as the /editor-ui,
-            // /design-kit, /candidate-artifacts, /static mounts below in
+            // and its own path-traversal hardening (same as the
+            // /design-kit, /candidate-artifacts and /static mounts in
             // server.rs) -- unlike the hand-rolled `read_to_string` +
             // `(StatusCode::OK, String)` handler this replaced, which stamped
             // every response `text/plain` regardless of the file served,

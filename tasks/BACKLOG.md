@@ -14,7 +14,8 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
 23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
     - Manager (`house`) nodes fail under claude-cli: `LlmManagerBackend` runs
       an agent session with tools, which `claude -p` single calls can't do.
-      Route them through `ClaudeCliBackend` once #35 is settled. Workaround:
+      They stay LLM nodes (decided 2026-10-13, closing #35), so route them
+      through `ClaudeCliBackend`. Workaround:
       `provider="<other>"` on the node.
     - Checkpoints skipped before merge, waiting on Jobsworth's call: the
       `#[ignore]` real-CLI tests (including the `curl` denial), `smasher run` on
@@ -27,40 +28,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
       `smasher-web/src/run_launch.rs`).
     - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
       from `PATH`.
-29. **Find why `events.jsonl` is cut short in the smasher-web test harness.**
-    In `crates/smasher-web/tests/events_test.rs`, a gated run completes, but
-    its `events.jsonl` stops at Exit's `node_completed`, without the final
-    `checkpoint_created` and `pipeline_completed`. Real `smasher serve` runs do
-    write both, so it may be harness-only. Likely lead: the `FileLogSink` in
-    `run_launch.rs` drains on its own task after the run's status is set, so
-    the test reads too early. Once fixed,
-    `test_human_gate_exchange_is_recorded_in_events_jsonl` should wait for
-    `pipeline_completed` again.
-33. **Fix the lightbox-resize race in `frontend/e2e/candidate-preview.spec.ts`.**
-    It asserts the iframe's final bounds (`<= 800`) while the resize may still
-    be running, and fails about 1 in 5 local runs. Poll on the final bounds
-    instead.
-34. **Find why a question answer can stall.** Seen once in
-    `question-card.spec.ts`: the Approval answer's POST didn't return within
-    5s. Suspect: `answer_question` (`routes/questions.rs`) takes
-    `state.runs.read()` on tokio's write-preferring `RwLock`, so a queued
-    writer (a run finishing) blocks it.
-35. **Decide what manager (`house`) nodes are for.** `docs/quickstart.md`
-    calls them human approval gates, but `ManagerHandler` runs an LLM agent
-    session and only `old-examples/` use them. Pick one and make the code and
-    docs agree. If they stay LLM nodes, fix their claude-cli routing (#23).
-36. **Fix the `_tool_fetch.status` condition example in
-    `docs/config-reference.md`.** It can never match, because conditions
-    compare flat strings and `_tool_<id>` holds a JSON object. Replace it (for
-    example with `outcome=success` or `tool.exit_code=0`), or teach conditions
-    to read nested values.
-37. **Fix the node shapes in `smasher-conformance/src/convert.rs`** and its
-    test table: Tool and Parallel are swapped (`component`/`parallelogram`),
-    FanIn should be `tripleoctagon` not `trapezium`, and Generic's `ellipse`
-    parses back as Interviewer.
-39. **Delete the legacy `crates/smasher-web/editor-ui/`** and its `/editor-ui`
-    mount. The `frontend/` SPA supersedes it.
-
 ## P2: Robustness
 
 40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
@@ -78,18 +45,8 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
-Batch #7, #8 and #11 together: several-candidate critique decides the
-`candidate_id` convention, and the lint override lives in the same `synthesis`
-code.
-
-7. **Critique several candidates from one node**, instead of writing one
-   `task_critic`/`synthesis` node per candidate. Most likely to be needed first.
-8. **Let a failing lint force `synthesis` to recommend `iterate`**, whatever
-   the model says.
 10. **Support two gallery gates pending on one run at once.** Needs a mapping
     from node id to question in the engine first.
-11. **Document where `candidate_id` values come from** for pipeline authors
-    (today they're hardcoded as `discover-a`..`d`).
 12. **Settle the shape of `generation_params`** (a free-form string map today).
 13. **Grow the design-kit components** (`select`, `checkbox`, `tabs`) **and the
     `system-lint` usage rules** to match.

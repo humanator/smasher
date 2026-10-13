@@ -86,7 +86,7 @@ Runs a built-in tool or a shell command. A tool node sets exactly one of:
   --worktree`), with an optional `timeout`.
 
 ```dot
-lint [shape=parallelogram, tool="system_lint", args="{\"candidate_dir\": \"candidates/a\"}"];
+lint [shape=parallelogram, tool="system_lint", args="{\"candidate_dir\": \"candidates/a\", \"candidate_id\": \"a\"}"];
 
 test [shape=parallelogram, tool_command="npm test", timeout="5m"];
 ```
@@ -95,7 +95,9 @@ A tool node never calls an LLM itself. Only `task_critic` and `synthesis`
 make an LLM call, and only because the node names them. Setting neither
 attribute, or both, fails the node, and `smasher lint` reports it (E004,
 E005). The node's label is not used as a tool name. An unknown `tool` name
-fails with a list of the built-ins.
+fails with a list of the built-ins. The built-ins' `args`, and where their
+`candidate_id` values come from, are in the
+[handler reference](handler-reference.md#candidate-ids).
 
 A command succeeds when it exits 0. Any other exit code fails the node with
 `exit code N: <end of stderr>`, and a timeout or cancellation kills the
@@ -163,12 +165,12 @@ join [shape=tripleoctagon, label="Join"];
 
 ### Manager (house)
 
-Human gate / coordinator node. Similar to Interviewer but designed for
-approval workflows. Reads the `question` attribute and presents it to the
-operator.
+LLM coordinator node. Runs an agent session on the node's `task` through the
+registered `ManagerBackend`; it doesn't ask a human. For a human approval gate,
+use an Interviewer (`hexagon`) node.
 
 ```dot
-gate [shape=house, label="Approval Gate", question="Do you approve?"];
+coordinate [shape=house, label="Coordinate", task="Split the work and check each part"];
 ```
 
 ### SubPipeline (folder)
@@ -293,12 +295,11 @@ Any node can have retry behavior:
 | `max_retry_delay`      | duration | Upper bound on exponential backoff                   |
 | `retry_jitter`         | boolean  | Randomize delay to avoid thundering herd             |
 
-### Interviewer / Manager Attributes
+### Interviewer Attributes
 
 | Attribute              | Type     | Description                                          |
 |------------------------|----------|------------------------------------------------------|
 | `question`             | string   | The question presented to the human                  |
-| `prompt`               | string   | Alternative to `question` (Manager nodes)            |
 | `options`              | string   | Comma-separated predefined choices                   |
 | `approve`              | boolean  | If true, use yes/no approval mode                    |
 | `human.timeout_secs`   | number   | Seconds to wait before timing out                    |
