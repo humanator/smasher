@@ -163,12 +163,12 @@ join [shape=tripleoctagon, label="Join"];
 
 ### Manager (house)
 
-Human gate / coordinator node. Similar to Interviewer but designed for
-approval workflows. Reads the `question` attribute and presents it to the
-operator.
+LLM coordinator node. Runs an agent session on the node's `task` through the
+registered `ManagerBackend`; it doesn't ask a human. For a human approval gate,
+use an Interviewer (`hexagon`) node.
 
 ```dot
-gate [shape=house, label="Approval Gate", question="Do you approve?"];
+coordinate [shape=house, label="Coordinate", task="Split the work and check each part"];
 ```
 
 ### SubPipeline (folder)
@@ -293,12 +293,11 @@ Any node can have retry behavior:
 | `max_retry_delay`      | duration | Upper bound on exponential backoff                   |
 | `retry_jitter`         | boolean  | Randomize delay to avoid thundering herd             |
 
-### Interviewer / Manager Attributes
+### Interviewer Attributes
 
 | Attribute              | Type     | Description                                          |
 |------------------------|----------|------------------------------------------------------|
 | `question`             | string   | The question presented to the human                  |
-| `prompt`               | string   | Alternative to `question` (Manager nodes)            |
 | `options`              | string   | Comma-separated predefined choices                   |
 | `approve`              | boolean  | If true, use yes/no approval mode                    |
 | `human.timeout_secs`   | number   | Seconds to wait before timing out                    |

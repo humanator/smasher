@@ -14,7 +14,8 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
 23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
     - Manager (`house`) nodes fail under claude-cli: `LlmManagerBackend` runs
       an agent session with tools, which `claude -p` single calls can't do.
-      Route them through `ClaudeCliBackend` once #35 is settled. Workaround:
+      They stay LLM nodes (decided 2026-10-13, closing #35), so route them
+      through `ClaudeCliBackend`. Workaround:
       `provider="<other>"` on the node.
     - Checkpoints skipped before merge, waiting on Jobsworth's call: the
       `#[ignore]` real-CLI tests (including the `curl` denial), `smasher run` on
@@ -27,10 +28,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
       `smasher-web/src/run_launch.rs`).
     - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
       from `PATH`.
-35. **Decide what manager (`house`) nodes are for.** `docs/quickstart.md`
-    calls them human approval gates, but `ManagerHandler` runs an LLM agent
-    session and only `old-examples/` use them. Pick one and make the code and
-    docs agree. If they stay LLM nodes, fix their claude-cli routing (#23).
 ## P2: Robustness
 
 40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing

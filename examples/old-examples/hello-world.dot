@@ -11,7 +11,7 @@
 //   shape=parallelogram→ Tool (run a built-in tool or a shell command)
 //   shape=hexagon      → Interviewer (ask a human)
 //   shape=component    → Parallel (fan-out concurrent execution)
-//   shape=house        → Manager (coordinator node)
+//   shape=house        → Manager (LLM coordinator)
 //
 // Run this pipeline:
 //   smasher run examples/hello-world.dot
