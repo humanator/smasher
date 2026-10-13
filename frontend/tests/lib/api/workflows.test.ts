@@ -139,13 +139,13 @@ describe('workflows API client - graph load and save with ETag', () => {
     await expect(workflows.updateWorkflowGraph(id, graph, next ?? undefined)).resolves.toBeTruthy();
   });
 
-  it('rejects a stale save with status 409 and the server message, leaving the file alone', async () => {
+  it('rejects a stale save with status 412 and the server message, leaving the file alone', async () => {
     const { graph, etag } = await workflows.getWorkflowGraph(id);
     appendFileSync(path, '// edited elsewhere\n');
     const changed = readFileSync(path, 'utf-8');
 
     await expect(workflows.updateWorkflowGraph(id, graph, etag ?? undefined)).rejects.toMatchObject({
-      status: 409,
+      status: 412,
       message: expect.stringContaining('changed on disk'),
     });
     expect(readFileSync(path, 'utf-8')).toBe(changed);

@@ -18,6 +18,10 @@ pub enum WebError {
     #[error("conflict: {0}")]
     Conflict(String),
 
+    /// A conditional request's precondition (e.g. `If-Match`) didn't hold.
+    #[error("precondition failed: {0}")]
+    PreconditionFailed(String),
+
     #[error("internal error: {0}")]
     Internal(String),
 
@@ -43,6 +47,7 @@ impl IntoResponse for WebError {
             WebError::NotFound(_) => StatusCode::NOT_FOUND,
             WebError::BadRequest(_) => StatusCode::BAD_REQUEST,
             WebError::Conflict(_) => StatusCode::CONFLICT,
+            WebError::PreconditionFailed(_) => StatusCode::PRECONDITION_FAILED,
             WebError::Unprocessable(_) => StatusCode::UNPROCESSABLE_ENTITY,
             WebError::Internal(_) | WebError::Pipeline(_) | WebError::Io(_) | WebError::Json(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -81,6 +86,13 @@ mod tests {
         let err = WebError::Conflict("workflow exists".into());
         let response = err.into_response();
         assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn precondition_failed_returns_412() {
+        let err = WebError::PreconditionFailed("stale".into());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::PRECONDITION_FAILED);
     }
 
     #[test]

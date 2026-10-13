@@ -404,7 +404,7 @@ The default server binds to `127.0.0.1:21541`.
 | `POST` | `/api/workflows/import` | Save raw DOT as a new workflow under `{data_dir}/workflows` (used by the catalog's "Import .dot"). |
 | `POST` | `/api/workflows/new` | Save a new workflow from editor JSON (used by node-editor). |
 | `GET` | `/api/workflows/{id}/graph` | Return a workflow's graph as editor JSON, with an `ETag` (used by node-editor). |
-| `PUT` | `/api/workflows/{id}/graph` | Update an existing workflow's graph; `If-Match` refuses a stale save with 409 (used by node-editor). |
+| `PUT` | `/api/workflows/{id}/graph` | Update an existing workflow's graph; `If-Match` refuses a stale save with 412 (used by node-editor). |
 | `POST` | `/api/runs/{id}/gallery/{qid}/decision` | Submit a gallery-gate decision (used by gallery-gate component). |
 | `GET` | `/` (and any unmatched non-`/api`/`/questions`/`/gallery` path) | Serve the `smasher-spa` static bundle, with SPA-style fallback to `index.html` for unmatched paths. |
 
@@ -864,7 +864,7 @@ file contents, good for the next save's `If-Match`.
 |---|---|
 | 400 | The graph has an unknown `node_type` or an unsupported attribute value. |
 | 404 | `id` doesn't match a discovered workflow. |
-| 409 | `If-Match` doesn't match: the file changed on disk since it was loaded. The file is untouched. |
+| 412 | `If-Match` doesn't match: the file changed on disk since it was loaded. The file is untouched. |
 | 422 | The rendered graph doesn't re-parse or resolve (e.g. duplicate node ids). The file is untouched. |
 
 ### POST /api/runs/{id}/gallery/{qid}/decision -- Gallery-Gate Decision
