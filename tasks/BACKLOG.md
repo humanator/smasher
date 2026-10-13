@@ -54,10 +54,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     compare flat strings and `_tool_<id>` holds a JSON object. Replace it (for
     example with `outcome=success` or `tool.exit_code=0`), or teach conditions
     to read nested values.
-37. **Fix the node shapes in `smasher-conformance/src/convert.rs`** and its
-    test table: Tool and Parallel are swapped (`component`/`parallelogram`),
-    FanIn should be `tripleoctagon` not `trapezium`, and Generic's `ellipse`
-    parses back as Interviewer.
 39. **Delete the legacy `crates/smasher-web/editor-ui/`** and its `/editor-ui`
     mount. The `frontend/` SPA supersedes it.
 
