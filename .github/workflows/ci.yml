@@ -49,6 +49,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [check]
     steps:
       - uses: actions/checkout@v4
@@ -106,6 +107,7 @@ jobs:
   msrv:
     name: MSRV (1.92)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [fmt]
     steps:
       - uses: actions/checkout@v4

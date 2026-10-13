@@ -331,11 +331,20 @@ pub fn env_key_is_filtered(key: &str, filter: &[impl AsRef<str>]) -> bool {
 /// Kill a process group given the leader's PID.
 #[cfg(unix)]
 pub fn kill_process_group(pid: u32) {
-    use std::process::Command as StdCommand;
-    // Use kill to send SIGKILL to the process group (negative PID).
-    let _ = StdCommand::new("kill")
-        .args(["-9", &format!("-{pid}")])
-        .output();
+    // Call killpg directly rather than shelling out to `kill -9 -<pid>`:
+    // procps-ng 4.0's `kill` reads `-<pid>` as only its first digit, so
+    // `kill -9 -1234` became `kill(-1, SIGKILL)` and killed every process the
+    // user owns (on CI, the runner itself). Pid 0 would mean our own group.
+    let Ok(pgid) = libc::pid_t::try_from(pid) else {
+        return;
+    };
+    if pgid <= 0 {
+        return;
+    }
+    // SAFETY: killpg only sends a signal; it touches no memory of ours.
+    unsafe {
+        libc::killpg(pgid, libc::SIGKILL);
+    }
 }
 
 /// Map std::io::Error to EnvironmentError, distinguishing not-found and permission errors.
