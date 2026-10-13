@@ -173,21 +173,43 @@ pub async fn launch_pipeline(
         }
     });
 
-    // Subscribe to events and write JSONL log to disk.
+    // Subscribe to events and write JSONL log to disk. Once the engine
+    // returns, `file_log_done` tells the writer to drain what's left and stop,
+    // and the run is only marked finished after that, so a finished run's
+    // `events.jsonl` always ends with its last event.
     let mut file_log_rx = emitter.subscribe();
     let file_sink = smasher_attractor::log_sink::FileLogSink::new(run_directory.event_log_path());
-    tokio::spawn(async move {
+    let (file_log_done, mut file_log_done_rx) = tokio::sync::oneshot::channel::<()>();
+    let file_log_writer = tokio::spawn(async move {
         loop {
-            match file_log_rx.recv().await {
+            let received = tokio::select! {
+                biased;
+                received = file_log_rx.recv() => received,
+                _ = &mut file_log_done_rx => break,
+            };
+            match received {
                 Ok(event) => {
                     if let Err(e) = file_sink.append(event).await {
                         tracing::warn!(error = %e, "failed to write event to JSONL log");
                     }
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                     tracing::warn!(missed = n, "file log subscriber lagged");
                 }
+            }
+        }
+        loop {
+            match file_log_rx.try_recv() {
+                Ok(event) => {
+                    if let Err(e) = file_sink.append(event).await {
+                        tracing::warn!(error = %e, "failed to write event to JSONL log");
+                    }
+                }
+                Err(tokio::sync::broadcast::error::TryRecvError::Lagged(n)) => {
+                    tracing::warn!(missed = n, "file log subscriber lagged");
+                }
+                Err(_) => break,
             }
         }
     });
@@ -332,6 +354,11 @@ pub async fn launch_pipeline(
         } else {
             engine.run(context).await
         };
+
+        let _ = file_log_done.send(());
+        if let Err(e) = file_log_writer.await {
+            tracing::warn!(error = %e, "JSONL log writer task failed");
+        }
 
         let mut runs = runs.write().await;
         if let Some(record) = runs.get_mut(&run_id_clone) {

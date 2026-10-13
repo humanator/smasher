@@ -318,7 +318,7 @@ async fn read_finished_event_log(path: &std::path::Path) -> Vec<Value> {
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     panic!(
-        "events.jsonl at {} never recorded Exit's node_completed:\n{}",
+        "events.jsonl at {} never recorded pipeline_completed:\n{}",
         path.display(),
         std::fs::read_to_string(path).unwrap_or_else(|e| e.to_string())
     );
@@ -415,5 +415,63 @@ async fn test_human_gate_exchange_is_recorded_in_events_jsonl() {
         sse_names.contains(&"human_prompt_issued")
             && sse_names.contains(&"human_response_received"),
         "expected both exchange events on the SSE stream, got {sse_names:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_events_jsonl_is_complete_once_run_reports_completed() {
+    let data_dir = tempfile::tempdir().expect("failed to create data dir");
+    let (base_url, _server) = start_test_server_in(data_dir.path().to_str().unwrap()).await;
+    let client = Client::new();
+
+    let dot = r#"digraph Quick { Start [shape=Mdiamond]; Exit [shape=Msquare]; Start -> Exit; }"#;
+    let submit_body: Value = client
+        .post(format!("{base_url}/api/runs"))
+        .json(&json!({ "dot_source": dot, "variables": {} }))
+        .send()
+        .await
+        .expect("failed to submit pipeline")
+        .json()
+        .await
+        .expect("failed to parse submit response");
+    let run_id = submit_body["run_id"].as_str().expect("run_id").to_string();
+
+    let start = std::time::Instant::now();
+    let summary = loop {
+        let summary: Value = client
+            .get(format!("{base_url}/api/runs/{run_id}"))
+            .send()
+            .await
+            .expect("failed to get run")
+            .json()
+            .await
+            .expect("failed to parse run summary");
+        if summary["status"] != "Running" {
+            break summary;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "run never finished"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    };
+    assert_eq!(summary["status"], "Completed", "{summary}");
+
+    // Read once, without polling: the log must already be fully written.
+    let log_path = data_dir
+        .path()
+        .join(
+            summary["run_working_dir"]
+                .as_str()
+                .expect("run_working_dir"),
+        )
+        .join("events")
+        .join("events.jsonl");
+    let contents = std::fs::read_to_string(&log_path).expect("events.jsonl should exist");
+    let last: Value = serde_json::from_str(contents.lines().last().expect("at least one event"))
+        .expect("events.jsonl line should be JSON");
+    assert_eq!(
+        last["event"]["kind"], "pipeline_completed",
+        "events.jsonl should end in pipeline_completed:\n{contents}"
     );
 }

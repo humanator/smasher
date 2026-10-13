@@ -27,16 +27,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
       `smasher-web/src/run_launch.rs`).
     - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
       from `PATH`.
-29. **Confirm `events.jsonl` is no longer cut short on macOS.** In
-    `crates/smasher-web/tests/events_test.rs`, a gated run's `events.jsonl`
-    was seen stopping at Exit's `node_completed`, without the final
-    `checkpoint_created` and `pipeline_completed`. *Checked 2026-10-13:* it
-    doesn't reproduce on Linux, at today's `main` or at `c5c3a0e` where it was
-    first seen (95 runs, alone and with the whole suite). The file sink keeps
-    polling for 10s, so reading too early isn't the cause either.
-    `test_human_gate_exchange_is_recorded_in_events_jsonl` now waits for
-    `pipeline_completed` and checks both final events, so run it a few times
-    on the Mac: if it passes, close this; if it fails, the cause is macOS-only.
 35. **Decide what manager (`house`) nodes are for.** `docs/quickstart.md`
     calls them human approval gates, but `ManagerHandler` runs an LLM agent
     session and only `old-examples/` use them. Pick one and make the code and
