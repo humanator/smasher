@@ -36,10 +36,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     the test reads too early. Once fixed,
     `test_human_gate_exchange_is_recorded_in_events_jsonl` should wait for
     `pipeline_completed` again.
-33. **Fix the lightbox-resize race in `frontend/e2e/candidate-preview.spec.ts`.**
-    It asserts the iframe's final bounds (`<= 800`) while the resize may still
-    be running, and fails about 1 in 5 local runs. Poll on the final bounds
-    instead.
 34. **Find why a question answer can stall.** Seen once in
     `question-card.spec.ts`: the Approval answer's POST didn't return within
     5s. Suspect: `answer_question` (`routes/questions.rs`) takes

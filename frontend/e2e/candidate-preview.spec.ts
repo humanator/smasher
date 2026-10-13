@@ -128,9 +128,9 @@ test('gate thumbnails open a scaled, interactive lightbox that never toggles the
     await expect
       .poll(async () => {
         const b = (await iframe.boundingBox())!;
-        return b.x + b.width;
+        return b.x + b.width <= 1024 && b.y + b.height <= 768;
       })
-      .toBeLessThanOrEqual(1024);
+      .toBe(true);
     const box = (await iframe.boundingBox())!;
     expect(box.width).toBeGreaterThan(0);
     expect(box.height).toBeGreaterThan(0);
@@ -141,11 +141,15 @@ test('gate thumbnails open a scaled, interactive lightbox that never toggles the
     // Scaled at the capture viewport's 16:10, not reflowed to the window.
     expect(box.width / box.height).toBeCloseTo(1280 / 800, 1);
 
+    // The rescale can take a few frames, so poll until the final bounds fit,
+    // rather than asserting on whatever frame the first shrink landed on.
     await page.setViewportSize({ width: 800, height: 600 });
-    await expect.poll(async () => (await iframe.boundingBox())!.width).toBeLessThan(box.width);
-    const resized = (await iframe.boundingBox())!;
-    expect(resized.x + resized.width).toBeLessThanOrEqual(800);
-    expect(resized.y + resized.height).toBeLessThanOrEqual(600);
+    await expect
+      .poll(async () => {
+        const b = (await iframe.boundingBox())!;
+        return b.width < box.width && b.x + b.width <= 800 && b.y + b.height <= 600;
+      })
+      .toBe(true);
 
     // The iframe stays clickable, its state survives a gate poll, and ⟲ resets it.
     const frame = page.frameLocator('iframe[title="Candidate cand-a"]');
