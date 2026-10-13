@@ -299,7 +299,7 @@ async fn wait_for_question_id(client: &Client, base_url: &str, run_id: &str) -> 
 }
 
 /// Reads the run's `events.jsonl` (unwrapping each `{sequence, event}` entry)
-/// once the file sink has written the Exit node's `node_completed`.
+/// once the file sink has written `pipeline_completed`.
 async fn read_finished_event_log(path: &std::path::Path) -> Vec<Value> {
     let start = std::time::Instant::now();
     while start.elapsed() < Duration::from_secs(10) {
@@ -312,10 +312,7 @@ async fn read_finished_event_log(path: &std::path::Path) -> Vec<Value> {
                 entry["event"].clone()
             })
             .collect();
-        if events
-            .iter()
-            .any(|e| e["kind"] == "node_completed" && e["node_id"] == "Exit")
-        {
+        if events.iter().any(|e| e["kind"] == "pipeline_completed") {
             return events;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -389,6 +386,15 @@ async fn test_human_gate_exchange_is_recorded_in_events_jsonl() {
             .position(|e| e["kind"] == kind && e["node_id"] == "Gate")
             .unwrap_or_else(|| panic!("no {kind} for Gate in {events:#?}"))
     };
+    // The run's final events reach the file too, not only SSE (#29).
+    assert!(
+        events
+            .iter()
+            .any(|e| e["kind"] == "checkpoint_created" && e["node_id"] == "Exit"),
+        "no checkpoint_created for Exit in {events:#?}"
+    );
+    assert_eq!(events.last().unwrap()["kind"], "pipeline_completed");
+
     let prompt = position("human_prompt_issued");
     let response = position("human_response_received");
     let completed = position("node_completed");
