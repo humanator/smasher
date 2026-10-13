@@ -37,11 +37,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     `test_human_gate_exchange_is_recorded_in_events_jsonl` now waits for
     `pipeline_completed` and checks both final events, so run it a few times
     on the Mac: if it passes, close this; if it fails, the cause is macOS-only.
-34. **Find why a question answer can stall.** Seen once in
-    `question-card.spec.ts`: the Approval answer's POST didn't return within
-    5s. Suspect: `answer_question` (`routes/questions.rs`) takes
-    `state.runs.read()` on tokio's write-preferring `RwLock`, so a queued
-    writer (a run finishing) blocks it.
 35. **Decide what manager (`house`) nodes are for.** `docs/quickstart.md`
     calls them human approval gates, but `ManagerHandler` runs an LLM agent
     session and only `old-examples/` use them. Pick one and make the code and

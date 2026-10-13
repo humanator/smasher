@@ -571,13 +571,20 @@ async fn render_graph(
 ) -> Result<axum::response::Response, WebError> {
     use axum::response::IntoResponse;
 
-    let runs = state.runs.read().await;
-    let record = runs
-        .get(&id)
-        .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+    // Copy what the render needs and release the `runs` lock before awaiting
+    // Graphviz. Holding a read lock across the `dot` subprocess let a queued
+    // writer (a run starting or finishing) block every other handler behind
+    // it on tokio's write-preferring RwLock, which stalled question answers
+    // (#34).
+    let (graph, events) = {
+        let runs = state.runs.read().await;
+        let record = runs
+            .get(&id)
+            .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+        (record.graph.clone(), record.event_log.events())
+    };
 
     // Build node status map from event log.
-    let events = record.event_log.events();
     let mut statuses: HashMap<String, NodeExecutionStatus> = HashMap::new();
 
     for event in &events {
@@ -598,7 +605,7 @@ async fn render_graph(
     let renderer = StatusGraphvizRenderer::new(statuses);
     let cached = CachedRenderer::new(renderer);
     let output = cached
-        .render(&record.graph, RenderFormat::Svg)
+        .render(&graph, RenderFormat::Svg)
         .await
         .map_err(|e| WebError::Internal(format!("graph render failed: {e}")))?;
 
