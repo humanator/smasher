@@ -454,9 +454,11 @@ The bundle is machine-local: it serves the SPA build, examples, and design
 kit from this checkout, so keep the repo where it was built.
 
 **Data dir:** the app keeps runs, workflows, and settings in
-`~/Documents/smasher` so they're easy to browse in Finder. Set
-`SMASHER_DATA_DIR` to use another location. The CLI still defaults to
-`~/.smasher`.
+`~/Documents/smasher` so they're easy to browse in Finder. `smasher serve`
+uses the same dir, so the app and the CLI dashboard see the same runs. Set
+`SMASHER_DATA_DIR` to use another location. Older builds used `~/.smasher`;
+if it still holds runs, the server logs a warning at startup. Move them into
+`~/Documents/smasher` to see them in the dashboard.
 
 **LLM settings:** click the gear in the page header. There you set the
 default model and provider, plus each provider's API key and base URL
@@ -515,8 +517,9 @@ every PR to `main`. It fails if `FAKE_CLAUDE_LOG` isn't empty at the end.
 Playwright installs its own Chromium there. `SMASHER_LLM_TESTS` is never set
 in CI, so the two critical-path tests, which spend real tokens, stay skipped.
 
-If the desktop app is left running on that port, its data lives in
-`~/Documents/smasher` instead, and about 50 tests fail for reasons unrelated
+If the desktop app is left running on that port, its data lives in its own
+dir (`~/Documents/smasher` unless it was launched with your
+`SMASHER_DATA_DIR`), and about 50 tests fail for reasons unrelated
 to the code. The gallery tests write candidate manifests straight into
 `SMASHER_DATA_DIR`, so a mismatch shows up as "gallery gate never appeared".
 New tests should reuse the inline graphs in `frontend/tests/fixtures/graphs.ts`

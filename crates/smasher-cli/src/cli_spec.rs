@@ -77,7 +77,7 @@
 /// |----------------------------|--------------------------------------------------|
 /// | `-p`, `--port <PORT>`      | Port to listen on (default: 21541).              |
 /// | `-m`, `--model <MODEL>`    | Default LLM model for pipeline execution.        |
-/// | `--data-dir <PATH>`        | Data directory for run artifacts (default: ~/.smasher). |
+/// | `--data-dir <PATH>`        | Data directory for run artifacts (default: ~/Documents/smasher). |
 ///
 /// ### `smasher ingest`
 ///

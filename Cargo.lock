@@ -4767,7 +4767,6 @@ dependencies = [
 name = "smasher-desktop"
 version = "0.1.0"
 dependencies = [
- "dirs",
  "dotenvy",
  "keyring",
  "reqwest 0.12.28",

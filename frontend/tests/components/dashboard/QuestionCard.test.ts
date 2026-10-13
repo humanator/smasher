@@ -53,8 +53,8 @@ const GALLERY_GATE = `digraph QuestionCardGallery {
   Proceed -> Exit; Iterate -> Exit;
 }`;
 
-// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/.smasher.
-const artifactsRoot = join(process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher'), 'artifacts');
+// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/Documents/smasher.
+const artifactsRoot = join(process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher'), 'artifacts');
 
 async function submitAndWaitForGalleryGate(): Promise<string> {
   const runId = await submitGraph(GALLERY_GATE);
