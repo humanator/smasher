@@ -39,6 +39,48 @@ fn read_report_artifact(
     })
 }
 
+/// Names of the checks that failed in a `lint-report.json` body, or `None` when the
+/// body can't be read as a lint report (`{"checks": [{"name", "passed"}, ...]}`).
+fn failed_lint_checks(lint_report: &str) -> Option<Vec<String>> {
+    let report: Value = serde_json::from_str(lint_report).ok()?;
+    let checks = report.get("checks")?.as_array()?;
+    checks
+        .iter()
+        .filter_map(|check| match check.get("passed").and_then(Value::as_bool) {
+            Some(true) => None,
+            Some(false) => Some(Some(
+                check
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unnamed check")
+                    .to_string(),
+            )),
+            None => Some(None),
+        })
+        .collect()
+}
+
+/// With `lint_must_pass`, a failing (or unreadable) lint report forces `iterate`,
+/// whatever the model recommended. Returns whether the recommendation changed.
+fn apply_lint_override(report: &mut SynthesisReport, lint_report: &str) -> bool {
+    let reason = match failed_lint_checks(lint_report) {
+        Some(failed) if failed.is_empty() => return false,
+        Some(failed) => format!(
+            "system_lint failed ({}), and lint_must_pass forces iterate",
+            failed.join(", ")
+        ),
+        None => "lint-report.json couldn't be read as a lint report, and lint_must_pass \
+                 forces iterate"
+            .to_string(),
+    };
+    if report.recommendation == Recommendation::Iterate {
+        return false;
+    }
+    report.recommendation = Recommendation::Iterate;
+    report.reasons.insert(0, reason);
+    true
+}
+
 fn parse_response(text: &str) -> Result<SynthesisReport, CriticError> {
     let body: SynthesisResponseBody =
         serde_json::from_str(text).map_err(|_| CriticError::UnparseableResponse {
@@ -55,7 +97,9 @@ fn parse_response(text: &str) -> Result<SynthesisReport, CriticError> {
 /// `critic-report.json` in `candidate_dir` (the candidate's own artifact
 /// directory, resolved by the caller from the run's real artifact base).
 ///
-/// `args`: `{candidate_id, model?, provider?}`. A missing
+/// `args`: `{candidate_id, model?, provider?, lint_must_pass?}`. With
+/// `lint_must_pass: true`, any failed check in `lint-report.json` forces the
+/// recommendation to `iterate`, whatever the model says. A missing
 /// `lint-report.json` or `critic-report.json` fails with
 /// `CriticError::MissingArtifact` naming the exact missing file, before any
 /// network call is attempted. `provider` (from `args["provider"]`, falling back
@@ -100,7 +144,11 @@ pub async fn run_synthesis(
             })?;
     let text = response.text().unwrap_or_default();
 
-    parse_response(&text)
+    let mut report = parse_response(&text)?;
+    if args.get("lint_must_pass").and_then(Value::as_bool) == Some(true) {
+        apply_lint_override(&mut report, &lint_report);
+    }
+    Ok(report)
 }
 
 #[cfg(test)]
@@ -136,6 +184,63 @@ mod tests {
         match err {
             CriticError::UnparseableResponse { response } => assert_eq!(response, text),
             other => panic!("expected UnparseableResponse, got {other:?}"),
+        }
+    }
+
+    fn proceed_report() -> SynthesisReport {
+        SynthesisReport {
+            recommendation: Recommendation::Proceed,
+            reasons: vec!["looks good".to_string()],
+        }
+    }
+
+    #[test]
+    fn failing_lint_forces_iterate_and_names_the_failed_checks() {
+        let lint = r#"{"checks": [
+            {"name": "token-adherence", "passed": false, "violations": ["raw red"]},
+            {"name": "kit-component-usage", "passed": true, "violations": []},
+            {"name": "spacing", "passed": false, "violations": ["13px"]}
+        ]}"#;
+        let mut report = proceed_report();
+
+        assert!(apply_lint_override(&mut report, lint));
+        assert_eq!(report.recommendation, Recommendation::Iterate);
+        assert!(report.reasons[0].contains("token-adherence, spacing"));
+        assert_eq!(report.reasons[1], "looks good");
+    }
+
+    #[test]
+    fn passing_lint_leaves_the_model_recommendation_alone() {
+        let lint = r#"{"checks": [{"name": "token-adherence", "passed": true, "violations": []}]}"#;
+        let mut report = proceed_report();
+
+        assert!(!apply_lint_override(&mut report, lint));
+        assert_eq!(report, proceed_report());
+    }
+
+    #[test]
+    fn failing_lint_on_an_iterate_report_adds_no_reason() {
+        let lint = r#"{"checks": [{"name": "spacing", "passed": false, "violations": []}]}"#;
+        let mut report = SynthesisReport {
+            recommendation: Recommendation::Iterate,
+            reasons: vec!["critic found friction".to_string()],
+        };
+
+        assert!(!apply_lint_override(&mut report, lint));
+        assert_eq!(report.reasons, vec!["critic found friction".to_string()]);
+    }
+
+    #[test]
+    fn unreadable_lint_report_forces_iterate() {
+        for lint in [
+            "not json",
+            r#"{"no_checks": true}"#,
+            r#"{"checks": [{"name": "x"}]}"#,
+        ] {
+            let mut report = proceed_report();
+            assert!(apply_lint_override(&mut report, lint), "lint: {lint}");
+            assert_eq!(report.recommendation, Recommendation::Iterate);
+            assert!(report.reasons[0].contains("couldn't be read"));
         }
     }
 

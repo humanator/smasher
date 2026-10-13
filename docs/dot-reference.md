@@ -86,7 +86,7 @@ Runs a built-in tool or a shell command. A tool node sets exactly one of:
   --worktree`), with an optional `timeout`.
 
 ```dot
-lint [shape=parallelogram, tool="system_lint", args="{\"candidate_dir\": \"candidates/a\"}"];
+lint [shape=parallelogram, tool="system_lint", args="{\"candidate_dir\": \"candidates/a\", \"candidate_id\": \"a\"}"];
 
 test [shape=parallelogram, tool_command="npm test", timeout="5m"];
 ```
@@ -95,7 +95,9 @@ A tool node never calls an LLM itself. Only `task_critic` and `synthesis`
 make an LLM call, and only because the node names them. Setting neither
 attribute, or both, fails the node, and `smasher lint` reports it (E004,
 E005). The node's label is not used as a tool name. An unknown `tool` name
-fails with a list of the built-ins.
+fails with a list of the built-ins. The built-ins' `args`, and where their
+`candidate_id` values come from, are in the
+[handler reference](handler-reference.md#candidate-ids).
 
 A command succeeds when it exits 0. Any other exit code fails the node with
 `exit code N: <end of stderr>`, and a timeout or cancellation kills the

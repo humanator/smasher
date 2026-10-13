@@ -45,18 +45,8 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
-Batch #7, #8 and #11 together: several-candidate critique decides the
-`candidate_id` convention, and the lint override lives in the same `synthesis`
-code.
-
-7. **Critique several candidates from one node**, instead of writing one
-   `task_critic`/`synthesis` node per candidate. Most likely to be needed first.
-8. **Let a failing lint force `synthesis` to recommend `iterate`**, whatever
-   the model says.
 10. **Support two gallery gates pending on one run at once.** Needs a mapping
     from node id to question in the engine first.
-11. **Document where `candidate_id` values come from** for pipeline authors
-    (today they're hardcoded as `discover-a`..`d`).
 12. **Settle the shape of `generation_params`** (a free-form string map today).
 13. **Grow the design-kit components** (`select`, `checkbox`, `tabs`) **and the
     `system-lint` usage rules** to match.
