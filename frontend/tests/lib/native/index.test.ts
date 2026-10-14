@@ -1,10 +1,28 @@
 // ABOUTME: Tests for the native shim module
 // ABOUTME: Tests browser fallback behavior (Tauri doesn't exist in test environment)
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as native from '../../../src/lib/native/index';
 
 describe('native shim', () => {
+  describe('markNativeWindow', () => {
+    afterEach(() => {
+      delete window.__TAURI__;
+      delete document.documentElement.dataset.native;
+    });
+
+    it('leaves <html> unmarked in a plain browser', () => {
+      native.markNativeWindow();
+      expect(document.documentElement.hasAttribute('data-native')).toBe(false);
+    });
+
+    it('sets data-native on <html> inside the desktop app', () => {
+      window.__TAURI__ = { core: { invoke: async () => undefined as never } };
+      native.markNativeWindow();
+      expect(document.documentElement.hasAttribute('data-native')).toBe(true);
+    });
+  });
+
   describe('isTauri', () => {
     it('should return false when window.__TAURI__ is not present', () => {
       expect(native.isTauri()).toBe(false);

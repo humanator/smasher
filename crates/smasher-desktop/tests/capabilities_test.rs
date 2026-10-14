@@ -78,6 +78,8 @@ fn app_command_permissions() -> Vec<String> {
 #[test]
 fn remote_capabilities_grant_only_native_shim_permissions() {
     const ALLOWED_PREFIXES: [&str; 3] = ["notification:", "dialog:", "fs:"];
+    // The toolbar and sidebar header are `data-tauri-drag-region`s, which call start_dragging.
+    const ALLOWED_EXACT: [&str; 1] = ["core:window:allow-start-dragging"];
     let app_commands = app_command_permissions();
 
     for (path, cap) in capabilities() {
@@ -87,6 +89,7 @@ fn remote_capabilities_grant_only_native_shim_permissions() {
         for id in permission_ids(&cap) {
             assert!(
                 ALLOWED_PREFIXES.iter().any(|prefix| id.starts_with(prefix))
+                    || ALLOWED_EXACT.contains(&id.as_str())
                     || app_commands.contains(&id),
                 "{} grants {id} to a remote origin",
                 path.display()
@@ -100,12 +103,14 @@ fn served_origin_holds_the_permissions_the_native_shim_calls() {
     // frontend/src/lib/native/index.ts: saveFile -> dialog.save + fs.writeTextFile,
     // loadFile -> dialog.open + fs.readTextFile,
     // showNotification -> notification.sendNotification.
-    const NEEDED: [&str; 5] = [
+    // The drag regions in the toolbar and sidebar header -> window.start_dragging.
+    const NEEDED: [&str; 6] = [
         "dialog:allow-save",
         "fs:allow-write-text-file",
         "dialog:allow-open",
         "fs:allow-read-text-file",
         "notification:default",
+        "core:window:allow-start-dragging",
     ];
     let granted: Vec<String> = capabilities()
         .into_iter()

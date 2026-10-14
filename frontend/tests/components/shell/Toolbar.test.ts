@@ -20,6 +20,23 @@ describe('Toolbar', () => {
     expect(headings[0].textContent?.trim()).toBe('Smasher Pipelines');
   });
 
+  it('is a window drag region, with its controls still clickable', () => {
+    render(Toolbar, { props: { title: 'Runs', actions: actionsSnippet } });
+    const header = screen.getByRole('banner');
+    expect(header.hasAttribute('data-tauri-drag-region')).toBe(true);
+    const button = within(header).getByRole('button', { name: 'Do the thing' });
+    // Tauri only drags when the mousedown target itself is the region, so child controls still click.
+    expect(button.hasAttribute('data-tauri-drag-region')).toBe(false);
+  });
+
+  it('renders a leading snippet ahead of the title', () => {
+    render(Toolbar, { props: { title: 'Runs', leading: actionsSnippet } });
+    const header = screen.getByRole('banner');
+    const button = within(header).getByRole('button', { name: 'Do the thing' });
+    const heading = within(header).getByRole('heading', { level: 1 });
+    expect(button.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('is 52px tall', () => {
     render(Toolbar, { props: { title: 'x' } });
     expect(screen.getByRole('banner').className).toContain('h-[52px]');

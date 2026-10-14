@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use smasher_desktop::bootstrap;
 use smasher_desktop::commands::{self, ServerHandle, SettingsLocation};
 use smasher_desktop::settings::{self, KEYCHAIN_SERVICE, Keychain};
+#[cfg(target_os = "macos")]
+use tauri::TitleBarStyle;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tokio_util::sync::CancellationToken;
@@ -72,10 +74,16 @@ fn main() {
                     let url = bootstrap::window_url(dev_server, server.addr);
                     tracing::info!(%url, "opening window");
                     let url = url.parse()?;
-                    WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+                    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
                         .title("Smasher")
-                        .inner_size(1440.0, 900.0)
-                        .build()?;
+                        .inner_size(1440.0, 900.0);
+                    // The content runs under a transparent title bar so the real traffic lights
+                    // sit inside the SPA's sidebar header.
+                    #[cfg(target_os = "macos")]
+                    let window = window
+                        .title_bar_style(TitleBarStyle::Overlay)
+                        .hidden_title(true);
+                    window.build()?;
                 }
                 Err(e) => {
                     tracing::error!(error = %e, "embedded server failed to start");

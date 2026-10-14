@@ -34,6 +34,14 @@ export function isTauri(): boolean {
 }
 
 /**
+ * Marks <html> with `data-native` inside the desktop app, so styles can tell it apart from a
+ * browser. Call once before the app mounts.
+ */
+export function markNativeWindow(): void {
+  if (isTauri()) document.documentElement.dataset.native = '';
+}
+
+/**
  * Save a file to disk.
  * Tauri: uses Tauri dialog.save() + fs.writeTextFile()
  * Browser: creates a download link and triggers download

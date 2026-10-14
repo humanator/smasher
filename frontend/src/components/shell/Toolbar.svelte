@@ -27,6 +27,7 @@
 </script>
 
 <header
+  data-tauri-drag-region
   class="sticky top-0 z-10 flex h-[52px] shrink-0 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70"
 >
   {#if leading}
