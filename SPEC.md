@@ -1,11 +1,12 @@
 # Spec: Smasher frontend redesign
 
-Status: **DRAFT — capability map awaiting approval.** Module specs (`SPEC-<module-id>.md`) are
-written only after this map is approved, in build order.
+Status: **Capability map approved 2026-10-14.** Module specs (`SPEC-<module-id>.md`) are
+written in build order, and each one is approved before it is planned.
 
 Design source: Claude Design canvas "Smasher Workflow Editor Redesign"
 (https://claude.ai/artifact/YQ7Hstw2od9Bx5wCi2JdtZ). Artboards: `Home` (Dashboard),
 `Workflow` (Workflow detail), `Run`, `Main` (Workflow editor), `Components` + 14 component boards.
+Offline copies are in [docs/design/redesign/](docs/design/redesign/README.md).
 
 ## Objective
 
@@ -151,12 +152,10 @@ Each module spec refines these into testable conditions.
    `cargo test -p smasher-web` and clippy all pass with zero warnings.
 4. Light and dark themes both meet WCAG AA contrast.
 
-## Open Questions
+## Resolved Questions
 
-1. **Dark mode.** The design is light only. I plan to derive a dark palette from the same tokens
-   (macOS dark source list, same accent hue). OK, or should dark mode be dropped?
-2. **Design references in-repo.** Should I copy the artboard `.dc.html` files into
-   `docs/design/redesign/` so implementers and future sessions can read them offline?
-3. **Components board.** It says the Manrope/Figtree fonts and the current tokens are in use.
-   With decision 2 that board is out of date. Should I update the canvas to match once
-   `shell-theme` lands?
+1. **Dark mode:** derive a dark palette from the same tokens (macOS dark source list, same
+   accent hue). It follows the OS setting.
+2. **Design references:** copied to `docs/design/redesign/`.
+3. **Components board:** update the canvas to match once `shell-theme` lands. This is a
+   follow-up and is not in any module's scope.

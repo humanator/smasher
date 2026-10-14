@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Switch component</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4) !important}
+</style>
+</helmet>
+<label style="{{rowStyle}}">
+  <button type="button" role="switch" aria-checked="{{isOn}}" aria-label="{{label}}" disabled="{{isDisabled}}" onClick="{{onPress}}" style="{{trackStyle}}"><span style="{{thumbStyle}}"></span></button>
+  <sc-if value="{{showLabel}}" hint-placeholder-val="{{ true }}"><span style="font-size:13px;line-height:1.2">{{label}}</span></sc-if>
+</label>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"label":{"editor":"text","default":"Allow retries"},"hideLabel":{"editor":"boolean","default":false},"checked":{"editor":"boolean","default":false},"size":{"editor":"enum","default":"default","options":["default","sm"]},"state":{"editor":"enum","default":"default","options":["default","disabled"]},"onToggle":{"editor":null},"$preview":{"width":220,"height":24}}'>
+// macOS switch. Same API as the shadcn switch it replaces. Give it onToggle(newBool) to control it from a screen.
+class Component extends DCLogic {
+  state = { on: null };
+  renderVals() {
+    const p = this.props;
+    const controlled = typeof p.onToggle === 'function';
+    const on = controlled ? !!p.checked : (this.state.on ?? !!p.checked);
+    const sm = p.size === 'sm';
+    const w = sm ? 26 : 38, h = sm ? 15 : 22, t = h - 2;
+    const dis = p.state === 'disabled';
+    return {
+      label: p.label ?? 'Switch', showLabel: !p.hideLabel, isOn: on, isDisabled: dis,
+      onPress: () => { if (controlled) p.onToggle(!on); else this.setState({ on: !on }); },
+      rowStyle: 'display:inline-flex;align-items:center;gap:8px;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#1D1D1F;opacity:' + (dis ? .45 : 1) + ';cursor:default',
+      trackStyle: 'box-sizing:border-box;flex:none;position:relative;width:' + w + 'px;height:' + h + 'px;padding:0;border:0;border-radius:999px;cursor:inherit;transition:background .15s;background:' + (on ? '#BE185D' : 'rgba(0,0,0,.09)') + ';box-shadow:inset 0 0 0 .5px rgba(0,0,0,' + (on ? '.1' : '.12') + ');',
+      thumbStyle: 'position:absolute;top:1px;left:1px;width:' + t + 'px;height:' + t + 'px;border-radius:999px;background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2.5px rgba(0,0,0,.25);transition:transform .15s;transform:translateX(' + (on ? w - t - 2 : 0) + 'px);'
+    };
+  }
+}
+</script>
+</body>
+</html>

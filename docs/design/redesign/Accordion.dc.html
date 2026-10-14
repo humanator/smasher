@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Accordion component</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4)}
+</style>
+</helmet>
+<div style="{{wrapStyle}}">
+  <sc-for list="{{items}}" as="it" hint-placeholder-count="3">
+    <div style="border-bottom:1px solid rgba(0,0,0,.08)">
+      <button type="button" aria-expanded="{{it.open}}" onClick="{{it.onPress}}" style="width:100%;display:flex;align-items:center;gap:6px;padding:9px 10px;background:transparent;border:0;font:inherit;font-size:13px;font-weight:600;color:#1D1D1F;text-align:left;cursor:default">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="#6E6E73" aria-hidden="true" style="{{it.chevron}}"><path d="M8 4l10 8-10 8z"/></svg>
+        <span>{{it.title}}</span>
+      </button>
+      <sc-if value="{{it.open}}" hint-placeholder-val="{{ false }}"><div style="padding:0 10px 10px 26px;font-size:13px;line-height:1.45;color:#6E6E73">{{it.body}}</div></sc-if>
+    </div>
+  </sc-for>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"items":{"editor":"text","default":"Anthropic~Key saved. Claude models are available.|OpenAI~No key yet. Add one to use GPT models.|Local~Runs on your computer, no key needed."},"open":{"editor":"text","default":"Anthropic"},"onChange":{"editor":null},"$preview":{"width":420,"height":200}}'>
+// macOS disclosure rows in a grouped box. Same API as the shadcn accordion it replaces.
+// `items` is "Title~Body" pairs separated by |. `open` is the title of the open item. Give it onChange(title or "") to control it.
+class Component extends DCLogic {
+  state = { v: undefined };
+  renderVals() {
+    const p = this.props;
+    const rows = String(p.items ?? '').split('|').map((x) => x.trim()).filter(Boolean).map((x) => {
+      const i = x.indexOf('~');
+      return i < 0 ? { t: x, b: '' } : { t: x.slice(0, i).trim(), b: x.slice(i + 1).trim() };
+    });
+    const controlled = typeof p.onChange === 'function';
+    const cur = controlled ? (p.open || '') : (this.state.v === undefined ? (p.open || '') : this.state.v);
+    return {
+      wrapStyle: 'width:100%;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:rgba(0,0,0,.025);border:1px solid rgba(0,0,0,.08);border-radius:10px;overflow:hidden;',
+      items: rows.map((r) => {
+        const open = r.t === cur;
+        return {
+          title: r.t, body: r.b, open,
+          chevron: 'flex:none;transition:transform .15s;transform:rotate(' + (open ? 90 : 0) + 'deg)',
+          onPress: () => { const next = open ? '' : r.t; if (controlled) p.onChange(next); else this.setState({ v: next }); }
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Textarea component</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+textarea::placeholder{color:#8E8E93}
+textarea:focus{border-color:#BE185D !important;box-shadow:0 0 0 3px rgba(190,24,93,.3) !important}
+</style>
+</helmet>
+<label style="width:100%;min-width:120px;display:flex;flex-direction:column;gap:4px;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#1D1D1F">
+  <sc-if value="{{showLabel}}" hint-placeholder-val="{{ true }}"><span style="font-size:13px;font-weight:500;line-height:1.2">{{label}}</span></sc-if>
+  <sc-if value="{{hasHint}}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;line-height:1.4;color:#6E6E73;font-weight:400">{{hint}}</span></sc-if>
+  <textarea aria-label="{{label}}" rows="{{rows}}" value="{{current}}" placeholder="{{placeholder}}" disabled="{{isDisabled}}" aria-invalid="{{isInvalid}}" spellcheck="false" onChange="{{onChange}}" style="{{style}}"></textarea>
+  <sc-if value="{{hasError}}" hint-placeholder-val="{{ false }}"><span role="alert" style="font-size:11.5px;color:#C4170F;font-weight:400">{{error}}</span></sc-if>
+</label>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"label":{"editor":"text","default":"Notes"},"hideLabel":{"editor":"boolean","default":false},"hint":{"editor":"text","default":""},"value":{"editor":"text","default":""},"placeholder":{"editor":"text","default":"Type here"},"rows":{"editor":"int","default":3,"min":2,"max":12},"mono":{"editor":"boolean","default":false},"state":{"editor":"enum","default":"default","options":["default","focus","invalid","disabled"]},"error":{"editor":"text","default":""},"onInput":{"editor":null},"$preview":{"width":360,"height":150}}'>
+// macOS multi-line text view. Same API as the shadcn textarea it replaces.
+const BASE = 'box-sizing:border-box;min-height:52px;width:100%;padding:5px 8px;border-radius:6px;background:#FFFFFF;border:1px solid rgba(0,0,0,.14);box-shadow:inset 0 .5px 1px rgba(0,0,0,.05);font-family:inherit;font-size:13px;line-height:1.45;color:#1D1D1F;outline:none;resize:vertical;';
+const STATE = {
+  default: '',
+  focus: 'border-color:#BE185D;box-shadow:0 0 0 3px rgba(190,24,93,.3);',
+  invalid: 'border-color:#FF3B30;box-shadow:0 0 0 3px rgba(255,59,48,.22);',
+  disabled: 'opacity:.45;cursor:not-allowed;'
+};
+class Component extends DCLogic {
+  state = { v: null };
+  renderVals() {
+    const p = this.props;
+    const s = STATE[p.state] !== undefined ? p.state : 'default';
+    const controlled = typeof p.onInput === 'function';
+    return {
+      label: p.label ?? 'Notes', showLabel: !p.hideLabel,
+      hint: p.hint ?? '', hasHint: !!p.hint,
+      rows: p.rows ?? 3, placeholder: p.placeholder ?? '',
+      current: controlled ? (p.value ?? '') : (this.state.v ?? p.value ?? ''),
+      onChange: (e) => { if (controlled) p.onInput(e.target.value); else this.setState({ v: e.target.value }); },
+      isDisabled: s === 'disabled', isInvalid: s === 'invalid',
+      style: BASE + (p.mono ? 'font-family:ui-monospace,Menlo,monospace;font-size:12px;' : '') + STATE[s],
+      hasError: s === 'invalid' && !!p.error, error: p.error ?? ''
+    };
+  }
+}
+</script>
+</body>
+</html>

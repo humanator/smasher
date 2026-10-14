@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Toggle group component</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4) !important}
+</style>
+</helmet>
+<div role="group" style="{{groupStyle}}">
+  <sc-for list="{{opts}}" as="o" hint-placeholder-count="2">
+    <button type="button" aria-pressed="{{o.active}}" onClick="{{o.onPress}}" style="{{o.style}}">{{o.label}}</button>
+  </sc-for>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"options":{"editor":"text","default":"Key moments|Everything"},"value":{"editor":"text","default":""},"variant":{"editor":"enum","default":"outline","options":["outline","default"]},"size":{"editor":"enum","default":"default","options":["sm","default"]},"onChange":{"editor":null},"$preview":{"width":280,"height":40}}'>
+// macOS segmented control (select one). `outline` = bordered segments, `default` = recessed track.
+// Same API as the shadcn toggle-group it replaces. `options` is pipe-separated.
+class Component extends DCLogic {
+  state = { v: null };
+  renderVals() {
+    const p = this.props;
+    const names = String(p.options ?? 'Key moments|Everything').split('|').map((x) => x.trim()).filter(Boolean);
+    const controlled = typeof p.onChange === 'function';
+    const cur = controlled ? (p.value || names[0]) : (this.state.v ?? (p.value || names[0]));
+    const outline = p.variant !== 'default';
+    const h = p.size === 'sm' ? 18 : 20;
+    return {
+      groupStyle: 'box-sizing:border-box;display:inline-flex;align-items:center;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;padding:2px;border-radius:7px;' + (outline ? 'background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.16),0 .5px 1.5px rgba(0,0,0,.12);' : 'background:rgba(0,0,0,.06);'),
+      opts: names.map((n, i) => {
+        const on = n === cur;
+        return {
+          label: n,
+          active: on,
+          onPress: () => { if (controlled) p.onChange(n); else this.setState({ v: n }); },
+          style: 'box-sizing:border-box;height:' + h + 'px;padding:0 11px;border:0;border-radius:5px;font:inherit;font-size:' + (p.size === 'sm' ? 12 : 13) + 'px;line-height:1;cursor:default;white-space:nowrap;'
+            + (outline
+              ? (on ? 'background:#BE185D;color:#FFFFFF;font-weight:500;' : 'background:transparent;color:#1D1D1F;')
+              : (on ? 'background:#FFFFFF;color:#1D1D1F;font-weight:500;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.14);' : 'background:transparent;color:#1D1D1F;'))
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

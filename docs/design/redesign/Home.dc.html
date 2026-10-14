@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Smasher dashboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4);border-radius:6px}
+</style>
+</helmet>
+<div style="position:relative;width:100%;min-width:1100px;height:900px;display:flex;background:#FFFFFF;color:#1D1D1F;font-size:13px;line-height:1.38;overflow:hidden">
+
+  <!-- Sidebar (source list) -->
+  <aside aria-label="Sidebar" style="width:220px;flex:none;display:flex;flex-direction:column;background:#EBEBEE;border-right:1px solid rgba(0,0,0,.08)">
+    <div aria-hidden="true" style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 20px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+    </div>
+    <nav aria-label="Library" style="padding:0 10px">
+      <div style="padding:4px 8px 4px;font-size:11px;font-weight:600;color:#636368">Library</div>
+      <a href="Home.dc.html" aria-current="page" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;background:rgba(0,0,0,.09)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v12M18 9v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+        <span style="flex:1">Workflows</span><span style="font-size:12px;color:#636368">6</span>
+      </a>
+      <a href="#runs" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg>
+        <span style="flex:1">Recent runs</span><span style="font-size:12px;color:#636368">6</span>
+      </a>
+      <a href="Run.dc.html" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+        <span style="flex:1">Needs you</span><span style="min-width:18px;height:16px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:#BE185D;color:#FFFFFF;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">1</span>
+      </a>
+    </nav>
+    <nav aria-label="Workflows" style="padding:14px 10px 0;flex:1;min-height:0;overflow:auto">
+      <div style="padding:4px 8px 4px;font-size:11px;font-weight:600;color:#636368">Workflows</div>
+      <sc-for list="{{sideWf}}" as="s" hint-placeholder-count="6">
+        <a href="Workflow.dc.html" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3v5h5"/></svg>
+          <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{s.title}}</span>
+          <span style="{{s.dot}}" aria-hidden="true"></span>
+        </a>
+      </sc-for>
+    </nav>
+    <div style="flex:none;padding:10px 18px 14px;font-size:11px;line-height:1.4;color:#636368">Smasher · 1 run needs your decision</div>
+  </aside>
+
+  <!-- Main column -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <!-- Unified toolbar -->
+    <header style="height:52px;flex:none;display:flex;align-items:center;gap:6px;padding:0 12px 0 20px;border-bottom:1px solid rgba(0,0,0,.08)">
+      <div style="flex:1;min-width:0">
+        <h1 style="margin:0;font-size:15px;font-weight:700;line-height:1.2">Workflows</h1>
+        <div style="font-size:11px;color:#6E6E73">{{wfCount}} · 1 needs you</div>
+      </div>
+      <div style="width:210px;margin-right:6px"><dc-import name="Input" label="Search workflows" hide-label="{{ true }}" search="{{ true }}" placeholder="Search" value="{{search}}" on-input="{{onSearch}}" hint-size="210px,28px"></dc-import></div>
+      <dc-import name="Button" variant="ghost" size="icon" label="Import .dot file" icon="upload" hint-size="28px,28px"></dc-import>
+      <dc-import name="Button" variant="ghost" size="icon" label="AI model settings" icon="settings" on-press="{{openSettings}}" hint-size="28px,28px"></dc-import>
+      <dc-import name="Button" variant="ghost" size="icon" label="New workflow" icon="plus" href="Main.dc.html" hint-size="28px,28px"></dc-import>
+    </header>
+
+    <!-- Needs-you banner -->
+    <section aria-label="Waiting for you" style="flex:none;display:flex;align-items:center;gap:12px;padding:10px 20px;background:#FCEEF4;border-bottom:1px solid rgba(190,24,93,.18)">
+      <span style="flex:none;width:28px;height:28px;border-radius:50%;background:#BE185D;display:flex;align-items:center;justify-content:center">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+      </span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">Design concepts review is waiting for your decision</div>
+        <div style="font-size:12px;color:#9D174D">Pick a favourite · 3 candidates ready · waiting 6 minutes</div>
+      </div>
+      <dc-import name="Button" variant="default" label="Review Candidates" href="Run.dc.html" hint-size="140px,24px"></dc-import>
+    </section>
+
+    <div style="flex:1;min-height:0;overflow:auto;padding:20px 24px 32px">
+
+      <!-- Workflows table -->
+      <section id="workflows" aria-labelledby="wf-h">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px">
+          <h2 id="wf-h" style="margin:0;font-size:15px;font-weight:700">All workflows</h2>
+        </div>
+        <p style="margin:0 0 10px;font-size:12px;color:#6E6E73">A workflow is a saved set of steps. Open one to see its runs, edit it, or start a new run.</p>
+        <div style="border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:minmax(0,2fr) 130px 150px 130px 132px;gap:12px;align-items:center;height:26px;padding:0 12px;background:#F7F7F9;border-bottom:1px solid rgba(0,0,0,.1);font-size:11px;font-weight:600;color:#6E6E73">
+            <span>Name</span><span>Status</span><span>Last activity</span><span>Location</span><span></span>
+          </div>
+          <sc-if value="{{noWf}}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:16px 12px;font-size:13px;color:#6E6E73">No workflows match that search.</p>
+          </sc-if>
+          <sc-for list="{{workflows}}" as="w" hint-placeholder-count="6">
+            <div style="{{w.rowStyle}}">
+              <span style="min-width:0">
+                <a href="Workflow.dc.html" style="display:block;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{w.title}}</a>
+                <span style="display:block;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6E6E73;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{w.file}}</span>
+              </span>
+              <span><dc-import name="Badge" variant="{{w.variant}}" label="{{w.status}}" dot="{{w.dot}}" hint-size="80px,18px"></dc-import></span>
+              <span style="font-size:12px;color:#3A3A3C">{{w.when}}</span>
+              <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6E6E73">{{w.source}}</span>
+              <span style="display:flex;justify-content:flex-end;gap:6px">
+                <dc-import name="Button" variant="outline" size="sm" label="Edit" href="Main.dc.html" hint-size="44px,22px"></dc-import>
+                <dc-import name="Button" variant="outline" size="sm" label="Run…" icon="play" on-press="{{w.onRun}}" hint-size="62px,22px"></dc-import>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <!-- Runs table -->
+      <section id="runs" aria-labelledby="runs-h" style="margin-top:28px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:2px">
+          <h2 id="runs-h" style="margin:0;font-size:15px;font-weight:700">Recent runs</h2>
+          <span style="flex:1"></span>
+          <dc-import name="ToggleGroup" variant="default" options="{{filterOpts}}" value="{{filterValue}}" on-change="{{onFilter}}" hint-size="380px,24px"></dc-import>
+        </div>
+        <p style="margin:0 0 10px;font-size:12px;color:#6E6E73">Every time a workflow runs, it shows up here. “Needs you” means the run is paused and waiting for an answer.</p>
+        <div style="border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:130px minmax(0,1fr) 170px 120px;gap:12px;align-items:center;height:26px;padding:0 12px;background:#F7F7F9;border-bottom:1px solid rgba(0,0,0,.1);font-size:11px;font-weight:600;color:#6E6E73">
+            <span>Status</span><span>Workflow</span><span>Started</span><span>Duration</span>
+          </div>
+          <sc-if value="{{noRuns}}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:16px 12px;font-size:13px;color:#6E6E73">No runs in this view.</p>
+          </sc-if>
+          <sc-for list="{{runs}}" as="r" hint-placeholder-count="6">
+            <a href="Run.dc.html" style="{{r.rowStyle}}">
+              <span><dc-import name="Badge" variant="{{r.variant}}" label="{{r.status}}" dot="{{r.dot}}" hint-size="80px,18px"></dc-import></span>
+              <span style="min-width:0;display:flex;align-items:baseline;gap:8px">
+                <span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{r.workflow}}</span>
+                <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6E6E73">{{r.id}}</span>
+              </span>
+              <span style="font-size:12px;color:#3A3A3C">{{r.started}}</span>
+              <span style="font-size:12px;color:#6E6E73;font-variant-numeric:tabular-nums">{{r.duration}}</span>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Run sheet -->
+  <sc-if value="{{runOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;align-items:flex-start;padding:40px 16px;box-sizing:border-box;background:rgba(0,0,0,.14);overflow:auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="run-h" style="width:100%;max-width:520px;box-sizing:border-box;background:#F6F6F8;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px;box-shadow:0 0 0 .5px rgba(0,0,0,.22),0 24px 60px rgba(0,0,0,.3)">
+        <div>
+          <h2 id="run-h" style="margin:0;font-size:13px;font-weight:700">Run “{{dlgName}}”</h2>
+          <p style="margin:4px 0 0;font-size:12px;line-height:1.45;color:#6E6E73">Everything here is optional. Leave a field blank and the workflow uses its usual behaviour.</p>
+        </div>
+
+        <dc-import name="Textarea" label="Brief" hint="A short note on what this run is for. It is passed to the workflow as a value called “brief”, so steps and prompts can use it." placeholder="e.g. Three concepts for a mobile checkout that feels calmer" value="{{rBrief}}" on-input="{{onBrief}}" hint-size="100%,110px"></dc-import>
+
+        <dc-import name="Input" label="Model" hint="Which AI model to use for this run. Leave blank to use your default model from Settings." placeholder="Default model" value="{{rModel}}" on-input="{{onModel}}" hint-size="100%,70px"></dc-import>
+
+        <dc-import name="Textarea" label="Extra values" hint="Extra information to hand to the workflow, one per line as name=value. Steps and rules can read each one by its name. A brief written above takes priority over a brief= line here." placeholder="audience=first-time buyers" mono="{{ true }}" value="{{rVars}}" on-input="{{onVars}}" state="{{varsState}}" error="{{varsErrorText}}" hint-size="100%,130px"></dc-import>
+
+        <button type="button" aria-expanded="{{advOpen}}" onClick="{{toggleAdv}}" style="display:flex;align-items:center;gap:6px;padding:0;border:0;background:transparent;font-size:13px;color:#1D1D1F;cursor:default;text-align:left">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#6E6E73" aria-hidden="true" style="{{advChev}}"><path d="M8 4l10 8-10 8z"/></svg>
+          Advanced: change the model for individual steps
+        </button>
+        <sc-if value="{{advOpen}}" hint-placeholder-val="{{ false }}">
+          <dc-import name="Textarea" label="Step overrides (JSON)" hint="Swap the model or provider for particular steps, for this run only, without editing the workflow. Use the step’s ID from the workflow file, not its name on the canvas." placeholder="{{overPlaceholder}}" mono="{{ true }}" value="{{rOver}}" on-input="{{onOver}}" state="{{overState}}" error="{{overErrorText}}" hint-size="100%,150px"></dc-import>
+        </sc-if>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+          <dc-import name="Button" variant="outline" label="Cancel" on-press="{{closeDialog}}" hint-size="72px,24px"></dc-import>
+          <dc-import name="Button" variant="default" label="Start Run" href="Run.dc.html" hint-size="84px,24px"></dc-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- Settings window -->
+  <sc-if value="{{setOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:0;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:center;align-items:flex-start;padding:60px 16px;box-sizing:border-box;background:rgba(0,0,0,.06);overflow:auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="set-h" style="width:100%;max-width:620px;box-sizing:border-box;background:#F6F6F8;border-radius:12px;overflow:hidden;box-shadow:0 0 0 .5px rgba(0,0,0,.25),0 30px 80px rgba(0,0,0,.35)">
+        <!-- Settings toolbar -->
+        <div style="position:relative;padding:12px 16px 8px;border-bottom:1px solid rgba(0,0,0,.08);background:#F0F0F2">
+          <div style="position:absolute;left:16px;top:14px;display:flex;gap:8px">
+            <button type="button" aria-label="Close settings" onClick="{{closeDialog}}" style="width:12px;height:12px;padding:0;border:0;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12);cursor:default"></button>
+            <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#D6D6D9;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)"></span>
+            <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#D6D6D9;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)"></span>
+          </div>
+          <h2 id="set-h" style="margin:0 0 8px;text-align:center;font-size:13px;font-weight:700">{{tabTitle}}</h2>
+          <div role="tablist" aria-label="Settings sections" style="display:flex;justify-content:center;gap:4px">
+            <sc-for list="{{setTabs}}" as="t" hint-placeholder-count="3">
+              <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.onPick}}" style="{{t.style}}">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{t.icon}}"/></svg>
+                <span style="font-size:11px">{{t.label}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px;max-height:520px;overflow:auto">
+          <!-- Defaults -->
+          <sc-if value="{{tabDefaults}}" hint-placeholder-val="{{ true }}">
+            <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:10px">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px;align-items:center;padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.07)">
+                <div>
+                  <div style="font-size:13px">Default model</div>
+                  <div style="margin-top:2px;font-size:11.5px;line-height:1.4;color:#6E6E73">The model AI steps use when neither the run nor the step asks for a specific one.</div>
+                </div>
+                <dc-import name="Input" label="Default model" hide-label="{{ true }}" placeholder="claude-sonnet-5" value="{{sModel}}" on-input="{{onSModel}}" hint-size="230px,24px"></dc-import>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:16px;align-items:center;padding:12px 14px">
+                <div>
+                  <div style="font-size:13px">Default provider</div>
+                  <div style="margin-top:2px;font-size:11.5px;line-height:1.4;color:#6E6E73">Which service to send requests to. “Infer from model name” works it out from the model you chose.</div>
+                </div>
+                <dc-import name="Select" label="Default provider" hide-label="{{ true }}" options="{{provOptions}}" value="{{provValue}}" on-input="{{onProv}}" hint-size="230px,24px"></dc-import>
+              </div>
+            </div>
+            <p style="margin:0;font-size:11.5px;line-height:1.45;color:#6E6E73">API keys are stored in your Mac’s Keychain. Changes apply after Smasher restarts.</p>
+          </sc-if>
+
+          <!-- Services -->
+          <sc-if value="{{tabServices}}" hint-placeholder-val="{{ false }}">
+            <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:10px;overflow:hidden">
+              <sc-for list="{{providers}}" as="p" hint-placeholder-count="4">
+                <div style="border-bottom:1px solid rgba(0,0,0,.07)">
+                  <button type="button" aria-expanded="{{p.open}}" onClick="{{p.onToggle}}" style="width:100%;display:flex;align-items:center;gap:8px;padding:10px 14px;border:0;background:transparent;text-align:left;font-size:13px;color:#1D1D1F;cursor:default">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#6E6E73" aria-hidden="true" style="{{p.chev}}"><path d="M8 4l10 8-10 8z"/></svg>
+                    <span style="font-weight:500">{{p.label}}</span>
+                    <span style="margin-left:auto"><dc-import name="Badge" variant="{{p.badgeVariant}}" label="{{p.keyText}}" dot="{{p.badgeDot}}" hint-size="72px,18px"></dc-import></span>
+                  </button>
+                  <sc-if value="{{p.open}}" hint-placeholder-val="{{ false }}">
+                    <div style="padding:2px 14px 14px 32px;display:flex;flex-direction:column;gap:12px">
+                      <div style="display:flex;gap:8px;align-items:flex-end">
+                        <div style="flex:1;min-width:0"><dc-import name="Input" label="API key" type="password" hint="The secret that lets Smasher use your account with {{p.label}}. It is saved to the Keychain, never into a workflow." placeholder="{{p.keyHint}}" hint-size="100%,80px"></dc-import></div>
+                        <sc-if value="{{p.canRemove}}" hint-placeholder-val="{{ false }}"><dc-import name="Button" variant="outline" label="Remove" on-press="{{p.onRemove}}" hint-size="72px,24px"></dc-import></sc-if>
+                      </div>
+                      <dc-import name="Input" label="Base URL" hint="{{p.urlHelp}}" placeholder="Default" hint-size="100%,80px"></dc-import>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <!-- Claude CLI -->
+          <sc-if value="{{tabCli}}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;font-size:12px;line-height:1.45;color:#6E6E73">Run every AI step through the claude command on this Mac, using the account it is signed in to. No API key needed.</p>
+            <div style="background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;gap:8px;align-items:flex-end">
+                <div style="flex:1;min-width:0"><dc-import name="Input" label="Where it is installed" hint="Leave blank and Smasher will find it automatically." placeholder="Find automatically" hint-size="100%,64px"></dc-import></div>
+                <dc-import name="Button" variant="outline" label="Detect" hint-size="64px,24px"></dc-import>
+              </div>
+              <div>
+                <div style="display:flex;align-items:center">
+                  <span style="flex:1"></span>
+                  <dc-import name="Button" variant="link" size="xs" label="Reset to Default" hint-size="100px,18px"></dc-import>
+                </div>
+                <dc-import name="Textarea" label="Tools AI Agent steps may use" hint="One per line, for example Bash(npm run build:*). AI Agent steps can use only what is listed here. Anything else is denied." mono="{{ true }}" rows="{{ 4 }}" value="{{toolsDefault}}" hint-size="100%,150px"></dc-import>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 24px 16px;border-top:1px solid rgba(0,0,0,.06)">
+          <sc-if value="{{sSaved}}" hint-placeholder-val="{{ false }}">
+            <span role="status" style="margin-right:auto;font-size:12px;color:#248A3D;font-weight:500">Saved. Restart Smasher to apply.</span>
+            <dc-import name="Button" variant="outline" label="Restart Now" hint-size="92px,24px"></dc-import>
+          </sc-if>
+          <dc-import name="Button" variant="default" label="Save" on-press="{{saveSettings}}" hint-size="56px,24px"></dc-import>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const WORKFLOWS = [
+  { id: 'w1', title: 'Design concepts review', file: 'design_concepts_review.dot', source: 'workflows/design', status: 'Needs you', when: 'Pick a favourite' },
+  { id: 'w2', title: 'Product design factory', file: 'product_design_factory.dot', source: 'examples', status: 'Running', when: 'Since 10:31 am' },
+  { id: 'w3', title: 'Gallery gate showcase', file: 'gallery_gate_showcase.dot', source: 'examples', status: 'Completed', when: 'Today, 9:05 am' },
+  { id: 'w4', title: 'Consensus task', file: 'consensus_task.dot', source: 'examples', status: 'Completed', when: 'Yesterday' },
+  { id: 'w5', title: 'Human gate showcase', file: 'human_gate_showcase.dot', source: 'examples', status: 'Aborted', when: 'Fri 9 Oct' },
+  { id: 'w6', title: 'Megaplan', file: 'megaplan.dot', source: 'examples', status: 'No runs yet', when: '—' }
+];
+const RUNS = [
+  { id: 'run-7f3a9c', workflow: 'Design concepts review', status: 'Needs you', group: 'active', started: 'Today, 10:42 am', duration: '10 min so far' },
+  { id: 'run-51be20', workflow: 'Product design factory', status: 'Running', group: 'active', started: 'Today, 10:31 am', duration: '21 min so far' },
+  { id: 'run-c902d4', workflow: 'Gallery gate showcase', status: 'Completed', group: 'completed', started: 'Today, 9:05 am', duration: '7 min 48 s' },
+  { id: 'run-1d7e88', workflow: 'Design concepts review', status: 'Failed', group: 'failed', started: 'Yesterday, 4:20 pm', duration: '1 min 2 s' },
+  { id: 'run-aa4107', workflow: 'Consensus task', status: 'Completed', group: 'completed', started: 'Yesterday, 11:12 am', duration: '12 min 30 s' },
+  { id: 'run-0b3c19', workflow: 'Human gate showcase', status: 'Aborted', group: 'failed', started: 'Fri 9 Oct, 3:48 pm', duration: '3 min 5 s' }
+];
+// Badge look per run state: [variant, dot colour]. "Needs you" uses the accent (pink) badge.
+const STATUS_BADGE = {
+  'Needs you': ['default', ''], Running: ['secondary', '#007AFF'], Completed: ['secondary', '#28C840'],
+  Failed: ['destructive', ''], Aborted: ['secondary', '#8E8E93'], 'No runs yet': ['outline', '']
+};
+// Sidebar dot per workflow state (only live ones show)
+const SIDE_DOT = { 'Needs you': '#BE185D', Running: '#007AFF' };
+const PROVIDERS = [
+  { id: 'anthropic', label: 'Anthropic', hasKey: true, hint: '' },
+  { id: 'openai', label: 'OpenAI', hasKey: false, hint: '' },
+  { id: 'gemini', label: 'Gemini', hasKey: false, hint: '' },
+  { id: 'ollama', label: 'Ollama', hasKey: false, hint: 'Ollama Cloud is used by default; enter http://localhost:11434 to use a copy running on this Mac.' }
+];
+const PROV_CHOICES = [{ id: '', label: 'Infer from model name' }].concat(PROVIDERS.map((p) => ({ id: p.id, label: p.label }))).concat([{ id: 'claude-cli', label: 'Claude CLI' }]);
+const URL_HELP = 'Only change this to point at a different server, such as a company proxy. Leave blank to use the standard address.';
+const TOOLS_DEFAULT = 'Read\nWrite\nEdit\nBash(npm run build:*)';
+const SET_TABS = [
+  { id: 'defaults', label: 'Defaults', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z' },
+  { id: 'services', label: 'Services', icon: 'M15 7a4 4 0 1 1-3.5 6L4 20.5V17h3v-3h3l1.5-1.5A4 4 0 0 1 15 7zM16 9h.01' },
+  { id: 'cli', label: 'Claude CLI', icon: 'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM7 10l3 2-3 2M12 15h5' }
+];
+const ROW = 'display:grid;gap:12px;align-items:center;min-height:42px;padding:6px 12px;box-sizing:border-box;border-bottom:1px solid rgba(0,0,0,.05);';
+
+class Component extends DCLogic {
+  state = {
+    search: '', filter: 'all', dialog: '', dlgName: '', sTab: 'defaults',
+    rBrief: '', rModel: '', rVars: '', rOver: '', advOpen: false,
+    sModel: 'claude-sonnet-5', sProvider: '', openProv: 'anthropic', sSaved: false, removed: {}
+  };
+
+  renderVals() {
+    const st = this.state;
+    const q = st.search.trim().toLowerCase();
+
+    const workflows = WORKFLOWS.filter((w) => !q || (w.title + ' ' + w.file).toLowerCase().indexOf(q) >= 0).map((w, i) => {
+      const b = STATUS_BADGE[w.status];
+      return { title: w.title, file: w.file, source: w.source, status: w.status, when: w.when, variant: b[0], dot: b[1],
+        rowStyle: ROW + 'grid-template-columns:minmax(0,2fr) 130px 150px 130px 132px;background:' + (i % 2 ? '#F7F7F9' : '#FFFFFF'),
+        onRun: () => this.setState({ dialog: 'run', dlgName: w.title, advOpen: false }) };
+    });
+    const sideWf = WORKFLOWS.map((w) => ({ title: w.title,
+      dot: 'flex:none;width:7px;height:7px;border-radius:50%;background:' + (SIDE_DOT[w.status] || 'transparent') }));
+
+    const counts = { all: RUNS.length, active: 0, completed: 0, failed: 0 };
+    RUNS.forEach((r) => { counts[r.group] += 1; });
+    const FILTERS = [['all', 'All'], ['active', 'Active'], ['completed', 'Completed'], ['failed', 'Failed or stopped']].map((f) => ({ key: f[0], label: f[1] + ' ' + counts[f[0]] }));
+    const runs = RUNS.filter((r) => st.filter === 'all' || r.group === st.filter).map((r, i) => {
+      const b = STATUS_BADGE[r.status];
+      return { id: r.id, workflow: r.workflow, status: r.status, started: r.started, duration: r.duration, variant: b[0], dot: b[1],
+        rowStyle: ROW + 'grid-template-columns:130px minmax(0,1fr) 170px 120px;min-height:34px;background:' + (i % 2 ? '#F7F7F9' : '#FFFFFF') };
+    });
+
+    /* run sheet validation (mirrors the app's own checks) */
+    let varsErrorText = '';
+    st.rVars.split('\n').some((line, i) => {
+      const l = line.trim(); if (!l) return false;
+      if (l.indexOf('=') < 1) { varsErrorText = 'Line ' + (i + 1) + ': write it as name=value'; return true; }
+      return false;
+    });
+    let overErrorText = '';
+    if (st.rOver.trim()) {
+      try {
+        const o = JSON.parse(st.rOver);
+        const ok = o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every((k) => o[k] && typeof o[k] === 'object' && !Array.isArray(o[k]));
+        if (!ok) overErrorText = 'Expected {"step_id": {"model": "...", "provider": "..."}}';
+      } catch (e) { overErrorText = 'That is not valid JSON yet (' + e.message + ')'; }
+    }
+
+    const providers = PROVIDERS.map((p) => {
+      const open = st.openProv === p.id; const has = p.hasKey && !st.removed[p.id];
+      return { label: p.label, open,
+        onToggle: () => this.setState({ openProv: open ? '' : p.id }),
+        chev: 'flex:none;transition:transform .15s;transform:rotate(' + (open ? '90' : '0') + 'deg)',
+        keyText: has ? 'Key saved' : 'No key', badgeVariant: has ? 'secondary' : 'outline', badgeDot: has ? '#28C840' : '',
+        keyHint: has ? 'Saved. Type to replace.' : 'Paste your API key',
+        urlHelp: URL_HELP + (p.hint ? ' ' + p.hint : ''),
+        canRemove: has, onRemove: () => this.setState({ removed: { ...this.state.removed, [p.id]: true } }) };
+    });
+    const curProv = PROV_CHOICES.filter((c) => c.id === st.sProvider)[0] || PROV_CHOICES[0];
+    const setTabs = SET_TABS.map((t) => {
+      const on = st.sTab === t.id;
+      return { label: t.label, icon: t.icon, on, ink: on ? '#BE185D' : '#6E6E73', onPick: () => this.setState({ sTab: t.id }),
+        style: 'display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;padding:5px 8px 4px;border:0;border-radius:6px;cursor:default;color:' + (on ? '#BE185D' : '#3A3A3C') + ';background:' + (on ? 'rgba(0,0,0,.07)' : 'transparent') };
+    });
+
+    return {
+      search: st.search, onSearch: (v) => this.setState({ search: v }), sideWf,
+      wfCount: workflows.length + ' ' + (workflows.length === 1 ? 'workflow' : 'workflows'), noWf: workflows.length === 0, workflows,
+      filterOpts: FILTERS.map((f) => f.label).join('|'),
+      filterValue: (FILTERS.filter((f) => f.key === st.filter)[0] || FILTERS[0]).label,
+      onFilter: (label) => { const f = FILTERS.filter((x) => x.label === label)[0]; if (f) this.setState({ filter: f.key }); },
+      runs, noRuns: runs.length === 0,
+      openSettings: () => this.setState({ dialog: 'settings', sSaved: false }),
+      closeDialog: () => this.setState({ dialog: '' }),
+      runOpen: st.dialog === 'run', setOpen: st.dialog === 'settings', dlgName: st.dlgName,
+      rBrief: st.rBrief, onBrief: (v) => this.setState({ rBrief: v }),
+      rModel: st.rModel, onModel: (v) => this.setState({ rModel: v }),
+      rVars: st.rVars, onVars: (v) => this.setState({ rVars: v }),
+      rOver: st.rOver, onOver: (v) => this.setState({ rOver: v }),
+      varsState: varsErrorText ? 'invalid' : 'default', varsErrorText,
+      overState: overErrorText ? 'invalid' : 'default', overErrorText,
+      overPlaceholder: '{"draft_concepts": {"model": "claude-opus-4-20250514"}}',
+      advOpen: st.advOpen, advChev: 'flex:none;transition:transform .15s;transform:rotate(' + (st.advOpen ? 90 : 0) + 'deg)',
+      toggleAdv: () => this.setState({ advOpen: !this.state.advOpen }),
+      sModel: st.sModel, onSModel: (v) => this.setState({ sModel: v }),
+      provOptions: PROV_CHOICES.map((c) => c.label).join('|'), provValue: curProv.label,
+      onProv: (label) => { const c = PROV_CHOICES.filter((x) => x.label === label)[0]; this.setState({ sProvider: c ? c.id : '' }); },
+      setTabs, tabTitle: (SET_TABS.filter((t) => t.id === st.sTab)[0] || SET_TABS[0]).label,
+      tabDefaults: st.sTab === 'defaults', tabServices: st.sTab === 'services', tabCli: st.sTab === 'cli',
+      providers, toolsDefault: TOOLS_DEFAULT,
+      sSaved: st.sSaved, saveSettings: () => this.setState({ sSaved: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

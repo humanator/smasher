@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Smasher workflow editor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:default}
+a{text-decoration:none;color:inherit}
+button:focus-visible,a:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4)}
+</style>
+</helmet>
+<div style="position:relative;width:100%;min-width:1180px;height:900px;display:flex;background:#FFFFFF;color:#1D1D1F;font-size:13px;line-height:1.38;overflow:hidden">
+
+  <!-- Step library (sidebar) -->
+  <aside aria-label="Step library" style="width:260px;flex:none;display:flex;flex-direction:column;min-height:0;background:#EBEBEE;border-right:1px solid rgba(0,0,0,.08)">
+    <div aria-hidden="true" style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 20px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+    </div>
+    <div style="flex:none;padding:0 12px 8px">
+      <dc-import name="Input" label="Search steps" hide-label="{{ true }}" search="{{ true }}" placeholder="Search steps" value="{{search}}" on-input="{{onSearch}}" hint-size="100%,28px"></dc-import>
+      <p style="margin:8px 6px 0;font-size:11px;line-height:1.4;color:#636368">Drag a step onto the canvas. Select one here to read what it does and what each of its settings means.</p>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:0 10px 16px">
+      <sc-if value="{{noMatches}}" hint-placeholder-val="{{ false }}">
+        <p style="margin:12px 8px;font-size:12px;color:#636368">No steps match that search.</p>
+      </sc-if>
+      <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+        <section>
+          <h3 style="{{g.titleStyle}}">{{g.title}}</h3>
+          <sc-for list="{{g.items}}" as="k" hint-placeholder-count="2">
+            <button type="button" onClick="{{k.onPick}}" aria-pressed="{{k.on}}" style="{{k.style}}">
+              <span style="{{k.chipStyle}}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{k.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{k.icon}}"/></svg>
+              </span>
+              <span style="display:block;min-width:0">
+                <span style="display:block;font-size:13px;font-weight:500;color:#1D1D1F">{{k.plain}}</span>
+                <span style="display:block;margin-top:1px;font-size:11px;line-height:1.35;color:#636368;white-space:normal">{{k.blurb}}</span>
+              </span>
+            </button>
+          </sc-for>
+        </section>
+      </sc-for>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <!-- Unified toolbar -->
+    <header style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.08)">
+      <dc-import name="Button" variant="ghost" size="icon" label="Back to Design concepts review" icon="back" href="Workflow.dc.html" hint-size="28px,28px"></dc-import>
+      <div style="flex:1;min-width:0;padding-left:4px">
+        <h1 style="margin:0;font-size:15px;font-weight:700;line-height:1.2">Design concepts review</h1>
+        <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6E6E73"><span style="width:6px;height:6px;border-radius:50%;background:#28C840" aria-hidden="true"></span>Saved just now</div>
+      </div>
+      <div role="group" aria-label="Zoom" style="display:flex;align-items:center;padding:2px;border-radius:7px;background:rgba(0,0,0,.06)">
+        <dc-import name="Button" variant="ghost" size="icon-sm" label="Zoom out" icon="minus" hint-size="24px,24px"></dc-import>
+        <span style="min-width:40px;text-align:center;font-size:12px;color:#3A3A3C;font-variant-numeric:tabular-nums">100%</span>
+        <dc-import name="Button" variant="ghost" size="icon-sm" label="Zoom in" icon="plus" hint-size="24px,24px"></dc-import>
+      </div>
+      <dc-import name="Button" variant="outline" label="Fit" hint-size="40px,24px"></dc-import>
+      <span aria-hidden="true" style="width:1px;height:18px;background:rgba(0,0,0,.12);margin:0 4px"></span>
+      <dc-import name="Button" variant="ghost" size="icon" label="Export .dot file" icon="share" hint-size="28px,28px"></dc-import>
+      <dc-import name="Button" variant="outline" label="Save" hint-size="52px,24px"></dc-import>
+      <dc-import name="Button" variant="default" label="Run" icon="play" href="Run.dc.html" hint-size="64px,24px"></dc-import>
+    </header>
+
+    <div style="flex:1;min-height:0;display:flex">
+
+    <!-- Canvas -->
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div style="flex:1;min-height:0;position:relative">
+        <div onClick="{{clearSel}}" style="position:absolute;top:0;left:0;right:0;bottom:0;overflow:auto;background-color:#F7F7F9;background-image:radial-gradient(#D1D1D6 1px,transparent 1px);background-size:20px 20px">
+          <div style="position:relative;width:720px;height:700px;margin:24px auto 0">
+            <sc-for list="{{segments}}" as="s" hint-placeholder-count="12">
+              <button type="button" aria-label="{{s.aria}}" onClick="{{s.onPick}}" style="{{s.wrap}}"><span style="{{s.line}}"></span></button>
+            </sc-for>
+            <sc-for list="{{arrows}}" as="a" hint-placeholder-count="7">
+              <span style="{{a.style}}"></span>
+            </sc-for>
+            <sc-for list="{{nodeCards}}" as="n" hint-placeholder-count="7">
+              <button type="button" onClick="{{n.onPick}}" aria-pressed="{{n.sel}}" style="{{n.style}}">
+                <sc-if value="{{n.isPill}}" hint-placeholder-val="{{ false }}">
+                  <span style="display:flex;align-items:center;justify-content:center;gap:8px;height:100%">
+                    <span style="{{n.chipStyle}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{n.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"/></svg></span>
+                    <span style="font-size:13px;font-weight:600;color:#1D1D1F">{{n.label}}</span>
+                  </span>
+                </sc-if>
+                <sc-if value="{{n.isCard}}" hint-placeholder-val="{{ true }}">
+                  <span style="display:flex;align-items:center;gap:8px">
+                    <span style="{{n.chipStyle}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{n.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"/></svg></span>
+                    <span style="{{n.kickerStyle}}">{{n.plain}}</span>
+                    <sc-if value="{{n.warn}}" hint-placeholder-val="{{ false }}">
+                      <span style="margin-left:auto"><dc-import name="Badge" variant="secondary" label="Needs attention" dot="#FF9500" hint-size="110px,18px"></dc-import></span>
+                    </sc-if>
+                  </span>
+                  <span style="display:block;margin-top:10px;font-size:14px;font-weight:600;color:#1D1D1F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{n.label}}</span>
+                  <span style="display:block;margin-top:2px;font-size:12px;color:#6E6E73;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{n.summary}}</span>
+                </sc-if>
+              </button>
+            </sc-for>
+            <sc-for list="{{edgeLabels}}" as="l" hint-placeholder-count="2">
+              <button type="button" aria-label="{{l.aria}}" onClick="{{l.onPick}}" style="{{l.style}}">{{l.text}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div style="position:absolute;left:14px;bottom:12px;display:flex;flex-direction:column;gap:5px;padding:8px 12px;background:rgba(255,255,255,.92);border-radius:8px;box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 2px 8px rgba(0,0,0,.08);font-size:11px;color:#3A3A3C">
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:20px;height:0;border-top:2px solid #AEAEB2"></span>Then run the next step</span>
+          <span style="display:flex;align-items:center;gap:8px"><span style="width:20px;height:0;border-top:2px dashed #C35A00"></span>Go back and redo (a loop)</span>
+        </div>
+      </div>
+
+      <!-- Status bar -->
+      <footer style="height:28px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;background:#F7F7F9;border-top:1px solid rgba(0,0,0,.08);font-size:11px;color:#6E6E73">
+        <span>{{stepCount}} steps · {{edgeCount}} connections</span>
+        <span style="flex:1"></span>
+        <sc-if value="{{hasIssues}}" hint-placeholder-val="{{ false }}">
+          <span style="display:flex;align-items:center;gap:6px;color:#1D1D1F"><span style="width:7px;height:7px;border-radius:50%;background:#FF9500" aria-hidden="true"></span>{{issueText}}<dc-import name="Button" variant="link" size="xs" label="Review" on-press="{{reviewIssue}}" hint-size="44px,18px"></dc-import></span>
+        </sc-if>
+        <sc-if value="{{noIssues}}" hint-placeholder-val="{{ true }}">
+          <span style="display:flex;align-items:center;gap:6px;color:#248A3D;font-weight:500"><span style="width:7px;height:7px;border-radius:50%;background:#28C840" aria-hidden="true"></span>No problems found</span>
+        </sc-if>
+      </footer>
+    </main>
+
+    <!-- Inspector -->
+    <aside aria-label="Inspector" style="width:360px;flex:none;background:#F7F7F9;border-left:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;min-height:0">
+
+      <sc-if value="{{isNone}}" hint-placeholder-val="{{ false }}">
+        <div style="padding:24px 20px">
+          <h2 style="margin:0 0 6px;font-size:15px;font-weight:700">Nothing selected</h2>
+          <p style="margin:0 0 18px;font-size:12px;line-height:1.5;color:#6E6E73">Select a step or a connection on the canvas to change its settings. Every setting comes with a plain-language explanation.</p>
+          <h3 style="margin:0 0 8px;font-size:11px;font-weight:600;color:#6E6E73">How a workflow runs</h3>
+          <ol style="margin:0;padding:12px 14px 12px 32px;font-size:13px;line-height:1.5;color:#1D1D1F;background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:8px">
+            <li style="margin-bottom:6px">It begins at <strong>Start</strong> and runs one step at a time.</li>
+            <li style="margin-bottom:6px">When a step finishes, a <strong>connection</strong> decides what runs next. Rules on connections can look at how the step went.</li>
+            <li style="margin-bottom:6px">Steps can ask a person, call an AI model, or run a tool. Results are saved so later steps can use them.</li>
+            <li>It ends when it reaches a <strong>Finish</strong> step.</li>
+          </ol>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{hasInspector}}" hint-placeholder-val="{{ true }}">
+        <div style="flex:none;padding:14px 16px 12px;border-bottom:1px solid rgba(0,0,0,.08)">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <span style="{{ins.chipStyle}}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{ins.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ins.icon}}"/></svg></span>
+            <div style="flex:1;min-width:0">
+              <div style="{{ins.kickerStyle}}">{{ins.kicker}}</div>
+              <h2 style="margin:1px 0 0;font-size:15px;font-weight:700;line-height:1.3;overflow-wrap:anywhere">{{ins.title}}</h2>
+              <sc-if value="{{ins.hasSub}}" hint-placeholder-val="{{ false }}">
+                <p style="margin:2px 0 0;font-size:11px;color:#6E6E73">{{ins.sub}}</p>
+              </sc-if>
+            </div>
+            <dc-import name="Button" variant="ghost" size="icon-sm" label="Close inspector" icon="x" on-press="{{clearSel}}" hint-size="24px,24px"></dc-import>
+          </div>
+          <sc-if value="{{ins.showTabs}}" hint-placeholder-val="{{ true }}">
+            <div role="tablist" aria-label="Inspector sections" style="display:flex;margin-top:12px;padding:2px;border-radius:7px;background:rgba(0,0,0,.06)">
+              <button type="button" role="tab" onClick="{{tabSettings}}" aria-selected="{{showSettings}}" style="{{tabSettingsStyle}}">Settings</button>
+              <button type="button" role="tab" onClick="{{tabAbout}}" aria-selected="{{showAbout}}" style="{{tabAboutStyle}}">About this {{ins.noun}}</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{isGuide}}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:10px;font-size:11px;font-weight:600;color:#9D174D">Step guide</div>
+          </sc-if>
+        </div>
+
+        <div style="flex:1;min-height:0;overflow:auto;padding:20px">
+
+          <sc-if value="{{showSettings}}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{fields}}" as="f" hint-placeholder-count="3">
+              <div style="margin-bottom:20px">
+
+                <sc-if value="{{f.isNote}}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:0;padding:12px 14px;border-radius:8px;background:#FFFFFF;border:1px solid rgba(0,0,0,.08);font-size:13px;line-height:1.5;color:#1D1D1F">{{f.help}}</p>
+                </sc-if>
+
+                <sc-if value="{{f.isToggleBtn}}" hint-placeholder-val="{{ false }}">
+                  <button type="button" onClick="{{f.onToggle}}" aria-expanded="{{f.open}}" style="width:100%;display:flex;align-items:center;gap:8px;padding:12px 0;border:0;border-top:1px solid #E2E2E7;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:#1D1D1F;text-align:left;cursor:default">
+                    <span style="{{f.chevStyle}}" aria-hidden="true">›</span>{{f.label}}
+                    <span style="margin-left:auto;font-size:12px;font-weight:400;color:#6E6E73">{{f.meta}}</span>
+                  </button>
+                </sc-if>
+
+                <sc-if value="{{f.isSyntax}}" hint-placeholder-val="{{ false }}">
+                  <div style="border:1px solid #E2E2E7;border-radius:10px;overflow:hidden">
+                    <sc-for list="{{f.rows}}" as="r" hint-placeholder-count="4">
+                      <div style="display:flex;gap:12px;padding:8px 12px;border-bottom:1px solid #ECECF0;font-size:13px">
+                        <code style="flex:none;width:150px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#1D1D1F">{{r.code}}</code>
+                        <span style="color:#6E6E73">{{r.text}}</span>
+                      </div>
+                    </sc-for>
+                    <p style="margin:0;padding:10px 12px;font-size:12px;line-height:1.5;color:#6E6E73;background:#EFEFF2">After every step, <code style="font-family:ui-monospace,Menlo,monospace">outcome</code> is <code style="font-family:ui-monospace,Menlo,monospace">success</code>, <code style="font-family:ui-monospace,Menlo,monospace">fail</code>, <code style="font-family:ui-monospace,Menlo,monospace">retry</code> or <code style="font-family:ui-monospace,Menlo,monospace">skip</code>. A value that was never saved makes a rule false.</p>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{f.isField}}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                    <span style="font-size:13px;font-weight:500;color:#1D1D1F">{{f.label}}</span>
+                    <sc-if value="{{f.hasBadge}}" hint-placeholder-val="{{ false }}">
+                      <span title="{{f.badgeTitle}}" style="display:inline-flex"><dc-import name="Badge" variant="{{f.badgeVariant}}" label="{{f.badge}}" hint-size="64px,20px"></dc-import></span>
+                    </sc-if>
+                    <span style="margin-left:auto"><dc-import name="Button" variant="{{f.helpVariant}}" size="icon-xs" label="More about {{f.label}}" icon="help" expanded="{{f.open}}" on-press="{{f.onHelp}}" hint-size="24px,24px"></dc-import></span>
+                  </div>
+                  <p style="margin:0 0 8px;font-size:12px;line-height:1.5;color:#6E6E73">{{f.help}}</p>
+
+                  <sc-if value="{{f.isText}}" hint-placeholder-val="{{ true }}">
+                    <dc-import name="Input" label="{{f.label}}" hide-label="{{ true }}" value="{{f.value}}" placeholder="{{f.placeholder}}" on-input="{{f.onInput}}" state="{{f.state}}" error="{{f.error}}" hint-size="100%,36px"></dc-import>
+                  </sc-if>
+                  <sc-if value="{{f.isArea}}" hint-placeholder-val="{{ false }}">
+                    <dc-import name="Textarea" label="{{f.label}}" hide-label="{{ true }}" rows="{{f.rows}}" value="{{f.value}}" placeholder="{{f.placeholder}}" on-input="{{f.onInput}}" state="{{f.state}}" error="{{f.error}}" hint-size="100%,140px"></dc-import>
+                  </sc-if>
+                  <sc-if value="{{f.isCode}}" hint-placeholder-val="{{ false }}">
+                    <dc-import name="Textarea" label="{{f.label}}" hide-label="{{ true }}" mono="{{ true }}" rows="{{f.rows}}" value="{{f.value}}" placeholder="{{f.placeholder}}" on-input="{{f.onInput}}" state="{{f.state}}" error="{{f.error}}" hint-size="100%,110px"></dc-import>
+                  </sc-if>
+                  <sc-if value="{{f.isSeg}}" hint-placeholder-val="{{ false }}">
+                    <div role="group" aria-label="{{f.label}}" style="display:flex;flex-direction:column;gap:8px">
+                      <sc-for list="{{f.opts}}" as="o" hint-placeholder-count="3">
+                        <button type="button" aria-pressed="{{o.on}}" onClick="{{o.onPick}}" style="{{o.style}}">
+                          <span style="{{o.dotStyle}}" aria-hidden="true"></span>
+                          <span style="display:block">
+                            <span style="display:block;font-size:13px;font-weight:600;color:#1D1D1F">{{o.title}}</span>
+                            <span style="display:block;margin-top:1px;font-size:12px;line-height:1.4;color:#6E6E73">{{o.desc}}</span>
+                          </span>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{f.isToggle}}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <button type="button" role="switch" id="{{f.id}}" aria-checked="{{f.on}}" aria-label="{{f.label}}" onClick="{{f.onToggle}}" style="{{f.trackStyle}}"><span style="{{f.knobStyle}}"></span></button>
+                      <span style="font-size:13px;color:#1D1D1F">{{f.onText}}</span>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{f.hasChips}}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                      <span style="font-size:12px;color:#6E6E73;align-self:center">Try:</span>
+                      <sc-for list="{{f.chips}}" as="c" hint-placeholder-count="2">
+                        <dc-import name="Button" variant="outline" size="xs" label="{{c.text}}" on-press="{{c.onPick}}" hint-size="130px,24px"></dc-import>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+
+                  <sc-if value="{{f.open}}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:10px;padding:12px 14px;border-radius:10px;background:#FFFFFF">
+                      <sc-for list="{{f.detailRows}}" as="d" hint-placeholder-count="2">
+                        <div style="margin-bottom:8px">
+                          <div style="font-size:11px;font-weight:600;color:#6E6E73">{{d.title}}</div>
+                          <div style="margin-top:2px;font-size:13px;line-height:1.5;color:#1D1D1F;overflow-wrap:anywhere">{{d.text}}</div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </sc-if>
+              </div>
+            </sc-for>
+          </sc-if>
+
+          <sc-if value="{{showAbout}}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{aboutItems}}" as="a" hint-placeholder-count="3">
+              <div style="margin-bottom:18px">
+                <h3 style="margin:0 0 4px;font-size:12px;color:#6E6E73">{{a.title}}</h3>
+                <p style="margin:0;font-size:13px;line-height:1.55;color:#1D1D1F">{{a.text}}</p>
+              </div>
+            </sc-for>
+            <sc-if value="{{isGuide}}" hint-placeholder-val="{{ false }}">
+              <h3 style="margin:24px 0 10px;padding-top:18px;border-top:1px solid #E2E2E7;font-size:12px;color:#6E6E73">Settings in this step</h3>
+              <sc-if value="{{refEmpty}}" hint-placeholder-val="{{ false }}">
+                <p style="margin:0;font-size:13px;color:#6E6E73">This step has no settings beyond its name.</p>
+              </sc-if>
+              <sc-for list="{{refFields}}" as="r" hint-placeholder-count="3">
+                <div style="margin-bottom:14px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:13px;font-weight:500">{{r.label}}</span>
+                    <sc-if value="{{r.hasBadge}}" hint-placeholder-val="{{ false }}"><span title="{{r.badgeTitle}}" style="display:inline-flex"><dc-import name="Badge" variant="{{r.badgeVariant}}" label="{{r.badge}}" hint-size="64px,20px"></dc-import></span></sc-if>
+                  </div>
+                  <p style="margin:2px 0 0;font-size:13px;line-height:1.5;color:#6E6E73">{{r.help}}</p>
+                </div>
+              </sc-for>
+            </sc-if>
+          </sc-if>
+        </div>
+      </sc-if>
+    </aside>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#BE185D"},"$preview":{"width":1440,"height":900}}'>
+const ICONS = {
+  Codergen: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z',
+  Manager: 'M12 4a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM5 15a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM19 15a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM12 9v3M12 12l-6 3M12 12l6 3',
+  Tool: 'M4 6l6 6-6 6M12 18h8',
+  Interviewer: 'M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20c0-3.5 3-6 7-6s7 2.5 7 6',
+  Conditional: 'M12 3l8 9-8 9-8-9z',
+  Parallel: 'M12 4v6M12 10l-6 5v5M12 10l6 5v5',
+  FanIn: 'M6 4v5l6 5M18 4v5l-6 5M12 14v6',
+  SubPipeline: 'M3 7h6l2 2h10v10H3z',
+  Start: 'M8 5l11 7-11 7z',
+  Exit: 'M6 6h12v12H6z'
+};
+
+const GROUPS = [
+  { id: 'ai', title: 'AI steps', ink: '#3730A3', tint: '#ECEBFB', kinds: ['Codergen', 'Manager'] },
+  { id: 'tool', title: 'Tools and checks', ink: '#0F5F5A', tint: '#E1F1EF', kinds: ['Tool'] },
+  { id: 'human', title: 'People', ink: '#8A4B06', tint: '#FBEEDA', kinds: ['Interviewer'] },
+  { id: 'flow', title: 'Flow', ink: '#334155', tint: '#E8EBF0', kinds: ['Conditional', 'Parallel', 'FanIn', 'SubPipeline'] },
+  { id: 'edge', title: 'Start and finish', ink: '#1E6B2E', tint: '#E3F3E6', kinds: ['Start', 'Exit'] }
+];
+
+const KINDS = {
+  Codergen: {
+    plain: 'AI Agent', tech: 'Codergen', group: 'ai',
+    blurb: 'Gives an AI model a brief and lets it do the work.',
+    about: [
+      ['What it does', 'Starts an AI agent with your instructions. The agent can read and change files in the project while it works, and its result is passed on to the steps that follow.'],
+      ['Use it when', 'You want something made or changed: drafting concepts, writing code, rewriting copy, or fixing a problem an earlier step found.'],
+      ['If it goes wrong', 'With no instructions and no step name the step fails with “no prompt specified”. You can send failures down a different path with a connection rule such as outcome=fail.']
+    ]
+  },
+  Manager: {
+    plain: 'AI Coordinator', tech: 'Manager', group: 'ai',
+    blurb: 'Asks an AI to coordinate a task and report back.',
+    about: [
+      ['What it does', 'Sends a task description to an AI model that acts as a coordinator, then saves what it returns for later steps.'],
+      ['Use it when', 'You need to review, delegate or combine the results of earlier steps. For example: coordinate a review, or aggregate results.'],
+      ['Looking for approval?', 'This step talks to an AI, not a person. To get a human decision, use an Ask a person step.'],
+      ['If it goes wrong', 'Fails with “no task specified” if Task and the step name are both empty, or “invalid JSON in config” if Settings cannot be read.']
+    ]
+  },
+  Tool: {
+    plain: 'Tool', tech: 'Tool', group: 'tool',
+    blurb: 'Runs a built-in check or a command. No AI unless the tool says so.',
+    about: [
+      ['What it does', 'Runs one thing and records the result: either one of four built-in tools, or a shell command on your computer. The step never calls an AI itself. Only Usability critique and Summarise critiques make a single AI call each.'],
+      ['Use it when', 'Capturing screenshots, running automated checks, running tests or scripts, or producing a critique that feeds a decision.'],
+      ['What it saves', 'For commands, what it printed, any errors and the exit code are saved as tool.output, tool.stderr and tool.exit_code so rules and later steps can use them.'],
+      ['If it goes wrong', 'Fails if neither or both of Tool and Command are set, the tool name is not built in, Settings are not valid JSON, a command exits with anything other than 0, or the time limit runs out.']
+    ]
+  },
+  Interviewer: {
+    plain: 'Ask a person', tech: 'Human Gate (Interviewer)', group: 'human',
+    blurb: 'Pauses the workflow and asks a person.',
+    about: [
+      ['What it does', 'Stops the run and shows a question in the app. The run carries on when someone answers. The answer is saved under this step’s name for later steps and rules to use.'],
+      ['Use it when', 'You need an approval, a choice between options, some feedback, or a pick from a gallery of generated designs.'],
+      ['Three ways to answer', 'Free text lets people type anything (or use the gallery). Yes or no gives an approval. Pick from a list offers your own choices.']
+    ]
+  },
+  Conditional: {
+    plain: 'Branch', tech: 'Conditional', group: 'flow',
+    blurb: 'Chooses which path to follow next.',
+    about: [
+      ['What it does', 'Looks at how things stand and sends the workflow down one of the paths leaving it. The rules live on those paths, so you can edit them right here.'],
+      ['Use it when', 'You want to loop until a check passes, skip a step, or handle failure differently from success.'],
+      ['What rules can look at', 'The result of the step before (outcome) and any value a step saved, such as tool.output or the answer to a question.'],
+      ['When several paths match', 'The path with the highest priority wins. Paths labelled success, yes or true match a good result; failure, error, no or false match a bad one.']
+    ]
+  },
+  Parallel: {
+    plain: 'Split', tech: 'Parallel', group: 'flow',
+    blurb: 'Runs several paths at the same time.',
+    about: [
+      ['What it does', 'Starts every path leaving this step at once instead of one after another. Pair it with a Join to wait for them all.'],
+      ['Use it when', 'Several checks or variants do not depend on each other and you want them side by side.']
+    ]
+  },
+  FanIn: {
+    plain: 'Join', tech: 'Fan-In', group: 'flow',
+    blurb: 'Waits for split paths to finish, then carries on.',
+    about: [
+      ['What it does', 'Collects the paths started by a Split and continues once they are done.'],
+      ['Good to know', 'If more than one path saves the same value, the last one to finish wins.']
+    ]
+  },
+  SubPipeline: {
+    plain: 'Nested workflow', tech: 'Sub-Pipeline', group: 'flow',
+    blurb: 'Runs another workflow as a single step.',
+    about: [
+      ['What it does', 'Loads a separate workflow file and runs it inside this one, sharing the same saved values.'],
+      ['Use it when', 'You have a routine, such as a review process, that you want to reuse across several workflows.']
+    ]
+  },
+  Start: {
+    plain: 'Start', tech: 'Start', group: 'edge',
+    blurb: 'Where the workflow begins. You need exactly one.',
+    about: [['What it does', 'The single starting point. The workflow begins here and follows the connection leaving it.']]
+  },
+  Exit: {
+    plain: 'Finish', tech: 'Exit', group: 'edge',
+    blurb: 'Where the workflow ends. You can have several.',
+    about: [['What it does', 'Ends the workflow. Use more than one to mark different outcomes, like Success and Failed.']]
+  }
+};
+
+const GROUP_OF = {};
+GROUPS.forEach((g) => g.kinds.forEach((k) => { GROUP_OF[k] = g; }));
+
+const NODES = {
+  n1: { kind: 'Start', x: 106, y: 28, w: 160, h: 44 },
+  n2: { kind: 'Codergen', x: 56, y: 120, w: 260, h: 96 },
+  n3: { kind: 'Tool', x: 56, y: 270, w: 260, h: 96 },
+  n4: { kind: 'Tool', x: 420, y: 270, w: 260, h: 96 },
+  n5: { kind: 'Conditional', x: 420, y: 420, w: 260, h: 96 },
+  n6: { kind: 'Interviewer', x: 420, y: 570, w: 260, h: 96 },
+  n7: { kind: 'Exit', x: 106, y: 596, w: 160, h: 44 }
+};
+
+const EDGE_GEO = {
+  e1: { pts: [[186, 72], [186, 120]], lab: [0, 0] },
+  e2: { pts: [[186, 216], [186, 270]], lab: [0, 0] },
+  e3: { pts: [[316, 318], [420, 318]], lab: [368, 318] },
+  e4: { pts: [[550, 366], [550, 420]], lab: [0, 0] },
+  e5: { pts: [[550, 516], [550, 570]], lab: [622, 543] },
+  e6: { pts: [[420, 468], [28, 468], [28, 168], [56, 168]], lab: [224, 468] },
+  e7: { pts: [[420, 618], [266, 618]], lab: [0, 0] }
+};
+
+const TOOLS = [
+  { value: 'render_capture', title: 'Screenshot a design', desc: 'Renders a candidate in a headless browser and saves screenshots and a manifest.' },
+  { value: 'system_lint', title: 'Design-system check', desc: 'Checks a candidate against the design system’s rules. No AI involved.' },
+  { value: 'task_critic', title: 'Usability critique', desc: 'One AI call that reviews a candidate the way a persona-based usability critic would.' },
+  { value: 'synthesis', title: 'Summarise critiques', desc: 'One AI call that merges earlier critiques into a single set of recommendations.' }
+];
+
+const SYNTAX = [
+  { code: 'status=ready', text: 'equals' },
+  { code: 'status!=ready', text: 'does not equal' },
+  { code: 'count>10', text: 'greater than (numbers)' },
+  { code: 'count<10', text: 'less than (numbers)' },
+  { code: 'a=1 && b=2', text: 'both must be true' },
+  { code: 'a=1 || b=2', text: 'either can be true' },
+  { code: '!a=1', text: 'not' },
+  { code: '(a=1 || b=2) && c=3', text: 'group with brackets' }
+];
+
+const jsonError = (t) => {
+  const s = (t || '').trim();
+  if (!s) return '';
+  try { JSON.parse(s); return ''; } catch (e) { return 'That is not valid JSON yet (' + e.message + '). The step would fail when it runs.'; }
+};
+// macOS segmented control segment (inspector tabs)
+const SEG = 'flex:1;height:20px;padding:0 10px;border:0;border-radius:5px;font-size:13px;line-height:1;color:#1D1D1F;cursor:default;';
+const SEG_ON = 'background:#FFFFFF;font-weight:500;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.14)';
+const trunc = (t, n) => { const s = (t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+
+class Component extends DCLogic {
+  state = {
+    nodes: {
+      n1: { label: 'Start', attrs: {} },
+      n2: { label: 'Draft three concepts', attrs: { prompt: 'Read the design brief in brief.md and create three distinct UI concepts as self-contained HTML files in candidates/. Add a one-line note on the idea behind each.', model: '' } },
+      n3: { label: 'Check against design system', attrs: { mode: 'builtin', tool: 'system_lint', args: '{"candidate_dir": "candidates/a"}' } },
+      n4: { label: 'Usability critique', attrs: { mode: 'builtin', tool: 'task_critic', args: '' } },
+      n5: { label: 'Did the checks pass?', attrs: {} },
+      n6: { label: 'Pick a favourite', attrs: { question: 'Which concept should we take forward?', answerMode: 'freeform', gallery: true, candidate_count: '3' } },
+      n7: { label: 'Done', attrs: {} }
+    },
+    edges: {
+      e1: { from: 'n1', to: 'n2', label: '', condition: '', priority: '', loop: false },
+      e2: { from: 'n2', to: 'n3', label: '', condition: '', priority: '', loop: false },
+      e3: { from: 'n3', to: 'n4', label: 'then', condition: '', priority: '', loop: false },
+      e4: { from: 'n4', to: 'n5', label: '', condition: '', priority: '', loop: false },
+      e5: { from: 'n5', to: 'n6', label: 'Yes, continue', condition: 'outcome=success', priority: '', loop: false },
+      e6: { from: 'n5', to: 'n2', label: 'No, try again', condition: 'outcome=fail', priority: '', loop: true },
+      e7: { from: 'n6', to: 'n7', label: '', condition: '', priority: '', loop: false }
+    },
+    selKind: 'node', selId: 'n2', guideKind: '', tab: 'settings',
+    help: {}, advOpen: false, syntaxOpen: false, search: ''
+  };
+
+  renderVals() {
+    const st = this.state;
+    const accent = this.props.accent ?? '#BE185D';
+    const sp = (fn) => (e) => { if (e && e.stopPropagation) e.stopPropagation(); fn(); };
+    const nodeLabel = (id) => st.nodes[id].label;
+
+    /* ---------- validation ---------- */
+    const issues = [];
+    Object.keys(st.nodes).forEach((id) => {
+      const kind = NODES[id].kind; const n = st.nodes[id]; const a = n.attrs;
+      const lab = (n.label || '').trim();
+      if (kind === 'Codergen' && !(a.prompt || '').trim() && !lab) issues.push({ id, msg: 'is missing instructions' });
+      if (kind === 'Manager') {
+        if (!(a.task || '').trim() && !lab) issues.push({ id, msg: 'is missing a task' });
+        if (jsonError(a.config)) issues.push({ id, msg: 'has settings that are not valid JSON' });
+      }
+      if (kind === 'Tool') {
+        if ((a.mode || 'builtin') === 'builtin') {
+          if (!a.tool) issues.push({ id, msg: 'needs a tool chosen' });
+          if (jsonError(a.args)) issues.push({ id, msg: 'has settings that are not valid JSON' });
+        } else if (!(a.tool_command || '').trim()) issues.push({ id, msg: 'needs a command' });
+      }
+      if (kind === 'SubPipeline' && !(a.pipeline || '').trim()) issues.push({ id, msg: 'needs a workflow file' });
+      if (kind === 'Interviewer' && a.answerMode === 'options' && !(a.options || '').trim()) issues.push({ id, msg: 'needs a list of options' });
+    });
+    const warnIds = {};
+    issues.forEach((i) => { warnIds[i.id] = true; });
+
+    /* ---------- field builders ---------- */
+    const sel = st.selId;
+    const hk = (k) => sel + ':' + k;
+    const toggleHelp = (k) => () => { const h = { ...this.state.help }; h[hk(k)] = !h[hk(k)]; this.setState({ help: h }); };
+    const NEW_TITLE = 'The workflow engine supports this setting, but the current app does not show it yet.';
+
+    const base = (o) => {
+      const rows = Object.keys(o.detail || {}).map((t) => ({ title: t, text: o.detail[t] }));
+      const badge = o.proposed ? 'New' : (o.req || '');
+      const open = !!st.help[hk(o.key)];
+      return {
+        isField: true, isText: false, isArea: false, isCode: false, isSeg: false, isToggle: false, isToggleBtn: false, isNote: false, isSyntax: false,
+        id: 'f-' + String(o.key).replace(/[^a-zA-Z0-9]/g, '-'),
+        label: o.label, help: o.help || '', placeholder: o.placeholder || '', rows: o.rows || 3,
+        badge, hasBadge: !!badge, badgeTitle: o.proposed ? NEW_TITLE : '',
+        badgeVariant: o.proposed ? 'secondary' : 'outline',
+        open, onHelp: toggleHelp(o.key), helpVariant: open ? 'default' : 'outline',
+        detailRows: rows,
+        value: '', error: '', hasError: false, state: 'default',
+        chips: o.chips || [], hasChips: !!(o.chips && o.chips.length),
+        opts: [], on: false, onText: ''
+      };
+    };
+    const text = (o) => { const f = base(o); f.isText = true; f.value = o.get(); f.onInput = (v) => o.set(v); return f; };
+    const area = (o) => { const f = base(o); f.isArea = true; f.value = o.get(); f.onInput = (v) => o.set(v); return f; };
+    const code = (o) => {
+      const f = base(o); f.isCode = true; f.value = o.get(); f.onInput = (v) => o.set(v);
+      f.error = o.json ? jsonError(f.value) : ''; f.hasError = !!f.error;
+      return f;
+    };
+    const seg = (o) => {
+      const f = base(o); f.isSeg = true; const cur = o.get();
+      f.opts = o.opts.map((op) => {
+        const on = cur === op.value;
+        return { title: op.title, desc: op.desc, on, onPick: () => o.set(op.value),
+          style: 'display:flex;align-items:flex-start;gap:8px;width:100%;box-sizing:border-box;padding:3px 0;border:0;border-radius:6px;text-align:left;background:transparent;cursor:default',
+          dotStyle: 'flex:none;margin-top:2px;width:14px;height:14px;box-sizing:border-box;border-radius:50%;background:#FFFFFF;' + (on ? 'border:4.5px solid ' + accent : 'border:1px solid rgba(0,0,0,.25);box-shadow:0 .5px 1px rgba(0,0,0,.08)') };
+      });
+      return f;
+    };
+    const toggle = (o) => {
+      const f = base(o); f.isToggle = true; const on = !!o.get(); f.on = on; f.onText = on ? 'On' : 'Off';
+      f.onToggle = () => o.set(!o.get());
+      f.trackStyle = 'flex:none;position:relative;width:38px;height:22px;padding:0;border:0;border-radius:999px;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12);background:' + (on ? accent : 'rgba(0,0,0,.09)');
+      f.knobStyle = 'position:absolute;top:1px;left:' + (on ? '17px' : '1px') + ';width:20px;height:20px;border-radius:50%;background:#FFFFFF;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2.5px rgba(0,0,0,.25);transition:left .15s';
+      return f;
+    };
+    const note = (t) => ({ isNote: true, isField: false, help: t });
+    const toggleBtn = (label, open, meta, fn) => ({ isToggleBtn: true, isField: false, isNote: false, label, open, meta, onToggle: fn,
+      chevStyle: 'display:inline-block;width:10px;font-size:16px;line-height:1;color:#6E6E73;transition:transform .15s;transform:rotate(' + (open ? '90' : '0') + 'deg)' });
+    const syntaxCard = () => ({ isSyntax: true, isField: false, isNote: false, isToggleBtn: false, rows: SYNTAX });
+
+    /* ---------- node field definitions ---------- */
+    const nodeDefs = (kind, id) => {
+      const G = !id;
+      const A = (k) => (id ? (this.state.nodes[id].attrs[k] ?? '') : '');
+      const setA = (patch) => { if (!id) return; const s = this.state; const n = s.nodes[id]; this.setState({ nodes: { ...s.nodes, [id]: { ...n, attrs: { ...n.attrs, ...patch } } } }); };
+      const out = []; const adv = [];
+      const nameHelp = { Codergen: 'Shown on the canvas and in run logs. If Instructions is empty, this name is used as the instruction.', Manager: 'Shown on the canvas and in run logs. If Task is empty, this name is used as the task.', Interviewer: 'Shown on the canvas and in run logs. If Question is empty, this name is used as the question.' }[kind] || 'Shown on the canvas and in run logs.';
+      out.push(text({ key: 'label', label: 'Step name', help: nameHelp, get: () => (id ? this.state.nodes[id].label : ''), set: (v) => { if (!id) return; const s = this.state; this.setState({ nodes: { ...s.nodes, [id]: { ...s.nodes[id], label: v } } }); } }));
+
+      if (kind === 'Codergen') {
+        out.push(area({ key: 'prompt', label: 'Instructions', rows: 7, help: 'Tell the AI what to do, as if briefing a colleague: the goal, what it should look at, and what a good result looks like.', placeholder: 'e.g. Read the brief and draft three concepts…',
+          detail: { 'Example': 'Read the design brief and produce three distinct concepts as self-contained HTML files. Explain the idea behind each in one sentence.', 'If left blank': 'The step name is used instead. If both are empty the run fails with “no prompt specified”.', 'Tip': 'Name the files or folders you expect it to read and write.' },
+          get: () => A('prompt'), set: (v) => setA({ prompt: v }) }));
+        out.push(text({ key: 'model', label: 'Model', help: 'Which AI model does this step’s work. Leave blank to use the workflow’s default.', placeholder: 'Workflow default',
+          chips: ['claude-sonnet-5', 'claude-opus-4-20250514'].map((m) => ({ text: m, onPick: () => setA({ model: m }) })),
+          detail: { 'If left blank': 'Uses the model chosen for the whole run (claude-sonnet-5 unless the run says otherwise).', 'Good to know': 'Larger models are usually slower and cost more, so save them for the hard steps. A workflow stylesheet can also set the model for many steps at once.' },
+          get: () => A('model'), set: (v) => setA({ model: v }) }));
+      }
+      if (kind === 'Manager') {
+        out.push(text({ key: 'task', label: 'Task', help: 'What should the coordinator work out? Write it in plain language. It is sent to the AI as-is.', placeholder: 'e.g. coordinate-review',
+          chips: ['coordinate-review', 'delegate-subtask', 'aggregate-results', 'escalate-to-human'].map((m) => ({ text: m, onPick: () => setA({ task: m }) })),
+          detail: { 'If left blank': 'The step name is used. If both are empty the run fails with “no task specified”.', 'Good to know': 'The suggestions are starting points, not a fixed list. This step talks to an AI. To get a person’s decision, use an Ask a person step.' },
+          get: () => A('task'), set: (v) => setA({ task: v }) }));
+        out.push(code({ key: 'config', label: 'Settings (JSON)', rows: 4, json: true, placeholder: '{ }', help: 'Optional extra settings for the coordinator, written as JSON. Leave blank for none.',
+          detail: { 'If left blank': 'Treated as empty settings: {}.', 'If it is not valid JSON': 'The step fails when it runs. The app flags it here first.' },
+          get: () => A('config'), set: (v) => setA({ config: v }) }));
+      }
+      if (kind === 'Tool') {
+        const mode = A('mode') || 'builtin';
+        out.push(seg({ key: 'mode', label: 'What should this step run?', help: 'Choose one. A step cannot do both.',
+          opts: [{ value: 'builtin', title: 'Built-in tool', desc: 'A ready-made check or capture from Smasher.' }, { value: 'command', title: 'Shell command', desc: 'Any command on your computer.' }],
+          get: () => (A('mode') || 'builtin'),
+          set: (v) => { if (v === 'command') setA({ mode: v, tool: '', args: '' }); else setA({ mode: v, tool_command: '', timeout: '' }); } }));
+        if (G || mode === 'builtin') {
+          out.push(seg({ key: 'tool', label: 'Tool', req: 'Required', help: 'Pick the built-in tool to run.',
+            opts: TOOLS, get: () => A('tool'), set: (v) => setA({ tool: v }),
+            detail: { 'If none is chosen': 'The step fails, because it needs either a tool or a command.' } }));
+          out.push(code({ key: 'args', label: 'Tool settings (JSON)', rows: 4, json: true, placeholder: '{ }', help: 'Optional settings for the tool, written as JSON.',
+            detail: { 'Example': '{"candidate_dir": "candidates/a"}', 'If left blank': 'The tool runs with its default settings: {}.', 'If it is not valid JSON': 'The step fails when it runs. The app flags it here first.' },
+            get: () => A('args'), set: (v) => setA({ args: v }) }));
+        }
+        if (G || mode === 'command') {
+          out.push(code({ key: 'tool_command', label: 'Command', req: 'Required', rows: 4, placeholder: 'e.g. npm test', help: 'The command to run, from the run’s working folder. It succeeds only if it finishes with exit code 0.',
+            detail: { 'Example': 'npm test', 'What you can use afterwards': 'Later steps and rules can read what it printed (tool.output), its errors (tool.stderr) and its exit code (tool.exit_code).', 'Good to know': 'Anything that looks like a secret (names containing API_KEY, TOKEN, PASSWORD or SECRET) is hidden from the command. If you start a background process, redirect its output (server > server.log 2>&1 &) or the step will wait for it.' },
+            get: () => A('tool_command'), set: (v) => setA({ tool_command: v }) }));
+          out.push(text({ key: 'timeout', label: 'Time limit', placeholder: '600', help: 'How long the command may run before it is stopped.',
+            detail: { 'Examples': '600 (seconds), 30s, 5m', 'If left blank': '10 minutes (600 seconds).', 'If it runs out': 'The command is stopped and the step fails with “timed out”.' },
+            get: () => A('timeout'), set: (v) => setA({ timeout: v }) }));
+        }
+      }
+      if (kind === 'Interviewer') {
+        const mode = A('answerMode') || 'freeform';
+        out.push(area({ key: 'question', label: 'Question', rows: 3, help: 'What you want to ask. Shown to the person in the app while the run is paused.', placeholder: 'e.g. Which concept should we take forward?',
+          detail: { 'If left blank': 'The step name is used as the question.' }, get: () => A('question'), set: (v) => setA({ question: v }) }));
+        out.push(seg({ key: 'answerMode', label: 'How should they answer?', help: 'Choose the kind of answer you need back.',
+          opts: [{ value: 'freeform', title: 'Free text', desc: 'Type anything, or choose from a gallery of candidates.' }, { value: 'approve', title: 'Yes or no', desc: 'A simple approval.' }, { value: 'options', title: 'Pick from a list', desc: 'Choose one of the options you write.' }],
+          get: () => (A('answerMode') || 'freeform'),
+          set: (v) => setA(v === 'freeform' ? { answerMode: v } : { answerMode: v, gallery: false, candidate_count: '' }) }));
+        if (G || mode === 'options') {
+          out.push(text({ key: 'options', label: 'Options', req: 'Required', placeholder: 'approve, revise, reject', help: 'Separate the choices with commas.',
+            detail: { 'Example': 'approve, revise, reject' }, get: () => A('options'), set: (v) => setA({ options: v }) }));
+        }
+        if (G || mode === 'freeform') {
+          out.push(toggle({ key: 'gallery', label: 'Show a gallery of candidates', help: 'Lets the person look through generated designs, choose favourites and add comments. Only works with free text answers.',
+            detail: { 'What gets saved': 'A structured answer: which candidates were selected, the decision and any comments.', 'Good to know': 'Switching to Yes or no, or to a list, turns the gallery off because those modes never reach it.' },
+            get: () => !!A('gallery'), set: (v) => setA({ gallery: v }) }));
+          if (G || A('gallery')) {
+            out.push(text({ key: 'candidate_count', label: 'Candidates to expect', placeholder: '3', help: 'How many candidates the gallery should expect to show.',
+              detail: { 'Examples': '3, or phase_default(discover)', 'Good to know': 'Only used for the gallery display and its warnings. It does not limit how many candidates the run makes.' },
+              get: () => A('candidate_count'), set: (v) => setA({ candidate_count: v }) }));
+          }
+          adv.push(text({ key: 'human.timeout_secs', proposed: true, label: 'Stop waiting after (seconds)', placeholder: 'e.g. 3600', help: 'If nobody answers in time, the step carries on with the fallback answer below. Free text answers only.',
+            get: () => A('human_timeout'), set: (v) => setA({ human_timeout: v }) }));
+          adv.push(text({ key: 'human.default_choice', proposed: true, label: 'Fallback answer', placeholder: 'e.g. approve', help: 'The answer to use when the wait runs out.',
+            get: () => A('human_default'), set: (v) => setA({ human_default: v }) }));
+        }
+      }
+      if (kind === 'SubPipeline') {
+        out.push(text({ key: 'pipeline', label: 'Workflow file', req: 'Required', placeholder: 'examples/sub_flow.dot', help: 'The path to the workflow (.dot file) to run as part of this one.',
+          detail: { 'Where it looks': 'Relative to the folder this workflow lives in.', 'If left blank': 'The workflow cannot be assembled and you will see a “missing pipeline” error.' },
+          get: () => A('pipeline'), set: (v) => setA({ pipeline: v }) }));
+      }
+      if (kind === 'Parallel') {
+        out.push(text({ key: 'max_concurrency', proposed: true, label: 'At most at once', placeholder: '10', help: 'Limits how many paths run at the same time.',
+          detail: { 'If left blank': 'Up to 10 paths at once.' }, get: () => A('max_concurrency'), set: (v) => setA({ max_concurrency: v }) }));
+        out.push(toggle({ key: 'fail_fast', proposed: true, label: 'Stop everything if one fails', help: 'When on, the remaining paths are cancelled as soon as any path fails.',
+          detail: { 'If off': 'Every path finishes, even if some fail. This is the default.' }, get: () => !!A('fail_fast'), set: (v) => setA({ fail_fast: v }) }));
+      }
+      if (kind === 'FanIn') out.push(note('This step has no settings. It waits for the paths started by a Split. If several of them save the same value, the last one to finish wins.'));
+      if (kind === 'Start' || kind === 'Exit') out.push(note('This step has no settings beyond its name.'));
+
+      if (kind !== 'Start' && kind !== 'Exit') {
+        const retryDetail = { 'Total attempts': 'Retries plus the first attempt. Two retries means up to three attempts.', 'Not the same as “Go back and redo”': 'Retries re-run a step after a failure. A loop is drawn on the canvas with a connection set to Go back and redo.' };
+        if (kind === 'Tool') retryDetail['Commands'] = 'A shell command that fails is not retried automatically.';
+        adv.push(text({ key: 'retries', proposed: true, label: 'Retries', placeholder: '0', help: 'How many extra attempts to make if the step fails.', detail: retryDetail, get: () => A('retries'), set: (v) => setA({ retries: v }) }));
+        adv.push(text({ key: 'retry_delay', proposed: true, label: 'Wait between attempts', placeholder: '1s', help: 'The starting pause before the next attempt, for example 500ms or 1s. It grows after each failed attempt.', get: () => A('retry_delay'), set: (v) => setA({ retry_delay: v }) }));
+        adv.push(text({ key: 'max_retry_delay', proposed: true, label: 'Longest wait', placeholder: '30s', help: 'Caps how long the pause can grow.', get: () => A('max_retry_delay'), set: (v) => setA({ max_retry_delay: v }) }));
+        adv.push(toggle({ key: 'retry_jitter', proposed: true, label: 'Randomise the wait', help: 'Adds a little randomness so lots of retries do not all fire at the same moment.', get: () => !!A('retry_jitter'), set: (v) => setA({ retry_jitter: v }) }));
+      }
+      return { out, adv };
+    };
+
+    /* ---------- edge field definitions ---------- */
+    const setE = (eid, patch) => { const s = this.state; this.setState({ edges: { ...s.edges, [eid]: { ...s.edges[eid], ...patch } } }); };
+    const condChips = (eid) => ['outcome=success', 'outcome=fail'].map((m) => ({ text: m, onPick: () => setE(eid, { condition: m }) }));
+    const edgeFields = (eid) => {
+      const e = st.edges[eid];
+      const prioErr = e.priority.trim() && !/^-?\d+$/.test(e.priority.trim());
+      const pr = text({ key: 'priority', label: 'Priority', placeholder: '0', help: 'If more than one connection’s rule is true, the highest number wins. Whole numbers only. The default is 0.',
+        get: () => e.priority, set: (v) => setE(eid, { priority: v }) });
+      if (prioErr) { pr.error = 'Priority must be a whole number, like 1 or 5.'; pr.hasError = true; }
+      return [
+        text({ key: 'label', proposed: true, label: 'Label', placeholder: 'e.g. Yes, continue', help: 'The name shown on the connection. Labels like success, yes or true also tell the workflow this path is for a good result; failure, error, no or false for a bad one.', get: () => e.label, set: (v) => setE(eid, { label: v }) }),
+        text({ key: 'condition', label: 'Take this path when…', placeholder: 'e.g. outcome=success', help: 'A rule that must be true for the workflow to follow this connection. If left blank, the label is used.',
+          chips: condChips(eid),
+          detail: { 'Examples': 'outcome=success · status!=ready · count>10 · auth=valid && quota=ok', 'Reading saved values': 'Use the name of any saved value, such as tool.output. A value that was never saved makes the rule false.', 'Need the full syntax?': 'Open “Rule syntax” below.' },
+          get: () => e.condition, set: (v) => setE(eid, { condition: v }) }),
+        pr,
+        toggle({ key: 'loop', label: 'Go back and redo', help: 'When on, following this connection clears the target step’s saved results and runs it again from scratch. Use it for “try again” loops.',
+          detail: { 'Not the same as retries': 'Retries re-run a step after a failure. This is a deliberate loop you draw on the canvas.', 'Safety stop': 'A run stops after 1000 step visits, so a loop can never run forever.' },
+          get: () => e.loop, set: (v) => setE(eid, { loop: v }) }),
+        toggleBtn('Rule syntax', st.syntaxOpen, '', () => this.setState({ syntaxOpen: !this.state.syntaxOpen })),
+        ...(st.syntaxOpen ? [syntaxCard()] : [])
+      ];
+    };
+
+    /* ---------- inspector assembly ---------- */
+    const kindOfSel = st.selKind === 'node' ? NODES[sel].kind : (st.selKind === 'guide' ? st.guideKind : '');
+    const isNode = st.selKind === 'node';
+    const isEdge = st.selKind === 'edge';
+    const isGuide = st.selKind === 'guide';
+    const isNone = st.selKind === 'none';
+    let ins = { chipStyle: '', ink: '#1D1D1F', icon: '', kicker: '', title: '', sub: '', hasSub: false, showTabs: false, noun: 'step', kickerStyle: '' };
+    let fields = []; let aboutItems = []; let refFields = [];
+
+    if (isNode || isGuide) {
+      const K = KINDS[kindOfSel]; const grp = GROUP_OF[kindOfSel];
+      ins.chipStyle = 'flex:none;width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:' + grp.tint;
+      ins.ink = grp.ink; ins.icon = ICONS[kindOfSel];
+      ins.kickerStyle = 'font-size:11px;font-weight:600;color:' + grp.ink;
+      ins.kicker = isGuide ? 'Step guide' : K.plain;
+      ins.title = isGuide ? K.plain : nodeLabel(sel);
+      ins.sub = isGuide ? ('Also called “' + K.tech + '” in workflow files.') : ('Also called “' + K.tech + '” in workflow files.');
+      ins.hasSub = true;
+      ins.showTabs = isNode; ins.noun = 'step';
+      aboutItems = K.about.map((r) => ({ title: r[0], text: r[1] }));
+      if (isNode) {
+        if (kindOfSel === 'Conditional') {
+          const outs = Object.keys(st.edges).filter((k) => st.edges[k].from === sel);
+          fields.push(text({ key: 'label', label: 'Step name', help: 'Shown on the canvas and in run logs.', get: () => st.nodes[sel].label, set: (v) => { const s = this.state; this.setState({ nodes: { ...s.nodes, [sel]: { ...s.nodes[sel], label: v } } }); } }));
+          fields.push(note('A branch has no rule of its own. Each path leaving it carries a rule, and the workflow follows the first path whose rule is true (the highest priority wins a tie). Edit those rules here, or select a connection on the canvas.'));
+          outs.forEach((eid) => {
+            const e = st.edges[eid];
+            fields.push(text({ key: 'cond-' + eid, label: 'Go to “' + nodeLabel(e.to) + '” when…', placeholder: 'e.g. outcome=success', help: (e.label ? 'Connection label: ' + e.label + '. ' : '') + (e.loop ? 'This path loops back and redoes the step. ' : '') + 'Leave blank to use the label as the rule.',
+              chips: condChips(eid), get: () => e.condition, set: (v) => setE(eid, { condition: v }) }));
+          });
+          fields.push(toggleBtn('Rule syntax', st.syntaxOpen, '', () => this.setState({ syntaxOpen: !this.state.syntaxOpen })));
+          if (st.syntaxOpen) fields.push(syntaxCard());
+        } else {
+          const d = nodeDefs(kindOfSel, sel);
+          fields = d.out.slice();
+          if (d.adv.length) {
+            fields.push(toggleBtn('More settings', st.advOpen, d.adv.length + ' settings', () => this.setState({ advOpen: !this.state.advOpen })));
+            if (st.advOpen) fields = fields.concat(d.adv);
+          }
+        }
+      } else {
+        const d = nodeDefs(kindOfSel, null);
+        refFields = d.out.concat(d.adv).filter((f) => f.isField && f.id !== 'f-label').map((f) => ({ label: f.label, help: f.help, hasBadge: f.hasBadge, badge: f.badge, badgeTitle: f.badgeTitle, badgeVariant: f.badgeVariant }));
+      }
+    }
+    if (isEdge) {
+      const e = st.edges[sel];
+      ins.chipStyle = 'flex:none;width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:#E6E9EE';
+      ins.ink = '#334155'; ins.icon = 'M4 12h13M13 7l5 5-5 5';
+      ins.kickerStyle = 'font-size:11px;font-weight:600;color:#334155';
+      ins.kicker = 'Connection'; ins.title = nodeLabel(e.from) + ' → ' + nodeLabel(e.to); ins.hasSub = false; ins.showTabs = true; ins.noun = 'connection';
+      fields = edgeFields(sel);
+      aboutItems = [
+        ['What it does', 'A connection decides what runs next. When a step finishes, the workflow follows the connection whose rule matches.'],
+        ['Rules', 'A rule can look at how the previous step went (outcome) or at any saved value. With no rule, the connection is always allowed.'],
+        ['Labels', 'Labels success, yes or true match a good result. Labels failure, error, no or false match a bad one.'],
+        ['When more than one matches', 'The connection with the highest priority wins. The default priority is 0.'],
+        ['Loops', 'Turn on Go back and redo to run the target step again from scratch. Loops are drawn dashed on the canvas.']
+      ].map((r) => ({ title: r[0], text: r[1] }));
+    }
+
+    fields = fields.map((f) => (f.isField ? { ...f, state: f.hasError ? 'invalid' : 'default' } : f));
+    const showSettings = (isNode || isEdge) && st.tab === 'settings';
+    const showAbout = isGuide || ((isNode || isEdge) && st.tab === 'about');
+
+    /* ---------- canvas ---------- */
+    const select = (id) => () => this.setState({ selKind: 'node', selId: id, tab: 'settings' });
+    const selectEdge = (id) => () => this.setState({ selKind: 'edge', selId: id, tab: 'settings' });
+    const nodeCards = Object.keys(NODES).map((id) => {
+      const g = NODES[id]; const K = KINDS[g.kind]; const grp = GROUP_OF[g.kind]; const n = st.nodes[id]; const a = n.attrs;
+      const on = st.selKind === 'node' && st.selId === id;
+      const pill = g.kind === 'Start' || g.kind === 'Exit';
+      let summary = '';
+      if (g.kind === 'Codergen') summary = trunc(a.prompt, 60) || 'No instructions yet';
+      else if (g.kind === 'Tool') {
+        if ((a.mode || 'builtin') === 'command') summary = a.tool_command ? '$ ' + trunc(a.tool_command, 50) : 'Add a command';
+        else { const t = TOOLS.filter((x) => x.value === a.tool)[0]; summary = t ? t.title : 'Choose a tool'; }
+      }
+      else if (g.kind === 'Manager') summary = trunc(a.task, 60) || 'No task yet';
+      else if (g.kind === 'Interviewer') summary = (a.answerMode === 'approve' ? 'Yes or no · ' : a.answerMode === 'options' ? 'Pick from a list · ' : a.gallery ? 'Gallery · ' : 'Free text · ') + trunc(a.question, 36);
+      else if (g.kind === 'Conditional') summary = Object.keys(st.edges).filter((k) => st.edges[k].from === id).length + ' paths out';
+      else if (g.kind === 'SubPipeline') summary = a.pipeline || 'No file chosen';
+      return {
+        isPill: pill, isCard: !pill, sel: on, warn: !!warnIds[id], label: n.label, summary, plain: K.plain, icon: ICONS[g.kind], ink: grp.ink,
+        chipStyle: 'flex:none;width:' + (pill ? 22 : 24) + 'px;height:' + (pill ? 22 : 24) + 'px;border-radius:' + (pill ? 11 : 6) + 'px;display:flex;align-items:center;justify-content:center;background:' + grp.tint,
+        kickerStyle: 'font-size:11px;font-weight:600;color:' + grp.ink,
+        onPick: sp(select(id)),
+        style: 'position:absolute;z-index:2;box-sizing:border-box;left:' + g.x + 'px;top:' + g.y + 'px;width:' + g.w + 'px;height:' + g.h + 'px;text-align:left;font-family:inherit;padding:' + (pill ? '0 12px' : '12px 14px') + ';overflow:hidden;cursor:default;background:#FFFFFF;border-radius:' + (pill ? '999px' : '10px') + ';border:' + (on ? '2px solid ' + accent : '1px solid rgba(0,0,0,.12)') + ';box-shadow:' + (on ? '0 0 0 4px rgba(190,24,93,.16),0 4px 12px rgba(0,0,0,.1)' : '0 1px 3px rgba(0,0,0,.08)')
+      };
+    });
+
+    const segments = []; const arrows = []; const edgeLabels = [];
+    Object.keys(EDGE_GEO).forEach((eid) => {
+      const e = st.edges[eid]; const geo = EDGE_GEO[eid]; const pts = geo.pts;
+      const on = st.selKind === 'edge' && st.selId === eid;
+      const col = on ? accent : (e.loop ? '#C35A00' : '#AEAEB2');
+      const pick = sp(selectEdge(eid));
+      const aria = 'Connection from ' + nodeLabel(e.from) + ' to ' + nodeLabel(e.to);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]; const b = pts[i + 1]; const horiz = a[1] === b[1];
+        const dash = e.loop ? (horiz ? 'repeating-linear-gradient(90deg,' + col + ' 0 7px,transparent 7px 12px)' : 'repeating-linear-gradient(180deg,' + col + ' 0 7px,transparent 7px 12px)') : col;
+        if (horiz) {
+          const x1 = Math.min(a[0], b[0]); const w = Math.abs(a[0] - b[0]);
+          segments.push({ aria, onPick: pick,
+            wrap: 'position:absolute;z-index:1;padding:0;border:0;background:transparent;display:flex;align-items:center;left:' + x1 + 'px;top:' + (a[1] - 8) + 'px;width:' + w + 'px;height:16px',
+            line: 'display:block;width:100%;height:' + (on ? 3 : 2) + 'px;background:' + dash });
+        } else {
+          const y1 = Math.min(a[1], b[1]); const h = Math.abs(a[1] - b[1]);
+          segments.push({ aria, onPick: pick,
+            wrap: 'position:absolute;z-index:1;padding:0;border:0;background:transparent;display:flex;justify-content:center;left:' + (a[0] - 8) + 'px;top:' + y1 + 'px;width:16px;height:' + h + 'px',
+            line: 'display:block;height:100%;width:' + (on ? 3 : 2) + 'px;background:' + dash });
+        }
+      }
+      const p = pts[pts.length - 1]; const q = pts[pts.length - 2];
+      let ar = 'position:absolute;z-index:1;width:0;height:0;pointer-events:none;border-style:solid;';
+      if (p[0] === q[0] && p[1] > q[1]) ar += 'left:' + (p[0] - 6) + 'px;top:' + (p[1] - 10) + 'px;border-width:10px 6px 0 6px;border-color:' + col + ' transparent transparent transparent';
+      else if (p[0] === q[0]) ar += 'left:' + (p[0] - 6) + 'px;top:' + p[1] + 'px;border-width:0 6px 10px 6px;border-color:transparent transparent ' + col + ' transparent';
+      else if (p[0] > q[0]) ar += 'left:' + (p[0] - 10) + 'px;top:' + (p[1] - 6) + 'px;border-width:6px 0 6px 10px;border-color:transparent transparent transparent ' + col;
+      else ar += 'left:' + p[0] + 'px;top:' + (p[1] - 6) + 'px;border-width:6px 10px 6px 0;border-color:transparent ' + col + ' transparent transparent';
+      arrows.push({ style: ar });
+      if (e.label && geo.lab[0]) {
+        edgeLabels.push({ text: e.label, aria: aria + ', labelled ' + e.label, onPick: pick,
+          style: 'position:absolute;z-index:3;transform:translate(-50%,-50%);left:' + geo.lab[0] + 'px;top:' + geo.lab[1] + 'px;height:20px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:500;white-space:nowrap;cursor:default;color:' + (e.loop ? '#8A4B06' : '#3A4556') + ';background:#FFFFFF;border:1px solid ' + (on ? accent : (e.loop ? '#C35A00' : 'rgba(0,0,0,.14)')) });
+      }
+    });
+
+    /* ---------- library ---------- */
+    const q = (st.search || '').trim().toLowerCase();
+    const groups = GROUPS.map((g) => ({
+      title: g.title,
+      titleStyle: 'margin:14px 8px 4px;font-size:11px;font-weight:600;color:#636368',
+      items: g.kinds.filter((k) => !q || (KINDS[k].plain + ' ' + KINDS[k].tech + ' ' + KINDS[k].blurb).toLowerCase().indexOf(q) >= 0).map((k) => {
+        const on = st.selKind === 'guide' && st.guideKind === k;
+        return { plain: KINDS[k].plain, blurb: KINDS[k].blurb, icon: ICONS[k], ink: g.ink, on,
+          onPick: () => this.setState({ selKind: 'guide', guideKind: k, selId: '' }),
+          chipStyle: 'flex:none;width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:' + g.tint,
+          style: 'display:flex;align-items:flex-start;gap:9px;width:100%;box-sizing:border-box;margin-bottom:1px;padding:6px 8px;border:0;border-radius:6px;text-align:left;cursor:default;background:' + (on ? 'rgba(0,0,0,.09)' : 'transparent') };
+      })
+    })).filter((g) => g.items.length > 0);
+
+    const first = issues[0];
+    return {
+      accent,
+      runStyle: 'height:36px;padding:0 16px;border-radius:8px;border:0;background:' + accent + ';color:#FFFFFF;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;text-decoration:none',
+      search: st.search, onSearch: (v) => this.setState({ search: v }),
+      groups, noMatches: groups.length === 0,
+      nodeCards, segments, arrows, edgeLabels,
+      stepCount: Object.keys(NODES).length, edgeCount: Object.keys(EDGE_GEO).length,
+      hasIssues: issues.length > 0, noIssues: issues.length === 0,
+      issueText: issues.length === 1 ? ('“' + nodeLabel(first.id) + '” ' + first.msg + '. ') : (issues.length + ' things to fix. '),
+      reviewIssue: () => { if (first) this.setState({ selKind: 'node', selId: first.id, tab: 'settings' }); },
+      clearSel: () => this.setState({ selKind: 'none', selId: '', guideKind: '' }),
+      isNone, isGuide, hasInspector: !isNone, ins,
+      showSettings, showAbout, fields, aboutItems, refFields, refEmpty: refFields.length === 0,
+      tabSettings: () => this.setState({ tab: 'settings' }), tabAbout: () => this.setState({ tab: 'about' }),
+      tabSettingsStyle: SEG + (showSettings ? SEG_ON : 'background:transparent;font-weight:400'),
+      tabAboutStyle: SEG + (showAbout && !isGuide ? SEG_ON : 'background:transparent;font-weight:400')
+    };
+  }
+}
+</script>
+</body>
+</html>

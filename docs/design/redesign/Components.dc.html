@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Smasher components</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.h{font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+.lbl{font-size:11px;font-weight:600;color:#6E6E73}
+</style>
+</helmet>
+<div style="width:100%;min-width:1100px;min-height:2400px;background:#FFFFFF;color:#1D1D1F;font-size:14px;line-height:1.5">
+  <div style="max-width:1240px;margin:0 auto;padding:48px 40px 96px">
+
+    <header>
+      <div style="font-size:12px;font-weight:600;color:#6E6E73">Design system</div>
+      <h1 class="h" style="margin:6px 0 0;font-size:34px;font-weight:600;line-height:1.15">Smasher components</h1>
+      <p style="margin:10px 0 0;max-width:720px;font-size:15px;color:#6E6E73">Every component currently installed in <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">frontend/src/lib/components/ui</span>, drawn from the real class names and theme tokens in the repo. Restyled as native macOS controls (system font, push buttons, segmented controls, pop-up buttons, source-list sidebar); each keeps the API of the shadcn-svelte component it is named after. Colours below are hex approximations of the oklch tokens in <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">app.css</span>.</p>
+    </header>
+
+    <!-- Tokens -->
+    <section style="margin-top:48px" aria-labelledby="tok-h">
+      <h2 id="tok-h" class="h" style="margin:0;font-size:22px;font-weight:600">Colour tokens</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73">Light theme. Dark theme tokens exist in <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px">.dark</span> but aren’t shown here.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px">
+        <sc-for list="{{swatches}}" as="s" hint-placeholder-count="12">
+          <div style="border:1px solid #E2E2E7;border-radius:8px;overflow:hidden">
+            <div style="{{s.chip}}">Aa</div>
+            <div style="padding:10px 12px">
+              <div style="font-size:13px;font-weight:600">{{s.name}}</div>
+              <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">{{s.token}}</div>
+              <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">{{s.hex}}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <p style="margin:14px 0 0;color:#6E6E73">Radius base <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">0.625rem</span>. Buttons, badges and cards use the largest steps (<span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">rounded-4xl</span>, 26px), inputs use <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">rounded-3xl</span> (22px), textareas <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">rounded-2xl</span> (18px).</p>
+    </section>
+
+    <!-- Type -->
+    <section style="margin-top:48px" aria-labelledby="type-h">
+      <h2 id="type-h" class="h" style="margin:0;font-size:22px;font-weight:600">Typography</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73">Manrope for body text, Figtree for headings and titles, monospace for code.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+        <div style="border:1px solid #E2E2E7;border-radius:8px;padding:20px 24px">
+          <div style="font-size:12px;color:#6E6E73;font-family:ui-monospace,Menlo,monospace">font-heading · Figtree Variable · 600</div>
+          <div class="h" style="margin-top:8px;font-size:30px;font-weight:600;line-height:1.2">Build a workflow your whole team can read</div>
+          <div class="h" style="margin-top:8px;font-size:16px;font-weight:500">Card title, dialog title (16 / 500)</div>
+        </div>
+        <div style="border:1px solid #E2E2E7;border-radius:8px;padding:20px 24px">
+          <div style="font-size:12px;color:#6E6E73;font-family:ui-monospace,Menlo,monospace">font-sans · Manrope Variable · 400 / 500</div>
+          <div style="margin-top:8px;font-size:14px">Body text is 14px. Descriptions and helper text use the muted foreground colour.</div>
+          <div style="margin-top:6px;font-size:14px;color:#6E6E73">Muted description text, 14px.</div>
+          <div style="margin-top:8px;font-size:12px;font-weight:500">Badge and extra-small button text, 12px / 500</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Button -->
+    <section style="margin-top:48px" aria-labelledby="btn-h">
+      <h2 id="btn-h" class="h" style="margin:0;font-size:22px;font-weight:600">Button</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/button</span> · 6 variants × 8 sizes. Renders as a link when given <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">href</span>.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:8px 24px 20px;overflow:auto">
+        <div style="display:grid;grid-template-columns:110px repeat(5,1fr);gap:12px 16px;align-items:center;padding-top:12px">
+          <div></div>
+          <sc-for list="{{btnCols}}" as="c" hint-placeholder-count="5"><div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">{{c}}</div></sc-for>
+        </div>
+        <sc-for list="{{btnRows}}" as="r" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:110px repeat(5,1fr);gap:12px 16px;align-items:center;padding:10px 0;border-top:1px solid #F0F0F0;margin-top:10px">
+            <div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:500">{{r.variant}}</div>
+            <sc-for list="{{r.cells}}" as="b" hint-placeholder-count="5"><div><dc-import name="Button" variant="{{b.variant}}" size="{{b.size}}" label="Button" disabled="{{b.disabled}}" hint-size="90px,36px"></dc-import></div></sc-for>
+          </div>
+        </sc-for>
+        <div style="margin-top:14px;padding-top:16px;border-top:1px solid #F0F0F0;display:grid;grid-template-columns:110px 1fr;gap:12px 16px;align-items:center">
+          <div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:500">icon sizes</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <sc-for list="{{iconBtns}}" as="b" hint-placeholder-count="4">
+              <span style="display:flex;flex-direction:column;align-items:center;gap:6px">
+                <dc-import name="Button" variant="outline" size="{{b.name}}" label="Add" icon="plus" hint-size="40px,40px"></dc-import>
+                <span style="font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#6E6E73">{{b.name}}</span>
+              </span>
+            </sc-for>
+          </div>
+          <div style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px;font-weight:500">with icon</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <dc-import name="Button" variant="default" size="default" label="Run workflow" icon="play" icon-position="start" hint-size="130px,36px"></dc-import>
+            <dc-import name="Button" variant="outline" size="default" label="Next" icon="arrow" icon-position="end" hint-size="80px,36px"></dc-import>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Badge -->
+    <section style="margin-top:48px" aria-labelledby="badge-h">
+      <h2 id="badge-h" class="h" style="margin:0;font-size:22px;font-weight:600">Badge</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/badge</span> · 6 variants, 20px tall. Also renders as a link.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:20px 24px;display:flex;gap:28px;flex-wrap:wrap">
+        <sc-for list="{{badges}}" as="b" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+            <dc-import name="Badge" variant="{{b.name}}" label="{{b.label}}" hint-size="70px,20px"></dc-import>
+            <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">{{b.name}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- Form controls -->
+    <section style="margin-top:48px" aria-labelledby="form-h">
+      <h2 id="form-h" class="h" style="margin:0;font-size:22px;font-weight:600">Form controls</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/label</span>, <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/input</span>, <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/textarea</span>, <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/native-select</span>, <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/checkbox</span>. Fields have a soft grey fill and no resting border; focus adds a ring.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:28px 32px">
+
+        <sc-for list="{{inputs}}" as="f" hint-placeholder-count="5">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">Input · {{f.state}}</span>
+            <dc-import name="Input" label="{{f.label}}" value="{{f.value}}" placeholder="{{f.placeholder}}" state="{{f.state}}" error="{{f.error}}" hint-size="100%,84px"></dc-import>
+          </div>
+        </sc-for>
+
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">Textarea</span>
+          <dc-import name="Textarea" label="Notes" placeholder="Tell the AI what to change in the next round…" hint-size="100%,150px"></dc-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">Select (native)</span>
+          <dc-import name="Select" label="Model" options="claude-sonnet-4-5|claude-opus-4-1|gpt-5" hint-size="100%,84px"></dc-import>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;grid-column:1 / -1">
+          <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6E6E73">checkbox</span>
+          <div style="display:flex;gap:32px;flex-wrap:wrap">
+            <sc-for list="{{checks}}" as="c" hint-placeholder-count="5">
+              <dc-import name="Checkbox" label="{{c.label}}" checked="{{c.on}}" state="{{c.state}}" hint-size="120px,24px"></dc-import>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Card -->
+    <section style="margin-top:48px" aria-labelledby="card-h">
+      <h2 id="card-h" class="h" style="margin:0;font-size:22px;font-weight:600">Card</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/card</span> · Card, Header, Title, Description, Action, Content, Footer. Default spacing 24px; <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">size="sm"</span> uses 16px.</p>
+      <div style="background:#FAFAFA;border:1px solid #E2E2E7;border-radius:8px;padding:32px;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+
+        <div style="width:380px;box-sizing:border-box;background:#FFFFFF;border-radius:12px;padding:24px 0;display:flex;flex-direction:column;gap:24px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1),0 0 0 1px rgba(10,10,10,.05)">
+          <div style="padding:0 24px;display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start">
+            <div class="h" style="font-size:16px;font-weight:500">Design concepts review</div>
+            <span style="grid-row:1 / span 2;grid-column:2;display:inline-flex;align-items:center;justify-content:center;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:500;background:#F4F4F5;color:#18181B">Edit</span>
+            <div style="color:#6E6E73;font-size:14px">design_concepts_review.dot</div>
+          </div>
+          <div style="padding:0 24px;font-size:14px">Drafts three concepts, checks them against the design system, then asks you to pick a favourite.</div>
+          <div style="padding:0 24px;display:flex;align-items:center;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:500;background:#BE185D;color:#FDF2F8">Run workflow</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:500;background:#FFFFFF;border:1px solid #E2E2E7">Duplicate</span>
+          </div>
+        </div>
+
+        <div style="width:300px;box-sizing:border-box;background:#FFFFFF;border-radius:12px;padding:16px 0;display:flex;flex-direction:column;gap:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1),0 0 0 1px rgba(10,10,10,.05)">
+          <div style="padding:0 16px;display:grid;gap:6px">
+            <div class="h" style="font-size:16px;font-weight:500">Small card</div>
+            <div style="color:#6E6E73;font-size:14px">size="sm"</div>
+          </div>
+          <div style="padding:0 16px;font-size:14px">Tighter 16px spacing for dense layouts such as lists of runs.</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Table -->
+    <section style="margin-top:48px" aria-labelledby="table-h">
+      <h2 id="table-h" class="h" style="margin:0;font-size:22px;font-weight:600">Table</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/table</span> · Table, Header, Body, Footer, Row, Head, Cell, Caption. Rows highlight on hover and take a muted fill when selected.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:8px 16px">
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <caption style="caption-side:bottom;padding:12px 0 4px;color:#6E6E73;font-size:14px">A caption sits under the table.</caption>
+          <thead>
+            <tr style="border-bottom:1px solid #E2E2E7">
+              <th style="height:48px;padding:0 12px;text-align:left;font-weight:500">Run</th>
+              <th style="height:48px;padding:0 12px;text-align:left;font-weight:500">Status</th>
+              <th style="height:48px;padding:0 12px;text-align:left;font-weight:500">Started</th>
+              <th style="height:48px;padding:0 12px;text-align:right;font-weight:500">Duration</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{tableRows}}" as="r" hint-placeholder-count="3">
+              <tr style="{{r.style}}">
+                <td style="padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:13px">{{r.id}}</td>
+                <td style="padding:12px"><span style="{{r.badge}}">{{r.status}}</span></td>
+                <td style="padding:12px">{{r.started}}</td>
+                <td style="padding:12px;text-align:right">{{r.duration}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Dialog -->
+    <section style="margin-top:48px" aria-labelledby="dlg-h">
+      <h2 id="dlg-h" class="h" style="margin:0;font-size:22px;font-weight:600">Dialog</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/dialog</span> · Dialog, Trigger, Content, Header, Title, Description, Footer, Close, Overlay, Portal. Shown open, centred over its overlay, with a built-in close button.</p>
+      <div style="background:rgba(0,0,0,.5);border-radius:8px;padding:48px 24px;display:flex;justify-content:center">
+        <div role="img" aria-label="Example dialog" style="position:relative;width:448px;max-width:100%;box-sizing:border-box;background:#FFFFFF;border-radius:12px;padding:24px;display:grid;gap:24px;box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1),0 0 0 1px rgba(10,10,10,.05)">
+          <span style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:999px;background:#F4F4F5;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1D1D1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></span>
+          <div style="display:flex;flex-direction:column;gap:6px;padding-right:40px">
+            <div class="h" style="font-size:16px;font-weight:500;line-height:1">Run workflow</div>
+            <div style="color:#6E6E73;font-size:14px">Add a brief and choose a model. You can change both later.</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:14px;font-weight:500;line-height:1">Brief</span>
+            <div style="box-sizing:border-box;height:36px;display:flex;align-items:center;padding:0 12px;border-radius:10px;background:rgba(229,229,229,.5);font-size:14px;color:#6E6E73">What should the AI design?</div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:500;background:#FFFFFF;border:1px solid #E2E2E7">Cancel</span>
+            <span style="display:inline-flex;align-items:center;justify-content:center;height:36px;padding:0 12px;border-radius:999px;font-size:14px;font-weight:500;background:#BE185D;color:#FDF2F8">Start run</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Breadcrumb + Separator -->
+    <section style="margin-top:48px;display:grid;grid-template-columns:1fr 1fr;gap:32px" aria-labelledby="bc-h">
+      <div>
+        <h2 id="bc-h" class="h" style="margin:0;font-size:22px;font-weight:600">Breadcrumb</h2>
+        <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/breadcrumb</span> · List, Item, Link, Page, Separator, Ellipsis.</p>
+        <div style="border:1px solid #E2E2E7;border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;align-items:center;gap:10px;color:#6E6E73;font-size:14px">
+            <span>Workflows</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <span>Design</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <span style="color:#1D1D1F">Design concepts review</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;color:#6E6E73;font-size:14px">
+            <span>Workflows</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="More"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            <span style="color:#1D1D1F">Run run-7f3a9c</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h2 class="h" style="margin:0;font-size:22px;font-weight:600">Separator</h2>
+        <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/separator</span> · horizontal or vertical, 1px, border colour.</p>
+        <div style="border:1px solid #E2E2E7;border-radius:8px;padding:24px">
+          <div style="font-size:14px;font-weight:500">Run details</div>
+          <div style="font-size:14px;color:#6E6E73">Where this run saved its files.</div>
+          <div style="height:1px;background:#E2E2E7;margin:14px 0"></div>
+          <div style="display:flex;align-items:center;gap:14px;height:20px;font-size:14px">
+            <span>Steps</span><span style="width:1px;align-self:stretch;background:#E2E2E7"></span><span>Runs</span><span style="width:1px;align-self:stretch;background:#E2E2E7"></span><span>Settings</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sonner -->
+    <section style="margin-top:48px" aria-labelledby="toast-h">
+      <h2 id="toast-h" class="h" style="margin:0;font-size:22px;font-weight:600">Toast (Sonner)</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#1D1D1F">ui/sonner</span> · themed to popover colours with a Lucide icon per type. Layout is approximate; Sonner draws the real toast.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+        <sc-for list="{{toasts}}" as="t" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:6px;border:1px solid #E2E2E7;background:#FFFFFF;box-shadow:0 4px 12px rgba(0,0,0,.08);font-size:14px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="{{t.icon}}"/></svg>
+            <span><span style="display:block;font-weight:500">{{t.title}}</span><span style="display:block;font-size:12.5px;color:#6E6E73">{{t.type}}</span></span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- Added components -->
+    <section style="margin-top:48px" aria-labelledby="add-h">
+      <h2 id="add-h" class="h" style="margin:0;font-size:22px;font-weight:600">Switch, Tabs, Toggle group, Accordion</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73">Added for the redesign. Each is an importable component that mirrors the shadcn-svelte one it is named after. Install the originals in the repo with the shadcn-svelte CLI.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:28px">
+        <div><div class="lbl">Switch</div><div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
+          <dc-import name="Switch" label="Allow retries" hint-size="220px,24px"></dc-import>
+          <dc-import name="Switch" label="Pause for review" checked="true" hint-size="220px,24px"></dc-import>
+          <dc-import name="Switch" label="Disabled" state="disabled" hint-size="220px,24px"></dc-import>
+        </div></div>
+        <div><div class="lbl">Tabs</div><div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
+          <dc-import name="Tabs" tabs="Settings|Help" variant="default" hint-size="200px,40px"></dc-import>
+          <dc-import name="Tabs" tabs="Settings|Help|History" variant="line" hint-size="280px,40px"></dc-import>
+        </div></div>
+        <div><div class="lbl">Toggle group</div><div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
+          <dc-import name="ToggleGroup" options="Key moments|Everything" variant="outline" hint-size="280px,36px"></dc-import>
+          <dc-import name="ToggleGroup" options="Day|Week|Month" variant="default" size="sm" hint-size="200px,32px"></dc-import>
+        </div></div>
+        <div style="grid-column:1/-1;max-width:520px"><div class="lbl">Accordion</div><div style="margin-top:10px">
+          <dc-import name="Accordion" items="Anthropic~Key saved. Claude models are available.|OpenAI~No key yet. Add one to use GPT models.|Local~Runs on your computer, no key needed." open="Anthropic" hint-size="520px,200px"></dc-import>
+        </div></div>
+      </div>
+    </section>
+
+    <section style="margin-top:48px" aria-labelledby="ov-h">
+      <h2 id="ov-h" class="h" style="margin:0;font-size:22px;font-weight:600">Tooltip, Popover, Drawer, Sidebar</h2>
+      <p style="margin:4px 0 16px;color:#6E6E73">Overlays and navigation. Tooltip and Popover are shown pinned open for review; in a screen they open on hover and click. Drawer and Sidebar take their content as props, since a component can’t hold child content here.</p>
+      <div style="border:1px solid #E2E2E7;border-radius:8px;padding:24px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+        <div style="width:300px"><div class="lbl">Tooltip</div><div style="margin-top:10px"><dc-import name="Tooltip" text="Scores how well the draft matches your brief" trigger="Score" side="top" open="true" hint-size="300px,90px"></dc-import></div></div>
+        <div style="width:320px"><div class="lbl">Popover</div><div style="margin-top:10px"><dc-import name="Popover" label="Details" title="Prompt" body="The instruction the AI follows. Describe the job, the tone and what a good answer looks like." open="true" hint-size="320px,180px"></dc-import></div></div>
+        <div style="width:256px;height:420px;border:1px solid #E2E2E7;border-radius:8px;overflow:hidden"><dc-import name="Sidebar" title="Smasher" items="Dashboard:home|Workflows:flow|Runs:play|Settings:settings" active="Dashboard" footer="3 runs need your decision" hint-size="256px,420px"></dc-import></div>
+        <div style="width:56px;height:420px;border:1px solid #E2E2E7;border-radius:8px;overflow:hidden"><dc-import name="Sidebar" title="Smasher" items="Dashboard:home|Workflows:flow|Runs:play|Settings:settings" active="Runs" collapsed="true" hint-size="56px,420px"></dc-import></div>
+      </div>
+      <div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:20px">
+        <div style="height:420px;border:1px solid #E2E2E7;border-radius:8px;overflow:hidden"><dc-import name="Drawer" direction="bottom" title="Run details" description="Everything about this run, out of the way until you need it." body="Started 9:41 am. Three candidates drafted, two scored above 80." primary-label="Done" secondary-label="Cancel" open="true" hint-size="420px,420px"></dc-import></div>
+        <div style="height:420px;border:1px solid #E2E2E7;border-radius:8px;overflow:hidden"><dc-import name="Drawer" direction="right" title="Node settings" description="Change how this step behaves." body="Pick a model, write the prompt and set what happens on failure." primary-label="Save" secondary-label="Cancel" show-close="true" open="true" hint-size="420px,420px"></dc-import></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2400}}'>
+const BTN_BASE = 'box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;border-radius:999px;font-family:inherit;font-weight:500;white-space:nowrap;font-size:14px;';
+const VAR = {
+  default: 'background:#BE185D;color:#FDF2F8;',
+  outline: 'background:#FFFFFF;border-color:#E2E2E7;color:#1D1D1F;',
+  secondary: 'background:#F4F4F5;color:#18181B;',
+  ghost: 'background:transparent;color:#1D1D1F;',
+  destructive: 'background:rgba(220,38,38,.1);color:#DC2626;',
+  link: 'background:transparent;color:#BE185D;text-decoration:underline;text-underline-offset:4px;'
+};
+const SIZE = {
+  xs: 'height:24px;padding:0 10px;font-size:12px;',
+  sm: 'height:32px;padding:0 12px;',
+  default: 'height:36px;padding:0 12px;',
+  lg: 'height:40px;padding:0 16px;'
+};
+const ICONSZ = { 'icon-xs': ['24px', 12], 'icon-sm': ['32px', 16], icon: ['36px', 16], 'icon-lg': ['40px', 16] };
+const badgeBase = 'box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;height:20px;padding:0 8px;border-radius:999px;border:1px solid transparent;font-size:12px;font-weight:500;white-space:nowrap;';
+const BADGE = {
+  default: 'background:#BE185D;color:#FDF2F8;',
+  secondary: 'background:#F4F4F5;color:#18181B;',
+  destructive: 'background:rgba(220,38,38,.1);color:#DC2626;',
+  outline: 'border-color:#E2E2E7;color:#1D1D1F;',
+  ghost: 'background:transparent;color:#1D1D1F;',
+  link: 'color:#BE185D;text-decoration:underline;text-underline-offset:4px;'
+};
+const fieldBase = 'box-sizing:border-box;height:36px;width:100%;display:flex;align-items:center;padding:0 12px;border-radius:10px;background:rgba(229,229,229,.5);border:1px solid transparent;font-size:14px;';
+const SW = [
+  ['Background', '--background', '#FFFFFF', '#1D1D1F'], ['Foreground', '--foreground', '#1D1D1F', '#FFFFFF'],
+  ['Primary', '--primary', '#BE185D', '#FDF2F8'], ['Primary foreground', '--primary-foreground', '#FDF2F8', '#BE185D'],
+  ['Secondary', '--secondary', '#F4F4F5', '#18181B'], ['Muted', '--muted', '#F5F5F5', '#6E6E73'],
+  ['Muted foreground', '--muted-foreground', '#6E6E73', '#FFFFFF'], ['Accent', '--accent', '#BE185D', '#FDF2F8'],
+  ['Destructive', '--destructive', '#DC2626', '#FFFFFF'], ['Border / input', '--border', '#E2E2E7', '#1D1D1F'],
+  ['Ring', '--ring', '#A3A3A3', '#FFFFFF'], ['Sidebar', '--sidebar', '#FAFAFA', '#1D1D1F'],
+  ['Chart 1', '--chart-1', '#FDA4AF', '#1D1D1F'], ['Chart 2', '--chart-2', '#FF2056', '#FFFFFF'],
+  ['Chart 3', '--chart-3', '#EC003F', '#FFFFFF'], ['Chart 4', '--chart-4', '#C70036', '#FFFFFF'], ['Chart 5', '--chart-5', '#A50036', '#FFFFFF']
+];
+const RUNS = [
+  { id: 'run-7f3a9c', status: 'Needs you', started: 'Today, 10:42 am', duration: '10 min so far', v: 'default', sel: true },
+  { id: 'run-1d7e88', status: 'Failed', started: 'Yesterday, 4:20 pm', duration: '1 min 2 s', v: 'destructive' },
+  { id: 'run-8e21b5', status: 'Completed', started: 'Mon 12 Oct, 2:10 pm', duration: '5 min 31 s', v: 'secondary' }
+];
+class Component extends DCLogic {
+  renderVals() {
+    const btn = (v, s, label, disabled) => ({ variant: v, size: s, disabled: !!disabled });
+    return {
+      swatches: SW.map((s) => ({ name: s[0], token: s[1], hex: s[2],
+        chip: 'height:56px;display:flex;align-items:center;padding:0 14px;font-weight:600;font-size:16px;background:' + s[2] + ';color:' + s[3] + ';border-bottom:1px solid #E2E2E7' })),
+      btnCols: ['xs', 'sm', 'default', 'lg', 'disabled'],
+      btnRows: Object.keys(VAR).map((v) => ({ variant: v, cells: [btn(v, 'xs', 'Button'), btn(v, 'sm', 'Button'), btn(v, 'default', 'Button'), btn(v, 'lg', 'Button'), btn(v, 'default', 'Button', true)] })),
+      iconBtns: Object.keys(ICONSZ).map((k) => ({ name: k })),
+      badges: Object.keys(BADGE).map((k) => ({ name: k, label: k === 'link' ? 'Link' : k.charAt(0).toUpperCase() + k.slice(1) })),
+      inputs: [
+        { label: 'Workflow name', state: 'default', value: 'Design concepts review', placeholder: '', error: '' },
+        { label: 'Brief', state: 'default', value: '', placeholder: 'What should the AI design?', error: '' },
+        { label: 'Focused', state: 'focus', value: 'Design concepts review', placeholder: '', error: '' },
+        { label: 'API key', state: 'invalid', value: 'sk-ant-', placeholder: '', error: 'That key looks too short.' },
+        { label: 'Working folder', state: 'disabled', value: 'runs/run-7f3a9c', placeholder: '', error: '' }
+      ],
+      checks: [
+        { label: 'Unchecked', state: 'default' }, { label: 'Checked', state: 'default', on: true },
+        { label: 'Invalid', state: 'invalid' }, { label: 'Disabled', state: 'disabled' }, { label: 'Disabled, checked', state: 'disabled', on: true }
+      ].map((c) => ({ label: c.label, state: c.state, on: !!c.on })),
+      tableRows: RUNS.map((r) => ({ ...r, badge: badgeBase + BADGE[r.v], style: 'border-bottom:1px solid #E2E2E7;' + (r.sel ? 'background:#F5F5F5;' : '') })),
+      toasts: [
+        { title: 'Settings saved', type: 'toast.success', icon: 'M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3', ink: '#1D1D1F' },
+        { title: 'Could not start the run', type: 'toast.error', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM15 9l-6 6M9 9l6 6', ink: '#DC2626' },
+        { title: 'Restart Smasher to apply', type: 'toast.info', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01', ink: '#1D1D1F' },
+        { title: 'Check the working folder', type: 'toast.warning', icon: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01', ink: '#B45309' },
+        { title: 'Starting run…', type: 'toast.loading', icon: 'M21 12a9 9 0 1 1-6.22-8.56', ink: '#6E6E73' }
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
