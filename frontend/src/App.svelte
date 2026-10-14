@@ -17,6 +17,7 @@
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
+  import { ModeWatcher } from 'mode-watcher';
   import { providePageHeader } from '$lib/page-header.svelte';
 
   let runId = $state<string | null>(null);
@@ -224,6 +225,7 @@
   </main>
 </div>
 
+<ModeWatcher defaultMode="system" />
 <Toaster />
 
 <style>
