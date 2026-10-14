@@ -9,6 +9,7 @@
   import { buildExchanges } from '../../lib/exchanges';
   import { renderMarkdown } from '../../lib/markdown';
   import { notifyError, pollFailureNotifier } from '$lib/notify';
+  import { libraryStore } from '../../stores/library.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
@@ -113,6 +114,7 @@
       // The server reports some rejections (e.g. an unknown question) as a 200.
       if (!result.success) throw new Error(result.error ?? '');
       questionStore.answer(questionId);
+      void libraryStore.refresh();
       update(questionId, { text: '', choice: null });
     } catch (err) {
       // The question stays pending, with its text, so it can be answered again.

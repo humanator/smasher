@@ -14,6 +14,7 @@
   import { Checkbox } from '$lib/components/ui/checkbox/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { pollFailureNotifier } from '$lib/notify';
+  import { libraryStore } from '../../stores/library.svelte';
 
   let { runId }: { runId: string } = $props();
 
@@ -82,6 +83,7 @@
       if (resp.success) {
         done = true;
         gate = null;
+        void libraryStore.refresh();
       } else {
         error = resp.error ?? 'decision not accepted';
       }

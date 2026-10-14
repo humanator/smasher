@@ -10,6 +10,9 @@ import { setApiBaseUrl } from '../../src/lib/api/client-config';
 import * as runsApi from '../../src/lib/api/runs';
 import * as workflowsApi from '../../src/lib/api/workflows';
 import { formatWorkflowName } from '../../src/lib/utils';
+import userEvent from '@testing-library/user-event';
+import { submitGraph, cancelAll } from '../fixtures/graphs';
+import { libraryStore } from '../../src/stores/library.svelte';
 import { rmSync } from 'fs';
 
 const humanGateDot = readFileSync(
@@ -61,7 +64,8 @@ describe('App catalog layout', () => {
     render(App);
     // Wait for a real workflow row to land before inspecting the table --
     // the list starts empty while GET /api/workflows is in flight.
-    await screen.findByText('Human Gate Showcase', {}, { timeout: 5000 });
+    // Scoped to main: the sidebar lists the same workflows and loads first.
+    await within(screen.getByRole('main')).findByText('Human Gate Showcase', {}, { timeout: 5000 });
     const table = screen.getByRole('heading', { name: 'Workflows' }).closest('.workflow-catalog')
       ?.querySelector('table');
     expect(table).toBeTruthy();
@@ -312,3 +316,72 @@ describe('App workflow detail route', () => {
   });
 });
 
+
+describe('App shell', () => {
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(async () => {
+    visit('/');
+    await cancelAll();
+  });
+
+  it.each(['/', '/workflows/new', '/workflows/some-id', '/runs/some-run'])(
+    'renders %s inside aside, header and main landmarks',
+    (path) => {
+      visit(path);
+      render(App);
+      expect(screen.getByRole('complementary')).toBeTruthy();
+      expect(screen.getByRole('banner')).toBeTruthy();
+      expect(screen.getByRole('main')).toBeTruthy();
+      expect(screen.getByRole('navigation', { name: 'Library' })).toBeTruthy();
+    }
+  );
+
+  it('lists the real workflows in the sidebar, by display name', async () => {
+    render(App);
+    const nav = screen.getByRole('navigation', { name: 'Workflows' });
+    const link = await within(nav).findByRole('link', { name: /Human Gate Showcase/ }, { timeout: 5000 });
+    expect(link.getAttribute('href')).toBe('/workflows/examples__human_gate_showcase');
+  });
+
+  it.each(['/workflows/examples__human_gate_showcase', '/workflows/examples__human_gate_showcase/edit'])(
+    'marks the active workflow in the sidebar on %s',
+    async (path) => {
+      visit(path);
+      render(App);
+      const nav = screen.getByRole('navigation', { name: 'Workflows' });
+      const link = await within(nav).findByRole('link', { name: /Human Gate Showcase/ }, { timeout: 5000 });
+      await waitFor(() => expect(link.getAttribute('aria-current')).toBe('page'));
+    }
+  );
+
+  it('offers a toolbar button that opens the sidebar for phone widths', () => {
+    render(App);
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Open sidebar' })).toBeTruthy();
+  });
+
+  it('counts a run that is waiting on a person, and drops it as soon as it is answered', async () => {
+    const runId = await submitGraph(
+      readFileSync(join(process.cwd(), 'e2e', 'fixtures', 'gate_only.dot'), 'utf-8')
+    );
+    visit(`/runs/${runId}`);
+    render(App);
+
+    // Other suites park runs on the same server, so follow this run rather than the total.
+    const pill = await screen.findByTestId('needs-you-count', {}, { timeout: 5000 });
+    expect(Number(pill.textContent?.trim())).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId('sidebar-footer').textContent).toMatch(/run(s)? needs? your decision/);
+    await waitFor(() => expect(libraryStore.needsYou.map((r) => r.id)).toContain(runId));
+
+    const user = userEvent.setup();
+    await user.type(await screen.findByRole('textbox', {}, { timeout: 5000 }), 'go');
+    await user.click(screen.getByRole('button', { name: 'Submit' }));
+
+    // The library polls every 5s; answering refreshes it straight away.
+    await waitFor(() => expect(libraryStore.needsYou.map((r) => r.id)).not.toContain(runId), {
+      timeout: 3000,
+    });
+  });
+});

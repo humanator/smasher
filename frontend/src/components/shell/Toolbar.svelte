@@ -10,12 +10,15 @@
     title,
     subtitle = null,
     back = null,
+    leading,
     actions,
   }: {
     title: string;
     /** Backtick-quoted fragments are set in mono. */
     subtitle?: string | null;
     back?: { label: string; href: string } | null;
+    /** Controls ahead of the back button, e.g. the phone-width sidebar button. */
+    leading?: Snippet | null;
     actions?: Snippet | null;
   } = $props();
 
@@ -26,6 +29,9 @@
 <header
   class="sticky top-0 z-10 flex h-[52px] shrink-0 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70"
 >
+  {#if leading}
+    {@render leading()}
+  {/if}
   {#if back}
     <Button href={back.href} variant="ghost" size="icon" aria-label={`Back to ${back.label}`}>
       <ChevronLeftIcon aria-hidden="true" />

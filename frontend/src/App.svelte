@@ -13,7 +13,7 @@
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
-  import Toolbar from './components/shell/Toolbar.svelte';
+  import AppShell from './components/shell/AppShell.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
@@ -145,86 +145,83 @@
   <SettingsDialog />
 {/snippet}
 
-<div class="min-h-screen bg-muted/40 text-foreground">
-  <Toolbar
-    title={pageTitle}
-    subtitle={pageHeader.subtitle}
-    back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
-    actions={headerActions}
-  />
+<AppShell
+  title={pageTitle}
+  subtitle={pageHeader.subtitle}
+  back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
+  actions={headerActions}
+  currentWorkflowId={workflowPageType === 'detail' || workflowPageType === 'edit' ? workflowId : null}
+>
+  <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
+       so they load as their own chunk on demand; bundling them kept the
+       entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
+  {#if workflowPageType === 'new'}
+    <!-- New Workflow Page: the canvas fills everything below the 52px toolbar -->
+    <div class="h-[calc(100dvh-52px)]">
+      {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}
+        <NewWorkflowPage />
+      {:catch}
+        <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
+      {/await}
+    </div>
+  {:else if workflowPageType === 'edit' && workflowId}
+    <!-- Edit Workflow Page: the canvas fills everything below the 52px toolbar -->
+    <div class="h-[calc(100dvh-52px)]">
+      {#await import('./components/dashboard/WorkflowEditorPage.svelte') then { default: WorkflowEditorPage }}
+        <WorkflowEditorPage {workflowId} />
+      {:catch}
+        <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
+      {/await}
+    </div>
+  {:else if workflowPageType === 'detail' && workflowId}
+    <div class="max-w-6xl mx-auto p-8">
+      {#key workflowId}
+        <WorkflowDetailPage {workflowId} />
+      {/key}
+    </div>
+  {:else if runId}
+    <!-- Run Detail View: EventLog + QuestionCard -->
+    <div class="max-w-6xl mx-auto p-8">
+      <div class="mb-8">
+        <RunDetail {runId} />
+      </div>
 
-  <main>
-    <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
-         so they load as their own chunk on demand; bundling them kept the
-         entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
-    {#if workflowPageType === 'new'}
-      <!-- New Workflow Page: the canvas fills everything below the 52px toolbar -->
-      <div class="h-[calc(100dvh-52px)]">
-        {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}
-          <NewWorkflowPage />
-        {:catch}
-          <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
-        {/await}
-      </div>
-    {:else if workflowPageType === 'edit' && workflowId}
-      <!-- Edit Workflow Page: the canvas fills everything below the 52px toolbar -->
-      <div class="h-[calc(100dvh-52px)]">
-        {#await import('./components/dashboard/WorkflowEditorPage.svelte') then { default: WorkflowEditorPage }}
-          <WorkflowEditorPage {workflowId} />
-        {:catch}
-          <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
-        {/await}
-      </div>
-    {:else if workflowPageType === 'detail' && workflowId}
-      <div class="max-w-6xl mx-auto p-8">
-        {#key workflowId}
-          <WorkflowDetailPage {workflowId} />
-        {/key}
-      </div>
-    {:else if runId}
-      <!-- Run Detail View: EventLog + QuestionCard -->
-      <div class="max-w-6xl mx-auto p-8">
-        <div class="mb-8">
-          <RunDetail {runId} />
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Event Log on the left -->
+        <div>
+          <h2 class="text-xl font-semibold mb-4">Events</h2>
+          <EventLog {runId} />
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <!-- Event Log on the left -->
-          <div>
-            <h2 class="text-xl font-semibold mb-4">Events</h2>
-            <EventLog {runId} />
-          </div>
-
-          <!-- Questions on the right -->
-          <div>
-            <h2 class="text-xl font-semibold mb-4">Questions</h2>
-            <QuestionCard {runId} />
-          </div>
-        </div>
-
-        <div class="mt-8">
-          <GalleryGate {runId} />
-        </div>
-
-        <div class="mt-8">
-          <h2 class="text-xl font-semibold mb-4">Candidates</h2>
-          <CandidateGallery {runId} />
-        </div>
-
-        <div class="mt-8">
-          <h2 class="text-xl font-semibold mb-4">Decision History</h2>
-          <DecisionHistory {runId} />
+        <!-- Questions on the right -->
+        <div>
+          <h2 class="text-xl font-semibold mb-4">Questions</h2>
+          <QuestionCard {runId} />
         </div>
       </div>
-    {:else}
-      <!-- Catalog View: Workflows and Runs stacked in the main column -->
-      <div class="mx-auto max-w-6xl px-4 sm:px-8">
-        <WorkflowCatalog />
-        <RunList />
+
+      <div class="mt-8">
+        <GalleryGate {runId} />
       </div>
-    {/if}
-  </main>
-</div>
+
+      <div class="mt-8">
+        <h2 class="text-xl font-semibold mb-4">Candidates</h2>
+        <CandidateGallery {runId} />
+      </div>
+
+      <div class="mt-8">
+        <h2 class="text-xl font-semibold mb-4">Decision History</h2>
+        <DecisionHistory {runId} />
+      </div>
+    </div>
+  {:else}
+    <!-- Catalog View: Workflows and Runs stacked in the main column -->
+    <div class="mx-auto max-w-6xl px-4 sm:px-8">
+      <WorkflowCatalog />
+      <RunList />
+    </div>
+  {/if}
+</AppShell>
 
 <ModeWatcher defaultMode="system" />
 <Toaster />
