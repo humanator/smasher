@@ -20,6 +20,7 @@ export interface RunSummary {
   run_working_dir: string | null;
   workflow_id: string | null;
   gallery_gates: string[];
+  pending_questions: number;
 }
 
 export interface ListRunsResponse {

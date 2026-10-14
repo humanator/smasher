@@ -18,6 +18,7 @@ function run(id: string, status: string): RunSummary {
     run_working_dir: null,
     workflow_id: 'wf',
     gallery_gates: [],
+    pending_questions: 0,
   };
 }
 

@@ -151,6 +151,9 @@ pub struct RunSummary {
     /// gallery picks out of Answered Questions.
     #[serde(default)]
     pub gallery_gates: Vec<String>,
+    /// Questions the run is currently blocked on. Drives the SPA's "Needs you".
+    #[serde(default)]
+    pub pending_questions: u32,
 }
 
 impl RunRecord {
@@ -175,6 +178,7 @@ impl RunRecord {
             }),
             workflow_id: self.workflow_id.clone(),
             gallery_gates: self.gallery_gates(),
+            pending_questions: self.interviewer.queue().len() as u32,
         }
     }
 
@@ -234,6 +238,7 @@ mod tests {
             run_working_dir: None,
             workflow_id: None,
             gallery_gates: vec![],
+            pending_questions: 0,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["id"], "test-123");
@@ -255,6 +260,7 @@ mod tests {
             run_working_dir: None,
             workflow_id: None,
             gallery_gates: vec![],
+            pending_questions: 0,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["error"], "node X failed");
@@ -289,6 +295,45 @@ mod tests {
             run_working_dir: working_dir,
             workflow_id,
         }
+    }
+
+    #[test]
+    fn to_summary_reports_pending_questions_from_the_interviewer_queue() {
+        use smasher_attractor::http_interviewer::{PendingQuestion, QuestionKind};
+        let record = make_test_record(RunStatus::Running, None, None);
+        assert_eq!(record.to_summary().pending_questions, 0);
+
+        let id = record.interviewer.queue().push(PendingQuestion {
+            id: "q1".into(),
+            question: "Proceed?".into(),
+            choices: vec![],
+            kind: QuestionKind::Approval,
+            created_at: std::time::Instant::now(),
+            node_id: Some("gate".into()),
+            answer_tx: None,
+        });
+        assert_eq!(record.to_summary().pending_questions, 1);
+
+        record.interviewer.queue().take(&id);
+        assert_eq!(record.to_summary().pending_questions, 0);
+    }
+
+    #[test]
+    fn run_summary_without_pending_questions_deserializes_to_zero() {
+        let json = serde_json::json!({
+            "id": "r1",
+            "status": "Running",
+            "started_at": "2025-01-01T00:00:00Z",
+            "completed_at": null,
+            "graph_name": null,
+            "error": null,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "run_working_dir": null,
+            "workflow_id": null,
+        });
+        let summary: RunSummary = serde_json::from_value(json).unwrap();
+        assert_eq!(summary.pending_questions, 0);
     }
 
     #[test]

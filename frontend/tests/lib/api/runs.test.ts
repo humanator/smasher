@@ -231,3 +231,36 @@ describe('runs and questions API clients - server error messages', () => {
     });
   });
 });
+
+describe('runs API client - pending_questions', () => {
+  beforeAll(() => {
+    setApiBaseUrl(API_URL);
+  });
+
+  async function pendingCount(runId: string): Promise<number> {
+    return (await runs.getRun(runId)).pending_questions;
+  }
+
+  async function waitForPending(runId: string, expected: number): Promise<void> {
+    for (let i = 0; i < 50; i++) {
+      if ((await pendingCount(runId)) === expected) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect.fail(`run ${runId} never reached ${expected} pending question(s)`);
+  }
+
+  it('counts a run parked at a human gate, and drops to 0 once it is answered', async () => {
+    const { run_id } = await runs.submitRun({ dot_source: gatedDot, variables: {} });
+    try {
+      await waitForPending(run_id, 1);
+      const listed = (await runs.listRuns()).runs.find((r) => r.id === run_id);
+      expect(listed?.pending_questions).toBe(1);
+
+      const { questions: pending } = await questions.listQuestions(run_id);
+      await questions.answerQuestion(run_id, pending[0].id, 'yes');
+      await waitForPending(run_id, 0);
+    } finally {
+      await runs.cancelRun(run_id).catch(() => {});
+    }
+  });
+});
