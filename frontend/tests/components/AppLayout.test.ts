@@ -34,6 +34,13 @@ describe('App catalog layout', () => {
     expect(link.getAttribute('href')).toBe('/workflows/new');
   });
 
+  it('has no back link and no breadcrumb trail on the catalog', () => {
+    render(App);
+    const header = screen.getByRole('banner');
+    expect(within(header).queryByRole('link', { name: /^Back to / })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'breadcrumb' })).toBeNull();
+  });
+
   it('renders exactly one New Workflow link', () => {
     render(App);
     expect(screen.getAllByRole('link', { name: /New Workflow/ })).toHaveLength(1);
@@ -81,11 +88,11 @@ describe('App page header on other routes', () => {
     visit('/');
   });
 
-  it('new-workflow page: breadcrumb back to the catalog, title, and Save in the header', async () => {
+  it('new-workflow page: back link to the catalog, title, and Save in the header', async () => {
     visit('/workflows/new');
     render(App);
     const header = screen.getByRole('banner');
-    const crumb = within(header).getByRole('link', { name: 'Smasher Pipelines' });
+    const crumb = within(header).getByRole('link', { name: 'Back to Smasher Pipelines' });
     expect(crumb.getAttribute('href')).toBe('/');
     expect(within(header).getByRole('heading', { level: 1, name: 'Create New Workflow' })).toBeTruthy();
     await waitFor(() => {
@@ -96,12 +103,23 @@ describe('App page header on other routes', () => {
     expect(screen.queryByText('← Back to Catalog')).toBeNull();
   });
 
+  it('every non-catalog route has a back link to the catalog and no breadcrumb', () => {
+    for (const path of ['/workflows/new', '/workflows/some-id/edit', '/workflows/some-id', '/runs/some-run']) {
+      visit(path);
+      const { unmount } = render(App);
+      const link = within(screen.getByRole('banner')).getByRole('link', { name: 'Back to Smasher Pipelines' });
+      expect(link.getAttribute('href'), path).toBe('/');
+      expect(screen.queryByRole('navigation', { name: 'breadcrumb' }), path).toBeNull();
+      unmount();
+    }
+  });
+
   it('edit-workflow page: title and Save in the header once the real graph loads', async () => {
     visit('/workflows/examples__consensus_task/edit');
     render(App);
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('heading', { level: 1, name: 'Edit Workflow' })).toBeTruthy();
-    expect(within(header).getByRole('link', { name: 'Smasher Pipelines' })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'Back to Smasher Pipelines' })).toBeTruthy();
     await waitFor(
       () => {
         expect(within(header).getByTestId('save-button')).toBeTruthy();
@@ -118,7 +136,7 @@ describe('App page header on other routes', () => {
       render(App);
       const header = screen.getByRole('banner');
       expect(within(header).getByRole('heading', { level: 1, name: `Run ${run_id}` })).toBeTruthy();
-      expect(within(header).getByRole('link', { name: 'Smasher Pipelines' })).toBeTruthy();
+      expect(within(header).getByRole('link', { name: 'Back to Smasher Pipelines' })).toBeTruthy();
       await waitFor(
         () => {
           expect(within(header).getByText('Running')).toBeTruthy();
@@ -247,7 +265,7 @@ describe('App workflow detail route', () => {
     await waitFor(() => expect(document.title).toBe(`${title} — Smasher`), { timeout: 4000 });
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('heading', { level: 1, name: title })).toBeTruthy();
-    expect(within(header).getByRole('link', { name: 'Smasher Pipelines' })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'Back to Smasher Pipelines' })).toBeTruthy();
     expect(within(header).getByRole('button', { name: 'Run Workflow' })).toBeTruthy();
     expect(screen.getByText(/^Source: /)).toBeTruthy();
   });

@@ -32,7 +32,7 @@ describe('NewWorkflowPage', () => {
 
   it('mounts canvas in create mode, leaving title and navigation to the page header', () => {
     render(NewWorkflowPage);
-    // Title + breadcrumb back to the catalog are owned by App's PageHeader
+    // Title + back link to the catalog are owned by App's Toolbar
     // (covered in AppLayout.test.ts); the page itself no longer duplicates them.
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
     expect(screen.getByTestId('create-name-input')).toBeTruthy();

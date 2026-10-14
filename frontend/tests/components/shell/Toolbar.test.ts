@@ -1,0 +1,63 @@
+// ABOUTME: Tests for Toolbar, the 52px unified bar holding the page title, back link and page controls
+// ABOUTME: Covers the single h1, optional subtitle with mono fragments, the back link and the actions snippet
+
+import { describe, it, expect } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte/svelte5';
+import { createRawSnippet } from 'svelte';
+import Toolbar from '../../../src/components/shell/Toolbar.svelte';
+
+const actionsSnippet = createRawSnippet(() => ({
+  render: () => '<button type="button">Do the thing</button>',
+}));
+
+describe('Toolbar', () => {
+  it('renders the title as the only h1, inside the banner', () => {
+    render(Toolbar, { props: { title: 'Smasher Pipelines' } });
+    const header = screen.getByRole('banner');
+    const headings = within(header).getAllByRole('heading');
+    expect(headings).toHaveLength(1);
+    expect(headings[0].tagName).toBe('H1');
+    expect(headings[0].textContent?.trim()).toBe('Smasher Pipelines');
+  });
+
+  it('is 52px tall', () => {
+    render(Toolbar, { props: { title: 'x' } });
+    expect(screen.getByRole('banner').className).toContain('h-[52px]');
+  });
+
+  it('omits the back link and subtitle by default', () => {
+    render(Toolbar, { props: { title: 'Runs' } });
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByTestId('toolbar-subtitle')).toBeNull();
+  });
+
+  it('renders a back link labelled with its destination', () => {
+    render(Toolbar, { props: { title: 'Edit Workflow', back: { label: 'Smasher Pipelines', href: '/' } } });
+    const link = within(screen.getByRole('banner')).getByRole('link', { name: 'Back to Smasher Pipelines' });
+    expect(link.getAttribute('href')).toBe('/');
+  });
+
+  it('renders the subtitle under the title', () => {
+    render(Toolbar, { props: { title: 'Run', subtitle: 'Started just now' } });
+    expect(screen.getByTestId('toolbar-subtitle').textContent).toBe('Started just now');
+  });
+
+  it('sets backtick fragments of the subtitle in mono', () => {
+    render(Toolbar, { props: { title: 'Run', subtitle: 'Workflow `consensus_task.dot` is running' } });
+    const subtitle = screen.getByTestId('toolbar-subtitle');
+    const code = subtitle.querySelector('code') as HTMLElement;
+    expect(code.textContent).toBe('consensus_task.dot');
+    expect(code.className).toContain('font-mono');
+    expect(subtitle.textContent).toBe('Workflow consensus_task.dot is running');
+  });
+
+  it('renders the actions snippet inside the banner', () => {
+    render(Toolbar, { props: { title: 'Runs', actions: actionsSnippet } });
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Do the thing' })).toBeTruthy();
+  });
+
+  it('renders no actions container when there are no actions', () => {
+    render(Toolbar, { props: { title: 'Runs' } });
+    expect(screen.queryByTestId('page-header-actions')).toBeNull();
+  });
+});

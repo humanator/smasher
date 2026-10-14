@@ -13,7 +13,7 @@
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
-  import PageHeader from './components/dashboard/PageHeader.svelte';
+  import Toolbar from './components/shell/Toolbar.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
@@ -26,7 +26,7 @@
 
   // Pages below register their own controls (Save, Abort) into this header.
   const pageHeader = providePageHeader();
-  const catalogCrumbs = [{ label: 'Smasher Pipelines', href: '/' }];
+  const catalogBack = { label: 'Smasher Pipelines', href: '/' };
   const isCatalog = $derived(!runId && !workflowPageType);
   const pageTitle = $derived(
     workflowPageType === 'new'
@@ -146,9 +146,10 @@
 {/snippet}
 
 <div class="min-h-screen bg-muted/40 text-foreground">
-  <PageHeader
+  <Toolbar
     title={pageTitle}
-    crumbs={isCatalog ? [] : catalogCrumbs}
+    subtitle={pageHeader.subtitle}
+    back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
     actions={headerActions}
   />
 
@@ -157,8 +158,8 @@
          so they load as their own chunk on demand; bundling them kept the
          entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
     {#if workflowPageType === 'new'}
-      <!-- New Workflow Page: the canvas fills everything below the 3.5rem header -->
-      <div class="h-[calc(100dvh-3.5rem)]">
+      <!-- New Workflow Page: the canvas fills everything below the 52px toolbar -->
+      <div class="h-[calc(100dvh-52px)]">
         {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}
           <NewWorkflowPage />
         {:catch}
@@ -166,8 +167,8 @@
         {/await}
       </div>
     {:else if workflowPageType === 'edit' && workflowId}
-      <!-- Edit Workflow Page: the canvas fills everything below the 3.5rem header -->
-      <div class="h-[calc(100dvh-3.5rem)]">
+      <!-- Edit Workflow Page: the canvas fills everything below the 52px toolbar -->
+      <div class="h-[calc(100dvh-52px)]">
         {#await import('./components/dashboard/WorkflowEditorPage.svelte') then { default: WorkflowEditorPage }}
           <WorkflowEditorPage {workflowId} />
         {:catch}

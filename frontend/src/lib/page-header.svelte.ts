@@ -9,6 +9,10 @@ export class PageHeaderState {
   actions = $state<Snippet | null>(null);
   /** A title the page sets from data it loads; null leaves App's own. */
   title = $state<string | null>(null);
+  /** A line under the title; `backticks` set a fragment in mono. */
+  subtitle = $state<string | null>(null);
+  /** Where the toolbar's back button goes; null leaves App's own. */
+  back = $state<{ label: string; href: string } | null>(null);
 }
 
 export function providePageHeader(): PageHeaderState {
@@ -47,6 +51,39 @@ export function usePageTitle(title: () => string | null): void {
     header.title = current;
     return () => {
       if (header.title === current) header.title = null;
+    };
+  });
+}
+
+/**
+ * Sets the toolbar's subtitle to `subtitle()` for as long as the calling
+ * component is mounted, following it as it changes. Must be called during
+ * component initialisation.
+ */
+export function usePageSubtitle(subtitle: () => string | null): void {
+  const header = getContext<PageHeaderState | undefined>(KEY);
+  if (!header) return;
+  $effect(() => {
+    const current = subtitle();
+    header.subtitle = current;
+    return () => {
+      if (header.subtitle === current) header.subtitle = null;
+    };
+  });
+}
+
+/**
+ * Overrides the toolbar's back button for as long as the calling component
+ * is mounted. Must be called during component initialisation.
+ */
+export function usePageBack(back: () => { label: string; href: string } | null): void {
+  const header = getContext<PageHeaderState | undefined>(KEY);
+  if (!header) return;
+  $effect(() => {
+    const current = back();
+    header.back = current;
+    return () => {
+      if (header.back === current) header.back = null;
     };
   });
 }
