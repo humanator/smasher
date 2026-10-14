@@ -54,36 +54,36 @@ T1, T2 and T9 have no dependencies on each other. T4–T7 can run in parallel on
 ## Task List
 
 ### Phase 1: Foundation
-- [ ] T1: `pending_questions` on `RunSummary` (API + TS type)
-- [ ] T2: Contrast helper, retuned tokens (light + dark), system font, mode-watcher
-- [ ] T3: `stepKinds` vocabulary
+- [x] T1: `pending_questions` on `RunSummary` (API + TS type)
+- [x] T2: Contrast helper, retuned tokens (light + dark), system font, mode-watcher
+- [x] T3: `stepKinds` vocabulary
 
 ### Checkpoint A: Foundation
-- [ ] All Vitest + `cargo test -p smasher-web` green, `check`/`lint`/clippy clean
+- [x] All Vitest + `cargo test -p smasher-web` green, `check`/`lint`/clippy clean
 - [ ] Every page renders in the new colours in light and dark (manual look)
 
 ### Phase 2: Primitives
-- [ ] T4: Button and Badge (`dot`)
-- [ ] T5: Input, Textarea, NativeSelect, Checkbox, Switch
-- [ ] T6: Tabs, ToggleGroup, Accordion
-- [ ] T7: Tooltip, Popover, Drawer, coarse-pointer hit areas
+- [x] T4: Button and Badge (`dot`)
+- [x] T5: Input, Textarea, NativeSelect, Checkbox, Switch
+- [x] T6: Tabs, ToggleGroup, Accordion
+- [x] T7: Tooltip, Popover, Drawer, coarse-pointer hit areas
 
 ### Checkpoint B: Primitives
-- [ ] Existing component + E2E tests green with no assertion changes
+- [x] Existing component + E2E tests green with no assertion changes
 - [ ] Side-by-side against each component board at 1:1, light + dark
 - [ ] Review with Jobsworth
 
 ### Phase 3: Shell
-- [ ] T8: Library store
-- [ ] T9: Toolbar and page-header API (replaces PageHeader)
-- [ ] T10: SourceList component
-- [ ] T11: AppShell wiring and phone-width sheet
-- [ ] T12: Native overlay title bar
-- [ ] T13: App-shell E2E with the no-LLM gate fixture
+- [x] T8: Library store
+- [x] T9: Toolbar and page-header API (replaces PageHeader)
+- [x] T10: SourceList component
+- [x] T11: AppShell wiring and phone-width sheet
+- [x] T12: Native overlay title bar
+- [x] T13: App-shell E2E with the no-LLM gate fixture
 
 ### Checkpoint C: Module complete
 - [ ] All eight Success Criteria in SPEC-shell-theme.md met
-- [ ] Full non-LLM suite green, zero warnings
+- [x] Full non-LLM suite green, zero warnings
 - [ ] `make desktop-dev` manual check
 - [ ] Review with Jobsworth before starting the next module spec
 
