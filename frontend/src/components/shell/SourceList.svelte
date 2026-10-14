@@ -160,6 +160,7 @@
     </nav>
 
     {#if expanded}
+      <a href="/design" class="shrink-0 px-5 pb-1 text-[11px] text-sidebar-muted-foreground hover:text-sidebar-foreground">Design system</a>
       <div data-testid="sidebar-footer" class="shrink-0 px-5 py-2.5 text-[11px] leading-snug text-sidebar-muted-foreground">
         {footerText}
       </div>

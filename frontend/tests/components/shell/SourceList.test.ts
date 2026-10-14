@@ -104,6 +104,15 @@ describe('SourceList footer', () => {
   });
 });
 
+describe('SourceList design link', () => {
+  it('links to the primitives gallery, and hides with the labels when collapsed', async () => {
+    mount();
+    expect(screen.getByRole('link', { name: 'Design system' }).getAttribute('href')).toBe('/design');
+    await fireEvent.click(screen.getByRole('button', { name: 'Toggle sidebar' }));
+    expect(screen.queryByRole('link', { name: 'Design system' })).toBeNull();
+  });
+});
+
 describe('SourceList header and collapse', () => {
   it('shows the wordmark in a browser and no drag region', () => {
     const { container } = mount({ native: false });

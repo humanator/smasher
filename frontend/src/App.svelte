@@ -21,15 +21,18 @@
   import { providePageHeader } from '$lib/page-header.svelte';
 
   let runId = $state<string | null>(null);
+  let designPage = $state(false);
   let workflowPageType = $state<'new' | 'edit' | 'detail' | null>(null);
   let workflowId = $state<string | null>(null);
 
   // Pages below register their own controls (Save, Abort) into this header.
   const pageHeader = providePageHeader();
   const catalogBack = { label: 'Smasher Pipelines', href: '/' };
-  const isCatalog = $derived(!runId && !workflowPageType);
+  const isCatalog = $derived(!runId && !workflowPageType && !designPage);
   const pageTitle = $derived(
-    workflowPageType === 'new'
+    designPage
+      ? 'Design system'
+      : workflowPageType === 'new'
       ? 'Create New Workflow'
       : workflowPageType === 'edit'
         ? 'Edit Workflow'
@@ -41,7 +44,9 @@
   );
   // The tab title puts the page first so truncated tabs stay readable.
   const documentTitle = $derived(
-    workflowPageType === 'new'
+    designPage
+      ? 'Design system — Smasher'
+      : workflowPageType === 'new'
       ? 'New Workflow — Smasher'
       : workflowPageType === 'edit'
         ? 'Edit Workflow — Smasher'
@@ -70,6 +75,14 @@
 
   function updatePath() {
     const path = window.location.pathname;
+
+    designPage = path === '/design';
+    if (designPage) {
+      runId = null;
+      workflowPageType = null;
+      workflowId = null;
+      return;
+    }
 
     // Extract run ID if path is /runs/{id} -- "new" is excluded since it's
     // not a real run id (the catalog's "Run Workflow" used to link to
@@ -155,7 +168,13 @@
   <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
        so they load as their own chunk on demand; bundling them kept the
        entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
-  {#if workflowPageType === 'new'}
+  {#if designPage}
+    {#await import('./components/design/PrimitivesGallery.svelte') then { default: PrimitivesGallery }}
+      <PrimitivesGallery />
+    {:catch}
+      <p class="p-8 text-destructive">Couldn't load the design system page. Reload to try again.</p>
+    {/await}
+  {:else if workflowPageType === 'new'}
     <!-- New Workflow Page: the canvas fills everything below the 52px toolbar -->
     <div class="h-[calc(100dvh-52px)]">
       {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}

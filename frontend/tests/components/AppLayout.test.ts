@@ -317,6 +317,27 @@ describe('App workflow detail route', () => {
 });
 
 
+describe('App design route', () => {
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(() => {
+    visit('/');
+  });
+
+  it('shows the primitives gallery at /design, with a back link', async () => {
+    visit('/design');
+    render(App);
+    expect(screen.getByRole('heading', { level: 1, name: 'Design system' })).toBeTruthy();
+    expect(await screen.findByTestId('primitives-gallery', {}, { timeout: 5000 })).toBeTruthy();
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'Back to Smasher Pipelines' })
+    ).toBeTruthy();
+    await waitFor(() => expect(document.title).toBe('Design system — Smasher'));
+  });
+});
+
 describe('App shell', () => {
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
