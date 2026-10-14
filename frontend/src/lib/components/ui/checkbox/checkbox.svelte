@@ -17,7 +17,7 @@
 	bind:ref
 	data-slot="checkbox"
 	class={cn(
-		"bg-input/90 data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary data-checked:border-primary border-transparent aria-invalid:aria-checked:border-primary aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 flex size-4 items-center justify-center rounded-[5px] border transition-shadow group-has-disabled/field:opacity-50 focus-visible:ring-3 aria-invalid:ring-3 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-transparent group-has-[:focus-visible]/field-label:data-checked:border-primary peer relative shrink-0 outline-none after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50",
+		"bg-background dark:bg-white/10 shadow-[inset_0_0_0_1px_rgba(0,0,0,.22),0_.5px_1px_rgba(0,0,0,.08)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,.25)] data-checked:bg-primary data-checked:text-primary-foreground data-checked:shadow-[inset_0_0_0_.5px_rgba(0,0,0,.15)] aria-invalid:shadow-[inset_0_0_0_1px_var(--destructive),0_0_0_3px_color-mix(in_srgb,var(--destructive)_25%,transparent)] focus-visible:ring-ring flex size-[14px] items-center justify-center rounded-[3.5px] border-0 transition-shadow focus-visible:ring-3 peer relative shrink-0 outline-none after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-45",
 		className
 	)}
 	bind:checked
@@ -27,7 +27,7 @@
 	{#snippet children({ checked, indeterminate })}
 		<div
 			data-slot="checkbox-indicator"
-			class="[&>svg]:size-3.5 grid place-content-center text-current transition-none"
+			class="[&>svg]:size-[11px] [&>svg]:stroke-[3] grid place-content-center text-current transition-none"
 		>
 			{#if checked}
 				<CheckIcon  />

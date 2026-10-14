@@ -19,7 +19,7 @@
 	data-slot="switch"
 	data-size={size}
 	class={cn(
-		"data-checked:bg-primary data-unchecked:bg-input/90 data-checked:border-primary border-2 data-unchecked:border-transparent focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 shrink-0 rounded-full focus-visible:ring-3 aria-invalid:ring-3 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:data-unchecked:border-transparent group-has-[:focus-visible]/field-label:data-checked:border-primary data-[size=default]:h-5 data-[size=default]:w-11 data-[size=sm]:h-4 data-[size=sm]:w-7 peer group/switch relative inline-flex items-center transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:cursor-not-allowed data-disabled:opacity-50",
+		"data-checked:bg-primary data-unchecked:bg-black/10 dark:data-unchecked:bg-white/20 shadow-[inset_0_0_0_.5px_rgba(0,0,0,.12)] aria-invalid:ring-destructive/25 focus-visible:ring-ring shrink-0 rounded-full border-0 p-px focus-visible:ring-3 aria-invalid:ring-3 data-[size=default]:h-[22px] data-[size=default]:w-[38px] data-[size=sm]:h-[15px] data-[size=sm]:w-[26px] peer group/switch relative inline-flex items-center transition-colors duration-150 outline-none after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:cursor-not-allowed data-disabled:opacity-45",
 		className
 	)}
 	{...restProps}
@@ -27,8 +27,7 @@
 	<SwitchPrimitive.Thumb
 		data-slot="switch-thumb"
 		class={cn(
-			"bg-background dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground rounded-full shadow-sm group-data-[size=default]/switch:h-4 group-data-[size=default]/switch:w-6 group-data-[size=sm]/switch:h-3 group-data-[size=sm]/switch:w-4 data-checked:translate-x-[calc(100%_-_8px)] data-unchecked:translate-x-0 not-dark:bg-clip-padding pointer-events-none block ring-0 transition-transform",
-			"rtl:data-[state=checked]:translate-x-[calc(-100%)]"
+			"bg-white rounded-full shadow-[0_0_0_.5px_rgba(0,0,0,.08),0_1px_2.5px_rgba(0,0,0,.25)] group-data-[size=default]/switch:size-5 group-data-[size=sm]/switch:size-[13px] group-data-[size=default]/switch:data-checked:translate-x-4 group-data-[size=sm]/switch:data-checked:translate-x-[11px] data-unchecked:translate-x-0 pointer-events-none block ring-0 transition-transform duration-150"
 		)}
 	/>
 </SwitchPrimitive.Root>
