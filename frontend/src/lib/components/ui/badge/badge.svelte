@@ -2,14 +2,14 @@
 	import { type VariantProps, tv } from "tailwind-variants";
 
 	export const badgeVariants = tv({
-		base: "h-5 gap-1 rounded-3xl border border-transparent px-2 py-0.5 text-xs font-medium transition-all has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&>svg]:size-3! group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none",
+		base: "h-[18px] gap-[5px] rounded-full border-0 px-[7px] text-[11px] leading-none font-medium transition-colors [&>svg]:size-3! group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:ring-3 focus-visible:ring-ring aria-invalid:ring-3 aria-invalid:ring-destructive/30 [&>svg]:pointer-events-none",
 		variants: {
 			variant: {
-				default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-				secondary: "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
-				destructive: "bg-destructive/10 [a]:hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 text-destructive dark:bg-destructive/20",
-				outline: "border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground",
-				ghost: "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
+				default: "bg-primary text-primary-foreground",
+				secondary: "bg-secondary text-secondary-foreground",
+				destructive: "bg-destructive-subtle text-destructive",
+				outline: "text-foreground shadow-[inset_0_0_0_1px_var(--input)]",
+				ghost: "text-foreground",
 				link: "text-primary underline-offset-4 hover:underline",
 			},
 		},
@@ -30,10 +30,13 @@
 		href,
 		class: className,
 		variant = "default",
+		dot,
 		children,
 		...restProps
 	}: WithElementRef<HTMLAnchorAttributes> & {
 		variant?: BadgeVariant;
+		/** Optional CSS colour for a leading status dot. */
+		dot?: string;
 	} = $props();
 </script>
 
@@ -45,5 +48,8 @@
 	class={cn(badgeVariants({ variant }), className)}
 	{...restProps}
 >
+	{#if dot}
+		<span data-slot="badge-dot" aria-hidden="true" class="size-1.5 flex-none rounded-full" style:background={dot}></span>
+	{/if}
 	{@render children?.()}
 </svelte:element>
