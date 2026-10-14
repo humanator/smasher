@@ -1,6 +1,6 @@
 # Spec: `shell-theme`
 
-Module of [SPEC.md](SPEC.md). Status: **DRAFT — awaiting approval.**
+Module of [SPEC.md](SPEC.md). Status: **Approved 2026-10-14.**
 Depends on: nothing. Every other module depends on this one.
 
 Design references: [Sidebar](docs/design/redesign/Sidebar.dc.html) and the shell around
