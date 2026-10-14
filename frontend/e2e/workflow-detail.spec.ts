@@ -35,7 +35,8 @@ test('goes from the catalog to a workflow, launches it, and comes back to its ca
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
-    await page.getByRole('link', { name: title }).click();
+    // The sidebar lists the same workflow, so click the catalog's own link.
+    await page.getByRole('main').getByRole('link', { name: title }).click();
     await expect(page).toHaveURL(`${base}/workflows/${encodeURIComponent(id)}`);
     const header = page.getByRole('banner');
     await expect(header.getByRole('heading', { level: 1, name: title })).toBeVisible();
