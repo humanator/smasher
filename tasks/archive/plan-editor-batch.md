@@ -98,23 +98,24 @@ rendering.rs preamble merge ──► put_graph copies defaults (#5)
 
 ### Phase 1: Independent fixes
 - [x] T1: Dropped node lands under the pointer at any pan or zoom (#3)
-- [ ] T2: `node [...]`/`edge [...]` defaults survive an editor save (#5)
+- [x] T2: `node [...]`/`edge [...]` defaults survive an editor save (#5)
 
 ### Checkpoint A
-- [ ] `make ci` clean. Frontend (in `frontend/`): `npx vitest run`, `npx eslint .`, and
+- [x] `make ci` clean. Frontend (in `frontend/`): `npx vitest run`, `npx eslint .`, and
       `npm run check` shows no errors beyond the 6 already on `main` (BACKLOG #2).
-- [ ] Manual: drag a node onto a zoomed and panned canvas. Save `examples/` DOT that has a
+- [x] Manual: drag a node onto a zoomed and panned canvas. Save `examples/` DOT that has a
       `node [color=...]` block and diff the file.
 
 ### Phase 2: Conflicting-save detection
-- [ ] T3: The API refuses a stale save with 409 (#4 backend + API docs)
-- [ ] T4: The SPA shows the conflict and keeps the user's edits (#4 frontend)
+- [x] T3: The API refuses a stale save with 409 (#4 backend + API docs). Shipped as 412, see
+      Open Question 1.
+- [x] T4: The SPA shows the conflict and keeps the user's edits (#4 frontend)
 
 ### Checkpoint B: Complete
-- [ ] `make ci` clean, and the full Vitest suite passes against a server from this branch
-- [ ] Playwright `node-editor.spec.ts` passes (run by hand, since CI doesn't run it yet, see #2)
-- [ ] BACKLOG.md: #3/#4/#5 marked done
-- [ ] Review with Jobsworth before merge
+- [x] `make ci` clean, and the full Vitest suite passes against a server from this branch
+- [x] Playwright `node-editor.spec.ts` passes (run by hand, since CI doesn't run it yet, see #2)
+- [x] BACKLOG.md: #3/#4/#5 marked done
+- [x] Review with Jobsworth before merge
 
 ## Risks and Mitigations
 
@@ -127,6 +128,15 @@ rendering.rs preamble merge ──► put_graph copies defaults (#5)
 | Vitest "real API" tests hit whatever is on :21541 | Med | Per BACKLOG's gotcha: quit the desktop app and `cargo run -p smasher-cli -- serve` from this branch first. |
 
 ## Open Questions
+
+All resolved; checked against the code on `main` (`b5a93c1`) on 2026-10-15:
+
+1. Shipped as **412** (`WebError::PreconditionFailed`, commit `253a216`), not 409.
+2. Two actions only, but shown as a toast from `WorkflowEditorPage.svelte`, not inline in the
+   canvas's `save-error` slot.
+3. Fixed: `docs/api-reference.md` now lists `/api/workflows/{id}/graph`.
+
+Original questions:
 
 1. **409 or 412** for an `If-Match` mismatch? Plan: 409, as in the backlog. It matches `import_dot`
    and `WebError::Conflict`, and 412 would need a new error variant.
