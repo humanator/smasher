@@ -104,13 +104,13 @@ Use `en-AU` and lower-case am/pm.
 Then make `StatusBadge.svelte` render `statusBadge`.
 
 **Acceptance criteria:**
-- [ ] Each row of the R3 table and each run status has a unit test. `needsYou` is defined in
+- [x] Each row of the R3 table and each run status has a unit test. `needsYou` is defined in
   one place (`Running && pending_questions > 0`), and `libraryStore` reuses it.
-- [ ] `StatusBadge` shows the label as text, with the dot `aria-hidden`.
-- [ ] The existing `runStatus`, `RunTable` and `WorkflowDetailPage` tests still pass.
+- [x] `StatusBadge` shows the label as text, with the dot `aria-hidden`.
+- [x] The existing `runStatus`, `RunTable` and `WorkflowDetailPage` tests still pass.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/runStatus.test.ts tests/components/dashboard`
+- [x] `npm run test -- --run tests/lib/runStatus.test.ts tests/components/dashboard`
 
 **Dependencies:** T2
 

@@ -4,7 +4,7 @@
 import { listRuns, type RunSummary } from '$lib/api/runs';
 import { listWorkflows, type WorkflowSummary } from '$lib/api/workflows';
 import { pollFailureNotifier } from '$lib/notify';
-import { isActive } from '$lib/runStatus';
+import { isActive, isNeedsYou } from '$lib/runStatus';
 
 export type WorkflowState = 'needs-you' | 'running' | null;
 
@@ -13,7 +13,7 @@ const POLL_MS = 5000;
 export function createLibraryStore(intervalMs = POLL_MS) {
   let workflows = $state<WorkflowSummary[]>([]);
   let runs = $state<RunSummary[]>([]);
-  const needsYou = $derived(runs.filter((r) => r.status === 'Running' && r.pending_questions > 0));
+  const needsYou = $derived(runs.filter(isNeedsYou));
   const pollFailure = pollFailureNotifier('library-poll', 'Failed to load the library');
 
   let timer: ReturnType<typeof setInterval> | undefined;
