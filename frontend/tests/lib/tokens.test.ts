@@ -54,6 +54,32 @@ describe.each(Object.entries(themes))('%s tokens', (_name, tokens) => {
   });
 });
 
+// Text the dashboard puts on its own backgrounds: [foreground, background, surface under a
+// translucent background]. Badges sit on both the plain and the zebra-striped table rows.
+// Accent text switches to primary-subtle-foreground in dark, where the pink is too dim.
+const ACCENT_TEXT = { light: 'primary', dark: 'primary-subtle-foreground' };
+const DASHBOARD_PAIRS: [string | typeof ACCENT_TEXT, string, string][] = [
+  ['foreground', 'primary-subtle', 'background'], // needs-you banner title
+  ['primary-subtle-foreground', 'primary-subtle', 'background'], // banner detail and "+ N more" link
+  ['secondary-foreground', 'secondary', 'card'], // Running / Completed / Aborted / Key saved badges
+  ['secondary-foreground', 'secondary', 'muted'],
+  ['primary-foreground', 'primary', 'card'], // Needs you badge, banner button
+  ['destructive', 'destructive-subtle', 'card'], // Failed badge
+  ['destructive', 'destructive-subtle', 'muted'],
+  ['foreground', 'card', 'card'], // outline badges: No runs yet, No key
+  ['foreground', 'muted', 'muted'],
+  [ACCENT_TEXT, 'popover', 'popover'], // Reset to Default link in Settings
+  [ACCENT_TEXT, 'muted', 'muted'], // selected Settings tab
+];
+
+describe.each(Object.entries(themes))('%s dashboard colours', (name, tokens) => {
+  it.each(DASHBOARD_PAIRS)('%o on %s (over %s) meets 4.5:1', (fg, bg, surface) => {
+    const token = typeof fg === 'string' ? fg : fg[name as keyof typeof ACCENT_TEXT];
+    const ratio = contrastRatio(tokens[`--${token}`], tokens[`--${bg}`], tokens[`--${surface}`]);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 describe('light token values from the spec', () => {
   it.each([
     ['background', '#FFFFFF'],

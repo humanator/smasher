@@ -47,7 +47,12 @@
     }))
   );
 
-  const GRID = 'grid grid-cols-[minmax(0,2fr)_130px_150px_130px_132px] items-center gap-3 px-3';
+  // Phones stack each row (title and status, then activity and location, then actions);
+  // from md up it's one line per workflow under the column headers.
+  const GRID = 'md:grid md:grid-cols-[minmax(0,2fr)_130px_150px_130px_132px] md:items-center md:gap-3 px-3';
+  const ROW = `${GRID} flex flex-wrap items-center gap-x-3 gap-y-1`;
+  // Forces the next cells onto a new line on phones; gone from md up.
+  const BREAK = 'basis-full md:hidden';
 </script>
 
 <section id="workflows" aria-labelledby="workflows-heading">
@@ -77,7 +82,7 @@
       class="relative overflow-x-auto rounded-lg border border-border bg-card"
     >
       <div role="rowgroup">
-        <div role="row" class="{GRID} h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">
+        <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">
           <span role="columnheader">Name</span>
           <span role="columnheader">Status</span>
           <span role="columnheader">Last activity</span>
@@ -88,7 +93,7 @@
       <div role="rowgroup">
         {#if loading}
           {#each [0, 1, 2] as i (i)}
-            <div class="{GRID} h-11" aria-hidden="true">
+            <div class="{ROW} min-h-11 py-2" aria-hidden="true">
               <Skeleton class="h-3.5 w-40 rounded" />
               <Skeleton class="h-3.5 w-20 rounded" />
               <Skeleton class="h-3.5 w-28 rounded" />
@@ -100,17 +105,19 @@
           <p class="m-0 px-3 py-4 text-[13px] text-muted-foreground">No workflows match that search.</p>
         {:else}
           {#each rows as row, i (row.workflow.id)}
-            <div role="row" class="{GRID} min-h-11 py-1.5 {i % 2 === 1 ? 'bg-muted' : 'bg-card'}">
-              <span role="cell" class="min-w-0">
+            <div role="row" class="{ROW} min-h-11 py-2 md:py-1.5 {i % 2 === 1 ? 'bg-muted' : 'bg-card'}">
+              <span role="cell" class="min-w-0 flex-1">
                 <a href={row.href} class="block truncate text-[13px] font-medium text-foreground hover:underline">
                   {row.title}
                 </a>
                 <span class="block truncate font-mono text-[11px] text-muted-foreground">{row.workflow.name}</span>
               </span>
               <span role="cell"><StatusBadge status={row.status} /></span>
+              <span class={BREAK} aria-hidden="true"></span>
               <span role="cell" class="text-xs text-foreground/80">{row.lastActivity}</span>
-              <span role="cell" class="truncate font-mono text-[11px] text-muted-foreground">{row.workflow.source_dir}</span>
-              <span role="cell" class="flex justify-end gap-1.5">
+              <span role="cell" class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">{row.workflow.source_dir}</span>
+              <span class={BREAK} aria-hidden="true"></span>
+              <span role="cell" class="flex gap-1.5 pt-1 md:justify-end md:pt-0">
                 <Button href="{row.href}/edit" variant="outline" size="sm">Edit</Button>
                 <Button variant="outline" size="sm" onclick={() => onRun(row.workflow)}>
                   <PlayIcon aria-hidden="true" />Run…

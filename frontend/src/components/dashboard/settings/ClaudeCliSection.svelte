@@ -58,7 +58,7 @@
 <div class="grid gap-1.5">
   <div class="flex items-center justify-between">
     <Label for="settings-claude-cli-tools">Tools AI Agent steps may use</Label>
-    <Button variant="link" size="xs" onclick={() => (allowedTools = defaultAllowedTools.join('\n'))}>
+    <Button variant="link" size="xs" class="dark:text-primary-subtle-foreground" onclick={() => (allowedTools = defaultAllowedTools.join('\n'))}>
       Reset to Default
     </Button>
   </div>

@@ -112,3 +112,87 @@ test('a run waiting on a person raises the banner and shows as Needs you until i
     if (workflowPath) rmSync(workflowPath, { force: true });
   }
 });
+
+test('every dashboard action can be reached with Tab and shows a focus ring', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('table', { name: 'All workflows' }).getByRole('link').first()).toBeVisible();
+
+  const wanted = [
+    'Search workflows',
+    'Import .dot file',
+    'AI model settings',
+    'New workflow',
+    'Edit',
+    'Run…',
+    'Human Gate Showcase',
+  ];
+  const reached = new Set<string>();
+  const withoutRing: string[] = [];
+  for (let i = 0; i < 160 && reached.size < wanted.length; i++) {
+    await page.keyboard.press('Tab');
+    const focused = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el === document.body) return null;
+      const name = (el.getAttribute('aria-label') || el.textContent || '').trim();
+      // A ring is whatever focus changes: an outline or box-shadow on the element, or
+      // (for run rows, whose link covers the row) on its row. Compare with it blurred.
+      const row = el.closest('[role="row"]');
+      const look = () => {
+        // Rings fade in; read them at their end state, not mid-transition.
+        document.getAnimations().forEach((a) => a.finish());
+        const s = getComputedStyle(el);
+        return [s.outlineStyle, s.outlineWidth, s.boxShadow, row ? getComputedStyle(row).boxShadow : ''].join('|');
+      };
+      const focusedLook = look();
+      el.blur();
+      const blurredLook = look();
+      el.focus({ focusVisible: true } as FocusOptions);
+      return { name, ring: focusedLook !== blurredLook };
+    });
+    if (!focused) continue;
+    const match = wanted.find((w) => focused.name === w || focused.name.endsWith(w));
+    if (match && !reached.has(match)) {
+      reached.add(match);
+      if (!focused.ring) withoutRing.push(match);
+    }
+  }
+
+  expect([...reached].sort()).toEqual([...wanted].sort());
+  expect(withoutRing).toEqual([]);
+});
+
+test.describe('at phone width', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  async function expectNoSidewaysScroll(page: import('@playwright/test').Page, what: string) {
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `${what}: page scrolls sideways`).toBeLessThanOrEqual(0);
+  }
+
+  test('stacks the tables and never scrolls sideways, with or without a dialog open', async ({ page }) => {
+    await page.goto('/');
+    const workflows = page.getByRole('table', { name: 'All workflows' });
+    await expect(workflows.getByRole('link', { name: 'Human Gate Showcase' })).toBeVisible();
+    await expectNoSidewaysScroll(page, 'dashboard');
+
+    // Stacked rows: no column headers, and each table fits without scrolling inside itself.
+    await expect(workflows.getByRole('columnheader', { name: 'Last activity' })).toBeHidden();
+    for (const name of ['All workflows', 'Runs']) {
+      const table = page.getByRole('table', { name });
+      if ((await table.count()) === 0) continue;
+      const inner = await table.evaluate((el) => el.scrollWidth - el.clientWidth);
+      expect(inner, `${name} scrolls inside itself`).toBeLessThanOrEqual(0);
+    }
+
+    await page.getByRole('searchbox', { name: 'Search workflows' }).fill('run_launch_check');
+    await workflows.getByRole('button', { name: 'Run…' }).first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expectNoSidewaysScroll(page, 'Run sheet open');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    await page.getByRole('button', { name: 'AI model settings' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expectNoSidewaysScroll(page, 'Settings open');
+  });
+});

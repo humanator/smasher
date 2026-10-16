@@ -430,13 +430,13 @@ Then check keyboard order, focus rings, and 4.5:1 contrast for the new badge, do
 colours, light and dark.
 
 **Acceptance criteria:**
-- [ ] At 375px there's no horizontal scroll on `/`, with either dialog open or closed (E2E).
-- [ ] Every action can be reached with Tab and has a visible focus ring.
-- [ ] The `contrast.ts` checks cover the banner and badge pairs in both themes.
+- [x] At 375px there's no horizontal scroll on `/`, with either dialog open or closed (E2E).
+- [x] Every action can be reached with Tab and has a visible focus ring.
+- [x] The contrast checks cover the banner and badge pairs in both themes (in `tests/lib/tokens.test.ts`, which holds the theme pairs).
 
 **Verification:**
-- [ ] `npm run test:e2e -- dashboard` (375px case)
-- [ ] `npm run test -- --run tests/lib/contrast.test.ts`
+- [x] `npm run test:e2e -- dashboard` (375px case)
+- [x] `npm run test -- --run tests/lib/contrast.test.ts`
 
 **Dependencies:** T9, T12
 

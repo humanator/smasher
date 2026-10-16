@@ -31,12 +31,15 @@
     return formatDuration(run.started_at, isActive(run.status) ? null : (run.completed_at ?? ''), current);
   }
 
-  const GRID = 'grid grid-cols-[130px_minmax(0,1fr)_170px_120px] items-center gap-3 px-3';
+  // Phones stack each row (status and workflow, then start and duration); from md up
+  // it's one line per run under the column headers.
+  const GRID = 'md:grid md:grid-cols-[130px_minmax(0,1fr)_170px_120px] md:items-center md:gap-3 px-3';
+  const ROW = `${GRID} flex flex-wrap items-center gap-x-3 gap-y-0.5`;
 </script>
 
 <div role="table" aria-label="Runs" class="relative overflow-x-auto rounded-lg border border-border bg-card">
   <div role="rowgroup">
-    <div role="row" class="{GRID} h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">
+    <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">
       <span role="columnheader">Status</span>
       <span role="columnheader">Workflow</span>
       <span role="columnheader">Started</span>
@@ -47,10 +50,10 @@
     {#each runs as run, i (run.id)}
       <div
         role="row"
-        class="{GRID} relative min-h-[34px] py-1 hover:bg-accent/60 has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-inset {i % 2 === 1 ? 'bg-muted' : 'bg-card'}"
+        class="{ROW} relative min-h-[34px] py-1.5 md:py-1 hover:bg-accent/60 has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-inset {i % 2 === 1 ? 'bg-muted' : 'bg-card'}"
       >
         <span role="cell"><StatusBadge status={isNeedsYou(run) ? 'Needs you' : run.status} /></span>
-        <span role="cell" class="flex min-w-0 items-baseline gap-2">
+        <span role="cell" class="flex min-w-0 flex-1 items-baseline gap-2">
           <span class="truncate text-[13px] font-medium text-foreground">{runTitle(run, workflows)}</span>
           <!-- The run id is the link; its ::after stretches over the whole row. -->
           <a
@@ -59,6 +62,7 @@
             >{run.id}</a
           >
         </span>
+        <span class="basis-full md:hidden" aria-hidden="true"></span>
         <span role="cell" class="text-xs text-foreground/80">{formatWhen(run.started_at, current, timeZone)}</span>
         <span role="cell" class="text-xs text-muted-foreground tabular-nums">{duration(run)}</span>
       </div>

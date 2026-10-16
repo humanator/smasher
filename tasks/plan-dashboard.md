@@ -107,7 +107,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Phase 4: Polish
 
-- [ ] Task 13: 375px stacked rows, no horizontal scroll, keyboard and contrast pass
+- [x] Task 13: 375px stacked rows, no horizontal scroll, keyboard and contrast pass
 - [ ] Task 14: Spec Success Criteria 1–10, side-by-side sign-off
 
 ### Checkpoint D: Complete

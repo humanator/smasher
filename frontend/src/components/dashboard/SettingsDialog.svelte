@@ -209,7 +209,7 @@
         {#each SECTIONS as s (s.value)}
           <Tabs.Trigger
             value={s.value}
-            class="h-auto min-w-[72px] flex-none flex-col gap-0.5 rounded-md px-2 pt-1.5 pb-1 text-[11px] text-foreground/80 data-active:bg-foreground/7 data-active:font-normal data-active:text-primary data-active:shadow-none dark:data-active:bg-white/10"
+            class="h-auto min-w-[72px] flex-none flex-col gap-0.5 rounded-md px-2 pt-1.5 pb-1 text-[11px] text-foreground/80 data-active:bg-foreground/7 data-active:font-normal data-active:text-primary data-active:shadow-none dark:data-active:bg-white/10 dark:data-active:text-primary-subtle-foreground"
           >
             <s.icon class="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
             {s.label}
