@@ -174,6 +174,31 @@ describe('WorkflowDetailPage', () => {
       );
     });
 
+    it('lists what the workflow does, in running order with plain kinds', async () => {
+      const { id } = await importThrowaway();
+      const library = await realLibrary();
+
+      render(WorkflowDetailHost, { props: { workflowId: id, library } });
+
+      const steps = screen.getByRole('region', { name: 'What it does' });
+      const list = await within(steps).findByRole('list', {}, { timeout: 5000 });
+      expect(within(steps).getByText('The steps in order.')).toBeTruthy();
+      expect(within(list).getAllByRole('listitem').map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+        '1 Start Start',
+        '2 Brief: {{brief}} | Model: {{model}} | Colour: {{colour}} Ask a person',
+        '3 Exit Finish',
+      ]);
+    });
+
+    it("shows a failed graph read with Try Again", async () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      const steps = screen.getByRole('region', { name: 'What it does' });
+      const alert = await within(steps).findByRole('alert', {}, { timeout: 5000 });
+      expect(alert.textContent).toContain("Couldn't read this workflow's steps.");
+      expect(within(alert).getByRole('button', { name: 'Try Again' })).toBeTruthy();
+    });
+
     it('opens the run dialog from Run, and Cancel launches nothing', async () => {
       const { id } = await importThrowaway();
       const library = await realLibrary();

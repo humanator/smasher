@@ -1,19 +1,24 @@
 <script lang="ts">
-  // ABOUTME: Workflow page at /workflows/{id}: toolbar (back, Edit Workflow, Run), its featured run and history
-  // ABOUTME: Reads the shared library store, which already polls workflows and runs, so it fetches neither itself
+  // ABOUTME: Workflow page at /workflows/{id}: toolbar (back, Edit Workflow, Run), what it does, its active run and history
+  // ABOUTME: Reads workflows and runs from the shared library store; fetches only the workflow's graph, once
 
+  import { onMount } from 'svelte';
   import PlayIcon from '@lucide/svelte/icons/play';
+  import { getWorkflowGraph, type EditorGraph } from '../../lib/api/workflows';
   import type { RunSummary } from '../../lib/api/runs';
   import type { WorkflowSummary } from '../../lib/api/workflows';
   import { pickFeaturedRun } from '../../lib/runStatus';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { errorMessage } from '$lib/notify';
   import { formatWorkflowName } from '$lib/utils';
+  import { describeLoops, orderSteps } from '$lib/workflowSteps';
   import { usePageActions, usePageBack, usePageSubtitle, usePageTitle } from '$lib/page-header.svelte';
   import { libraryStore } from '../../stores/library.svelte';
   import LazyRunDialog from './LazyRunDialog.svelte';
   import RunMetaList from './RunMetaList.svelte';
   import RunTable from './RunTable.svelte';
   import StatusBadge from './StatusBadge.svelte';
+  import StepList from './StepList.svelte';
 
   interface Library {
     readonly workflows: WorkflowSummary[];
@@ -31,6 +36,24 @@
   // Newest first, as the server lists them. The card and the history both come from this one list.
   const runs = $derived(library.runs.filter((run) => run.workflow_id === workflowId));
   const featured = $derived(pickFeaturedRun(runs));
+
+  let graph = $state<EditorGraph | null>(null);
+  let graphError = $state<string | null>(null);
+  const order = $derived(graph ? orderSteps(graph) : { steps: [], backEdges: [] });
+  const intro = $derived(graph ? describeLoops(graph, order) : '');
+
+  async function loadGraph() {
+    graphError = null;
+    try {
+      graph = (await getWorkflowGraph(workflowId)).graph;
+    } catch (err) {
+      graphError = errorMessage(err, 'The server could not read it.');
+    }
+  }
+
+  onMount(() => {
+    void loadGraph();
+  });
 
   // App shows "Workflow" until the library has loaded.
   usePageTitle(() => {
@@ -54,8 +77,11 @@
 
 <div class="workflow-detail flex flex-col gap-6">
   {#if !library.loaded && library.error}
-    <div role="alert" class="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 p-4 text-body">
-      <p class="m-0 text-destructive">Couldn't load your workflows. {library.error}</p>
+    <div
+      role="alert"
+      class="flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive"
+    >
+      <span class="min-w-0 flex-1">Couldn't load your workflows. {library.error}</span>
       <Button variant="outline" size="sm" onclick={() => void library.refresh()}>Try Again</Button>
     </div>
   {:else if !library.loaded}
@@ -71,7 +97,14 @@
     {/if}
 
     <div class="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-      <div class="flex min-w-0 flex-col gap-6"></div>
+      <StepList
+        steps={order.steps}
+        {intro}
+        loading={!graph && !graphError}
+        error={graphError}
+        editHref="/workflows/{encodeURIComponent(workflow.id)}/edit"
+        onRetry={() => void loadGraph()}
+      />
 
       <div class="flex min-w-0 flex-col gap-6">
         {#if featured}

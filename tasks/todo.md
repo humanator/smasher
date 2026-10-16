@@ -233,15 +233,15 @@ The quotes are typographic (“ ”).
   - empty: "This workflow has no steps yet." with an **Edit Workflow** link
 
 **Acceptance criteria:**
-- [ ] It renders an `h2` **What it does**, the intro, and an `<ol>` of numbered rows. Each row
+- [x] It renders an `h2` **What it does**, the intro, and an `<ol>` of numbered rows. Each row
   has the kind chip (`stepKind` icon and tint), the label, and the plain kind name, in
   `orderSteps` order.
-- [ ] Loading, error (Try Again refetches) and empty states render and can be found by role or
+- [x] Loading, error (Try Again refetches) and empty states render and can be found by role or
   label.
-- [ ] No raw handler name ("codergen", "wait.human") appears in the rendered text.
+- [x] No raw handler name ("codergen", "wait.human") appears in the rendered text.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/StepList.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/StepList.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
 
 **Dependencies:** Tasks 2 and 5
 
