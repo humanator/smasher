@@ -79,7 +79,7 @@
           <span role="cell" class="flex min-w-0 flex-1 flex-col">
             <span class="text-xs text-foreground/80">{formatWhen(run.started_at, current, timeZone)}</span>
             {#if reason}
-              <span id="run-reason-{run.id}" class="flex items-start gap-1 text-[11.5px] leading-snug text-destructive">
+              <span id="run-reason-{run.id}" class="flex items-start gap-1 text-hint text-destructive">
                 <TriangleAlertIcon class="mt-px size-3 shrink-0" aria-hidden="true" />
                 <span>{reason}</span>
               </span>
