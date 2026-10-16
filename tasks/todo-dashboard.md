@@ -330,15 +330,15 @@ Change the `runRequest` error copy to "Line {n}: write it as name=value",
 change. Update `run-launch.spec.ts`.
 
 **Acceptance criteria:**
-- [ ] The labels, hints and placeholders match the artboard, and the errors are linked with
+- [x] The labels, hints and placeholders match the artboard, and the errors are linked with
   `aria-describedby`.
-- [ ] The `runRequest` tests show the request body is the same for the same inputs. Only the
+- [x] The `runRequest` tests show the request body is the same for the same inputs. Only the
   messages change.
-- [ ] A restored draft reopens the disclosure when it has overrides.
+- [x] A restored draft reopens the disclosure when it has overrides.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/runRequest.test.ts tests/components/dashboard/RunDialog.test.ts`
-- [ ] `npm run test:e2e -- run-launch`
+- [x] `npm run test -- --run tests/lib/runRequest.test.ts tests/components/dashboard/RunDialog.test.ts`
+- [x] `npm run test:e2e -- run-launch`
 
 **Dependencies:** T0
 

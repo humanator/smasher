@@ -36,9 +36,9 @@ test('Run… opens the run sheet, launches, and lands on the new run', async ({ 
     await row.getByRole('button', { name: 'Run…' }).click();
 
     const sheet = page.getByRole('dialog');
-    await expect(sheet.getByRole('heading', { name: /Run Launch Check/ })).toBeVisible();
+    await expect(sheet.getByRole('heading', { name: 'Run “Run Launch Check”' })).toBeVisible();
     await sheet.getByLabel('Brief').fill('dashboard e2e');
-    await sheet.locator('button[type="submit"]').click();
+    await sheet.getByRole('button', { name: 'Start Run' }).click();
 
     await page.waitForURL(/\/runs\/[a-zA-Z0-9-]+$/);
     runId = new URL(page.url()).pathname.split('/')[2];

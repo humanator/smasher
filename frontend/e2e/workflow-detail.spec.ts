@@ -44,7 +44,7 @@ test('goes from the catalog to a workflow, launches it, and comes back to its ca
 
     // 2–3. Launch it from Run Workflow, and land on the run page.
     await header.getByRole('button', { name: 'Run Workflow' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Run', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Start Run' }).click();
     await expect(page).toHaveURL(/\/runs\/[a-z0-9-]+$/, { timeout: 10000 });
     runId = page.url().split('/runs/')[1];
 

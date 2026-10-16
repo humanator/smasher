@@ -1,8 +1,9 @@
 <script lang="ts">
-  // ABOUTME: Run-launch dialog: model, variables, brief and node overrides for one workflow, then launch it
+  // ABOUTME: The Run sheet: brief, model, extra values and (under Advanced) step overrides for one workflow, then launch it
   // ABOUTME: Validates client-side via buildRunRequest, keeps typed values per workflow, opens the new run
 
   import { untrack } from 'svelte';
+  import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
@@ -23,6 +24,7 @@
   let errors = $state<RunFormErrors>({});
   let serverError = $state<string | null>(null);
   let starting = $state(false);
+  let advancedOpen = $state(false);
   // The picker reads its starting values once, so restoring a draft remounts it.
   let pickerKey = $state(0);
 
@@ -32,6 +34,8 @@
     const id = workflow.id;
     untrack(() => {
       values = getDraft(id);
+      // Overrides from a draft are never hidden behind the closed disclosure.
+      advancedOpen = values.nodeOverrides.trim() !== '';
       pickerKey++;
       errors = {};
       serverError = null;
@@ -74,65 +78,102 @@
 <Dialog.Root bind:open>
   <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
     <Dialog.Header>
-      <Dialog.Title>Run {formatWorkflowName(workflow.name)}</Dialog.Title>
-      <Dialog.Description>Leave Provider on Server default to use the server's model.</Dialog.Description>
+      <Dialog.Title>Run “{formatWorkflowName(workflow.name)}”</Dialog.Title>
+      <Dialog.Description>
+        Everything here is optional. Leave a field blank and the workflow uses its usual behaviour.
+      </Dialog.Description>
     </Dialog.Header>
 
     <form class="grid gap-4" onsubmit={submit}>
-      {#key pickerKey}
-        <ModelPicker
-          idPrefix="run"
-          provider={values.provider}
-          model={values.model}
-          onChange={pickModel}
-        />
-      {/key}
-
-      <div class="grid gap-2">
-        <Label for="run-variables">Variables</Label>
-        <Textarea
-          id="run-variables"
-          bind:value={values.variables}
-          oninput={() => edited('variables')}
-          placeholder="key=value"
-          rows={4}
-          spellcheck={false}
-          class="font-mono text-xs"
-          aria-invalid={errors.variables ? true : undefined}
-          aria-describedby={errors.variables ? 'run-variables-error' : undefined}
-        />
-        {#if errors.variables}
-          <p id="run-variables-error" class="text-sm text-destructive">{errors.variables}</p>
-        {/if}
-      </div>
-
-      <div class="grid gap-2">
+      <div class="grid gap-1.5">
         <Label for="run-brief">Brief</Label>
         <Textarea
           id="run-brief"
           bind:value={values.brief}
           oninput={() => edited('brief')}
+          placeholder="e.g. Three concepts for a mobile checkout that feels calmer"
           rows={3}
+          aria-describedby="run-brief-hint"
         />
+        <p id="run-brief-hint" class="text-xs text-muted-foreground">
+          A short note on what this run is for. It is passed to the workflow as a value called “brief”, so steps and
+          prompts can use it.
+        </p>
       </div>
 
-      <div class="grid gap-2">
-        <Label for="run-node-overrides">Node Overrides (JSON)</Label>
+      <fieldset class="grid gap-1.5" aria-describedby="run-model-hint">
+        <legend class="mb-1.5 text-[13px] font-medium">Model</legend>
+        {#key pickerKey}
+          <ModelPicker
+            idPrefix="run"
+            provider={values.provider}
+            model={values.model}
+            blankLabel="Default model"
+            onChange={pickModel}
+          />
+        {/key}
+        <p id="run-model-hint" class="text-xs text-muted-foreground">
+          Which AI model to use for this run. Leave blank to use your default model from Settings.
+        </p>
+      </fieldset>
+
+      <div class="grid gap-1.5">
+        <Label for="run-variables">Extra values</Label>
         <Textarea
-          id="run-node-overrides"
-          bind:value={values.nodeOverrides}
-          oninput={() => edited('nodeOverrides')}
-          placeholder={'{"node_id": {"model": "..."}}'}
-          rows={2}
+          id="run-variables"
+          bind:value={values.variables}
+          oninput={() => edited('variables')}
+          placeholder="audience=first-time buyers"
+          rows={4}
           spellcheck={false}
           class="font-mono text-xs"
-          aria-invalid={errors.nodeOverrides ? true : undefined}
-          aria-describedby={errors.nodeOverrides ? 'run-node-overrides-error' : undefined}
+          aria-invalid={errors.variables ? true : undefined}
+          aria-describedby={errors.variables ? 'run-variables-hint run-variables-error' : 'run-variables-hint'}
         />
-        {#if errors.nodeOverrides}
-          <p id="run-node-overrides-error" class="text-sm text-destructive">
-            {errors.nodeOverrides}
-          </p>
+        {#if errors.variables}
+          <p id="run-variables-error" class="text-sm text-destructive">{errors.variables}</p>
+        {/if}
+        <p id="run-variables-hint" class="text-xs text-muted-foreground">
+          Extra information to hand to the workflow, one per line as name=value. Steps and rules can read each one by
+          its name. A brief written above takes priority over a brief= line here.
+        </p>
+      </div>
+
+      <div class="grid gap-3">
+        <button
+          type="button"
+          class="flex w-fit items-center gap-1.5 rounded-sm text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
+          aria-expanded={advancedOpen}
+          aria-controls="run-advanced"
+          onclick={() => (advancedOpen = !advancedOpen)}
+        >
+          <ChevronRightIcon class="size-3 transition-transform {advancedOpen ? 'rotate-90' : ''}" aria-hidden="true" />
+          Advanced: change the model for individual steps
+        </button>
+        {#if advancedOpen}
+          <div id="run-advanced" class="grid gap-1.5">
+            <Label for="run-node-overrides">Step overrides (JSON)</Label>
+            <Textarea
+              id="run-node-overrides"
+              bind:value={values.nodeOverrides}
+              oninput={() => edited('nodeOverrides')}
+              placeholder={'{"draft_concepts": {"model": "claude-opus-4-20250514"}}'}
+              rows={3}
+              spellcheck={false}
+              class="font-mono text-xs"
+              aria-invalid={errors.nodeOverrides ? true : undefined}
+              aria-describedby={errors.nodeOverrides
+                ? 'run-node-overrides-hint run-node-overrides-error'
+                : 'run-node-overrides-hint'}
+            />
+            {#if errors.nodeOverrides}
+              <p id="run-node-overrides-error" class="text-sm text-destructive">{errors.nodeOverrides}</p>
+            {/if}
+            <p id="run-node-overrides-hint" class="text-xs text-muted-foreground">
+              Swap the model or provider for particular steps, for this run only, without editing the workflow. Use the
+              step’s ID from the workflow file, not its name on the canvas.
+            </p>
+          </div>
         {/if}
       </div>
 
@@ -142,7 +183,7 @@
 
       <Dialog.Footer>
         <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-        <Button type="submit" disabled={starting}>{starting ? 'Starting…' : 'Run'}</Button>
+        <Button type="submit" disabled={starting}>{starting ? 'Starting…' : 'Start Run'}</Button>
       </Dialog.Footer>
     </form>
   </Dialog.Content>

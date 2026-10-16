@@ -14,7 +14,8 @@ import * as workflowsApi from '../../../src/lib/api/workflows';
 import { saveDraft } from '../../../src/lib/runDrafts';
 
 const MARKER = '_test_run_launch_';
-const SHAPE_ERROR = 'Expected {"node_id": {"model": "...", "provider": "..."}}';
+const SHAPE_ERROR = 'Expected {"step_id": {"model": "...", "provider": "..."}}';
+const ADVANCED = 'Advanced: change the model for individual steps';
 
 // Gate-only, so even a launch that shouldn't happen spends nothing.
 const fixtureDot = readFileSync(
@@ -100,17 +101,40 @@ describe('RunDialog', () => {
     }
   });
 
-  it('renders provider and model selects plus the old form\'s other fields under a "Run {name}" title', async () => {
+  it('shows the design\'s title, copy and fields: Brief, Model, Extra values', async () => {
     openDialog(await runLaunchCheck());
 
-    expect(await screen.findByRole('heading', { name: 'Run Run Launch Check' })).toBeTruthy();
-    expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('');
-    expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('');
-    expect(field('Variables').getAttribute('placeholder')).toBe('key=value');
-    expect(field('Brief').getAttribute('placeholder')).toBeNull();
-    expect(field('Node Overrides (JSON)').getAttribute('placeholder')).toBe(
-      '{"node_id": {"model": "..."}}'
+    expect(await screen.findByRole('heading', { name: 'Run “Run Launch Check”' })).toBeTruthy();
+    expect(
+      screen.getByText('Everything here is optional. Leave a field blank and the workflow uses its usual behaviour.')
+    ).toBeTruthy();
+    expect(field('Brief').getAttribute('placeholder')).toBe(
+      'e.g. Three concepts for a mobile checkout that feels calmer'
     );
+    expect(field('Brief')).toHaveAccessibleDescription(/passed to the workflow as a value called “brief”/);
+    const model = screen.getByRole('group', { name: 'Model' });
+    expect(model).toHaveAccessibleDescription(/Leave blank to use your default model from Settings/);
+    expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('');
+    expect(screen.getByRole('option', { name: 'Default model' })).toBeTruthy();
+    expect(field('Extra values').getAttribute('placeholder')).toBe('audience=first-time buyers');
+    expect(field('Extra values')).toHaveAccessibleDescription(/one per line as name=value/);
+    expect(screen.getByRole('button', { name: 'Start Run' })).toBeTruthy();
+  });
+
+  it('hides Step overrides behind the Advanced disclosure until it is opened', async () => {
+    const { user } = openDialog(await runLaunchCheck());
+    const advanced = await screen.findByRole('button', { name: ADVANCED });
+
+    expect(advanced).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByLabelText('Step overrides (JSON)')).toBeNull();
+
+    await user.click(advanced);
+
+    expect(advanced).toHaveAttribute('aria-expanded', 'true');
+    expect(field('Step overrides (JSON)').getAttribute('placeholder')).toBe(
+      '{"draft_concepts": {"model": "claude-opus-4-20250514"}}'
+    );
+    expect(field('Step overrides (JSON)')).toHaveAccessibleDescription(/for this run only/);
   });
 
   describe('closing without launching', () => {
@@ -157,37 +181,37 @@ describe('RunDialog', () => {
       const workflow = await importWorkflow(fixtureDot);
       const { user } = openDialog(workflow);
 
-      await user.type(await screen.findByLabelText('Variables'), 'a=1{Enter}colour blue');
-      await user.click(screen.getByRole('button', { name: 'Run' }));
+      await user.type(await screen.findByLabelText('Extra values'), 'a=1{Enter}colour blue');
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
 
-      const error = await screen.findByText('Line 2: expected key=value');
-      expect(field('Variables').getAttribute('aria-describedby')).toBe(error.id);
-      expect(field('Variables').getAttribute('aria-invalid')).toBe('true');
+      const error = await screen.findByText('Line 2: write it as name=value');
+      expect(field('Extra values').getAttribute('aria-describedby')?.split(' ')).toContain(error.id);
+      expect(field('Extra values').getAttribute('aria-invalid')).toBe('true');
       expect(location.href).toBe('');
 
-      await user.type(field('Variables'), 'x');
-      expect(screen.queryByText('Line 2: expected key=value')).toBeNull();
-      expect(field('Variables').getAttribute('aria-invalid')).toBeNull();
+      await user.type(field('Extra values'), 'x');
+      expect(screen.queryByText('Line 2: write it as name=value')).toBeNull();
+      expect(field('Extra values').getAttribute('aria-invalid')).toBeNull();
 
       const { runs } = await runsApi.listRuns();
       expect(runs.filter((r) => r.workflow_id === workflow.id)).toEqual([]);
     });
 
-    it('shows invalid JSON and wrong-shape Node Overrides errors under their field', async () => {
+    it('shows invalid JSON and wrong-shape Step overrides errors under their field', async () => {
       const { user } = openDialog(await runLaunchCheck());
-      const overrides = await screen.findByLabelText('Node Overrides (JSON)');
+      await user.click(await screen.findByRole('button', { name: ADVANCED }));
+      const overrides = await screen.findByLabelText('Step overrides (JSON)');
 
       await user.type(overrides, '{{nope');
-      await user.click(screen.getByRole('button', { name: 'Run' }));
-      expect((await screen.findByText(/^Invalid JSON: /)).id).toBe(
-        overrides.getAttribute('aria-describedby')
-      );
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
+      const invalid = await screen.findByText(/^That is not valid JSON yet \(/);
+      expect(overrides.getAttribute('aria-describedby')?.split(' ')).toContain(invalid.id);
 
       await user.clear(overrides);
-      expect(screen.queryByText(/^Invalid JSON: /)).toBeNull();
+      expect(screen.queryByText(/^That is not valid JSON yet \(/)).toBeNull();
 
       await user.type(overrides, '{{"a": "m"}');
-      await user.click(screen.getByRole('button', { name: 'Run' }));
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
       expect(await screen.findByText(SHAPE_ERROR)).toBeTruthy();
       expect(location.href).toBe('');
     });
@@ -195,11 +219,12 @@ describe('RunDialog', () => {
     it('shows both errors at once when both fields are bad', async () => {
       const { user } = openDialog(await runLaunchCheck());
 
-      await user.type(await screen.findByLabelText('Variables'), 'oops');
-      await user.type(field('Node Overrides (JSON)'), '[[]'); // '[[' types a literal '['
-      await user.click(screen.getByRole('button', { name: 'Run' }));
+      await user.type(await screen.findByLabelText('Extra values'), 'oops');
+      await user.click(screen.getByRole('button', { name: ADVANCED }));
+      await user.type(field('Step overrides (JSON)'), '[[]'); // '[[' types a literal '['
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
 
-      expect(await screen.findByText('Line 1: expected key=value')).toBeTruthy();
+      expect(await screen.findByText('Line 1: write it as name=value')).toBeTruthy();
       expect(screen.getByText(SHAPE_ERROR)).toBeTruthy();
       expect(location.href).toBe('');
     });
@@ -211,9 +236,9 @@ describe('RunDialog', () => {
       const { user } = openDialog(workflow);
 
       await pickModel(user, 'claude-opus');
-      await user.type(field('Variables'), 'colour=blue');
+      await user.type(field('Extra values'), 'colour=blue');
       await user.type(field('Brief'), 'hello');
-      await user.click(screen.getByRole('button', { name: 'Run' }));
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
 
       const runId = await waitForLaunch();
       expect((await runsApi.getRun(runId)).workflow_id).toBe(workflow.id);
@@ -224,7 +249,7 @@ describe('RunDialog', () => {
       const { user } = openDialog(await runLaunchCheck());
 
       await user.type(await screen.findByLabelText('Brief'), 'default model');
-      await user.click(screen.getByRole('button', { name: 'Run' }));
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
 
       const question = await pendingQuestion(await waitForLaunch());
       const model = question.match(/\| Model: (.*) \| Colour:/)?.[1];
@@ -237,7 +262,7 @@ describe('RunDialog', () => {
       openDialog(await runLaunchCheck());
 
       // fireEvent returns after Svelte flushes, well before the network round trip.
-      await fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
+      await fireEvent.click(await screen.findByRole('button', { name: 'Start Run' }));
       const button = screen.getByRole('button', { name: 'Starting…' }) as HTMLButtonElement;
       expect(button.disabled).toBe(true);
 
@@ -250,14 +275,14 @@ describe('RunDialog', () => {
 
       await pickModel(user, 'claude-opus');
       await user.type(field('Brief'), 'kept');
-      await user.click(screen.getByRole('button', { name: 'Run' }));
+      await user.click(screen.getByRole('button', { name: 'Start Run' }));
 
       const alert = await screen.findByRole('alert', {}, { timeout: 5000 });
       expect(alert.textContent).toContain('Pipeline lint errors: Graph has no exit node');
       expect(location.href).toBe('');
       expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('claude-opus');
       expect(field('Brief').value).toBe('kept');
-      expect((screen.getByRole('button', { name: 'Run' }) as HTMLButtonElement).disabled).toBe(
+      expect((screen.getByRole('button', { name: 'Start Run' }) as HTMLButtonElement).disabled).toBe(
         false
       );
 
@@ -272,11 +297,12 @@ describe('RunDialog', () => {
     const { user, rerender } = openDialog(workflow);
 
     await pickModel(user, 'claude-opus');
-    await user.type(field('Variables'), 'bad line');
+    await user.type(field('Extra values'), 'bad line');
     await user.type(field('Brief'), 'kept brief');
-    await user.type(field('Node Overrides (JSON)'), '{{}');
-    await user.click(screen.getByRole('button', { name: 'Run' }));
-    expect(await screen.findByText('Line 1: expected key=value')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: ADVANCED }));
+    await user.type(field('Step overrides (JSON)'), '{{}');
+    await user.click(screen.getByRole('button', { name: 'Start Run' }));
+    expect(await screen.findByText('Line 1: write it as name=value')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByLabelText('Brief')).toBeNull());
@@ -289,10 +315,12 @@ describe('RunDialog', () => {
       expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('claude-cli')
     );
     expect((screen.getByLabelText('Model') as HTMLSelectElement).value).toBe('claude-opus');
-    expect(field('Variables').value).toBe('bad line');
+    expect(field('Extra values').value).toBe('bad line');
     expect(field('Brief').value).toBe('kept brief');
-    expect(field('Node Overrides (JSON)').value).toBe('{}');
-    expect(screen.queryByText('Line 1: expected key=value')).toBeNull();
+    // Restored overrides reopen the disclosure, so they're never hidden.
+    expect(screen.getByRole('button', { name: ADVANCED })).toHaveAttribute('aria-expanded', 'true');
+    expect(field('Step overrides (JSON)').value).toBe('{}');
+    expect(screen.queryByText('Line 1: write it as name=value')).toBeNull();
   });
 
   it('depends on nothing from the catalog, so workflow-detail can mount it as is', () => {

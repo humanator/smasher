@@ -96,7 +96,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Phase 3: Dialogs (T10 and T11 can run in parallel with Phase 2)
 
-- [ ] Task 10: Run sheet restyle + `runRequest` copy; update `run-launch.spec.ts`
+- [x] Task 10: Run sheet restyle + `runRequest` copy; update `run-launch.spec.ts`
 - [ ] Task 11: Settings window frame, browser/desktop tabs, Defaults section, saved copy
 - [ ] Task 12: Services + Claude CLI sections; update `settings.spec.ts`
 

@@ -18,7 +18,8 @@ export type RunRequestResult =
   | { ok: true; request: RunWorkflowRequest }
   | { ok: false; errors: RunFormErrors };
 
-const SHAPE_ERROR = 'Expected {"node_id": {"model": "...", "provider": "..."}}';
+// The dialog calls node overrides "step overrides", so the messages do too.
+const SHAPE_ERROR = 'Expected {"step_id": {"model": "...", "provider": "..."}}';
 
 export function buildRunRequest(values: RunFormValues): RunRequestResult {
   const errors: RunFormErrors = {};
@@ -48,7 +49,7 @@ function parseVariables(text: string, errors: RunFormErrors): Record<string, str
     const eq = line.indexOf('=');
     const key = eq === -1 ? '' : line.slice(0, eq).trim();
     if (!key) {
-      errors.variables = `Line ${i + 1}: expected key=value`;
+      errors.variables = `Line ${i + 1}: write it as name=value`;
       break;
     }
     variables[key] = line.slice(eq + 1).trim();
@@ -67,7 +68,7 @@ function parseNodeOverrides(
   try {
     parsed = JSON.parse(text);
   } catch (err) {
-    errors.nodeOverrides = `Invalid JSON: ${err instanceof Error ? err.message : String(err)}`;
+    errors.nodeOverrides = `That is not valid JSON yet (${err instanceof Error ? err.message : String(err)})`;
     return undefined;
   }
   if (!isPlainObject(parsed) || !Object.values(parsed).every(isNodeOverride)) {
