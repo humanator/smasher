@@ -23,7 +23,7 @@
 	data-size={ctx.size || size}
 	data-spacing={ctx.spacing}
 	class={cn(
-		"shrink-0 focus:z-10 focus-visible:z-10 data-[variant=default]:data-[state=on]:bg-background data-[variant=default]:data-[state=on]:font-medium data-[variant=default]:data-[state=on]:shadow-[0_0_0_.5px_rgba(0,0,0,.08),0_1px_2px_rgba(0,0,0,.14)] dark:data-[variant=default]:data-[state=on]:bg-white/15 dark:data-[variant=default]:data-[state=on]:shadow-none data-[variant=outline]:data-[state=on]:bg-primary data-[variant=outline]:data-[state=on]:font-medium data-[variant=outline]:data-[state=on]:text-primary-foreground",
+		"shrink-0 focus:z-10 focus-visible:z-10 data-[variant=default]:data-[state=on]:bg-segment data-[variant=default]:data-[state=on]:font-medium data-[variant=default]:data-[state=on]:shadow-segment data-[variant=outline]:data-[state=on]:bg-primary data-[variant=outline]:data-[state=on]:font-medium data-[variant=outline]:data-[state=on]:text-primary-foreground",
 		toggleVariants({
 			variant: ctx.variant || variant,
 			size: ctx.size || size,

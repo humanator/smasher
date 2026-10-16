@@ -34,4 +34,26 @@ describe('Tabs', () => {
     const tab = screen.getAllByRole('tab')[0];
     expect(tab.className).toContain('group-data-[variant=line]/tabs-list:data-active:border-primary');
   });
+
+  it('sizes segments to their labels unless the list is fullWidth', () => {
+    render(TabsHost);
+    expect(screen.getAllByRole('tab')[0].className.split(' ')).toContain('flex-none');
+    expect(screen.getByRole('tablist').hasAttribute('data-full-width')).toBe(false);
+  });
+
+  it('stretches segments when fullWidth is set', () => {
+    render(TabsHost, { props: { fullWidth: true } });
+    const list = screen.getByRole('tablist');
+    expect(list.getAttribute('data-full-width')).toBe('true');
+    expect(list.className.split(' ')).toContain('w-full');
+    expect(screen.getAllByRole('tab')[0].className).toContain('group-data-[full-width=true]/tabs-list:flex-1');
+  });
+
+  it('has a toolbar variant for preference-window icon tabs', () => {
+    render(TabsHost, { props: { variant: 'toolbar' } });
+    const list = screen.getByRole('tablist');
+    expect(list.getAttribute('data-variant')).toBe('toolbar');
+    expect(list.className).not.toContain('bg-secondary');
+    expect(screen.getAllByRole('tab')[0].className).toContain('group-data-[variant=toolbar]/tabs-list:data-active:text-primary');
+  });
 });

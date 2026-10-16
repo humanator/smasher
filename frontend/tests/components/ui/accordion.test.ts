@@ -10,7 +10,7 @@ describe('Accordion', () => {
     const { container } = render(AccordionHost);
     const root = container.querySelector('[data-slot="accordion"]') as HTMLElement;
     expect(root.className).toContain('border');
-    expect(root.className).toContain('rounded-[10px]');
+    expect(root.className).toContain('rounded-xl') // 10px on the radius scale;
     expect(root.querySelectorAll('[data-slot="accordion-item"]')).toHaveLength(2);
   });
 

@@ -14,6 +14,6 @@
 	bind:ref
 	bind:value={value as never}
 	data-slot="accordion"
-	class={cn("bg-black/[.025] dark:bg-white/[.03] overflow-hidden rounded-[10px] border border-border flex w-full flex-col", className)}
+	class={cn("bg-group overflow-hidden rounded-xl border border-border flex w-full flex-col", className)}
 	{...restProps}
 />

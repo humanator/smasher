@@ -13,7 +13,7 @@
 <div
 	bind:this={ref}
 	data-slot="drawer-footer"
-	class={cn("gap-2 p-4 mt-auto flex flex-col", className)}
+	class={cn("mt-auto flex flex-row justify-end gap-2 pt-[18px] [&>*]:min-w-[72px]", className)}
 	{...restProps}
 >
 	{@render children?.()}

@@ -1,12 +1,15 @@
 <script lang="ts" module>
-	import { tv, type VariantProps } from "tailwind-variants";
+	import type { VariantProps } from "tailwind-variants";
+	import { tv } from "$lib/utils.js";
 
 	export const tabsListVariants = tv({
 		base: "group/tabs-list inline-flex w-fit items-center text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col",
 		variants: {
 			variant: {
-				default: "rounded-[7px] bg-secondary p-0.5",
-				line: "gap-[18px] border-b border-border bg-transparent",
+				default: "rounded-track bg-secondary p-0.5",
+				line: "gap-[18px] border-b border-border-strong bg-transparent",
+				// Preference-window section switcher: icon over caption, no track (Home.dc.html Settings).
+				toolbar: "gap-1 bg-transparent p-0",
 			},
 		},
 		defaultVariants: {
@@ -24,10 +27,13 @@
 	let {
 		ref = $bindable(null),
 		variant = "default",
+		fullWidth = false,
 		class: className,
 		...restProps
 	}: TabsPrimitive.ListProps & {
 		variant?: TabsListVariant;
+		/** Stretch the segments to fill the row; by default each sizes to its label. */
+		fullWidth?: boolean;
 	} = $props();
 </script>
 
@@ -35,6 +41,7 @@
 	bind:ref
 	data-slot="tabs-list"
 	data-variant={variant}
-	class={cn(tabsListVariants({ variant }), className)}
+	data-full-width={fullWidth || undefined}
+	class={cn(tabsListVariants({ variant }), fullWidth && "w-full", className)}
 	{...restProps}
 />

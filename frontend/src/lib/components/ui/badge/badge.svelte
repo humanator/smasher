@@ -1,14 +1,15 @@
 <script lang="ts" module>
-	import { type VariantProps, tv } from "tailwind-variants";
+	import type { VariantProps } from "tailwind-variants";
+	import { tv } from "$lib/utils.js";
 
 	export const badgeVariants = tv({
-		base: "h-[18px] gap-[5px] rounded-full border-0 px-[7px] text-[11px] leading-none font-medium transition-colors [&>svg]:size-3! group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:ring-3 focus-visible:ring-ring aria-invalid:ring-3 aria-invalid:ring-destructive/30 [&>svg]:pointer-events-none",
+		base: "h-[18px] gap-[5px] rounded-full border-0 px-[7px] text-caption leading-none font-medium transition-colors [&>svg]:size-3! group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:ring-3 focus-visible:ring-ring aria-invalid:ring-3 aria-invalid:ring-invalid-ring [&>svg]:pointer-events-none",
 		variants: {
 			variant: {
 				default: "bg-primary text-primary-foreground",
 				secondary: "bg-secondary text-secondary-foreground",
 				destructive: "bg-destructive-subtle text-destructive",
-				outline: "text-foreground shadow-[inset_0_0_0_1px_var(--input)]",
+				outline: "text-foreground-secondary shadow-[inset_0_0_0_1px_var(--input)]",
 				ghost: "text-foreground",
 				link: "text-primary underline-offset-4 hover:underline",
 			},

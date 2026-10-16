@@ -13,7 +13,7 @@
 	bind:ref
 	data-slot="drawer-overlay"
 	class={cn(
-		"bg-black/30 supports-backdrop-filter:backdrop-blur-sm fixed inset-0 z-50 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+		"data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 bg-scrim-strong fixed inset-0 z-50 [&:has(+[data-vaul-drawer-direction=left])]:bg-transparent [&:has(+[data-vaul-drawer-direction=right])]:bg-transparent",
 		className
 	)}
 	{...restProps}

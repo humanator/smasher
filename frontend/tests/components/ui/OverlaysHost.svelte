@@ -5,9 +5,10 @@
 	import * as Tooltip from '../../../src/lib/components/ui/tooltip/index.js';
 	import * as Drawer from '../../../src/lib/components/ui/drawer/index.js';
 
-	let { drawerDirection = 'right', popoverAlign = 'start' }: {
+	let { drawerDirection = 'right', popoverAlign = 'start', showClose = false }: {
 		drawerDirection?: 'top' | 'bottom' | 'left' | 'right';
 		popoverAlign?: 'start' | 'center' | 'end';
+		showClose?: boolean;
 	} = $props();
 </script>
 
@@ -24,9 +25,13 @@
 </Tooltip.Provider>
 
 <Drawer.Root open direction={drawerDirection}>
-	<Drawer.Content>
+	<Drawer.Content {showClose}>
 		<Drawer.Header>
 			<Drawer.Title>Drawer title</Drawer.Title>
+			<Drawer.Description>Drawer description</Drawer.Description>
 		</Drawer.Header>
+		<Drawer.Footer>
+			<button type="button">Done</button>
+		</Drawer.Footer>
 	</Drawer.Content>
 </Drawer.Root>

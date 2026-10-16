@@ -3,11 +3,11 @@
 	// ABOUTME: Lets tabs.test.ts exercise the real components with a chosen list variant
 	import * as Tabs from '../../../src/lib/components/ui/tabs/index.js';
 
-	let { variant = 'default' }: { variant?: 'default' | 'line' } = $props();
+	let { variant = 'default', fullWidth = false }: { variant?: 'default' | 'line' | 'toolbar'; fullWidth?: boolean } = $props();
 </script>
 
 <Tabs.Root value="a">
-	<Tabs.List {variant}>
+	<Tabs.List {variant} {fullWidth}>
 		<Tabs.Trigger value="a">Alpha</Tabs.Trigger>
 		<Tabs.Trigger value="b">Beta</Tabs.Trigger>
 	</Tabs.List>

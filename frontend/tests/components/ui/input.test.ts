@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/svelte/svelte5';
 import Input from '../../../src/lib/components/ui/input/input.svelte';
+import Textarea from '../../../src/lib/components/ui/textarea/textarea.svelte';
 
 describe('Input', () => {
   it('renders a bare input by default, with no wrapper or icon', () => {
@@ -26,5 +27,28 @@ describe('Input', () => {
   it('forwards the class to the input in both modes', () => {
     render(Input, { props: { search: true, class: 'extra', 'aria-label': 'x' } });
     expect(screen.getByRole('textbox').className).toContain('extra');
+  });
+
+  it('with mono, sets 12px monospace like the board', () => {
+    render(Input, { props: { mono: true, 'aria-label': 'Key' } });
+    const classes = screen.getByRole('textbox').className.split(' ');
+    expect(classes).toContain('font-mono');
+    expect(classes).toContain('text-small');
+  });
+
+  it('marks invalid fields with the systemRed token, not the error-text red', () => {
+    render(Input, { props: { 'aria-label': 'x' } });
+    const classes = screen.getByRole('textbox').className.split(' ');
+    expect(classes).toContain('aria-invalid:border-invalid');
+    expect(classes).toContain('focus-visible:ring-ring-field');
+  });
+});
+
+describe('Textarea', () => {
+  it('with mono, sets 12px monospace like the board', () => {
+    render(Textarea, { props: { mono: true, 'aria-label': 'Vars' } });
+    const classes = screen.getByRole('textbox').className.split(' ');
+    expect(classes).toContain('font-mono');
+    expect(classes).toContain('text-small');
   });
 });
