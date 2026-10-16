@@ -76,13 +76,13 @@ report `None`. Mirror the field in TypeScript.
 Use `en-AU` and lower-case am/pm.
 
 **Acceptance criteria:**
-- [ ] Every example in spec R2–R4 is a test case, with `now` and `timeZone` pinned
+- [x] Every example in spec R2–R4 is a test case, with `now` and `timeZone` pinned
   (`Australia/Sydney` and `UTC`).
-- [ ] The day boundary is checked in the given time zone, not UTC.
-- [ ] A missing or invalid date returns "—" instead of throwing.
+- [x] The day boundary is checked in the given time zone, not UTC.
+- [x] A missing or invalid date returns "—" instead of throwing.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/timeFormat.test.ts`
+- [x] `npm run test -- --run tests/lib/timeFormat.test.ts`
 
 **Dependencies:** None
 
