@@ -451,13 +451,67 @@ colours, light and dark.
 side by side in the browser and in `make desktop-dev`, light and dark. Run the full suite.
 
 **Acceptance criteria:**
-- [ ] Every Success Criterion is ticked, with the evidence noted.
-- [ ] Any deviation beyond D2–D5 and "Waiting since" is written up for Jobsworth.
+- [ ] Every Success Criterion is ticked, with the evidence noted. (SC1 still needs the
+  side-by-side check in `make desktop-dev`, which needs a Mac.)
+- [x] Any deviation beyond D2–D5 and "Waiting since" is written up for Jobsworth (below).
 
 **Verification:**
-- [ ] `npm run check && npm run lint && npm run test -- --run && npm run build:check`
-- [ ] non-LLM `npm run test:e2e`
-- [ ] `cargo test -p smasher-web && cargo clippy --workspace -- -D warnings`
+- [x] `npm run check && npm run lint && npm run test -- --run && npm run build:check`: 0 errors,
+  0 warnings; eslint clean; 882 passed, 1 skipped (the LLM-spending test); bundle check
+  passes, with the entry chunk at 493.9 kB
+- [x] non-LLM `npm run test:e2e`: 29 passed, 1 skipped. The 1 failure is
+  `candidate-preview.spec.ts`, which fails the same way on `bf8a45f` (before this module).
+  See "Not this module" below.
+- [x] `cargo test -p smasher-web`: all pass. `cargo clippy --workspace --exclude
+  smasher-desktop -- -D warnings`: clean. smasher-desktop can't build in the Linux cloud
+  container, which has no GTK, so its clippy needs a Mac.
+
+### Success Criteria evidence
+
+| # | Status | Evidence |
+|---|---|---|
+| 1 | Browser only | Screenshots at 1440×900 and 375×812, light and dark, match the artboard's layout and copy. The `make desktop-dev` side-by-side is still to do. |
+| 2 | Met | `NeedsYouBanner.test.ts`: the gallery case reads "Pick a favourite · 3 candidates ready · waiting 6 minutes" and links Review Candidates to the run. `dashboard.spec.ts`: a real gate raises the banner, and it clears after the answer within one 5 s poll (the E2E allows 9 s for slack). |
+| 3 | Met | `runStatus.test.ts` covers each R3 row. `WorkflowTable.test.ts` covers states. `dashboard.spec.ts` checks search by title and by file name. |
+| 4 | Met | `RunList.test.ts`: counts, rows, `?runs=` round trip, back and forward. `dashboard.spec.ts`: reload restores the filter, and the sidebar's Needs you link selects Active. |
+| 5 | Met | `RunTable.test.ts`: an active run ticks every 30 s (fake timers), and a finished run stays fixed. |
+| 6 | Met | `runRequest.test.ts` produces the same bodies with only the messages changed. `run-launch.spec.ts` checks brief, model and an extra value on the run page. |
+| 7 | Met | `SettingsDialog.test.ts`: same save calls and order; browser shows Defaults only; no "restart" text. `settings.spec.ts` passes. |
+| 8 | Met | Rust tests on `waiting_since` (Task 1), `tests/lib/api` integration, and the banner's real-gate test. |
+| 9 | Met | `dashboard.spec.ts` at 375px: no sideways scroll with the Run sheet or Settings open, and the tables don't scroll inside themselves. A Tab walk reaches every dashboard action, and each one's focus ring changes. |
+| 10 | Met, except desktop clippy | See Verification above. |
+
+### Deviations beyond D2–D5 and "Waiting since" (for Jobsworth)
+
+1. **Settings → Defaults order.** Provider comes before Model, not Model then Provider as
+   drawn, because the model list depends on the provider. The provider hint drops "“Infer
+   from model name” works it out…", since that choice doesn't exist (Open Question 1).
+2. **Run sheet Model field.** It's a "Model" group holding the Provider and Model selects (D3),
+   so "Model" shows twice. Worth a visual tidy.
+3. **Settings title in a browser.** It reads "Settings" rather than a section name, because
+   there's only one section there.
+4. **Copy the design doesn't cover:** "Removed when you save" (key placeholder after Remove),
+   "Found {version} at {path}." / "claude not found. Install Claude Code, or enter where it is
+   installed." (Detect result), and "API keys come from the server’s environment or .env file,
+   not from this page." (browser footnote).
+5. **Dark-mode contrast fixes:**
+   - The dark `--destructive` token is lifted from `#FF6961` to `#FF7B74`, so the Failed badge
+     meets 4.5:1 on cards. This is a shell-theme token.
+   - Pink accent text (the selected Settings tab and Reset to Default) uses the light pink in
+     dark mode.
+6. **Lazy dialogs.** The Run sheet and Settings load on first open, to keep the entry bundle
+   under 500 kB. Not visible, apart from a brief load on a cold first open.
+
+### Not this module (follow-ups)
+
+- `e2e/candidate-preview.spec.ts`: the click on the lightbox's iframe button times out
+  ("`<html>` intercepts pointer events"). It fails identically on `bf8a45f`. It's likely this
+  container's Chromium build 1194, since the project's Playwright expects 1243. Re-check it on
+  a machine with the matching browser.
+- Shell-theme still uses `text-primary` for text in dark mode (the Button `link` variant, the
+  WorkflowDetailPage links). It's about 3:1 on dark surfaces.
+- The entry bundle has about 6 kB of headroom. The `run` module should lazy-load the run page,
+  as the editor pages do.
 
 **Dependencies:** T13
 
