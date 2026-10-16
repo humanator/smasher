@@ -119,7 +119,7 @@ describe('RunDialog', () => {
       'Which AI model to use for this run. Leave blank to use your default model from Settings.'
     );
     expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('');
-    expect(screen.getByRole('option', { name: 'Default model' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Default (from Settings)' })).toBeTruthy();
     expect(field('Extra values').getAttribute('placeholder')).toBe('audience=first-time buyers');
     expect(field('Extra values')).toHaveAccessibleDescription(/one per line as name=value/);
     expect(screen.getByRole('button', { name: 'Start Run' })).toBeTruthy();

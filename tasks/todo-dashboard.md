@@ -320,7 +320,7 @@ Update `app-shell.spec.ts` for the new copy and selectors without deleting any t
 **Description:** Restyle `RunDialog` to match spec R5:
 
 - title and description as drawn
-- Brief, then Model (`ModelPicker` with blank label "Default model"), then Extra values
+- Brief, then Model (`ModelPicker` with blank label "Default (from Settings)"), then Extra values
 - the **Advanced: change the model for individual steps** disclosure (`aria-expanded`, open
   when a draft has overrides) revealing **Step overrides (JSON)**
 - **Cancel** / **Start Run** (reading **Starting…** while it starts)
@@ -488,7 +488,7 @@ side by side in the browser and in `make desktop-dev`, light and dark. Run the f
    from model name” works it out…", since that choice doesn't exist (Open Question 1).
 2. **Run sheet Model field.** The design's single Model input is two fields, Provider then
    Model (D3), with the design's hint under Model. (The "Model" group label that doubled it was
-   removed on 2026-10-16.) The blank provider option reads "Default model", as R5 specifies.
+   removed on 2026-10-16.) The blank provider option reads "Default (from Settings)".
 3. **Settings title in a browser.** It reads "Settings" rather than a section name, because
    there's only one section there.
 4. **Copy the design doesn't cover:** "Removed when you save" (key placeholder after Remove),

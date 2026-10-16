@@ -106,7 +106,7 @@
           idPrefix="run"
           provider={values.provider}
           model={values.model}
-          blankLabel="Default model"
+          blankLabel="Default (from Settings)"
           modelHint="Which AI model to use for this run. Leave blank to use your default model from Settings."
           onChange={pickModel}
         />

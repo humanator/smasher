@@ -125,7 +125,7 @@ and later from workflow-detail. The Settings dialog opens from the toolbar on ev
   blank and the workflow uses its usual behaviour."
 - Fields, in this order, with the design's labels, hints and placeholders:
   1. **Brief** (textarea)
-  2. **Model** (`ModelPicker`, with "Default model" as the blank label; per D3)
+  2. **Model** (`ModelPicker`, with "Default (from Settings)" as the blank label; per D3)
   3. **Extra values** (mono textarea, `name=value`)
   4. A disclosure button, **Advanced: change the model for individual steps**, with
      `aria-expanded`. It reveals **Step overrides (JSON)**. The disclosure starts open when the
