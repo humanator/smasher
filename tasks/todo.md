@@ -125,15 +125,15 @@ The quotes are typographic (“ ”).
 - Null or empty input returns null.
 
 **Acceptance criteria:**
-- [ ] There's one test per wrapper format, using the engine's exact `#[error]` strings, plus
+- [x] There's one test per wrapper format, using the engine's exact `#[error]` strings, plus
   nested wrappers.
-- [ ] An unknown node id falls back to the id. An unrecognised string passes through tidied.
+- [x] An unknown node id falls back to the id. An unrecognised string passes through tidied.
   Truncation is covered. Null and empty input return null.
-- [ ] No output contains text that wasn't in the input, apart from the label, the capital, the
+- [x] No output contains text that wasn't in the input, apart from the label, the capital, the
   full stop and "…".
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/runError.test.ts`
+- [x] `npm run test -- --run tests/lib/runError.test.ts`
 
 **Dependencies:** None
 
