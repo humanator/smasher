@@ -587,8 +587,8 @@
 
   :global(.svelte-flow__node.wf-node-connected .svelte-flow__handle) {
     opacity: 1;
-    background-color: #3b82f6;
-    border-color: #3b82f6;
+    background-color: var(--primary);
+    border-color: var(--primary);
   }
 
   /* Edge lines default to Svelte Flow's own pale-gray 1px stroke
@@ -600,9 +600,11 @@
      hover/selected states, arrowheads, etc. all still driven by the one
      source of truth. */
   :global(.svelte-flow) {
-    --xy-edge-stroke-default: #64748b;
+    /* Theme tokens so edges follow dark mode. The board draws --neutral (#AEAEB2); the editor
+       rebuild decides whether that is visible enough, so this keeps the darker muted grey for now. */
+    --xy-edge-stroke-default: var(--muted-foreground);
     --xy-edge-stroke-width-default: 2;
-    --xy-edge-stroke-selected-default: #3b82f6;
+    --xy-edge-stroke-selected-default: var(--primary);
   }
 
   /* @xyflow/svelte 1.6.6's own base.css gives `.svelte-flow__viewport` and

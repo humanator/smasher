@@ -92,7 +92,7 @@
 
 <div class="px-4 pt-5 pb-8 sm:px-6">
   {#if importError}
-    <p role="alert" class="mb-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive">
+    <p role="alert" class="mb-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive">
       Couldn't import that file: {importError}
     </p>
   {/if}

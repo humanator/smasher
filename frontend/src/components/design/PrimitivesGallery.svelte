@@ -15,6 +15,11 @@
   import * as Tooltip from '$lib/components/ui/tooltip/index.js';
   import * as Popover from '$lib/components/ui/popover/index.js';
   import * as Drawer from '$lib/components/ui/drawer/index.js';
+  import * as Field from '$lib/components/ui/field/index.js';
+  import * as RadioGroup from '$lib/components/ui/radio-group/index.js';
+  import * as Card from '$lib/components/ui/card/index.js';
+  import * as Dialog from '$lib/components/ui/dialog/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
   import PlusIcon from '@lucide/svelte/icons/plus';
   import { stepKind } from '$lib/stepKinds';
 
@@ -26,9 +31,29 @@
     'Codergen', 'Manager', 'Tool', 'Interviewer', 'Conditional', 'Parallel', 'FanIn', 'SubPipeline', 'Start', 'Exit',
   ];
   const colourTokens = [
-    'background', 'foreground', 'muted', 'muted-foreground', 'sidebar', 'primary', 'primary-foreground',
-    'primary-subtle', 'primary-subtle-foreground', 'secondary', 'destructive', 'destructive-subtle',
-    'success', 'info', 'border', 'input', 'ring',
+    'background', 'foreground', 'foreground-secondary', 'foreground-control', 'foreground-tertiary',
+    'muted', 'muted-foreground', 'sidebar', 'sheet', 'sheet-toolbar', 'tooltip', 'primary',
+    'primary-foreground', 'primary-subtle', 'primary-subtle-foreground', 'secondary', 'destructive',
+    'destructive-subtle', 'destructive-surface', 'invalid', 'success', 'success-foreground',
+    'success-subtle', 'warning', 'warning-foreground', 'info', 'info-foreground', 'neutral', 'border',
+    'border-strong', 'separator', 'input', 'ring', 'track', 'field-fill',
+  ];
+  // Class names are written out in full so Tailwind generates them.
+  const typeScale = [
+    ['text-caption', '11px', 'Captions, counts, badges, subtitles'],
+    ['text-hint', '11.5px', 'Field hints and errors'],
+    ['text-small', '12px', 'Descriptions, mono values'],
+    ['text-body', '13px', 'Body text, labels, controls'],
+    ['text-heading', '15px', 'Toolbar titles, section headings'],
+    ['text-display', '20px', 'Hero headings'],
+  ] as const;
+  const radii = [
+    ['rounded-xs', 4], ['rounded-sm', 5], ['rounded-md', 6], ['rounded-track', 7], ['rounded-lg', 8],
+    ['rounded-xl', 10], ['rounded-2xl', 12],
+  ] as const;
+  const shadows = [
+    'shadow-push', 'shadow-push-accent', 'shadow-segment', 'shadow-field', 'shadow-check', 'shadow-card',
+    'shadow-tooltip', 'shadow-popover', 'shadow-sheet', 'shadow-dialog', 'shadow-window',
   ];
 
   let checked = $state(true);
@@ -36,12 +61,15 @@
   let lineTabValue = $state('one');
   let toggleValue = $state('a');
   let outlineToggleValue = $state('a');
+  let toolbarTabValue = $state('defaults');
+  let radioValue = $state('yes');
+  let dialogVariant = $state<'sheet' | 'window' | null>(null);
 </script>
 
 {#snippet section(name: string, body: import('svelte').Snippet)}
   {@const id = `gallery-${name.toLowerCase().replace(/\s+/g, '-')}`}
   <section aria-labelledby={id} class="grid gap-3 border-b border-border py-6 last:border-b-0">
-    <h2 {id} class="m-0 text-[15px] font-bold">{name}</h2>
+    <h2 {id} class="m-0 text-heading font-bold">{name}</h2>
     {@render body()}
   </section>
 {/snippet}
@@ -55,7 +83,7 @@
   {#snippet colours()}
     <div class="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
       {#each colourTokens as token (token)}
-        <div class="grid gap-1 text-[11px]">
+        <div class="grid gap-1 text-caption">
           <div class="h-10 rounded-md border border-border" style:background={`var(--${token})`}></div>
           <code class="font-mono text-muted-foreground">--{token}</code>
         </div>
@@ -64,15 +92,47 @@
   {/snippet}
   {@render section('Colours', colours)}
 
+  {#snippet type()}
+    <div class="grid gap-2">
+      {#each typeScale as [cls, size, use] (cls)}
+        <div class="flex items-baseline gap-4">
+          <code class="w-36 shrink-0 font-mono text-caption text-muted-foreground">{cls} · {size}</code>
+          <span class={cls}>{use}</span>
+        </div>
+      {/each}
+    </div>
+  {/snippet}
+  {@render section('Type', type)}
+
+  {#snippet elevation()}
+    <div class="flex flex-wrap gap-3">
+      {#each radii as [cls, px] (cls)}
+        <div class="grid gap-1 text-caption">
+          <div class="size-12 border border-border-strong bg-muted {cls}"></div>
+          <code class="font-mono text-muted-foreground">{cls} · {px}px</code>
+        </div>
+      {/each}
+    </div>
+    <div class="flex flex-wrap gap-4 pt-2">
+      {#each shadows as cls (cls)}
+        <div class="grid gap-1 text-caption">
+          <div class="bg-control h-10 w-20 rounded-md {cls}"></div>
+          <code class="font-mono text-muted-foreground">{cls}</code>
+        </div>
+      {/each}
+    </div>
+  {/snippet}
+  {@render section('Radius and elevation', elevation)}
+
   {#snippet steps()}
     <div class="flex flex-wrap gap-2">
       {#each stepHandlers as handler (handler)}
         {@const kind = stepKind(handler)}
         {@const Icon = kind.icon}
-        <div class="step-swatch inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px]" style:--ink={kind.ink} style:--tint={kind.tint} style:--ink-dark={kind.inkDark} style:--tint-dark={kind.tintDark}>
+        <div class="step-swatch inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-small" style:--ink={kind.ink} style:--tint={kind.tint} style:--ink-dark={kind.inkDark} style:--tint-dark={kind.tintDark}>
           <Icon class="size-[13px]" aria-hidden="true" />
           <span>{kind.plain}</span>
-          <code class="font-mono text-[10px] opacity-70">{kind.tech}</code>
+          <code class="font-mono text-caption opacity-70">{kind.tech}</code>
         </div>
       {/each}
     </div>
@@ -82,7 +142,7 @@
   {#snippet buttons()}
     {#each buttonVariants as variant (variant)}
       <div data-testid={`button-row-${variant}`} class="flex flex-wrap items-center gap-2">
-        <code class="w-24 font-mono text-[11px] text-muted-foreground">{variant}</code>
+        <code class="w-24 font-mono text-caption text-muted-foreground">{variant}</code>
         {#each buttonSizes as size (size)}
           <Button {variant} {size}>{size}</Button>
         {/each}
@@ -102,7 +162,8 @@
       {/each}
       <Badge variant="secondary" dot="var(--info)">Running</Badge>
       <Badge variant="secondary" dot="var(--success)">Completed</Badge>
-      <Badge variant="destructive" dot="var(--destructive)">Failed</Badge>
+      <Badge variant="destructive">Failed</Badge>
+      <Badge variant="secondary" dot="var(--foreground-tertiary)">Aborted</Badge>
     </div>
   {/snippet}
   {@render section('Badge', badges)}
@@ -113,7 +174,7 @@
       <Input aria-label="Search field" search placeholder="Search" />
       <Input aria-label="Invalid field" aria-invalid="true" value="Invalid" />
       <Input aria-label="Disabled field" disabled value="Disabled" />
-      <Input aria-label="Mono field" class="font-mono text-xs" value="mono_value" />
+      <Input aria-label="Mono field" mono value="mono_value" />
     </div>
   {/snippet}
   {@render section('Input', inputs)}
@@ -123,12 +184,13 @@
       <Textarea aria-label="Default notes" placeholder="Default" />
       <Textarea aria-label="Invalid notes" aria-invalid="true" value="Invalid" />
       <Textarea aria-label="Disabled notes" disabled value="Disabled" />
+      <Textarea aria-label="Mono notes" mono value="audience=first-time buyers" />
     </div>
   {/snippet}
   {@render section('Textarea', textareas)}
 
   {#snippet selects()}
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="grid max-w-sm gap-2">
       <NativeSelect.Root aria-label="Default select">
         <NativeSelect.Option value="a">claude-sonnet</NativeSelect.Option>
         <NativeSelect.Option value="b">claude-opus</NativeSelect.Option>
@@ -182,6 +244,19 @@
           <Tabs.Trigger value="one">Settings</Tabs.Trigger>
           <Tabs.Trigger value="two">Help</Tabs.Trigger>
           <Tabs.Trigger value="three">About</Tabs.Trigger>
+        </Tabs.List>
+      </Tabs.Root>
+      <Tabs.Root value="one" class="max-w-sm">
+        <Tabs.List fullWidth>
+          <Tabs.Trigger value="one">Progress</Tabs.Trigger>
+          <Tabs.Trigger value="two">Activity</Tabs.Trigger>
+          <Tabs.Trigger value="three">Details</Tabs.Trigger>
+        </Tabs.List>
+      </Tabs.Root>
+      <Tabs.Root bind:value={toolbarTabValue} class="bg-sheet-toolbar w-fit rounded-md p-2">
+        <Tabs.List variant="toolbar" aria-label="Toolbar tabs">
+          <Tabs.Trigger value="defaults"><PlusIcon strokeWidth={1.7} aria-hidden="true" />Defaults</Tabs.Trigger>
+          <Tabs.Trigger value="services"><PlusIcon strokeWidth={1.7} aria-hidden="true" />Services</Tabs.Trigger>
         </Tabs.List>
       </Tabs.Root>
     </div>
@@ -289,16 +364,93 @@
             <Button {...props} variant="outline">Open sheet drawer</Button>
           {/snippet}
         </Drawer.Trigger>
-        <Drawer.Content>
+        <Drawer.Content showClose>
           <Drawer.Header>
-            <Drawer.Title>Sheet</Drawer.Title>
-            <Drawer.Description>A sheet on the popover surface.</Drawer.Description>
+            <Drawer.Title>Run details</Drawer.Title>
+            <Drawer.Description>Everything about this run, out of the way until you need it.</Drawer.Description>
           </Drawer.Header>
+          <Drawer.Footer>
+            <Drawer.Close>
+              {#snippet child({ props })}<Button {...props} variant="outline">Cancel</Button>{/snippet}
+            </Drawer.Close>
+            <Drawer.Close>
+              {#snippet child({ props })}<Button {...props}>Done</Button>{/snippet}
+            </Drawer.Close>
+          </Drawer.Footer>
         </Drawer.Content>
       </Drawer.Root>
     </div>
   {/snippet}
   {@render section('Drawer', drawers)}
+
+  {#snippet fields()}
+    <div class="grid max-w-sm gap-4">
+      <Field.Root>
+        <Field.Label for="gallery-brief">Brief</Field.Label>
+        <Field.Description id="gallery-brief-hint">A short note on what this run is for.</Field.Description>
+        <Input id="gallery-brief" aria-describedby="gallery-brief-hint" placeholder="e.g. Three calmer checkout concepts" />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label for="gallery-vars">Extra values</Field.Label>
+        <Field.Description id="gallery-vars-hint">One per line as name=value.</Field.Description>
+        <Textarea id="gallery-vars" mono aria-invalid="true" aria-describedby="gallery-vars-hint" value="audience" />
+        <Field.Error>Line 1 needs an = sign, like name=value.</Field.Error>
+      </Field.Root>
+    </div>
+  {/snippet}
+  {@render section('Field', fields)}
+
+  {#snippet radios()}
+    <RadioGroup.Root bind:value={radioValue} aria-label="Approve this design?">
+      {#each [['yes', 'Approve'], ['no', 'Reject'], ['off', 'Disabled']] as [value, label] (value)}
+        <div class="flex items-center gap-2">
+          <RadioGroup.Item {value} id={`gallery-radio-${value}`} disabled={value === 'off'} />
+          <Label for={`gallery-radio-${value}`}>{label}</Label>
+        </div>
+      {/each}
+    </RadioGroup.Root>
+  {/snippet}
+  {@render section('Radio group', radios)}
+
+  {#snippet cards()}
+    <div class="grid gap-3 sm:grid-cols-2">
+      <Card.Root size="sm">
+        <Card.Header><Card.Title>Candidate</Card.Title><Card.Description>Default, sm: white, 12px padding.</Card.Description></Card.Header>
+      </Card.Root>
+      <Card.Root variant="muted">
+        <Card.Header><Card.Title>Step list</Card.Title><Card.Description>Muted surface with a hairline.</Card.Description></Card.Header>
+      </Card.Root>
+      <Card.Root variant="success">
+        <Card.Header><Card.Title>Finished in 10 min 35 s</Card.Title><Card.Description>Success hero.</Card.Description></Card.Header>
+      </Card.Root>
+      <Card.Root variant="destructive">
+        <Card.Header><Card.Title>Check the designs couldn’t finish</Card.Title><Card.Description>Failure hero.</Card.Description></Card.Header>
+      </Card.Root>
+    </div>
+  {/snippet}
+  {@render section('Card', cards)}
+
+  {#snippet dialogs()}
+    <div class="flex gap-3">
+      <Button variant="outline" onclick={() => (dialogVariant = 'sheet')}>Open sheet dialog</Button>
+      <Button variant="outline" onclick={() => (dialogVariant = 'window')}>Open window dialog</Button>
+    </div>
+    <Dialog.Root open={dialogVariant !== null} onOpenChange={(open) => !open && (dialogVariant = null)}>
+      <Dialog.Content variant={dialogVariant ?? 'sheet'} showCloseButton={dialogVariant === 'window'}>
+        <Dialog.Header class={dialogVariant === 'window' ? 'bg-sheet-toolbar border-b border-border px-4 py-3' : ''}>
+          <Dialog.Title>{dialogVariant === 'window' ? 'Settings' : 'Run “Design concepts review”'}</Dialog.Title>
+          <Dialog.Description>Everything here is optional.</Dialog.Description>
+        </Dialog.Header>
+        <Dialog.Footer class={dialogVariant === 'window' ? 'px-4 pb-4' : ''}>
+          <Dialog.Close>
+            {#snippet child({ props })}<Button {...props} variant="outline">Cancel</Button>{/snippet}
+          </Dialog.Close>
+          <Button>Start Run</Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  {/snippet}
+  {@render section('Dialog', dialogs)}
 </div>
 
 <style>

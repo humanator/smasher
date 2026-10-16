@@ -24,7 +24,7 @@
   } = $props();
 </script>
 
-<p class="m-0 text-[13px] text-muted-foreground">
+<p class="m-0 text-body text-muted-foreground">
   Run every AI step through the claude command on this Mac, using the account it is signed in to. No API key needed.
 </p>
 

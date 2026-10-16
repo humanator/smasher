@@ -83,7 +83,7 @@
       <UserIcon class="size-[15px]" aria-hidden="true" />
     </span>
     <div class="min-w-0 flex-1">
-      <p class="m-0 text-[13px] font-semibold text-foreground">
+      <p class="m-0 text-body font-semibold text-foreground">
         {runTitle(featured, library.workflows)} is waiting for your decision
       </p>
       <p class="m-0 text-xs text-primary-subtle-foreground">

@@ -109,7 +109,7 @@
 </script>
 
 {#if done}
-  <p class="gate-done font-medium text-green-700">Decision recorded — resuming…</p>
+  <p class="gate-done font-medium text-success-foreground">Decision recorded — resuming…</p>
 {:else if gate}
   <div class="gate-card flex flex-col gap-4">
     {#if gate.expected_count !== null}
@@ -125,7 +125,8 @@
         {#if isFailed(candidate)}
           <Card.Root
             size="sm"
-            class="candidate-card candidate-card-failed gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 shadow-none ring-0"
+            variant="destructive"
+            class="candidate-card candidate-card-failed gap-2"
           >
             <div class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</div>
             {#if failureReason(candidate)}

@@ -15,20 +15,19 @@
 
   // Border and label colour per tone; tinted lines also get a background.
   const TONE_CLASSES: Record<EventTone, string> = {
-    blue: 'border-blue-500 [&_.event-label]:text-blue-600 dark:[&_.event-label]:text-blue-400',
-    green: 'border-green-500 [&_.event-label]:text-green-600 dark:[&_.event-label]:text-green-400',
-    red: 'border-red-500 [&_.event-label]:text-red-600 dark:[&_.event-label]:text-red-400',
-    amber: 'border-amber-500 [&_.event-label]:text-amber-600 dark:[&_.event-label]:text-amber-400',
-    purple:
-      'border-purple-500 [&_.event-label]:text-purple-600 dark:[&_.event-label]:text-purple-400',
+    blue: 'border-info [&_.event-label]:text-info-foreground',
+    green: 'border-success [&_.event-label]:text-success-foreground',
+    red: 'border-invalid [&_.event-label]:text-destructive',
+    amber: 'border-warning [&_.event-label]:text-warning-foreground',
+    purple: 'border-primary [&_.event-label]:text-primary-subtle-foreground',
     muted: 'border-border [&_.event-label]:text-muted-foreground',
   };
   const TINT_CLASSES: Record<EventTone, string> = {
-    blue: 'bg-blue-500/10',
-    green: 'bg-green-500/10',
-    red: 'bg-red-500/10',
-    amber: 'bg-amber-500/10',
-    purple: 'bg-purple-500/10',
+    blue: 'bg-info/10',
+    green: 'bg-success-subtle',
+    red: 'bg-destructive-surface',
+    amber: 'bg-warning/10',
+    purple: 'bg-primary-subtle',
     muted: 'bg-muted',
   };
 
@@ -147,6 +146,6 @@
   {/if}
 
   {#if eventStore.isComplete}
-    <p class="mt-4 text-center font-medium text-green-600" role="status">Pipeline complete</p>
+    <p class="mt-4 text-center font-medium text-success-foreground" role="status">Pipeline complete</p>
   {/if}
 </div>

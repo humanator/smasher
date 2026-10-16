@@ -7,6 +7,8 @@ import PrimitivesGallery from '../../../src/components/design/PrimitivesGallery.
 
 const SECTIONS = [
   'Colours',
+  'Type',
+  'Radius and elevation',
   'Step kinds',
   'Button',
   'Badge',
@@ -21,6 +23,10 @@ const SECTIONS = [
   'Tooltip',
   'Popover',
   'Drawer',
+  'Field',
+  'Radio group',
+  'Card',
+  'Dialog',
 ];
 
 describe('PrimitivesGallery', () => {

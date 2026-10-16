@@ -60,9 +60,7 @@
 </button>
 
 <Dialog.Root bind:open>
-  <Dialog.Content
-    class="flex h-[calc(100vh-2rem)] flex-col gap-3 p-4 sm:max-w-[calc(100vw-2rem)]"
-  >
+  <Dialog.Content variant="fullscreen">
     <Dialog.Header class="flex-row items-center gap-2 pr-10">
       <Dialog.Title class="mr-auto font-mono">{candidate.candidate_id}</Dialog.Title>
       {#if candidate.bundle_url}

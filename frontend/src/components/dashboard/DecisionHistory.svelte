@@ -50,7 +50,7 @@
     <ul class="decision-list m-0 flex list-none flex-col gap-3 p-0">
       {#each decisions as decision (decision.node_id + decision.timestamp)}
         <li class="decision-item">
-          <Card.Root size="sm" class="block rounded-lg border border-border p-4 shadow-none ring-0">
+          <Card.Root size="sm" class="block">
             <div class="flex flex-wrap items-center gap-3">
               <span class="font-mono text-xs font-semibold text-foreground">{decision.node_id}</span>
               <Badge variant="secondary" class="rounded font-semibold">{decision.decision}</Badge>
@@ -62,7 +62,7 @@
               <div class="mt-2 flex flex-wrap gap-1.5">
                 <!-- Selected candidates are green: selection carries semantic meaning. -->
                 {#each decision.selected as candidateId (candidateId)}
-                  <Badge class="rounded bg-green-100 font-mono font-normal text-green-700"
+                  <Badge class="rounded bg-success-subtle font-mono font-normal text-success-foreground"
                     >{candidateId}</Badge
                   >
                 {/each}

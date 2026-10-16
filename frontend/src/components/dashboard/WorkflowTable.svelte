@@ -56,19 +56,19 @@
 </script>
 
 <section id="workflows" aria-labelledby="workflows-heading">
-  <h2 id="workflows-heading" class="m-0 text-[15px] font-bold text-foreground">All workflows</h2>
+  <h2 id="workflows-heading" class="m-0 text-heading font-bold text-foreground">All workflows</h2>
   <p class="mt-0.5 mb-2.5 text-xs text-muted-foreground">
     A workflow is a saved set of steps. Open one to see its runs, edit it, or start a new run.
   </p>
 
   {#if error}
-    <div role="alert" class="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive">
+    <div role="alert" class="flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive">
       <span class="min-w-0 flex-1">Couldn't load workflows: {error}</span>
       <Button variant="outline" size="sm" onclick={onRetry}>Try Again</Button>
     </div>
   {:else if !loading && workflows.length === 0}
     <div class="rounded-lg border border-border px-3 py-6 text-center">
-      <p class="m-0 text-[13px] text-muted-foreground">No workflows yet. Create one or import a .dot file.</p>
+      <p class="m-0 text-body text-muted-foreground">No workflows yet. Create one or import a .dot file.</p>
       <div class="mt-3 flex justify-center gap-2">
         <Button href="/workflows/new" size="sm">New Workflow</Button>
         <Button variant="outline" size="sm" onclick={onImport}>Import .dot File</Button>
@@ -82,7 +82,7 @@
       class="relative overflow-x-auto rounded-lg border border-border bg-card"
     >
       <div role="rowgroup">
-        <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">
+        <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-caption font-semibold text-muted-foreground">
           <span role="columnheader">Name</span>
           <span role="columnheader">Status</span>
           <span role="columnheader">Last activity</span>
@@ -102,20 +102,20 @@
             </div>
           {/each}
         {:else if rows.length === 0}
-          <p class="m-0 px-3 py-4 text-[13px] text-muted-foreground">No workflows match that search.</p>
+          <p class="m-0 px-3 py-4 text-body text-muted-foreground">No workflows match that search.</p>
         {:else}
           {#each rows as row, i (row.workflow.id)}
             <div role="row" class="{ROW} min-h-11 py-2 md:py-1.5 {i % 2 === 1 ? 'bg-muted' : 'bg-card'}">
               <span role="cell" class="min-w-0 flex-1">
-                <a href={row.href} class="block truncate text-[13px] font-medium text-foreground hover:underline">
+                <a href={row.href} class="block truncate text-body font-medium text-foreground hover:underline">
                   {row.title}
                 </a>
-                <span class="block truncate font-mono text-[11px] text-muted-foreground">{row.workflow.name}</span>
+                <span class="block truncate font-mono text-caption text-muted-foreground">{row.workflow.name}</span>
               </span>
               <span role="cell"><StatusBadge status={row.status} /></span>
               <span class={BREAK} aria-hidden="true"></span>
               <span role="cell" class="text-xs text-foreground/80">{row.lastActivity}</span>
-              <span role="cell" class="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">{row.workflow.source_dir}</span>
+              <span role="cell" class="min-w-0 flex-1 truncate font-mono text-caption text-muted-foreground">{row.workflow.source_dir}</span>
               <span class={BREAK} aria-hidden="true"></span>
               <span role="cell" class="flex gap-1.5 pt-1 md:justify-end md:pt-0">
                 <Button href="{row.href}/edit" variant="outline" size="sm">Edit</Button>

@@ -76,7 +76,7 @@
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+  <Dialog.Content>
     <Dialog.Header>
       <Dialog.Title>Run “{formatWorkflowName(workflow.name)}”</Dialog.Title>
       <Dialog.Description>
@@ -137,7 +137,7 @@
       <div class="grid gap-3">
         <button
           type="button"
-          class="flex w-fit items-center gap-1.5 rounded-sm text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
+          class="flex w-fit items-center gap-1.5 rounded-sm text-body text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
           aria-expanded={advancedOpen}
           aria-controls="run-advanced"
           onclick={() => (advancedOpen = !advancedOpen)}

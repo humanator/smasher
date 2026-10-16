@@ -82,6 +82,86 @@ Fix these first. Most screen-level drift traces back to them.
     - NativeSelect, the outline ToggleGroup and Switch: black hairlines.
     - Run-page Tailwind palette colours (`text-green-700`, violet and so on) with no dark variant.
 
+### Status: design-system fixes landed (2026-10-16)
+
+Items 1–9 above are fixed. Item 10 (dark mode) is fixed everywhere except the editor's node
+colours.
+
+**Tokens**
+
+- **Radius scale.** Each step is now a literal value: xs 4, sm 5, md 6, track 7, lg 8, xl 10,
+  2xl 12.
+- **Type scale.** `text-caption` 11, `text-hint` 11.5, `text-small` 12, `text-body` 13,
+  `text-heading` 15, `text-display` 20. Every `text-[Npx]` in components now uses these.
+- **Shadows.** Thirteen `shadow-*` tokens (push, segment, card, sheet, dialog, window and so on),
+  each with a dark value. No raw rgba shadow is left in the primitives.
+- **Board colours that had no token.** These now exist, each with a dark value:
+  - Text tiers: `foreground-secondary`, `foreground-control`, `foreground-tertiary`.
+  - Status: `warning`, `success`, `info` and `destructive` foregrounds, surfaces and borders.
+  - Invalid state: `invalid`, `invalid-ring`, `ring-field`.
+  - Surfaces: `sheet`, `sheet-toolbar`, `tooltip`, `control`, `segment`, `field`, `field-fill`,
+    `track`, `group`.
+  - Hairlines: `separator`, `border-strong`, `divider`.
+  - Scrims and layout: three `scrim` levels, and `h-toolbar`.
+- **Unused shadcn chart tokens** are removed.
+
+**Class merging.** `cn()` and `tv()` share one merge config that knows these scales, and
+`tests/lib/utils.test.ts` covers it. Without that config, `text-body` beside a text colour was
+silently dropped. `cn()` now reuses tailwind-variants' bundled merger, so the separate `cn` engine
+is no longer shipped. The entry chunk went from 494 kB to 469 kB.
+
+**Primitives.** Each primitive is restyled to its board:
+
+- **Card:** variants `default`, `muted`, `success` and `destructive`.
+- **Dialog:** variants `sheet`, `window` and `fullscreen`. It is top-aligned on the sheet surface
+  with no blur, and has a round 22px close.
+- **Label:** 13px.
+- **Drawer:** top and bottom open as a floating 420px sheet; left and right are the muted
+  inspector. It also gets the board's header and footer, and a `showClose` prop.
+- **NativeSelect:** the accent stepper.
+- **Input and Textarea:** a `mono` option and the systemRed invalid state.
+- **Tabs:** sized to their labels by default, with `fullWidth` and a `toolbar` variant for
+  Settings.
+- **Others:** Popover, Tooltip, Accordion (the board's triangle), Toggle group (outline by
+  default), Sidebar rows and Sheet.
+
+**New components:** Field (label, hint, control, error) and RadioGroup.
+
+**Shell:**
+
+- **SourceList:** the board's icons and a document icon on workflow rows. The Library row for the
+  current page is marked as current. The Needs-you pill is 16px and counts are 12px.
+- **Toolbar:** opaque, with the board's padding and a `titleAccessory` slot. A `ToolbarDivider`
+  is new.
+- **ToolbarIconButton:** gains `pressed` and `expanded`.
+
+**stepKinds** now matches `Main.dc.html` icons, group titles and order (`STEP_GROUPS`), blurbs,
+About copy and display tech names. The raw engine name is the new `handler` field.
+
+**Guard.** `tests/lib/designSystem.test.ts` fails on any hex, rgba, Tailwind palette colour,
+black/white alpha or arbitrary font size in the primitives, the shell, the dashboard/run
+components or the gallery. The editor is excluded until its rebuild.
+
+**Deliberate deviations from the boards:**
+
+- `--success-foreground` is `#1F8136`. The board's `#248A3D` is 4.40:1 on white, which fails AA.
+- Settings toolbar labels use `foreground-secondary`. The board's `#6E6E73` on `#F0F0F2` is
+  4.46:1.
+- Canvas edges use `muted-foreground`, not the board's pale `--neutral`. An earlier fix found
+  pale edges unreadable, so the editor rebuild should decide.
+- Dialog keeps its close button by default, for API compatibility. The Run sheet therefore still
+  shows a × that the board doesn't draw; drop it in the dashboard follow-up.
+
+**Not touched (screen work):** hint placement in the Run sheet and Settings forms (they can now
+use Field), and the hand-rolled disclosures that should use Accordion.
+
+Two flaky tests are worth knowing about:
+
+- `DashboardPage` "opens Settings" timed out on the old code too. Settings takes about 7.5s to
+  compile cold under Vitest; its budget is now 15s.
+- E2E `candidate-preview.spec.ts` (clicking inside the lightbox iframe) fails on the old code
+  too.
+
 ## Bugs found along the way
 
 - **The next gallery round never appears.** After an "iterate" decision, `GalleryGate.svelte`

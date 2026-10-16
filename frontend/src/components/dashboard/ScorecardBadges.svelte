@@ -32,8 +32,8 @@
   {#if lintPassed !== null}
     <Badge
       class="scorecard-badge rounded font-semibold {lintPassed
-        ? 'scorecard-badge-pass bg-green-100 text-green-700'
-        : 'scorecard-badge-fail bg-red-100 text-red-700'}"
+        ? 'scorecard-badge-pass bg-success-subtle text-success-foreground'
+        : 'scorecard-badge-fail bg-destructive-subtle text-destructive'}"
     >
       lint: {lintPassed ? 'pass' : 'fail'}
     </Badge>
@@ -45,8 +45,8 @@
   {#if criticSuccess !== null}
     <Badge
       class="scorecard-badge rounded font-semibold {criticSuccess
-        ? 'scorecard-badge-pass bg-green-100 text-green-700'
-        : 'scorecard-badge-fail bg-red-100 text-red-700'}"
+        ? 'scorecard-badge-pass bg-success-subtle text-success-foreground'
+        : 'scorecard-badge-fail bg-destructive-subtle text-destructive'}"
     >
       critic: {criticSuccess ? 'success' : 'friction'}
     </Badge>

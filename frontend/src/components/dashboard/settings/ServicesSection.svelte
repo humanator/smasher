@@ -46,7 +46,7 @@
     <div class="border-b border-border last:border-b-0">
       <button
         type="button"
-        class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] font-medium outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
+        class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-body font-medium outline-none hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
         aria-expanded={open}
         aria-controls="settings-{p.id}-panel"
         onclick={() => (openId = open ? null : p.id)}

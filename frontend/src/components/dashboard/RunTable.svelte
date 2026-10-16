@@ -39,7 +39,7 @@
 
 <div role="table" aria-label="Runs" class="relative overflow-x-auto rounded-lg border border-border bg-card">
   <div role="rowgroup">
-    <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">
+    <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-caption font-semibold text-muted-foreground">
       <span role="columnheader">Status</span>
       <span role="columnheader">Workflow</span>
       <span role="columnheader">Started</span>
@@ -54,11 +54,11 @@
       >
         <span role="cell"><StatusBadge status={isNeedsYou(run) ? 'Needs you' : run.status} /></span>
         <span role="cell" class="flex min-w-0 flex-1 items-baseline gap-2">
-          <span class="truncate text-[13px] font-medium text-foreground">{runTitle(run, workflows)}</span>
+          <span class="truncate text-body font-medium text-foreground">{runTitle(run, workflows)}</span>
           <!-- The run id is the link; its ::after stretches over the whole row. -->
           <a
             href="/runs/{run.id}"
-            class="shrink-0 font-mono text-[11px] text-muted-foreground outline-none after:absolute after:inset-0 after:content-['']"
+            class="shrink-0 font-mono text-caption text-muted-foreground outline-none after:absolute after:inset-0 after:content-['']"
             >{run.id}</a
           >
         </span>

@@ -61,7 +61,7 @@
 
 <section id="runs" aria-labelledby="runs-heading" class="scroll-mt-4">
   <div class="mb-0.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-    <h2 id="runs-heading" class="m-0 text-[15px] font-bold text-foreground">Recent runs</h2>
+    <h2 id="runs-heading" class="m-0 text-heading font-bold text-foreground">Recent runs</h2>
     <div class="ml-auto max-w-full overflow-x-auto">
       <ToggleGroup.Root type="single" variant="default" aria-label="Show runs" bind:value={() => filter, choose}>
         {#each FILTERS as option (option.value)}
@@ -78,13 +78,13 @@
   </p>
 
   {#if !library.loaded}
-    <p class="m-0 rounded-lg border border-border px-3 py-4 text-[13px] text-muted-foreground">Loading runs…</p>
+    <p class="m-0 rounded-lg border border-border px-3 py-4 text-body text-muted-foreground">Loading runs…</p>
   {:else if library.runs.length === 0}
-    <p class="m-0 rounded-lg border border-border px-3 py-4 text-[13px] text-muted-foreground">
+    <p class="m-0 rounded-lg border border-border px-3 py-4 text-body text-muted-foreground">
       No runs yet. Run a workflow to see it here.
     </p>
   {:else if shown.length === 0}
-    <p class="m-0 rounded-lg border border-border px-3 py-4 text-[13px] text-muted-foreground">No runs in this view.</p>
+    <p class="m-0 rounded-lg border border-border px-3 py-4 text-body text-muted-foreground">No runs in this view.</p>
   {:else}
     <RunTable runs={shown} workflows={library.workflows} />
   {/if}

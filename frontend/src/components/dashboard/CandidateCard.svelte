@@ -27,7 +27,8 @@
 {#if failed}
   <Card.Root
     size="sm"
-    class="candidate-card candidate-card-failed gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 shadow-none ring-0"
+    variant="destructive"
+    class="candidate-card candidate-card-failed gap-2"
   >
     <div class="candidate-id font-mono text-xs text-foreground">{candidate.candidate_id}</div>
     {#if capturedAt}
@@ -40,7 +41,7 @@
 {:else}
   <Card.Root
     size="sm"
-    class="candidate-card gap-2 rounded-lg border border-border p-4 shadow-none ring-0"
+    class="candidate-card gap-2"
   >
     <CandidatePreview {candidate} />
 

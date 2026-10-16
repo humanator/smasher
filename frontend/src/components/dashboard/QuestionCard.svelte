@@ -168,14 +168,13 @@
               <Button
                 onclick={() => handleAnswer(question.id, 'yes')}
                 disabled={card(question.id).submitting}
-                class="bg-green-600 text-white hover:bg-green-700"
               >
                 Yes
               </Button>
               <Button
                 onclick={() => handleAnswer(question.id, 'no')}
                 disabled={card(question.id).submitting}
-                class="bg-destructive text-white hover:bg-destructive/90"
+                variant="destructive"
               >
                 No
               </Button>
@@ -224,11 +223,11 @@
     {#if answered.length > 0}
       <h3 class="mb-4 text-base font-semibold text-foreground">Answered Questions</h3>
       {#each answered as exchange, index (index)}
-        <div class="answered-card mb-4 rounded border-l-4 border-green-600 bg-green-50 p-4">
+        <div class="answered-card mb-4 rounded-md border-l-4 border-success bg-success-subtle p-4">
           <p class="question-text mb-4 font-medium text-foreground">{exchange.question}</p>
-          <p class="answer-text mt-2 italic text-green-700">Answer: {exchange.answer}</p>
+          <p class="answer-text mt-2 italic text-success-foreground">Answer: {exchange.answer}</p>
           {#each exchange.replies as reply, replyIndex (replyIndex)}
-            <div class="reply mt-3 border-t border-green-600/20 pt-3">
+            <div class="reply mt-3 border-t border-success-border pt-3">
               <p class="reply-node font-mono text-xs text-muted-foreground">{reply.nodeId}</p>
               <div class="markdown mt-1">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -- renderMarkdown() sanitises with DOMPurify -->

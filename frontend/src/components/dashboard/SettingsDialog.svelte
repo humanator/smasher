@@ -178,10 +178,7 @@
       {/snippet}
     </Dialog.Trigger>
   {/if}
-  <Dialog.Content
-    showCloseButton={false}
-    class="flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-[620px]"
-  >
+  <Dialog.Content variant="window" showCloseButton={false}>
     {#if desktop}
       <Tabs.Root bind:value={section} class="flex min-h-0 flex-1 flex-col gap-0">
         {@render window(true)}
@@ -193,7 +190,7 @@
 </Dialog.Root>
 
 {#snippet window(tabs: boolean)}
-  <header class="shrink-0 border-b border-border bg-muted px-3 pt-2 pb-1.5">
+  <header class="bg-sheet-toolbar shrink-0 border-b border-border px-4 pt-3 pb-2">
     <div class="relative flex h-7 items-center justify-center">
       <Dialog.Close>
         {#snippet child({ props })}
@@ -202,16 +199,13 @@
           </Button>
         {/snippet}
       </Dialog.Close>
-      <Dialog.Title class="text-[13px] font-semibold">{title}</Dialog.Title>
+      <Dialog.Title>{title}</Dialog.Title>
     </div>
     {#if tabs}
-      <Tabs.List aria-label="Settings sections" class="mx-auto mt-1 flex gap-1 bg-transparent p-0">
+      <Tabs.List variant="toolbar" aria-label="Settings sections" class="mx-auto mt-1">
         {#each SECTIONS as s (s.value)}
-          <Tabs.Trigger
-            value={s.value}
-            class="h-auto min-w-[72px] flex-none flex-col gap-0.5 rounded-md px-2 pt-1.5 pb-1 text-[11px] text-foreground/80 data-active:bg-foreground/7 data-active:font-normal data-active:text-primary data-active:shadow-none dark:data-active:bg-white/10 dark:data-active:text-primary-subtle-foreground"
-          >
-            <s.icon class="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+          <Tabs.Trigger value={s.value}>
+            <s.icon strokeWidth={1.7} aria-hidden="true" />
             {s.label}
           </Tabs.Trigger>
         {/each}
