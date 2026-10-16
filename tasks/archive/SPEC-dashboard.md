@@ -70,6 +70,24 @@ and later from workflow-detail. The Settings dialog opens from the toolbar on ev
   fails, the detail line shows just the wait, and the button reads **Open Run**.
 - Landmark: `<section aria-label="Waiting for you">`.
 
+### R2a. Running banner (amendment, approved 2026-10-16)
+
+The dashboard always shows a banner while a workflow is running. Only one banner shows at a time:
+
+- If a run needs you, it's the needs-you banner (R2). That run is running too.
+- Otherwise, if any run is active (any non-terminal status), the running banner shows:
+  - It features the most recently started active run.
+  - Title: **{Workflow title} is running**.
+  - Detail line: "Started {when} · {duration} so far", using the R3/R4 wording. It ticks at
+    least every 30 s.
+  - Button: **Open Run** (outline), linking to `/runs/{id}`.
+  - When more than one run is active, a trailing link reads "+ {N} more running" and goes to
+    `/?runs=active#runs`.
+  - Its colours are neutral (muted background, blue running icon), so it reads as status, not as
+    a call to act.
+  - Landmark: `<section aria-label="Running now">`.
+- With nothing active, no banner renders and no space is reserved.
+
 ### R3. All workflows table
 
 - Heading **All workflows** and intro copy as drawn: "A workflow is a saved set of steps. Open

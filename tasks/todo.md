@@ -28,15 +28,15 @@ kept. Then run the full gates on it and commit it on its own, separate from work
 work.
 
 **Acceptance criteria:**
-- [ ] Simon confirms the work is kept, or says how to handle it.
-- [ ] It's committed as one dashboard commit, and the working tree is clean apart from the
+- [x] Simon confirms the work is kept, or says how to handle it.
+- [x] It's committed as one dashboard commit, and the working tree is clean apart from the
   workflow-detail spec and plan files.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard tests/lib/runStatus.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard tests/lib/runStatus.test.ts`
   (the focused files pass 53/53 as of 2026-10-16)
-- [ ] `npm run check` and `npm run lint` are clean
-- [ ] `npm run test:e2e -- dashboard`
+- [x] `npm run check` and `npm run lint` are clean
+- [x] `npm run test:e2e -- dashboard`
 
 **Dependencies:** None
 

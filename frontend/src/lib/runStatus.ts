@@ -25,6 +25,11 @@ export function runTitle(run: RunSummary, workflows: readonly WorkflowSummary[])
   return run.graph_name?.trim() || 'Unnamed workflow';
 }
 
+/** The most recently started active run. Expects runs newest-first, as the server lists them. */
+export function latestRunning(runs: readonly RunSummary[]): RunSummary | null {
+  return runs.find((run) => isActive(run.status)) ?? null;
+}
+
 /** The run that has waited on a person longest. Runs without a `waiting_since` come last. */
 export function longestWaiting(runs: readonly RunSummary[]): RunSummary | null {
   let best: RunSummary | null = null;

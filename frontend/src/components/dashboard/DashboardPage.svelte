@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ABOUTME: The home page: toolbar search and actions, the needs-you banner, All workflows and Recent runs
+  // ABOUTME: The home page: toolbar search and actions, the needs-you or running banner, All workflows and Recent runs
   // ABOUTME: Reads the library store, owns the search query, the Run sheet, Settings and .dot import
 
   import PlusIcon from '@lucide/svelte/icons/plus';
@@ -18,6 +18,7 @@
   import { libraryStore } from '../../stores/library.svelte';
   import ToolbarIconButton from '../shell/ToolbarIconButton.svelte';
   import NeedsYouBanner from './NeedsYouBanner.svelte';
+  import RunningBanner from './RunningBanner.svelte';
   import LazyRunDialog from './LazyRunDialog.svelte';
   import LazySettingsDialog from './LazySettingsDialog.svelte';
   import RunList from './RunList.svelte';
@@ -84,7 +85,9 @@
   <div class="flex items-center gap-1.5 px-6 pt-3">{@render toolbarActions()}</div>
 {/if}
 
+<!-- One banner at a time: a run waiting on you outranks one that's just running. -->
 <NeedsYouBanner {library} />
+<RunningBanner {library} />
 
 {#if mobile.current}
   <div class="border-b border-border px-4 py-2">{@render search()}</div>

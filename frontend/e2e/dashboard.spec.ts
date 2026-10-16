@@ -99,6 +99,8 @@ test('a run waiting on a person raises the banner and shows as Needs you until i
     await expect(banner).toBeVisible(POLL);
     await expect(banner).toContainText('is waiting for your decision');
     await expect(banner).toContainText(/waiting (less than a minute|\d+ minutes?|\d+ hours?)/);
+    // A run waiting on a person is running too; only its banner shows, never both.
+    await expect(page.getByRole('region', { name: 'Running now' })).toHaveCount(0);
 
     const runs = page.getByRole('table', { name: 'Runs' });
     const row = runs.getByRole('row').filter({ has: page.getByRole('link', { name: runId }) });

@@ -6,6 +6,7 @@ import {
   TERMINAL_STATUSES,
   isActive,
   isNeedsYou,
+  latestRunning,
   longestWaiting,
   pickFeaturedRun,
   runGroup,
@@ -195,5 +196,15 @@ describe('longestWaiting', () => {
   it('puts runs without a waiting_since last, keeping list order between them', () => {
     expect(longestWaiting([waiting('a', null), waiting('b', '2026-10-16T02:00:00Z')])?.id).toBe('b');
     expect(longestWaiting([waiting('a', null), waiting('b', null)])?.id).toBe('a');
+  });
+});
+
+describe('latestRunning', () => {
+  it('is null when nothing is active', () => {
+    expect(latestRunning([run('a', 'Completed'), run('b', 'Failed'), run('c', 'Aborted')])).toBeNull();
+  });
+
+  it('picks the first active run, since the server lists newest first', () => {
+    expect(latestRunning([run('done', 'Completed'), run('new', 'Running'), run('old', 'Running')])?.id).toBe('new');
   });
 });
