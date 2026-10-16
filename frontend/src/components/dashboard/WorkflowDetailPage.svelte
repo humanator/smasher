@@ -7,17 +7,15 @@
   import { getWorkflowGraph, type EditorGraph } from '../../lib/api/workflows';
   import type { RunSummary } from '../../lib/api/runs';
   import type { WorkflowSummary } from '../../lib/api/workflows';
-  import { pickFeaturedRun } from '../../lib/runStatus';
   import { Button } from '$lib/components/ui/button/index.js';
   import { errorMessage } from '$lib/notify';
   import { formatWorkflowName } from '$lib/utils';
-  import { describeLoops, orderSteps } from '$lib/workflowSteps';
+  import { describeLoops, orderSteps, stepLabel } from '$lib/workflowSteps';
   import { usePageActions, usePageBack, usePageSubtitle, usePageTitle } from '$lib/page-header.svelte';
   import { libraryStore } from '../../stores/library.svelte';
+  import ActiveRunBanner from './ActiveRunBanner.svelte';
   import LazyRunDialog from './LazyRunDialog.svelte';
-  import RunMetaList from './RunMetaList.svelte';
   import RunTable from './RunTable.svelte';
-  import StatusBadge from './StatusBadge.svelte';
   import StepList from './StepList.svelte';
 
   interface Library {
@@ -33,14 +31,15 @@
   let runDialogOpen = $state(false);
 
   const workflow = $derived(library.workflows.find((w) => w.id === workflowId) ?? null);
-  // Newest first, as the server lists them. The card and the history both come from this one list.
+  // Newest first, as the server lists them. The banner and the history both come from this one list.
   const runs = $derived(library.runs.filter((run) => run.workflow_id === workflowId));
-  const featured = $derived(pickFeaturedRun(runs));
 
   let graph = $state<EditorGraph | null>(null);
   let graphError = $state<string | null>(null);
   const order = $derived(graph ? orderSteps(graph) : { steps: [], backEdges: [] });
   const intro = $derived(graph ? describeLoops(graph, order) : '');
+  /** Step id → the name every section uses for it. */
+  const labels = $derived(new Map((graph?.nodes ?? []).map((n) => [n.id, stepLabel(n)])));
 
   async function loadGraph() {
     graphError = null;
@@ -75,7 +74,11 @@
   {/if}
 {/snippet}
 
-<div class="workflow-detail flex flex-col gap-6">
+{#if library.loaded && workflow}
+  <ActiveRunBanner {runs} {labels} />
+{/if}
+
+<div class="workflow-detail flex flex-col gap-6 px-4 pt-5 pb-8 sm:px-6">
   {#if !library.loaded && library.error}
     <div
       role="alert"
@@ -107,28 +110,6 @@
       />
 
       <div class="flex min-w-0 flex-col gap-6">
-        {#if featured}
-          <section
-            aria-label={featured.heading}
-            class="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground"
-          >
-            <h3 class="text-base font-semibold text-foreground">{featured.heading}</h3>
-            <div class="flex flex-wrap items-center gap-3">
-              <a href="/runs/{featured.run.id}" class="font-mono text-primary hover:underline">
-                {featured.run.id}
-              </a>
-              <StatusBadge status={featured.run.status} />
-            </div>
-            <p class="text-sm text-muted-foreground">
-              Started {new Date(featured.run.started_at).toLocaleString()}
-            </p>
-            <RunMetaList run={featured.run} />
-            {#if featured.moreRunning > 0}
-              <p class="text-sm text-muted-foreground">+{featured.moreRunning} more running</p>
-            {/if}
-          </section>
-        {/if}
-
         <section aria-label="Run History" class="flex flex-col gap-4">
           <h3 class="text-base font-semibold text-foreground">Run History</h3>
           {#if runs.length > 0}

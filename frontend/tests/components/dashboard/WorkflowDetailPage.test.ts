@@ -213,18 +213,17 @@ describe('WorkflowDetailPage', () => {
       expect(runs.filter((r) => r.workflow_id === id)).toEqual([]);
     });
 
-    it('shows no card and "No runs yet." for a fresh workflow', async () => {
+    it('shows no banner and "No runs yet." for a fresh workflow', async () => {
       const { id } = await importThrowaway();
       const library = await realLibrary();
 
       render(WorkflowDetailHost, { props: { workflowId: id, library } });
 
       expect(await screen.findByText('No runs yet.', {}, { timeout: 5000 })).toBeTruthy();
-      expect(screen.queryByText('Active run')).toBeNull();
-      expect(screen.queryByText('Latest run')).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Active run' })).toBeNull();
     });
 
-    it('features the newest running run, lists only its own runs, then shows the latest once done', async () => {
+    it('features the newest running run, lists only its own runs, and drops the banner once done', async () => {
       const { id } = await importThrowaway();
       const older = (await runsApi.runWorkflow(id)).run_id;
       launched.push(older);
@@ -236,9 +235,15 @@ describe('WorkflowDetailPage', () => {
 
       render(WorkflowDetailHost, { props: { workflowId: id, library } });
 
-      const card = await screen.findByRole('region', { name: 'Active run' }, { timeout: 5000 });
-      expect(within(card).getByRole('link', { name: newer })).toHaveAttribute('href', `/runs/${newer}`);
-      expect(within(card).getByText('+1 more running')).toBeTruthy();
+      const banner = await screen.findByRole('region', { name: 'Active run' }, { timeout: 5000 });
+      expect(within(banner).getByRole('link', { name: newer })).toHaveAttribute('href', `/runs/${newer}`);
+      expect(within(banner).getByText('+ 1 more running')).toBeTruthy();
+      // Paused at names the gate step by its label from the graph.
+      await waitFor(
+        () => expect(within(banner).getByText(/^Brief: .* \| Colour: /, { selector: 'strong' })).toBeTruthy(),
+        { timeout: 5000 }
+      );
+      expect(within(banner).getByRole('link', { name: 'Answer' })).toHaveAttribute('href', `/runs/${newer}`);
 
       const history = screen.getByRole('region', { name: 'Run History' });
       const rows = within(history).getAllByRole('row').slice(1);
@@ -250,9 +255,10 @@ describe('WorkflowDetailPage', () => {
       await runsApi.cancelRun(older);
       await runsApi.cancelRun(newer);
 
-      const latest = await screen.findByRole('region', { name: 'Latest run' }, { timeout: 8000 });
-      expect(within(latest).getByText('Completed')).toBeTruthy();
-      expect(within(latest).queryByText(/more running/)).toBeNull();
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Active run' })).toBeNull(), {
+        timeout: 8000,
+      });
+      expect(screen.queryByRole('region', { name: 'Latest run' })).toBeNull();
     }, 20000);
   });
 });

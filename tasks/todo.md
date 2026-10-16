@@ -269,16 +269,16 @@ for the featured run only, keyed on its id and `pending_questions`.
 The banner replaces the old featured-run card.
 
 **Acceptance criteria:**
-- [ ] The component cases pass: hidden (no active run, no space reserved), running, needs-you
+- [x] The component cases pass: hidden (no active run, no space reserved), running, needs-you
   gallery, needs-you approval, a failed questions fetch (drops "Paused at", button **Open
   Run**), a missing `node_id`, and "+ N more running".
-- [ ] The landmark is `section[aria-label="Active run"]`. The text on the accent tint is at
+- [x] The landmark is `section[aria-label="Active run"]`. The text on the accent tint is at
   least 4.5:1 in light and dark, checked through the existing `contrast` test helpers.
-- [ ] The old card and its `RunMetaList` are gone from the page. The active run stays reachable
+- [x] The old card and its `RunMetaList` are gone from the page. The active run stays reachable
   from the banner.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/ActiveRunBanner.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/ActiveRunBanner.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
 
 **Dependencies:** Tasks 4 and 6
 

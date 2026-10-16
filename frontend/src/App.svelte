@@ -186,11 +186,9 @@
       {/await}
     </div>
   {:else if workflowPageType === 'detail' && workflowId}
-    <div class="max-w-6xl mx-auto p-8">
-      {#key workflowId}
-        <WorkflowDetailPage {workflowId} />
-      {/key}
-    </div>
+    {#key workflowId}
+      <WorkflowDetailPage {workflowId} />
+    {/key}
   {:else if runId}
     <!-- Run Detail View: EventLog + QuestionCard -->
     <div class="max-w-6xl mx-auto p-8">

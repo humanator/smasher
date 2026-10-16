@@ -89,6 +89,7 @@ const DASHBOARD_PAIRS: [string | typeof ACCENT_TEXT, string, string][] = [
   ['secondary-foreground', 'secondary', 'card'], // Running / Completed / Aborted / Key saved badges
   ['secondary-foreground', 'secondary', 'muted'],
   ['primary-foreground', 'primary', 'card'], // Needs you badge, banner button
+  ['primary-foreground', 'primary', 'primary-subtle'], // Needs you badge on the workflow page's active-run banner
   ['destructive', 'destructive-subtle', 'card'], // Failed badge
   ['destructive', 'destructive-subtle', 'muted'],
   ['foreground', 'card', 'card'], // outline badges: No runs yet, No key
