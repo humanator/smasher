@@ -43,7 +43,7 @@
   // it's one line per run under the column headers.
   const GRID = $derived(
     columns === 'workflow'
-      ? 'md:grid md:grid-cols-[110px_minmax(0,1fr)_110px_110px] md:items-center md:gap-3 px-3'
+      ? 'md:grid md:grid-cols-[110px_minmax(0,1fr)_180px_110px] md:items-center md:gap-3 px-3'
       : 'md:grid md:grid-cols-[130px_minmax(0,1fr)_170px_120px] md:items-center md:gap-3 px-3'
   );
   const ROW = $derived(`${GRID} flex flex-wrap items-center gap-x-3 gap-y-0.5`);
@@ -86,7 +86,7 @@
             {/if}
           </span>
           <span class="basis-full md:hidden" aria-hidden="true"></span>
-          <span role="cell">
+          <span role="cell" class="min-w-0 truncate">
             <!-- The run id is the link; its ::after stretches over the whole row. -->
             <a
               id="run-link-{run.id}"
