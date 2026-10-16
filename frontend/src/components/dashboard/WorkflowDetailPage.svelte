@@ -11,7 +11,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { formatWorkflowName } from '$lib/utils';
   import { usePageActions, usePageTitle } from '$lib/page-header.svelte';
-  import RunDialog from './RunDialog.svelte';
+  import LazyRunDialog from './LazyRunDialog.svelte';
   import RunMetaList from './RunMetaList.svelte';
   import RunTable from './RunTable.svelte';
   import StatusBadge from './StatusBadge.svelte';
@@ -139,6 +139,6 @@
       {/if}
     </section>
 
-    <RunDialog {workflow} bind:open={runDialogOpen} />
+    <LazyRunDialog {workflow} bind:open={runDialogOpen} />
   {/if}
 </div>

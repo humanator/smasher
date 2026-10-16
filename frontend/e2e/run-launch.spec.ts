@@ -7,7 +7,8 @@ async function openRunLaunchCheckDialog(page: Page) {
   await page.goto('/');
   const row = page.getByRole('row').filter({ hasText: 'run_launch_check.dot' });
   await row.getByRole('button', { name: 'Run…' }).click();
-  await expect(page.getByRole('heading', { name: 'Run “Run Launch Check”' })).toBeVisible();
+  // The Run sheet loads as its own chunk on first open; a cold dev server compiles it on demand.
+  await expect(page.getByRole('heading', { name: 'Run “Run Launch Check”' })).toBeVisible({ timeout: 15000 });
 }
 
 test('launches the typed brief, model and variable, then shows them on the run page', async ({

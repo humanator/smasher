@@ -9,6 +9,9 @@ const gateOnlyDot = readFileSync(join(process.cwd(), 'e2e', 'fixtures', 'gate_on
 
 // The library polls every 5s, so allow one full poll plus slack.
 const POLL = { timeout: 9000 };
+// The Run sheet and Settings load as their own chunks on first open, which a cold dev
+// server compiles on demand; under the full suite's load that can pass 5s.
+const LAZY = { timeout: 15000 };
 
 test('search filters the workflows table by title and file name', async ({ page }) => {
   await page.goto('/');
@@ -36,7 +39,7 @@ test('Run… opens the run sheet, launches, and lands on the new run', async ({ 
     await row.getByRole('button', { name: 'Run…' }).click();
 
     const sheet = page.getByRole('dialog');
-    await expect(sheet.getByRole('heading', { name: 'Run “Run Launch Check”' })).toBeVisible();
+    await expect(sheet.getByRole('heading', { name: 'Run “Run Launch Check”' })).toBeVisible(LAZY);
     await sheet.getByLabel('Brief').fill('dashboard e2e');
     await sheet.getByRole('button', { name: 'Start Run' }).click();
 
@@ -186,13 +189,13 @@ test.describe('at phone width', () => {
 
     await page.getByRole('searchbox', { name: 'Search workflows' }).fill('run_launch_check');
     await workflows.getByRole('button', { name: 'Run…' }).first().click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible(LAZY);
     await expectNoSidewaysScroll(page, 'Run sheet open');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();
 
     await page.getByRole('button', { name: 'AI model settings' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible(LAZY);
     await expectNoSidewaysScroll(page, 'Settings open');
   });
 });

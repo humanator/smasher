@@ -13,7 +13,7 @@
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import AppShell from './components/shell/AppShell.svelte';
-  import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
+  import LazySettingsDialog from './components/dashboard/LazySettingsDialog.svelte';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
   import { ModeWatcher } from 'mode-watcher';
   import { providePageHeader } from '$lib/page-header.svelte';
@@ -147,7 +147,7 @@
   {@render pageHeader.actions?.()}
   <!-- The dashboard places its own settings button, between Import and New workflow. -->
   {#if !isCatalog}
-    <SettingsDialog />
+    <LazySettingsDialog />
   {/if}
 {/snippet}
 

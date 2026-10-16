@@ -18,9 +18,9 @@
   import { libraryStore } from '../../stores/library.svelte';
   import ToolbarIconButton from '../shell/ToolbarIconButton.svelte';
   import NeedsYouBanner from './NeedsYouBanner.svelte';
-  import RunDialog from './RunDialog.svelte';
+  import LazyRunDialog from './LazyRunDialog.svelte';
+  import LazySettingsDialog from './LazySettingsDialog.svelte';
   import RunList from './RunList.svelte';
-  import SettingsDialog from './SettingsDialog.svelte';
   import WorkflowTable from './WorkflowTable.svelte';
 
   let { library = libraryStore }: { library?: typeof libraryStore } = $props();
@@ -115,6 +115,6 @@
 </div>
 
 {#if runTarget}
-  <RunDialog workflow={runTarget} bind:open={runDialogOpen} />
+  <LazyRunDialog workflow={runTarget} bind:open={runDialogOpen} />
 {/if}
-<SettingsDialog bind:open={settingsOpen} trigger={false} />
+<LazySettingsDialog bind:open={settingsOpen} trigger={false} />
