@@ -2,7 +2,7 @@
 // ABOUTME: Covers linear, looping, parallel, unreachable, multi-exit, self-loop and empty graphs
 
 import { describe, it, expect } from 'vitest';
-import { orderSteps, stepLabel } from '../../src/lib/workflowSteps';
+import { describeLoops, orderSteps, stepLabel } from '../../src/lib/workflowSteps';
 import type { EditorEdge, EditorGraph, EditorNode } from '../../src/lib/api/workflows';
 
 function node(id: string, node_type = 'Codergen', label?: string): EditorNode {
@@ -184,5 +184,81 @@ describe('stepLabel', () => {
 
   it('calls a start step with neither label nor id "Start"', () => {
     expect(stepLabel(node('', 'Start'))).toBe('Start');
+  });
+});
+
+describe('describeLoops', () => {
+  const nodes = [
+    node('start', 'Start'),
+    node('draft', 'Codergen', 'Draft three concepts'),
+    node('lint', 'Tool', 'Check against design system'),
+    node('critique', 'Tool', 'Usability critique'),
+    node('checks', 'Conditional', 'Did the checks pass?'),
+    node('done', 'Exit', 'Done'),
+  ];
+  const chain = [
+    edge('start', 'draft'),
+    edge('draft', 'lint'),
+    edge('lint', 'critique'),
+    edge('critique', 'checks'),
+    edge('checks', 'done'),
+  ];
+
+  function describe_(extra: EditorEdge[], graphNodes = nodes): string {
+    const graph: EditorGraph = { nodes: graphNodes, edges: [...chain, ...extra] };
+    return describeLoops(graph, orderSteps(graph));
+  }
+
+  it('says only "The steps in order." when nothing loops', () => {
+    expect(describe_([])).toBe('The steps in order.');
+  });
+
+  it('explains a labelled loop back to the first step', () => {
+    expect(describe_([edge('checks', 'draft', { label: 'No' })])).toBe(
+      'The steps in order. If “Did the checks pass?” says no, the workflow goes back to the first step and tries again.'
+    );
+  });
+
+  it('names a middle step it loops back to and words an unlabelled loop', () => {
+    expect(describe_([edge('checks', 'lint')])).toBe(
+      'The steps in order. After “Did the checks pass?”, the workflow can go back to “Check against design system” and try again.'
+    );
+  });
+
+  it('keeps an all-capitals label as written', () => {
+    expect(describe_([edge('checks', 'draft', { label: 'FAIL' })])).toBe(
+      'The steps in order. If “Did the checks pass?” says FAIL, the workflow goes back to the first step and tries again.'
+    );
+  });
+
+  it('treats a blank label as no label', () => {
+    expect(describe_([edge('checks', 'lint', { label: ' ' })])).toContain('After “Did the checks pass?”');
+  });
+
+  it('names steps through stepLabel, so an unlabelled step reads as its id', () => {
+    const unlabelled = nodes.map((n) => (n.id === 'checks' ? node('checks', 'Conditional') : n));
+    expect(describe_([edge('checks', 'lint')], unlabelled)).toContain('After “checks”,');
+  });
+
+  it('collapses loops after the third into one sentence, singular', () => {
+    const text = describe_([
+      edge('lint', 'draft'),
+      edge('critique', 'draft'),
+      edge('checks', 'draft'),
+      edge('checks', 'lint', { label: 'retry' }),
+    ]);
+    expect(text.match(/go(es)? back to/g)).toHaveLength(3);
+    expect(text.endsWith(' It can also loop back from 1 other step.')).toBe(true);
+  });
+
+  it('collapses loops after the third into one sentence, plural', () => {
+    const text = describe_([
+      edge('lint', 'draft'),
+      edge('critique', 'draft'),
+      edge('checks', 'draft'),
+      edge('critique', 'lint'),
+      edge('checks', 'lint'),
+    ]);
+    expect(text.endsWith(' It can also loop back from 2 other steps.')).toBe(true);
   });
 });

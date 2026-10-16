@@ -103,3 +103,30 @@ function findBackEdges(
   for (const n of nodes) if (!done.has(n.id)) visit(n.id);
   return back;
 }
+
+const MAX_LOOP_SENTENCES = 3;
+
+/**
+ * The step list's intro: "The steps in order." plus one plain sentence per
+ * loop-back edge. Past three, the rest collapse into a count of the steps
+ * they loop back from.
+ */
+export function describeLoops(graph: EditorGraph, order: OrderedSteps): string {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const name = (id: string) => `“${stepLabel(byId.get(id)!)}”`;
+  const firstStep = order.steps.find((n) => n.node_type !== 'Start');
+
+  const sentences = order.backEdges.slice(0, MAX_LOOP_SENTENCES).map((e) => {
+    const to = e.to === firstStep?.id ? 'the first step' : name(e.to);
+    const label = e.label?.trim();
+    if (!label) return `After ${name(e.from)}, the workflow can go back to ${to} and try again.`;
+    const says = label === label.toUpperCase() ? label : label.toLowerCase();
+    return `If ${name(e.from)} says ${says}, the workflow goes back to ${to} and tries again.`;
+  });
+
+  const others = new Set(order.backEdges.slice(MAX_LOOP_SENTENCES).map((e) => e.from)).size;
+  if (others > 0) {
+    sentences.push(`It can also loop back from ${others} other step${others === 1 ? '' : 's'}.`);
+  }
+  return ['The steps in order.', ...sentences].join(' ');
+}

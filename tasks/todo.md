@@ -94,13 +94,13 @@ intro:
 The quotes are typographic (“ ”).
 
 **Acceptance criteria:**
-- [ ] The cases pass: no loops, a labelled loop to the first step, an unlabelled loop to a
+- [x] The cases pass: no loops, a labelled loop to the first step, an unlabelled loop to a
   middle step, an all-capitals label, and more than three loops (singular and plural "step").
-- [ ] It reads labels through `stepLabel`, so the step list and the intro name steps the same
+- [x] It reads labels through `stepLabel`, so the step list and the intro name steps the same
   way.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/workflowSteps.test.ts`
+- [x] `npm run test -- --run tests/lib/workflowSteps.test.ts`
 
 **Dependencies:** Task 1
 
