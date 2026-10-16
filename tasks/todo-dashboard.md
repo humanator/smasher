@@ -44,16 +44,16 @@ convert it with `SystemTime::now() - created_at.elapsed()`. Rehydrated and new-r
 report `None`. Mirror the field in TypeScript.
 
 **Acceptance criteria:**
-- [ ] No questions gives `null`. Two questions give the older one's time (±1 s). Once both are
+- [x] No questions gives `null`. Two questions give the older one's time (±1 s). Once both are
   answered, it's `null` again.
-- [ ] An old summary JSON without the field deserialises to `None`.
-- [ ] `RunSummary` in `frontend/src/lib/api/runs.ts` has `waiting_since: string | null`, and
+- [x] An old summary JSON without the field deserialises to `None`.
+- [x] `RunSummary` in `frontend/src/lib/api/runs.ts` has `waiting_since: string | null`, and
   the test fixtures are updated.
 
 **Verification:**
-- [ ] `cargo test -p smasher-web waiting_since`
-- [ ] `npm run test -- --run tests/lib/api` (a live gate shows a non-null `waiting_since`)
-- [ ] clippy and fmt are clean
+- [x] `cargo test -p smasher-web waiting_since`
+- [x] `npm run test -- --run tests/lib/api` (a live gate shows a non-null `waiting_since`)
+- [x] clippy and fmt are clean
 
 **Dependencies:** None
 

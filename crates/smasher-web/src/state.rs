@@ -154,6 +154,10 @@ pub struct RunSummary {
     /// Questions the run is currently blocked on. Drives the SPA's "Needs you".
     #[serde(default)]
     pub pending_questions: u32,
+    /// When the oldest pending question was raised (RFC3339 UTC), or `None`
+    /// when nothing is waiting. Drives the SPA's needs-you banner.
+    #[serde(default)]
+    pub waiting_since: Option<String>,
 }
 
 impl RunRecord {
@@ -179,7 +183,16 @@ impl RunRecord {
             workflow_id: self.workflow_id.clone(),
             gallery_gates: self.gallery_gates(),
             pending_questions: self.interviewer.queue().len() as u32,
+            waiting_since: self.waiting_since(),
         }
+    }
+
+    /// The oldest pending question's creation time on the wall clock. The queue
+    /// stores monotonic `Instant`s, so convert via the time elapsed since then.
+    fn waiting_since(&self) -> Option<String> {
+        let created_at = self.interviewer.queue().oldest_created_at()?;
+        let wall = std::time::SystemTime::now().checked_sub(created_at.elapsed())?;
+        Some(DateTime::<Utc>::from(wall).to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
     }
 
     fn gallery_gates(&self) -> Vec<String> {
@@ -239,6 +252,7 @@ mod tests {
             workflow_id: None,
             gallery_gates: vec![],
             pending_questions: 0,
+            waiting_since: None,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["id"], "test-123");
@@ -261,6 +275,7 @@ mod tests {
             workflow_id: None,
             gallery_gates: vec![],
             pending_questions: 0,
+            waiting_since: None,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["error"], "node X failed");
@@ -316,6 +331,81 @@ mod tests {
 
         record.interviewer.queue().take(&id);
         assert_eq!(record.to_summary().pending_questions, 0);
+    }
+
+    fn pending(
+        id: &str,
+        created_at: std::time::Instant,
+    ) -> smasher_attractor::http_interviewer::PendingQuestion {
+        smasher_attractor::http_interviewer::PendingQuestion {
+            id: id.into(),
+            question: "Proceed?".into(),
+            choices: vec![],
+            kind: smasher_attractor::http_interviewer::QuestionKind::Approval,
+            created_at,
+            node_id: None,
+            answer_tx: None,
+        }
+    }
+
+    fn parse_rfc3339(s: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc)
+    }
+
+    #[test]
+    fn waiting_since_is_none_without_pending_questions() {
+        let record = make_test_record(RunStatus::Running, None, None);
+        assert!(record.to_summary().waiting_since.is_none());
+    }
+
+    #[test]
+    fn waiting_since_reports_the_oldest_pending_question() {
+        use std::time::{Duration, Instant};
+        let record = make_test_record(RunStatus::Running, None, None);
+        let queue = record.interviewer.queue();
+        queue.push(pending("q-new", Instant::now() - Duration::from_secs(30)));
+        queue.push(pending("q-old", Instant::now() - Duration::from_secs(300)));
+
+        let since = record
+            .to_summary()
+            .waiting_since
+            .expect("waiting_since set");
+        let expected = Utc::now() - chrono::Duration::seconds(300);
+        let drift = (parse_rfc3339(&since) - expected).num_milliseconds().abs();
+        assert!(drift <= 1000, "waiting_since {since} drifted {drift} ms");
+
+        queue.take("q-new");
+        queue.take("q-old");
+        assert!(record.to_summary().waiting_since.is_none());
+    }
+
+    #[test]
+    fn waiting_since_serialises_as_rfc3339_utc() {
+        let record = make_test_record(RunStatus::Running, None, None);
+        record
+            .interviewer
+            .queue()
+            .push(pending("q1", std::time::Instant::now()));
+        let since = record.to_summary().waiting_since.unwrap();
+        assert!(since.ends_with('Z'), "expected UTC 'Z' suffix, got {since}");
+    }
+
+    #[test]
+    fn run_summary_without_waiting_since_deserializes_to_none() {
+        let json = serde_json::json!({
+            "id": "r1",
+            "status": "Running",
+            "started_at": "2025-01-01T00:00:00Z",
+            "completed_at": null,
+            "graph_name": null,
+            "error": null,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "run_working_dir": null,
+            "workflow_id": null,
+        });
+        let summary: RunSummary = serde_json::from_value(json).unwrap();
+        assert!(summary.waiting_since.is_none());
     }
 
     #[test]

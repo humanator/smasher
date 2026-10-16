@@ -21,6 +21,7 @@ export interface RunSummary {
   workflow_id: string | null;
   gallery_gates: string[];
   pending_questions: number;
+  waiting_since: string | null;
 }
 
 export interface ListRunsResponse {

@@ -71,7 +71,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Phase 1: Foundation (pure logic + API; T1–T4 can run in parallel)
 
-- [ ] Task 1: `waiting_since` on `RunSummary`
+- [x] Task 1: `waiting_since` on `RunSummary`
 - [ ] Task 2: `timeFormat.ts`: when, duration, waiting
 - [ ] Task 3: `runStatus.ts`: `runGroup`, `statusBadge`, `workflowStatus`; `StatusBadge` uses it
 - [ ] Task 4: `questionKind.ts` and `runFilter.ts`

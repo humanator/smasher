@@ -255,10 +255,13 @@ describe('runs API client - pending_questions', () => {
       await waitForPending(run_id, 1);
       const listed = (await runs.listRuns()).runs.find((r) => r.id === run_id);
       expect(listed?.pending_questions).toBe(1);
+      expect(listed?.waiting_since).toEqual(expect.any(String));
+      expect(Math.abs(Date.parse(listed!.waiting_since!) - Date.now())).toBeLessThan(60_000);
 
       const { questions: pending } = await questions.listQuestions(run_id);
       await questions.answerQuestion(run_id, pending[0].id, 'yes');
       await waitForPending(run_id, 0);
+      expect((await runs.getRun(run_id)).waiting_since).toBeNull();
     } finally {
       await runs.cancelRun(run_id).catch(() => {});
     }
