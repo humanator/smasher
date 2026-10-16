@@ -21,10 +21,10 @@ updated: 2026-10-16T10:50:58Z
 
 ## Automated gates
 
-These are shared with [VERIFICATION-shell-theme.md](VERIFICATION-shell-theme.md). All pass
-except two e2e failures. `candidate-preview.spec.ts:81` is a known Chromium-build mismatch in
-the container. `dashboard.spec.ts:34` flakes under 2 workers and passed when re-run alone.
-Desktop clippy is unchecked because there's no GTK here.
+These are shared with [VERIFICATION-shell-theme.md](VERIFICATION-shell-theme.md). All pass.
+`candidate-preview.spec.ts:81` fails only in the container, because of its Chromium build, and
+passes on Simon's Mac. `dashboard.spec.ts:34` flakes under 2 workers and passed when re-run
+alone. Desktop clippy passes on Simon's Mac.
 
 ## Manual checklist
 

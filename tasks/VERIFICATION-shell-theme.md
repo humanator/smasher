@@ -24,16 +24,16 @@ Run in the cloud container at `fb5061e`.
 - vitest: pass (1101 passed, 1 skipped)
 - build:check: pass (12 chunks, all under 500 kB)
 - e2e (non-LLM): 28 passed, 2 failed, 1 skipped (the LLM-spending critical path)
-  - `candidate-preview.spec.ts:81`: fails, environment. The lightbox iframe click times out
-    with "`<html>` intercepts pointer events". It also fails on `bc232c7`, and it's already
-    logged in `tasks/todo-dashboard.md` "Not this module". Likely cause: this container has
-    Chromium build 1194, but Playwright 1.63 expects 1243.
+  - `candidate-preview.spec.ts:81`: fails in the container only. The lightbox iframe click
+    times out with "`<html>` intercepts pointer events", and it also fails on `bc232c7`. It
+    **passes on Simon's Mac** (1 passed, 5.4 s) with Playwright's matching Chromium, which
+    confirms the container's Chromium build 1194 (Playwright 1.63 expects 1243) is the cause.
   - `dashboard.spec.ts:34` (Run… opens the run sheet): failed with 2 workers and passed when
     re-run alone. It flakes under parallel load.
 - cargo test -p smasher-web: pass (212 tests)
-- cargo clippy --workspace --exclude smasher-desktop -D warnings: pass. `smasher-desktop` can't
-  build here because the GTK system libraries (`gdk-sys`) are missing, so desktop clippy is
-  unchecked.
+- cargo clippy --workspace --exclude smasher-desktop -D warnings: pass in the container.
+- cargo clippy -p smasher-desktop -D warnings: pass on Simon's Mac. The container can't build
+  it because the GTK system libraries (`gdk-sys`) are missing.
 
 ## Manual checklist
 
