@@ -362,14 +362,14 @@ change. Update `run-launch.spec.ts`.
 The browser shows Defaults only, with no tab strip. Loading and saving don't change.
 
 **Acceptance criteria:**
-- [ ] In the browser (`isTauri` false) there's no tablist and no Keychain text. On desktop
+- [x] In the browser (`isTauri` false) there's no tablist and no Keychain text. On desktop
   (mocked) there are three tabs, navigable with the arrow keys.
-- [ ] No "restart" text appears anywhere in the dialog.
-- [ ] Saving the defaults still makes the `PUT /api/settings` call, and the existing
+- [x] No "restart" text appears anywhere in the dialog.
+- [x] Saving the defaults still makes the `PUT /api/settings` call, and the existing
   `SettingsDialog` tests pass or are updated, never deleted.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/SettingsDialog.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/SettingsDialog.test.ts`
 
 **Dependencies:** T0
 

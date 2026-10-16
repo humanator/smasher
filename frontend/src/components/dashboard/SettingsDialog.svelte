@@ -1,16 +1,20 @@
 <script lang="ts">
-  // ABOUTME: Settings modal: the default provider/model for new runs, plus (desktop only) API keys, base URLs and the Claude CLI
+  // ABOUTME: The Settings window: Defaults (provider/model for new runs), plus Services and Claude CLI tabs in the desktop app
   // ABOUTME: The default goes through PUT /api/settings; desktop keys go to the Keychain via Tauri commands and never come back
 
   import { untrack } from 'svelte';
   import SettingsIcon from '@lucide/svelte/icons/settings';
+  import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+  import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
+  import XIcon from '@lucide/svelte/icons/x';
+  import * as Tabs from '$lib/components/ui/tabs/index.js';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import { getSettings, putSettings, type LlmDefaults } from '$lib/api/settings';
-  import ModelPicker from '../node-editor/nodeForms/ModelPicker.svelte';
+  import DefaultsSection from './settings/DefaultsSection.svelte';
   import {
     getLlmSettings,
     saveLlmSettings,
@@ -63,11 +67,15 @@
   let defaultAllowedTools = $state<string[]>([]);
   let detection = $state<ClaudeCliDetection | null>(null);
 
-  const SOURCE_TEXT: Record<LlmDefaults['source'], string> = {
-    settings: 'Saved in the settings file.',
-    env: 'Set by the SMASHER_MODEL / SMASHER_PROVIDER environment variables.',
-    default: 'The built-in default.',
-  };
+  type Section = 'defaults' | 'services' | 'cli';
+  const SECTIONS: { value: Section; label: string; icon: typeof SettingsIcon }[] = [
+    { value: 'defaults', label: 'Defaults', icon: SettingsIcon },
+    { value: 'services', label: 'Services', icon: KeyRoundIcon },
+    { value: 'cli', label: 'Claude CLI', icon: SquareTerminalIcon },
+  ];
+  let section = $state<Section>('defaults');
+  // The browser has only the defaults, so the window is just "Settings" there.
+  const title = $derived(desktop ? SECTIONS.find((s) => s.value === section)!.label : 'Settings');
 
   function pick(patch: { provider?: string; model?: string }) {
     if ('provider' in patch) pickedProvider = patch.provider ?? '';
@@ -113,6 +121,7 @@
 
   async function load() {
     loading = true;
+    section = 'defaults';
     saved = false;
     error = null;
     try {
@@ -189,43 +198,91 @@
       {/snippet}
     </Dialog.Trigger>
   {/if}
-  <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-    <Dialog.Header>
-      <Dialog.Title>Settings</Dialog.Title>
-      <Dialog.Description>
-        {#if desktop}
-          API keys are stored in the macOS Keychain. Changes apply to new runs; runs already
-          started keep what they had.
-        {:else}
-          The default for new runs. API keys come from the server's environment or <code>.env</code>
-          file, not from this page.
-        {/if}
-      </Dialog.Description>
-    </Dialog.Header>
-
-    {#if loading}
-      <p class="text-muted-foreground">Loading…</p>
+  <Dialog.Content
+    showCloseButton={false}
+    class="flex max-h-[90vh] flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-[620px]"
+  >
+    {#if desktop}
+      <Tabs.Root bind:value={section} class="flex min-h-0 flex-1 flex-col gap-0">
+        {@render window(true)}
+      </Tabs.Root>
     {:else}
-      <form class="grid gap-6" onsubmit={save}>
-        <div class="grid gap-3">
-          <h3 class="text-sm font-semibold">Default model</h3>
-          {#key pickerKey}
-            <ModelPicker
-              idPrefix="settings"
-              blankLabel="Choose a provider…"
-              provider={defaults?.provider ?? undefined}
-              model={defaults?.model}
-              onChange={pick}
-            />
-          {/key}
-          {#if defaults}
-            <p class="text-xs text-muted-foreground" data-testid="settings-source">
-              {SOURCE_TEXT[defaults.source]}
-            </p>
-          {/if}
-        </div>
+      {@render window(false)}
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
 
-        {#if desktop}
+{#snippet window(tabs: boolean)}
+  <header class="shrink-0 border-b border-border bg-muted px-3 pt-2 pb-1.5">
+    <div class="relative flex h-7 items-center justify-center">
+      <Dialog.Close>
+        {#snippet child({ props })}
+          <Button variant="ghost" size="icon-sm" class="absolute left-0" aria-label="Close settings" {...props}>
+            <XIcon />
+          </Button>
+        {/snippet}
+      </Dialog.Close>
+      <Dialog.Title class="text-[13px] font-semibold">{title}</Dialog.Title>
+    </div>
+    {#if tabs}
+      <Tabs.List aria-label="Settings sections" class="mx-auto mt-1 flex gap-1 bg-transparent p-0">
+        {#each SECTIONS as s (s.value)}
+          <Tabs.Trigger
+            value={s.value}
+            class="h-auto min-w-[72px] flex-none flex-col gap-0.5 rounded-md px-2 pt-1.5 pb-1 text-[11px] text-foreground/80 data-active:bg-foreground/7 data-active:font-normal data-active:text-primary data-active:shadow-none dark:data-active:bg-white/10"
+          >
+            <s.icon class="size-[22px]" strokeWidth={1.7} aria-hidden="true" />
+            {s.label}
+          </Tabs.Trigger>
+        {/each}
+      </Tabs.List>
+    {/if}
+  </header>
+
+  {#if loading}
+    <p class="px-5 py-6 text-muted-foreground">Loading…</p>
+  {:else}
+    <form class="flex min-h-0 flex-1 flex-col" onsubmit={save}>
+      <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        {#if tabs}
+          <Tabs.Content value="defaults">{@render defaultsSection()}</Tabs.Content>
+          <Tabs.Content value="services" class="grid gap-4">{@render servicesSection()}</Tabs.Content>
+          <Tabs.Content value="cli" class="grid gap-4">{@render cliSection()}</Tabs.Content>
+        {:else}
+          {@render defaultsSection()}
+        {/if}
+
+        {#if error}
+          <p role="alert" class="mt-4 text-sm text-destructive">{error}</p>
+        {/if}
+      </div>
+
+      <footer class="flex shrink-0 items-center gap-3 border-t border-border px-5 py-3">
+        {#if saved}
+          <p class="mr-auto text-sm" role="status">Saved. Changes apply to the next run.</p>
+        {:else if desktop && settingsPath}
+          <p class="mr-auto truncate text-xs text-muted-foreground" title={settingsPath}>{settingsPath}</p>
+        {/if}
+        <Button type="submit" class="ml-auto" disabled={saving || (!desktop && !dirty)}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </footer>
+    </form>
+  {/if}
+{/snippet}
+
+{#snippet defaultsSection()}
+  <DefaultsSection
+    provider={pickedProvider}
+    model={pickedModel}
+    source={defaults?.source ?? null}
+    {pickerKey}
+    {desktop}
+    onPick={pick}
+  />
+{/snippet}
+
+{#snippet servicesSection()}
         {#each providers as p (p.id)}
           <fieldset class="grid gap-3 border-t border-border pt-4">
             <legend class="text-sm font-semibold">{p.label}</legend>
@@ -268,6 +325,9 @@
           </fieldset>
         {/each}
 
+{/snippet}
+
+{#snippet cliSection()}
         <fieldset class="grid gap-3 border-t border-border pt-4">
           <legend class="text-sm font-semibold">Claude CLI</legend>
           <p class="text-xs text-muted-foreground">
@@ -319,23 +379,4 @@
             </p>
           </div>
         </fieldset>
-        {/if}
-
-        {#if error}
-          <p role="alert" class="text-sm text-destructive">{error}</p>
-        {/if}
-
-        <Dialog.Footer class="items-center">
-          {#if saved}
-            <p class="mr-auto text-sm" role="status">Saved. New runs use these settings.</p>
-          {:else if desktop && settingsPath}
-            <p class="mr-auto truncate text-xs text-muted-foreground" title={settingsPath}>{settingsPath}</p>
-          {/if}
-          <Button type="submit" disabled={saving || (!desktop && !dirty)}>
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-        </Dialog.Footer>
-      </form>
-    {/if}
-  </Dialog.Content>
-</Dialog.Root>
+{/snippet}

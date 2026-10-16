@@ -19,6 +19,11 @@
     models: providedModels,
     idPrefix,
     blankLabel = 'Server default',
+    providerLabel = 'Provider',
+    modelLabel = 'Model',
+    providerHint,
+    modelHint,
+    layout = 'stack',
   }: {
     provider?: string;
     model?: string;
@@ -29,6 +34,13 @@
     idPrefix: string;
     /** Label of the option that clears the provider (and so the model). */
     blankLabel?: string;
+    providerLabel?: string;
+    modelLabel?: string;
+    /** Help under each field's label, read out as the field's description. */
+    providerHint?: string;
+    modelHint?: string;
+    /** 'rows' puts each label and hint beside its field, as in a settings window. */
+    layout?: 'stack' | 'rows';
   } = $props();
   const uid = $props.id();
 
@@ -66,19 +78,33 @@
     onChange({ provider: value || undefined, model: modelAttr || undefined });
   }
 
+  // Label and hint on the left, the field on the right; stacks on narrow screens.
+  const ROW =
+    'grid grid-cols-1 items-center gap-2 border-b border-border py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_230px] sm:gap-4';
+
   function handleModelChange(event: Event) {
     modelAttr = (event.target as HTMLSelectElement | HTMLInputElement).value;
     onChange({ model: modelAttr || undefined });
   }
 </script>
 
-<div class="flex flex-col gap-3" data-testid="{idPrefix}-model-picker">
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-provider">Provider</Label>
+{#snippet fieldLabel(id: string, text: string, hint: string | undefined)}
+  <div class="flex flex-col gap-0.5">
+    <Label for={id}>{text}</Label>
+    {#if hint}
+      <p id="{id}-hint" class="m-0 text-xs text-muted-foreground">{hint}</p>
+    {/if}
+  </div>
+{/snippet}
+
+<div class="flex flex-col {layout === 'rows' ? 'gap-0' : 'gap-3'}" data-testid="{idPrefix}-model-picker">
+  <div class={layout === 'rows' ? ROW : 'flex flex-col gap-1.5'}>
+    {@render fieldLabel(`${uid}-provider`, providerLabel, providerHint)}
     <NativeSelect.Root
       id="{uid}-provider"
       class="w-full"
       data-testid="{idPrefix}-provider"
+      aria-describedby={providerHint ? `${uid}-provider-hint` : undefined}
       value={shownProvider}
       onchange={handleProviderChange}
     >
@@ -88,13 +114,14 @@
       {/each}
     </NativeSelect.Root>
   </div>
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-model">Model</Label>
+  <div class={layout === 'rows' ? ROW : 'flex flex-col gap-1.5'}>
+    {@render fieldLabel(`${uid}-model`, modelLabel, modelHint)}
     {#if freeText}
       <Input
         id="{uid}-model"
         type="text"
         data-testid="{idPrefix}-model"
+        aria-describedby={modelHint ? `${uid}-model-hint` : undefined}
         value={modelAttr}
         oninput={handleModelChange}
         placeholder="model name"
@@ -104,6 +131,7 @@
         id="{uid}-model"
         class="w-full"
         data-testid="{idPrefix}-model"
+        aria-describedby={modelHint ? `${uid}-model-hint` : undefined}
         value={modelAttr}
         onchange={handleModelChange}
       >
