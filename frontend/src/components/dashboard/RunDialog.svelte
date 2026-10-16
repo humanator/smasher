@@ -101,21 +101,16 @@
         </p>
       </div>
 
-      <fieldset class="grid gap-1.5" aria-describedby="run-model-hint">
-        <legend class="mb-1.5 text-[13px] font-medium">Model</legend>
-        {#key pickerKey}
-          <ModelPicker
-            idPrefix="run"
-            provider={values.provider}
-            model={values.model}
-            blankLabel="Default model"
-            onChange={pickModel}
-          />
-        {/key}
-        <p id="run-model-hint" class="text-xs text-muted-foreground">
-          Which AI model to use for this run. Leave blank to use your default model from Settings.
-        </p>
-      </fieldset>
+      {#key pickerKey}
+        <ModelPicker
+          idPrefix="run"
+          provider={values.provider}
+          model={values.model}
+          blankLabel="Default model"
+          modelHint="Which AI model to use for this run. Leave blank to use your default model from Settings."
+          onChange={pickModel}
+        />
+      {/key}
 
       <div class="grid gap-1.5">
         <Label for="run-variables">Extra values</Label>

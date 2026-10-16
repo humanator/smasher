@@ -112,8 +112,12 @@ describe('RunDialog', () => {
       'e.g. Three concepts for a mobile checkout that feels calmer'
     );
     expect(field('Brief')).toHaveAccessibleDescription(/passed to the workflow as a value called “brief”/);
-    const model = screen.getByRole('group', { name: 'Model' });
-    expect(model).toHaveAccessibleDescription(/Leave blank to use your default model from Settings/);
+    // One "Model" label only: the picker's own Model field carries the design's hint.
+    expect(screen.getAllByText('Model', { exact: true })).toHaveLength(1);
+    expect(screen.queryByRole('group', { name: 'Model' })).toBeNull();
+    expect(screen.getByLabelText('Model')).toHaveAccessibleDescription(
+      'Which AI model to use for this run. Leave blank to use your default model from Settings.'
+    );
     expect((screen.getByLabelText('Provider') as HTMLSelectElement).value).toBe('');
     expect(screen.getByRole('option', { name: 'Default model' })).toBeTruthy();
     expect(field('Extra values').getAttribute('placeholder')).toBe('audience=first-time buyers');

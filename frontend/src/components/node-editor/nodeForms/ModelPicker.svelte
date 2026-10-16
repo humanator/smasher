@@ -88,13 +88,21 @@
   }
 </script>
 
+<!-- Rows put the hint under the label, beside the field; a stack puts it under the field,
+     like the other fields in a form. -->
 {#snippet fieldLabel(id: string, text: string, hint: string | undefined)}
   <div class="flex flex-col gap-0.5">
     <Label for={id}>{text}</Label>
-    {#if hint}
+    {#if hint && layout === 'rows'}
       <p id="{id}-hint" class="m-0 text-xs text-muted-foreground">{hint}</p>
     {/if}
   </div>
+{/snippet}
+
+{#snippet stackHint(id: string, hint: string | undefined)}
+  {#if hint && layout === 'stack'}
+    <p id="{id}-hint" class="m-0 text-xs text-muted-foreground">{hint}</p>
+  {/if}
 {/snippet}
 
 <div class="flex flex-col {layout === 'rows' ? 'gap-0' : 'gap-3'}" data-testid="{idPrefix}-model-picker">
@@ -113,6 +121,7 @@
         <NativeSelect.Option value={p.provider}>{p.label}</NativeSelect.Option>
       {/each}
     </NativeSelect.Root>
+    {@render stackHint(`${uid}-provider`, providerHint)}
   </div>
   <div class={layout === 'rows' ? ROW : 'flex flex-col gap-1.5'}>
     {@render fieldLabel(`${uid}-model`, modelLabel, modelHint)}
@@ -146,6 +155,7 @@
         {/if}
       </NativeSelect.Root>
     {/if}
+    {@render stackHint(`${uid}-model`, modelHint)}
   </div>
   {#if loadError}
     <p class="m-0 text-xs text-destructive" role="alert" data-testid="{idPrefix}-models-error">
