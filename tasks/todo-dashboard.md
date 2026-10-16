@@ -132,11 +132,11 @@ Then make `StatusBadge.svelte` render `statusBadge`.
   `needs-you` maps to `active` with `needsYouFirst: true`, and an unknown value maps to `all`.
 
 **Acceptance criteria:**
-- [ ] All four kinds plus an empty response are tested.
-- [ ] Every value of `?runs=` is tested, including a missing one and garbage.
+- [x] All four kinds plus an empty response are tested.
+- [x] Every value of `?runs=` is tested, including a missing one and garbage.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/questionKind.test.ts tests/lib/runFilter.test.ts`
+- [x] `npm run test -- --run tests/lib/questionKind.test.ts tests/lib/runFilter.test.ts`
 
 **Dependencies:** None
 
