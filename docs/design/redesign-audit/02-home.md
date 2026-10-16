@@ -1,3 +1,6 @@
+<!-- ABOUTME: Redesign gap audit section: Audit 02: Home (dashboard, Run sheet, Settings) vs `Home.dc.html`. -->
+<!-- ABOUTME: Findings carry file:line refs, board values and High/Med/Low severity; see README.md for the summary. -->
+
 # Audit 02: Home (dashboard, Run sheet, Settings) vs `Home.dc.html`
 
 Design source: `docs/design/redesign/Home.dc.html` (plus the primitive boards `Input`, `Textarea`,

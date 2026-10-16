@@ -1,3 +1,6 @@
+<!-- ABOUTME: Redesign gap audit section: 05 — Workflow editor audit (Main.dc.html vs `frontend/src/components/node-editor`). -->
+<!-- ABOUTME: Findings carry file:line refs, board values and High/Med/Low severity; see README.md for the summary. -->
+
 # 05 — Workflow editor audit (Main.dc.html vs `frontend/src/components/node-editor`)
 
 Design source: `docs/design/redesign/Main.dc.html` (abbreviated **M**). Implementation paths are relative to `frontend/src/`.

@@ -1,3 +1,6 @@
+<!-- ABOUTME: Redesign gap audit section: Audit 03: Workflow detail page vs `Workflow.dc.html`. -->
+<!-- ABOUTME: Findings carry file:line refs, board values and High/Med/Low severity; see README.md for the summary. -->
+
 # Audit 03: Workflow detail page vs `Workflow.dc.html`
 
 Design: `docs/design/redesign/Workflow.dc.html` (DH below, line numbers into that file).

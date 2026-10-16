@@ -1,3 +1,6 @@
+<!-- ABOUTME: Redesign gap audit section: Audit 01: tokens, primitives, and shell vs the redesign boards. -->
+<!-- ABOUTME: Findings carry file:line refs, board values and High/Med/Low severity; see README.md for the summary. -->
+
 # Audit 01: tokens, primitives, and shell vs the redesign boards
 
 Scope: `frontend/src/app.css` tokens; the 13 component boards plus `Sidebar.dc.html`; shell chrome in

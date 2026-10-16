@@ -1,3 +1,6 @@
+<!-- ABOUTME: Redesign gap audit section: Audit 04 — Run page vs `Run.dc.html`. -->
+<!-- ABOUTME: Findings carry file:line refs, board values and High/Med/Low severity; see README.md for the summary. -->
+
 # Audit 04 — Run page vs `Run.dc.html`
 
 Design: `docs/design/redesign/Run.dc.html` (markup lines 20–291, data/JS lines 294–495; scenarios
