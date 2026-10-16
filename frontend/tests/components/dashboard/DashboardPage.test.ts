@@ -52,7 +52,8 @@ describe('DashboardPage', () => {
 
     // examples/human_gate_showcase.dot is a real fixture in the workflow dir
     // the dev:backend server is configured against.
-    expect(await screen.findByText('Human Gate Showcase', {}, { timeout: 5000 })).toBeTruthy();
+    const table = screen.getByRole('table', { name: 'All workflows' });
+    expect(await within(table).findByText('Human Gate Showcase', {}, { timeout: 5000 })).toBeTruthy();
   });
 
   it("links each workflow's name to its page", async () => {
@@ -78,7 +79,7 @@ describe('DashboardPage', () => {
     it('filters the workflows table as you type', async () => {
       const user = userEvent.setup();
       renderPage();
-      await screen.findByText('Human Gate Showcase', {}, { timeout: 5000 });
+      await within(screen.getByRole('table', { name: 'All workflows' })).findByText('Human Gate Showcase', {}, { timeout: 5000 });
 
       await user.type(screen.getByRole('searchbox', { name: 'Search workflows' }), 'HUMAN_GATE_SHOW');
 

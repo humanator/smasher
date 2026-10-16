@@ -109,7 +109,7 @@
   />
 
   <div class="mt-7">
-    <RunList />
+    <RunList {library} />
   </div>
 </div>
 

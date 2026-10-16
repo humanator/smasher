@@ -90,8 +90,8 @@ describe('App dashboard layout', () => {
   it('renders the workflows table with its columns', async () => {
     render(App);
     // Scoped to main: the sidebar lists the same workflows and loads first.
-    await within(screen.getByRole('main')).findByText('Human Gate Showcase', {}, { timeout: 5000 });
     const table = screen.getByRole('table', { name: 'All workflows' });
+    await within(table).findByText('Human Gate Showcase', {}, { timeout: 5000 });
     const headerRow = within(table).getAllByRole('columnheader');
     expect(headerRow.map((th) => th.textContent?.trim())).toEqual(
       expect.arrayContaining(['Name', 'Status', 'Last activity', 'Location'])
