@@ -87,7 +87,7 @@ All ── T13 responsive + a11y ── T14 sign-off
   it into `App.svelte`
 - [x] Task 7: `RunList` filters, `?runs=` sync, durations; restyle `RunTable`
 - [x] Task 8: `NeedsYouBanner`
-- [ ] Task 9: `e2e/dashboard.spec.ts`, plus `app-shell.spec.ts` updates
+- [x] Task 9: `e2e/dashboard.spec.ts`, plus `app-shell.spec.ts` updates
 
 ### Checkpoint B: Dashboard works end to end
 

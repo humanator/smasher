@@ -1,4 +1,4 @@
-// ABOUTME: Run-summary E2E: a failed run's details and graph, and "unnamed" in the run list
+// ABOUTME: Run-summary E2E: a failed run's details and graph, and "Unnamed workflow" in the run list
 // ABOUTME: Uses the shared inline test graphs, which never reach an LLM
 
 import { test, expect } from '@playwright/test';
@@ -30,7 +30,7 @@ test('a failed run shows its error, completion time and graph', async ({ page, b
   }
 });
 
-test('the run list shows "unnamed" for a run with no graph name', async ({ page, baseURL }) => {
+test('the run list shows "Unnamed workflow" for a run with no graph name', async ({ page, baseURL }) => {
   const base = baseURL || 'http://127.0.0.1:5173';
   let runId: string | undefined;
 
@@ -44,7 +44,8 @@ test('the run list shows "unnamed" for a run with no graph name', async ({ page,
     await page.goto(`${base}/`);
 
     const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: runId! }) });
-    await expect(row.getByRole('cell').nth(1)).toHaveText('unnamed', { timeout: 10000 });
+    // The Workflow cell holds the title, then the run id.
+    await expect(row.getByRole('cell').nth(1)).toContainText('Unnamed workflow', { timeout: 10000 });
   } finally {
     if (runId) await page.request.post(`${base}/api/runs/${runId}/cancel`);
   }

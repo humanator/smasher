@@ -294,11 +294,11 @@ workflows from `e2e/fixtures`. It covers:
 Update `app-shell.spec.ts` for the new copy and selectors without deleting any test.
 
 **Acceptance criteria:**
-- [ ] The new spec passes 3 runs in a row locally.
-- [ ] All existing non-LLM specs pass.
+- [x] The new spec passes 3 runs in a row locally.
+- [x] All existing non-LLM specs pass.
 
 **Verification:**
-- [ ] `npm run test:e2e -- dashboard app-shell` ×3, then a full non-LLM `npm run test:e2e`
+- [x] `npm run test:e2e -- dashboard app-shell` ×3, then a full non-LLM `npm run test:e2e`
 
 **Dependencies:** T6, T7, T8
 
