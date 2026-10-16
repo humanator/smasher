@@ -138,3 +138,29 @@ fn served_origin_may_invoke_every_settings_command() {
         assert!(granted.contains(&id), "served origin is missing {id}");
     }
 }
+
+#[test]
+fn served_origin_may_reveal_a_workflow_in_finder() {
+    let granted: Vec<String> = capabilities()
+        .into_iter()
+        .filter(|(_, cap)| !remote_urls(cap).is_empty())
+        .flat_map(|(_, cap)| permission_ids(&cap))
+        .collect();
+
+    assert!(granted.iter().any(|g| g == "allow-reveal-in-finder"));
+}
+
+#[test]
+fn build_script_declares_exactly_the_app_commands() {
+    // build.rs can't import the crate, so it lists the commands again; the two lists must agree.
+    let build_rs =
+        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("build.rs"))
+            .unwrap();
+    let start = build_rs
+        .find(".commands(&[")
+        .expect("build.rs declares its commands");
+    let end = start + build_rs[start..].find("])").unwrap();
+    let declared: Vec<&str> = build_rs[start..end].split('"').skip(1).step_by(2).collect();
+
+    assert_eq!(declared, smasher_desktop::commands::COMMANDS);
+}

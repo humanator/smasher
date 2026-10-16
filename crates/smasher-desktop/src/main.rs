@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use smasher_desktop::bootstrap;
-use smasher_desktop::commands::{self, ServerHandle, SettingsLocation};
+use smasher_desktop::commands::{self, ServerHandle, SettingsLocation, WorkflowDirs};
 use smasher_desktop::settings::{self, KEYCHAIN_SERVICE, Keychain};
 #[cfg(target_os = "macos")]
 use tauri::TitleBarStyle;
@@ -29,6 +29,14 @@ fn main() {
         tracing::error!(error = %e, "failed to apply saved LLM settings");
     }
 
+    // The same folders the embedded server scans, which Show in Finder is limited to.
+    let config = bootstrap::server_config();
+    let workflow_dirs =
+        smasher_web::server::effective_workflow_dirs(&config.data_dir, &config.workflow_dirs)
+            .into_iter()
+            .map(PathBuf::from)
+            .collect();
+
     let shutdown = CancellationToken::new();
     let server_shutdown = shutdown.clone();
 
@@ -37,10 +45,12 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .manage(SettingsLocation { data_dir })
+        .manage(WorkflowDirs(workflow_dirs))
         .invoke_handler(tauri::generate_handler![
             commands::get_llm_settings,
             commands::save_llm_settings,
-            commands::detect_claude_cli
+            commands::detect_claude_cli,
+            commands::reveal_in_finder
         ])
         .setup(move |app| {
             // Start even with no provider configured, so the settings modal

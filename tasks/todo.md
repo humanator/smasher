@@ -349,15 +349,15 @@ The banner replaces the old featured-run card.
 - Add the command to `COMMANDS`, `build.rs`, `generate_handler!` and `served-origin.json`.
 
 **Acceptance criteria:**
-- [ ] Rust tests (tempdir): accepts a `.dot` inside a dir. Refuses one outside, a non-`.dot`
+- [x] Rust tests (tempdir): accepts a `.dot` inside a dir. Refuses one outside, a non-`.dot`
   file, a `..` escape, a symlink pointing out, and a missing file.
-- [ ] `capabilities_test` passes with `allow-reveal-in-finder`, and `COMMANDS` matches
+- [x] `capabilities_test` passes with `allow-reveal-in-finder`, and `COMMANDS` matches
   `build.rs`.
-- [ ] No shell is involved: the arguments are a list, and code review confirms it.
+- [x] No shell is involved: the arguments are a list, and code review confirms it.
 
 **Verification:**
-- [ ] `cargo test -p smasher-desktop`
-- [ ] `cargo clippy -p smasher-desktop -- -D warnings` and `cargo fmt --all --check`
+- [x] `cargo test -p smasher-desktop`
+- [x] `cargo clippy -p smasher-desktop -- -D warnings` and `cargo fmt --all --check`
 
 **Dependencies:** None
 

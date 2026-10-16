@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "served-origin",
-  "description": "Native shim, window-drag and settings-modal permissions for the SPA served by the embedded server (or Vite in dev). Loopback origins only.",
+  "description": "Native shim, window-drag, settings-modal and Show in Finder permissions for the SPA served by the embedded server (or Vite in dev). Loopback origins only.",
   "windows": ["main"],
   "remote": {
     "urls": ["http://127.0.0.1:*"]
@@ -15,6 +15,7 @@
     "fs:allow-read-text-file",
     "allow-get-llm-settings",
     "allow-save-llm-settings",
-    "allow-detect-claude-cli"
+    "allow-detect-claude-cli",
+    "allow-reveal-in-finder"
   ]
 }
