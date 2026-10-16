@@ -7,11 +7,11 @@ outside the canvas. Read them for layout, copy, sizes and colour values.
 
 | File | Screen | Module spec |
 |---|---|---|
-| `Home.dc.html` | Dashboard: workflows, recent runs, Run and Settings dialogs | `SPEC-dashboard.md` |
+| `Home.dc.html` | Dashboard: workflows, recent runs, Run and Settings dialogs | `tasks/archive/SPEC-dashboard.md` |
 | `Workflow.dc.html` | Workflow detail | `SPEC-workflow-detail.md` |
 | `Run.dc.html` | Run | `SPEC-run.md` |
 | `Main.dc.html` | Workflow editor | `SPEC-editor.md` |
-| `Sidebar.dc.html` and the other component boards | macOS-styled shadcn primitives | `SPEC-shell-theme.md` |
+| `Sidebar.dc.html` and the other component boards | macOS-styled shadcn primitives | `tasks/archive/SPEC-shell-theme.md` |
 | `Components.dc.html` | Old token sheet. **Out of date**: it still lists Manrope/Figtree. The screens win. | — |
 
 The canvas is the source of truth. If the two disagree, re-copy from the canvas.

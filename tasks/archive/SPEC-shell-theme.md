@@ -1,11 +1,11 @@
 # Spec: `shell-theme`
 
-Module of [SPEC.md](SPEC.md). Status: **Approved 2026-10-14.**
+Module of [SPEC.md](../../SPEC.md). Status: **Approved 2026-10-14.**
 Depends on: nothing. Every other module depends on this one.
 
-Design references: [Sidebar](docs/design/redesign/Sidebar.dc.html) and the shell around
-[Home](docs/design/redesign/Home.dc.html), [Workflow](docs/design/redesign/Workflow.dc.html) and
-[Run](docs/design/redesign/Run.dc.html). Primitives come from the 13 component boards
+Design references: [Sidebar](../../docs/design/redesign/Sidebar.dc.html) and the shell around
+[Home](../../docs/design/redesign/Home.dc.html), [Workflow](../../docs/design/redesign/Workflow.dc.html) and
+[Run](../../docs/design/redesign/Run.dc.html). Primitives come from the 13 component boards
 (`Button`, `Badge`, `Input`, `Textarea`, `Select`, `Checkbox`, `Switch`, `Tabs`, `ToggleGroup`,
 `Accordion`, `Tooltip`, `Popover`, `Drawer`).
 
@@ -182,7 +182,7 @@ exposed as a `data-native` attribute on `<html>`.
 
 ## Commands
 
-As in [SPEC.md](SPEC.md#commands), plus `make desktop-dev` for the title-bar check.
+As in [SPEC.md](../../SPEC.md#commands), plus `make desktop-dev` for the title-bar check.
 
 ## Project Structure (this module)
 
@@ -239,7 +239,7 @@ crates/smasher-desktop/src/main.rs           → overlay title bar
 
 ## Boundaries (module-specific)
 
-These are in addition to the [SPEC.md boundaries](SPEC.md#boundaries):
+These are in addition to the [SPEC.md boundaries](../../SPEC.md#boundaries):
 
 - **Always:** keep primitive props and exports backwards compatible; replace every
   `PageHeader` caller in the same task that deletes it.

@@ -1,7 +1,7 @@
 # Implementation Plan: `shell-theme`
 
-Spec: [SPEC-shell-theme.md](../SPEC-shell-theme.md), part of [SPEC.md](../SPEC.md).
-The task list is in [todo.md](todo.md).
+Spec: [SPEC-shell-theme.md](SPEC-shell-theme.md), part of [SPEC.md](../../SPEC.md).
+The task list is in [todo-shell-theme.md](todo-shell-theme.md).
 
 ## Overview
 

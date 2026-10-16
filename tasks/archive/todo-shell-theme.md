@@ -1,6 +1,6 @@
 # Todo: `shell-theme`
 
-Plan: [plan.md](plan.md). Spec: [SPEC-shell-theme.md](../SPEC-shell-theme.md).
+Plan: [plan.md](plan-shell-theme.md). Spec: [SPEC-shell-theme.md](SPEC-shell-theme.md).
 
 Shared commands (from `frontend/`):
 
@@ -354,7 +354,7 @@ existing e2e specs
 
 ## Checkpoint C: Module complete
 
-Signed off 2026-10-16 by Jobsworth in the verify-spec UAT pass: see [VERIFICATION-shell-theme.md](VERIFICATION-shell-theme.md) (6/6 manual checkpoints pass, all gates green).
+Signed off 2026-10-16 by Jobsworth in the verify-spec UAT pass: see [VERIFICATION-shell-theme.md](../VERIFICATION-shell-theme.md) (6/6 manual checkpoints pass, all gates green).
 
 - [x] SPEC-shell-theme.md Success Criteria 1–8 all met
 - [x] Full non-LLM suite green with zero warnings

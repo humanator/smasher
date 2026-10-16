@@ -1,6 +1,6 @@
 # Todo: `dashboard`
 
-Plan: [plan-dashboard.md](plan-dashboard.md). Spec: [SPEC-dashboard.md](../../SPEC-dashboard.md).
+Plan: [plan-dashboard.md](plan-dashboard.md). Spec: [SPEC-dashboard.md](SPEC-dashboard.md).
 
 Shared commands (from `frontend/`):
 
@@ -20,18 +20,18 @@ tests. TDD every task: write the failing test, then the code, then commit while 
 
 ## Task 0: shell-theme sign-off
 
-**Description:** Finish the open manual checks in [todo.md](../todo.md): the side-by-side checks
+**Description:** Finish the open manual checks in [todo-shell-theme.md](todo-shell-theme.md): the side-by-side checks
 against the component boards, light and dark, `make desktop-dev`, and the review with
 Jobsworth. Phase 1 may start before this. Phase 2 may not.
 
 **Acceptance criteria:**
-- [x] Every unchecked item in `tasks/todo.md` is ticked or turned into a follow-up.
+- [x] Every unchecked item in `tasks/archive/todo-shell-theme.md` is ticked or turned into a follow-up.
 
 **Verification:**
 - [x] Jobsworth confirms.
 
 **Waived 2026-10-16:** Simon waived this gate so Phases 2–4 could start. The open manual checks
-in `tasks/todo.md` still stand and are picked up at Checkpoint B.
+in `tasks/archive/todo-shell-theme.md` still stand and are picked up at Checkpoint B.
 
 **Dependencies:** None
 

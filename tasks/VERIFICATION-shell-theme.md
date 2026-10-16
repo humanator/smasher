@@ -1,6 +1,6 @@
 ---
 status: complete
-source: SPEC-shell-theme.md, tasks/plan.md, tasks/todo.md
+source: tasks/archive/SPEC-shell-theme.md, tasks/archive/plan-shell-theme.md, tasks/archive/todo-shell-theme.md
 e2e_excluded:
   - "app-shell: shows the ⚡ favicon and never asks for /vite.svg"
   - "app-shell: toasts each failing poll on a missing run once, not on every tick"

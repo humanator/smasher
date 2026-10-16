@@ -1,6 +1,6 @@
 # Implementation Plan: `dashboard`
 
-Spec: [SPEC-dashboard.md](../../SPEC-dashboard.md), part of [SPEC.md](../../SPEC.md).
+Spec: [SPEC-dashboard.md](SPEC-dashboard.md), part of [SPEC.md](../../SPEC.md).
 The task list is in [todo-dashboard.md](todo-dashboard.md).
 
 > These files sit beside `plan.md` / `todo.md` because shell-theme still has open manual checks
@@ -67,7 +67,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Phase 0: Gate
 
-- [x] Task 0: shell-theme manual checks signed off (open items in [todo.md](../todo.md))
+- [x] Task 0: shell-theme manual checks signed off (open items in [todo-shell-theme.md](todo-shell-theme.md))
 
 ### Phase 1: Foundation (pure logic + API; T1–T4 can run in parallel)
 

@@ -1,10 +1,10 @@
 # Spec: `dashboard`
 
-Module of [SPEC.md](SPEC.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](tasks/archive/plan-dashboard.md).
+Module of [SPEC.md](../../SPEC.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](plan-dashboard.md).
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`, `libraryStore`,
 `pending_questions`).
 
-Design reference: [Home](docs/design/redesign/Home.dc.html) (1440×900), covering the dashboard,
+Design reference: [Home](../../docs/design/redesign/Home.dc.html) (1440×900), covering the dashboard,
 the Run sheet and the Settings window. Primitives come from the shell-theme component boards.
 
 ## Objective
@@ -343,5 +343,6 @@ TDD per task. Write the failing test first.
    choices, and does this module own it?
 2. ~~Last activity for needs-you workflows.~~ **Resolved 2026-10-16:** "Waiting since {time}"
    is fine.
-3. **shell-theme manual checks** are still open in `tasks/todo.md`. Per your call, this spec is
-   written in parallel, and building it waits until those are signed off.
+3. ~~shell-theme manual checks.~~ **Resolved 2026-10-16:** every check in
+   `tasks/archive/todo-shell-theme.md` is signed off. See
+   [VERIFICATION-shell-theme.md](../VERIFICATION-shell-theme.md).
