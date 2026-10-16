@@ -34,9 +34,25 @@
     }))
   );
 
+  // The dashboard hosts all three Library views, told apart by the runs filter and #runs anchor.
+  type LibrarySection = 'workflows' | 'runs' | 'needs-you' | null;
+  function readSection(): LibrarySection {
+    if (window.location.pathname !== '/') return null;
+    if (new URLSearchParams(window.location.search).get('runs') === 'needs-you') return 'needs-you';
+    return window.location.hash === '#runs' ? 'runs' : 'workflows';
+  }
+  let librarySection = $state<LibrarySection>(readSection());
+
   onMount(() => {
     libraryStore.start();
-    return () => libraryStore.stop();
+    const sync = () => (librarySection = readSection());
+    window.addEventListener('hashchange', sync);
+    window.addEventListener('popstate', sync);
+    return () => {
+      libraryStore.stop();
+      window.removeEventListener('hashchange', sync);
+      window.removeEventListener('popstate', sync);
+    };
   });
 </script>
 
@@ -46,6 +62,7 @@
     runCount={libraryStore.runs.length}
     needsYouCount={libraryStore.needsYou.length}
     {currentWorkflowId}
+    {librarySection}
     native={isTauri()}
   />
   <div class="flex min-w-0 flex-1 flex-col bg-background text-foreground">

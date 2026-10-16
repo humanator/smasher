@@ -154,3 +154,32 @@ describe('SourceList header and collapse', () => {
     }
   });
 });
+
+describe('SourceList against the Home board', () => {
+  it('marks the current Library row', () => {
+    mount({ librarySection: 'workflows' });
+    const nav = screen.getByRole('navigation', { name: 'Library' });
+    expect(within(nav).getByRole('link', { name: /^Workflows/ }).getAttribute('aria-current')).toBe('page');
+    expect(within(nav).getByRole('link', { name: /^Recent runs/ }).hasAttribute('aria-current')).toBe(false);
+  });
+
+  it('sets Library counts at 12px', () => {
+    mount();
+    const nav = screen.getByRole('navigation', { name: 'Library' });
+    expect(within(nav).getByText('12').className.split(' ')).toContain('text-small');
+  });
+
+  it('draws the needs-you pill 16px tall and semibold, like the board', () => {
+    mount();
+    const pill = screen.getByTestId('needs-you-count');
+    expect(pill.className.split(' ')).toEqual(expect.arrayContaining(['h-4', 'min-w-[18px]', 'px-[5px]', 'font-semibold']));
+  });
+
+  it('gives each expanded workflow row a document icon', () => {
+    mount();
+    const nav = screen.getByRole('navigation', { name: 'Workflows' });
+    for (const link of within(nav).getAllByRole('link')) {
+      expect(link.querySelector('[data-icon="workflow-file"]')).not.toBeNull();
+    }
+  });
+});

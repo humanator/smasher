@@ -5,12 +5,14 @@
   import type { Snippet } from 'svelte';
   import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { cn } from '$lib/utils.js';
 
   let {
     title,
     subtitle = null,
     back = null,
     leading,
+    titleAccessory,
     actions,
   }: {
     title: string;
@@ -19,6 +21,8 @@
     back?: { label: string; href: string } | null;
     /** Controls ahead of the back button, e.g. the phone-width sidebar button. */
     leading?: Snippet | null;
+    /** Sits on the title line after the h1, e.g. the Run page's status badge. */
+    titleAccessory?: Snippet | null;
     actions?: Snippet | null;
   } = $props();
 
@@ -28,7 +32,10 @@
 
 <header
   data-tauri-drag-region
-  class="sticky top-0 z-10 flex h-[52px] shrink-0 items-center gap-2 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70"
+  class={cn(
+    'bg-background sticky top-0 z-10 flex h-toolbar shrink-0 items-center gap-2 border-b border-border pr-3',
+    back ? 'pl-3' : 'pl-5'
+  )}
 >
   {#if leading}
     {@render leading()}
@@ -38,16 +45,21 @@
       <ChevronLeftIcon aria-hidden="true" />
     </Button>
   {/if}
-  <div class="flex min-w-0 flex-col justify-center">
-    <h1 class="m-0 truncate text-[15px] leading-tight font-bold text-foreground">{title}</h1>
+  <div class={cn('flex min-w-0 flex-col justify-center', back && 'pl-1')}>
+    <div class="flex min-w-0 items-center gap-2">
+      <h1 class="text-heading m-0 truncate font-bold text-foreground">{title}</h1>
+      {#if titleAccessory}
+        {@render titleAccessory()}
+      {/if}
+    </div>
     {#if subtitle}
-      <p data-testid="toolbar-subtitle" class="m-0 truncate text-[11px] leading-tight text-muted-foreground">
+      <p data-testid="toolbar-subtitle" class="text-caption m-0 truncate text-muted-foreground">
         {#each subtitleParts as part, i (i)}{#if i % 2 === 1}<code class="font-mono">{part}</code>{:else}{part}{/if}{/each}
       </p>
     {/if}
   </div>
   {#if actions}
-    <div class="ml-auto flex shrink-0 items-center gap-2" data-testid="page-header-actions">
+    <div class="ml-auto flex shrink-0 items-center gap-1.5" data-testid="page-header-actions">
       {@render actions()}
     </div>
   {/if}

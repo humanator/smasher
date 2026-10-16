@@ -11,18 +11,24 @@
     icon: Icon,
     href = undefined,
     onclick = undefined,
+    pressed = undefined,
+    expanded = undefined,
   }: {
     label: string;
     icon: Component;
     href?: string;
     onclick?: () => void;
+    /** For toggles such as the Run page's inspector button: shows the pressed fill. */
+    pressed?: boolean;
+    /** When the button shows or hides a panel. */
+    expanded?: boolean;
   } = $props();
 </script>
 
 <Tooltip.Root>
   <Tooltip.Trigger>
     {#snippet child({ props })}
-      <Button {...props} {href} {onclick} variant="ghost" size="icon" aria-label={label}>
+      <Button {...props} {href} {onclick} variant="ghost" size="icon" aria-label={label} aria-pressed={pressed} aria-expanded={expanded}>
         <Icon aria-hidden="true" />
       </Button>
     {/snippet}

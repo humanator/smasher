@@ -84,8 +84,8 @@ describe('statusBadge', () => {
   it.each([
     ['Running', 'secondary', 'var(--info)'],
     ['Completed', 'secondary', 'var(--success)'],
-    ['Failed', 'destructive', 'var(--destructive)'],
-    ['Aborted', 'secondary', 'var(--muted-foreground)'],
+    ['Failed', 'destructive', undefined], // Home.dc.html STATUS_BADGE: the red capsule carries it, no dot
+    ['Aborted', 'secondary', 'var(--foreground-tertiary)'], // #8E8E93 on the board
   ])('badges %s as %s with a %s dot', (status, variant, dot) => {
     expect(statusBadge(status)).toEqual({ label: status, variant, dot });
   });

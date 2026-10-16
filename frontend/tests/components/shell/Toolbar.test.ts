@@ -39,7 +39,7 @@ describe('Toolbar', () => {
 
   it('is 52px tall', () => {
     render(Toolbar, { props: { title: 'x' } });
-    expect(screen.getByRole('banner').className).toContain('h-[52px]');
+    expect(screen.getByRole('banner').className).toContain('h-toolbar'); // --spacing-toolbar: 52px (tokens.test.ts)
   });
 
   it('omits the back link and subtitle by default', () => {
@@ -76,5 +76,24 @@ describe('Toolbar', () => {
   it('renders no actions container when there are no actions', () => {
     render(Toolbar, { props: { title: 'Runs' } });
     expect(screen.queryByTestId('page-header-actions')).toBeNull();
+  });
+});
+
+describe('Toolbar against the boards', () => {
+  const badgeSnippet = createRawSnippet(() => ({ render: () => '<span>Running</span>' }));
+
+  it('is an opaque 52px bar with the title at 15px and the subtitle at 11px', () => {
+    render(Toolbar, { props: { title: 'Workflows', subtitle: '3 workflows' } });
+    const header = screen.getByRole('banner');
+    expect(header.className.split(' ')).toEqual(expect.arrayContaining(['h-toolbar', 'bg-background']));
+    expect(header.className).not.toContain('backdrop-blur');
+    expect(screen.getByRole('heading').className.split(' ')).toContain('text-heading');
+    expect(screen.getByTestId('toolbar-subtitle').className.split(' ')).toContain('text-caption');
+  });
+
+  it('puts an optional accessory, such as a status badge, beside the title', () => {
+    render(Toolbar, { props: { title: 'Design concepts review', titleAccessory: badgeSnippet } });
+    const row = screen.getByRole('heading').parentElement as HTMLElement;
+    expect(within(row).getByText('Running')).toBeTruthy();
   });
 });

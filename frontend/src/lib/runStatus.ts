@@ -48,7 +48,7 @@ export type WorkflowStatusLabel = 'Needs you' | 'No runs yet';
 export interface StatusBadgeSpec {
   label: string;
   variant: BadgeVariant;
-  /** CSS colour for the leading dot, from the theme tokens; none for accent and outline badges. */
+  /** CSS colour for the leading dot, from the theme tokens; none for accent, outline and Failed badges. */
   dot: string | undefined;
 }
 
@@ -62,9 +62,9 @@ export function statusBadge(status: string): StatusBadgeSpec {
     case 'Completed':
       return { label: status, variant: 'secondary', dot: 'var(--success)' };
     case 'Failed':
-      return { label: status, variant: 'destructive', dot: 'var(--destructive)' };
+      return { label: status, variant: 'destructive', dot: undefined };
     case 'Aborted':
-      return { label: status, variant: 'secondary', dot: 'var(--muted-foreground)' };
+      return { label: status, variant: 'secondary', dot: 'var(--foreground-tertiary)' };
     default:
       return { label: status, variant: 'secondary', dot: 'var(--info)' };
   }

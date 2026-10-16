@@ -5,9 +5,9 @@
 	import SourceList from '../../../src/components/shell/SourceList.svelte';
 	import type { ComponentProps } from 'svelte';
 
-	let { workflows, runCount, needsYouCount, currentWorkflowId, native }: ComponentProps<typeof SourceList> = $props();
+	let { workflows, runCount, needsYouCount, currentWorkflowId, native, librarySection }: ComponentProps<typeof SourceList> = $props();
 </script>
 
 <Sidebar.Provider>
-	<SourceList {workflows} {runCount} {needsYouCount} {currentWorkflowId} {native} />
+	<SourceList {workflows} {runCount} {needsYouCount} {currentWorkflowId} {native} {librarySection} />
 </Sidebar.Provider>
