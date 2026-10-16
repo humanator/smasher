@@ -62,15 +62,15 @@ work.
 "Start".
 
 **Acceptance criteria:**
-- [ ] The spec's cases pass: linear, the design's 7-step graph with a loop back from the
+- [x] The spec's cases pass: linear, the design's 7-step graph with a loop back from the
   Branch, parallel fan-out and fan-in, an unreachable node, several Exits, a self-loop, and an
   empty graph.
-- [ ] Every case also asserts the invariant: each node appears exactly once.
-- [ ] `backEdges` holds exactly the loop-back edges, in visit order.
+- [x] Every case also asserts the invariant: each node appears exactly once.
+- [x] `backEdges` holds exactly the loop-back edges, in visit order.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/workflowSteps.test.ts`
-- [ ] `npm run check`
+- [x] `npm run test -- --run tests/lib/workflowSteps.test.ts`
+- [x] `npm run check`
 
 **Dependencies:** None
 
