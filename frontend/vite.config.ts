@@ -13,8 +13,16 @@ export default defineConfig({
   // no longer sees these two. Left to runtime discovery, the first editor
   // visit re-optimizes them and force-reloads every open page -- which
   // breaks whatever Playwright tests are mid-flight on a cold cache (CI).
+  // The Run sheet and Settings load lazily too; these icons appear only in them.
   optimizeDeps: {
-    include: ['@xyflow/svelte', '@dagrejs/dagre'],
+    include: [
+      '@xyflow/svelte',
+      '@dagrejs/dagre',
+      '@lucide/svelte/icons/chevron-down',
+      '@lucide/svelte/icons/chevron-right',
+      '@lucide/svelte/icons/key-round',
+      '@lucide/svelte/icons/square-terminal',
+    ],
   },
   server: {
     host: '127.0.0.1',

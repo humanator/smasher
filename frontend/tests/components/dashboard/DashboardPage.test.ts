@@ -95,7 +95,8 @@ describe('DashboardPage', () => {
 
       await user.click(screen.getByRole('button', { name: 'AI model settings' }));
 
-      expect(await screen.findByRole('heading', { name: 'Settings' })).toBeTruthy();
+      // Settings loads as its own chunk on first open.
+      expect(await screen.findByRole('heading', { name: 'Settings' }, { timeout: 5000 })).toBeTruthy();
     });
   });
 
@@ -126,7 +127,8 @@ describe('DashboardPage', () => {
 
       await user.click(within(await rowFor(`${name}.dot`)).getByRole('button', { name: 'Run…' }));
 
-      expect(await screen.findByRole('heading', { name: /^Run / })).toBeTruthy();
+      // The Run sheet loads as its own chunk on first open.
+      expect(await screen.findByRole('heading', { name: /^Run / }, { timeout: 5000 })).toBeTruthy();
       expect(screen.getByLabelText('Brief')).toBeTruthy();
       expect(location.href).toBe('');
       const { runs } = await runsApi.listRuns();
