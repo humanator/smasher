@@ -1,6 +1,6 @@
 # Spec: `workflow-detail`
 
-Module of [CAPABILITY_MAP.md](CAPABILITY_MAP.md). Status: **Draft 2026-10-16, awaiting approval.**
+Module of [CAPABILITY_MAP.md](CAPABILITY_MAP.md). Status: **Approved 2026-10-16.**
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`/`Toolbar`, page-header
 context, `libraryStore`). It also reuses the `dashboard` helpers (`statusBadge`, `formatWhen`,
 `formatDuration`, `questionKind`, `RunTable`, `LazyRunDialog`).
@@ -29,6 +29,8 @@ Rebuild the workflow page (`/workflows/{id}`) so someone who has never read a DO
 | D2 | A failed run's one-line reason comes from a client-side `summariseRunError()` that reads the engine's existing `RunSummary.error` string. It needs no API change, and the `run` module reuses it. |
 | D3 | The "What it does" intro is generated from the graph: "The steps in order." plus one sentence for each loop-back edge. |
 | D4 | The "Latest run" card goes. The banner appears only while a run of this workflow is active. The latest finished run is the top row of Run history, and its tokens and working folder stay on the run page. |
+| D5 | A run that's only running gets a banner too, matching the dashboard's Running banner (SPEC-dashboard R2a) in wording, colours and button. Both pages word the start time the same way, through `formatWhenInline`. |
+| D6 | The E2E workflow that fails without an LLM call is a test fixture in `frontend/e2e/fixtures/`, next to `gate_only.dot`. It isn't added to `examples/`. |
 
 ## Requirements
 
@@ -51,7 +53,8 @@ Rebuild the workflow page (`/workflows/{id}`) so someone who has never read a DO
 
 - A new command `reveal_in_finder(path: String) -> Result<(), String>` in `commands.rs`.
 - It canonicalises `path` and refuses it unless it is an existing `.dot` file inside one of the
-  server's configured workflow dirs (`server_config()` dirs, held in managed state). The
+  server's effective workflow dirs. These are `effective_workflow_dirs(data_dir, workflow_dirs)`,
+  which includes the imported-workflows folder, held in managed state. The
   refusal message is "That file isn't in a workflows folder."
 - On success it runs `open -R <canonical path>` with an argument list, never a shell string.
 - Add `allow-reveal-in-finder` to `capabilities/served-origin.json`, and register the command in
@@ -65,25 +68,28 @@ Rebuild the workflow page (`/workflows/{id}`) so someone who has never read a DO
   same run `pickFeaturedRun` picks today. Otherwise nothing renders and no space is reserved.
 - Landmark: `<section aria-label="Active run">`.
 - Left: a round 28px chip with an icon. A needs-you run gets the accent fill and a `user` icon.
-  A running run gets a neutral fill and a `loader` icon (static when
-  `prefers-reduced-motion` is set).
+  A running run uses the dashboard Running banner's chip (D5): the info fill and a `play` icon,
+  on a muted background.
 - First line: the run id in mono as a link to `/runs/{id}`, then the status badge from
   `statusBadge` (**Needs you** or **Running**).
 - Detail line:
   - Needs you: "Started {when}. Paused at **{step label}**, waiting for you to {what}."
-    - `{when}` is the inline form of `formatWhen`: "today at 10:42 am", "yesterday at 4:20 pm",
-      "on Fri 9 Oct at 3:48 pm". Add this as `formatWhenInline` in `timeFormat.ts`.
+    - `{when}` is `formatWhenInline`: `formatWhen` with "Today"/"Yesterday" lower-cased for
+      mid-sentence use ("today, 10:42 am", "Fri 9 Oct, 3:48 pm"). Add it to `timeFormat.ts`.
+      The dashboard's `RunningBanner` already does this inline, so it moves there and
+      `RunningBanner` calls it.
     - `{step label}` is the label, from the workflow graph, of the pending question's `node_id`.
       Fall back to the node id, and leave out "Paused at …" when there's no node id.
     - `{what}` is "choose from {c} candidate(s)" for a gallery gate, "approve or reject it" for
       `approval`, "choose an option" for `multiple_choice` and "answer a question" for
       `free_form`. It comes from `questionKind`, extended with this phrase.
-  - Running: "Started {when}. Running for {duration}." The duration uses `formatDuration`, so it
-    reads like "7 min 48 s", and updates every 30 s. There's no current-step text, because the
-    API doesn't provide one.
+  - Running (D5): "Started {when} · {duration}". The duration is
+    `formatDuration(started_at, null, now)`, so it reads like "7 min 48 s so far", and ticks every
+    30 s. There's no current-step text, because the API doesn't provide one.
 - Action button:
   - **Review Candidates** for a gallery gate, **Answer** for any other question, and **Open Run**
-    for a run that is just running. All three link to `/runs/{id}`.
+    (outline, as on the dashboard) for a run that is just running. All three link to
+    `/runs/{id}`.
   - If the questions fetch fails, the detail line drops the "Paused at …" clause and the button
     reads **Open Run**.
 - When more than one run is active, a trailing muted line reads "+ {N} more running".
@@ -328,11 +334,7 @@ TDD per task. Write the failing test first.
 8. check, lint, Vitest, non-LLM E2E, `cargo test -p smasher-desktop` and clippy all pass with
    zero warnings.
 
-## Open Questions
+## Resolved Questions
 
-1. **A failing workflow for E2E.** R5's E2E needs a workflow that fails without calling an LLM,
-   for example a `parallelogram` tool step running `false`. Is adding one under
-   `examples/` (or `frontend/e2e/fixtures/`) fine?
-2. **Banner for runs that are only running.** The artboard only draws the needs-you banner. R3's
-   running variant (neutral chip, "Running for …", **Open Run**) is my extrapolation. Is that
-   right, or should running-only runs show no banner?
+1. **A failing workflow for E2E:** it's a fixture in `frontend/e2e/fixtures/` (D6).
+2. **A banner for runs that are only running:** yes, matching dashboard R2a (D5).
