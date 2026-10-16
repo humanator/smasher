@@ -1,6 +1,6 @@
 # Spec: `dashboard`
 
-Module of [SPEC.md](SPEC.md). Status: **Draft 2026-10-16, awaiting approval.**
+Module of [SPEC.md](SPEC.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](tasks/plan-dashboard.md).
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`, `libraryStore`,
 `pending_questions`).
 
@@ -175,8 +175,9 @@ and later from workflow-detail. The Settings dialog opens from the toolbar on ev
 "waiting_since": "2026-10-16T00:42:07Z" // RFC3339 UTC; the oldest pending question's creation time. null when none.
 ```
 
-- `PendingQuestion` gets a wall-clock `asked_at: SystemTime`, set where `created_at: Instant` is
-  set today. `RunRecord::to_summary` reports the minimum `asked_at` in the queue.
+- `RunRecord::to_summary` takes the oldest `created_at: Instant` in the interviewer queue and
+  converts it to wall-clock time as `SystemTime::now() - created_at.elapsed()`. That's accurate
+  to milliseconds, and `PendingQuestion`'s 16 constructors stay untouched.
 - `#[serde(default)]` keeps old persisted summaries readable. Rehydrated runs report `null`.
 - TypeScript: `waiting_since: string | null` on `RunSummary`.
 
@@ -232,7 +233,7 @@ frontend/src/lib/api/runs.ts → + waiting_since
 frontend/tests/lib/         → unit tests for the helpers above
 frontend/tests/components/dashboard/ → component tests per new/restyled component
 frontend/e2e/dashboard.spec.ts → NEW; settings/run-launch/app-shell specs updated for new copy
-crates/smasher-web/src/state.rs, crates/smasher-attractor/src/http_interviewer.rs → R7
+crates/smasher-web/src/state.rs → R7
 ```
 
 `App.svelte` renders `<DashboardPage />` in place of the `WorkflowCatalog` and `RunList` stack,
@@ -340,8 +341,7 @@ TDD per task. Write the failing test first.
    the provider select. Today `PUT /api/settings` needs an explicit provider, and claude-cli is
    configured separately. The spec keeps today's list. Should a later change add these two
    choices, and does this module own it?
-2. **Last activity for needs-you workflows.** The design shows "Pick a favourite", which would
-   need a questions fetch per waiting workflow. The spec uses "Waiting since {time}" from
-   `waiting_since`. Is that acceptable?
+2. ~~Last activity for needs-you workflows.~~ **Resolved 2026-10-16:** "Waiting since {time}"
+   is fine.
 3. **shell-theme manual checks** are still open in `tasks/todo.md`. Per your call, this spec is
    written in parallel, and building it waits until those are signed off.
