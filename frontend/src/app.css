@@ -40,11 +40,6 @@
   --border: rgba(0, 0, 0, .08);
   --input: rgba(0, 0, 0, .14);
   --ring: rgba(190, 24, 93, .4);
-  --chart-1: oklch(0.81 0.117 11.638);
-  --chart-2: oklch(0.645 0.246 16.439);
-  --chart-3: oklch(0.586 0.253 17.585);
-  --chart-4: oklch(0.514 0.222 16.935);
-  --chart-5: oklch(0.455 0.188 13.697);
   --radius: 6px;
   --sidebar: #EBEBEE;
   --sidebar-foreground: #1D1D1F;
@@ -55,6 +50,59 @@
   --sidebar-accent-foreground: #1D1D1F;
   --sidebar-border: rgba(0, 0, 0, .08);
   --sidebar-ring: rgba(190, 24, 93, .4);
+
+  /* Text tiers beyond foreground / muted-foreground (macOS label colours from the boards). */
+  --foreground-secondary: #3A3A3C;
+  --foreground-control: #4A4A4F;
+  --foreground-tertiary: #8E8E93;
+  /* Status: dot colour plus a darker text shade that meets 4.5:1. */
+  --warning: #FF9500;
+  --warning-foreground: #B25000;
+  --success-foreground: #1F8136; /* board #248A3D is 4.40:1 on white; darkened to pass AA */
+  --success-subtle: #F2FAF4;
+  --success-border: rgba(40, 200, 64, .3);
+  --info-foreground: #0060DF;
+  --destructive-surface: #FFF5F4;
+  --destructive-border: rgba(255, 59, 48, .28);
+  --primary-subtle-border: rgba(190, 24, 93, .18);
+  --neutral: #AEAEB2;
+  /* Invalid fields use systemRed; --destructive stays the error-text red. */
+  --invalid: #FF3B30;
+  --invalid-ring: rgba(255, 59, 48, .22);
+  --ring-field: rgba(190, 24, 93, .3);
+  /* Surfaces */
+  --tooltip: #F6F6F6;
+  --sheet: #F6F6F8;
+  --sheet-toolbar: #F0F0F2;
+  --control: #FFFFFF;
+  --segment: #FFFFFF;
+  --field: #FFFFFF;
+  --field-fill: rgba(0, 0, 0, .05);
+  --fill-pressed: rgba(0, 0, 0, .08);
+  --track: rgba(0, 0, 0, .09);
+  --group: rgba(0, 0, 0, .025);
+  /* Hairlines: --separator between rows, --border-strong round tables and inspectors. */
+  --separator: rgba(0, 0, 0, .05);
+  --border-strong: rgba(0, 0, 0, .1);
+  --divider: rgba(0, 0, 0, .12);
+  /* Scrims: dialogs, drawer sheets, preference windows. */
+  --scrim: rgba(0, 0, 0, .14);
+  --scrim-strong: rgba(0, 0, 0, .18);
+  --scrim-faint: rgba(0, 0, 0, .06);
+  /* Shadows (exposed as shadow-push, shadow-card, ...). */
+  --elevation-push: 0 0 0 .5px rgba(0, 0, 0, .16), 0 .5px 1.5px rgba(0, 0, 0, .14);
+  --elevation-push-accent: 0 0 0 .5px rgba(0, 0, 0, .14), 0 .5px 1.5px rgba(0, 0, 0, .18), inset 0 .5px 0 rgba(255, 255, 255, .22);
+  --elevation-segment: 0 0 0 .5px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .14);
+  --elevation-field: inset 0 .5px 1px rgba(0, 0, 0, .05);
+  --elevation-thumb: 0 0 0 .5px rgba(0, 0, 0, .08), 0 1px 2.5px rgba(0, 0, 0, .25);
+  --elevation-check: inset 0 0 0 1px rgba(0, 0, 0, .22), 0 .5px 1px rgba(0, 0, 0, .08);
+  --elevation-tooltip: 0 0 0 .5px rgba(0, 0, 0, .2), 0 4px 12px rgba(0, 0, 0, .14);
+  --elevation-popover: 0 0 0 .5px rgba(0, 0, 0, .14), 0 10px 30px rgba(0, 0, 0, .18);
+  --elevation-card: 0 0 0 1px rgba(0, 0, 0, .1), 0 1px 3px rgba(0, 0, 0, .06);
+  --elevation-sheet: 0 0 0 .5px rgba(0, 0, 0, .18), 0 20px 50px rgba(0, 0, 0, .28);
+  --elevation-dialog: 0 0 0 .5px rgba(0, 0, 0, .22), 0 24px 60px rgba(0, 0, 0, .3);
+  --elevation-window: 0 0 0 .5px rgba(0, 0, 0, .25), 0 30px 80px rgba(0, 0, 0, .35);
+  --elevation-hairline: inset 0 0 0 .5px rgba(0, 0, 0, .12);
 }
 .dark {
   --background: #1E1E1E;
@@ -80,11 +128,6 @@
   --border: rgba(255, 255, 255, .1);
   --input: rgba(255, 255, 255, .18);
   --ring: rgba(219, 39, 119, .5);
-  --chart-1: oklch(0.81 0.117 11.638);
-  --chart-2: oklch(0.645 0.246 16.439);
-  --chart-3: oklch(0.586 0.253 17.585);
-  --chart-4: oklch(0.514 0.222 16.935);
-  --chart-5: oklch(0.455 0.188 13.697);
   --sidebar: #2A2A2D;
   --sidebar-foreground: #F5F5F7;
   --sidebar-muted-foreground: #A1A1A6;
@@ -94,6 +137,52 @@
   --sidebar-accent-foreground: #F5F5F7;
   --sidebar-border: rgba(255, 255, 255, .1);
   --sidebar-ring: rgba(219, 39, 119, .5);
+
+  --foreground-secondary: #D1D1D6;
+  --foreground-control: #C7C7CC;
+  --foreground-tertiary: #8E8E93;
+  --warning: #FF9F0A;
+  --warning-foreground: #FFB340;
+  --success-foreground: #30D158;
+  --success-subtle: rgba(48, 209, 88, .12);
+  --success-border: rgba(48, 209, 88, .35);
+  --info-foreground: #409CFF;
+  --destructive-surface: rgba(255, 69, 58, .1);
+  --destructive-border: rgba(255, 69, 58, .35);
+  --primary-subtle-border: rgba(219, 39, 119, .3);
+  --neutral: #636366;
+  --invalid: #FF453A;
+  --invalid-ring: rgba(255, 69, 58, .3);
+  --ring-field: rgba(219, 39, 119, .45);
+  --tooltip: #3A3A3C;
+  --sheet: #2C2C2E;
+  --sheet-toolbar: #333336;
+  --control: rgba(255, 255, 255, .1);
+  --segment: rgba(255, 255, 255, .15);
+  --field: rgba(255, 255, 255, .05);
+  --field-fill: rgba(255, 255, 255, .08);
+  --fill-pressed: rgba(255, 255, 255, .14);
+  --track: rgba(255, 255, 255, .2);
+  --group: rgba(255, 255, 255, .03);
+  --separator: rgba(255, 255, 255, .06);
+  --border-strong: rgba(255, 255, 255, .14);
+  --divider: rgba(255, 255, 255, .16);
+  --scrim: rgba(0, 0, 0, .4);
+  --scrim-strong: rgba(0, 0, 0, .45);
+  --scrim-faint: rgba(0, 0, 0, .25);
+  --elevation-push: 0 0 0 .5px rgba(255, 255, 255, .16), 0 .5px 1.5px rgba(0, 0, 0, .4);
+  --elevation-push-accent: 0 0 0 .5px rgba(255, 255, 255, .12), 0 .5px 1.5px rgba(0, 0, 0, .4), inset 0 .5px 0 rgba(255, 255, 255, .22);
+  --elevation-segment: 0 0 0 .5px rgba(255, 255, 255, .12), 0 1px 2px rgba(0, 0, 0, .4);
+  --elevation-field: inset 0 .5px 1px rgba(0, 0, 0, .2);
+  --elevation-thumb: 0 0 0 .5px rgba(0, 0, 0, .2), 0 1px 2.5px rgba(0, 0, 0, .5);
+  --elevation-check: inset 0 0 0 1px rgba(255, 255, 255, .25);
+  --elevation-tooltip: 0 0 0 .5px rgba(255, 255, 255, .18), 0 4px 12px rgba(0, 0, 0, .4);
+  --elevation-popover: 0 0 0 .5px rgba(255, 255, 255, .16), 0 10px 30px rgba(0, 0, 0, .5);
+  --elevation-card: 0 0 0 1px rgba(255, 255, 255, .1), 0 1px 3px rgba(0, 0, 0, .3);
+  --elevation-sheet: 0 0 0 .5px rgba(255, 255, 255, .16), 0 20px 50px rgba(0, 0, 0, .55);
+  --elevation-dialog: 0 0 0 .5px rgba(255, 255, 255, .16), 0 24px 60px rgba(0, 0, 0, .6);
+  --elevation-window: 0 0 0 .5px rgba(255, 255, 255, .18), 0 30px 80px rgba(0, 0, 0, .65);
+  --elevation-hairline: inset 0 0 0 .5px rgba(255, 255, 255, .16);
 }
 @theme inline {
   --font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -113,11 +202,6 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -136,13 +220,74 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Radius scale, literal so each step lands on a board value:
+     chips 4, segments/tooltips 5, controls 6, tables 8, cards/popovers 10, sheets/windows 12. */
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-track: 7px;
+  /* Type scale from the boards. Use these, not text-[13px] or Tailwind's 14px text-sm. */
+  --text-caption: 11px;
+  --text-caption--line-height: 1.35;
+  --text-hint: 11.5px;
+  --text-hint--line-height: 1.4;
+  --text-small: 12px;
+  --text-small--line-height: 1.45;
+  --text-body: 13px;
+  --text-body--line-height: 1.38;
+  --text-heading: 15px;
+  --text-heading--line-height: 1.2;
+  --text-display: 20px;
+  --text-display--line-height: 1.2;
+  --spacing-toolbar: 52px;
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-foreground-control: var(--foreground-control);
+  --color-foreground-tertiary: var(--foreground-tertiary);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-border: var(--success-border);
+  --color-info-foreground: var(--info-foreground);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-destructive-border: var(--destructive-border);
+  --color-primary-subtle-border: var(--primary-subtle-border);
+  --color-neutral: var(--neutral);
+  --color-invalid: var(--invalid);
+  --color-invalid-ring: var(--invalid-ring);
+  --color-ring-field: var(--ring-field);
+  --color-tooltip: var(--tooltip);
+  --color-sheet: var(--sheet);
+  --color-sheet-toolbar: var(--sheet-toolbar);
+  --color-control: var(--control);
+  --color-segment: var(--segment);
+  --color-field: var(--field);
+  --color-field-fill: var(--field-fill);
+  --color-fill-pressed: var(--fill-pressed);
+  --color-track: var(--track);
+  --color-group: var(--group);
+  --color-separator: var(--separator);
+  --color-border-strong: var(--border-strong);
+  --color-divider: var(--divider);
+  --color-scrim: var(--scrim);
+  --color-scrim-strong: var(--scrim-strong);
+  --color-scrim-faint: var(--scrim-faint);
+  --shadow-push: var(--elevation-push);
+  --shadow-push-accent: var(--elevation-push-accent);
+  --shadow-segment: var(--elevation-segment);
+  --shadow-field: var(--elevation-field);
+  --shadow-thumb: var(--elevation-thumb);
+  --shadow-check: var(--elevation-check);
+  --shadow-tooltip: var(--elevation-tooltip);
+  --shadow-popover: var(--elevation-popover);
+  --shadow-card: var(--elevation-card);
+  --shadow-sheet: var(--elevation-sheet);
+  --shadow-dialog: var(--elevation-dialog);
+  --shadow-window: var(--elevation-window);
+  --shadow-hairline: var(--elevation-hairline);
 }
 
 /* Rendered agent markdown (renderMarkdown), kept to the card's text-sm scale. */

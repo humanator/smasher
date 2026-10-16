@@ -27,6 +27,16 @@ const REQUIRED_TOKENS = [
   'sidebar-muted-foreground', 'sidebar-accent', 'primary', 'primary-foreground', 'primary-subtle',
   'primary-subtle-foreground', 'secondary', 'destructive', 'destructive-subtle', 'success', 'info',
   'border', 'input', 'ring',
+  // Board values with no shadcn equivalent (audit 2026-10-16)
+  'foreground-secondary', 'foreground-control', 'foreground-tertiary', 'warning', 'warning-foreground',
+  'success-foreground', 'info-foreground', 'success-subtle', 'success-border', 'destructive-surface',
+  'destructive-border', 'invalid', 'invalid-ring', 'ring-field', 'primary-subtle-border', 'neutral',
+  'tooltip', 'sheet', 'sheet-toolbar', 'control', 'segment', 'field', 'field-fill', 'fill-pressed',
+  'track', 'group', 'separator', 'border-strong', 'divider', 'scrim', 'scrim-strong', 'scrim-faint',
+  // Shadows, so primitives never paste rgba strings
+  'elevation-push', 'elevation-push-accent', 'elevation-segment', 'elevation-field', 'elevation-thumb',
+  'elevation-check', 'elevation-tooltip', 'elevation-popover', 'elevation-card', 'elevation-sheet',
+  'elevation-dialog', 'elevation-window', 'elevation-hairline',
 ];
 
 // [foreground token, background token]
@@ -41,6 +51,21 @@ const PAIRS: [string, string][] = [
   ['primary-subtle-foreground', 'primary-subtle'],
   ['destructive', 'background'],
   ['destructive', 'destructive-subtle'],
+  ['destructive', 'destructive-surface'],
+  ['foreground-secondary', 'background'],
+  ['foreground-secondary', 'muted'],
+  ['foreground-control', 'background'],
+  ['foreground-control', 'sidebar'],
+  ['foreground', 'sheet'],
+  ['foreground', 'sheet-toolbar'],
+  ['muted-foreground', 'sheet'],
+  ['foreground-secondary', 'sheet-toolbar'], // board #6E6E73 is 4.46:1 here, so toolbar labels use secondary
+  ['foreground', 'tooltip'],
+  ['success-foreground', 'background'],
+  ['success-foreground', 'success-subtle'],
+  ['success-foreground', 'sheet'],
+  ['warning-foreground', 'background'],
+  ['info-foreground', 'background'],
 ];
 
 describe.each(Object.entries(themes))('%s tokens', (_name, tokens) => {
@@ -90,6 +115,76 @@ describe('light token values from the spec', () => {
   ])('--%s is %s', (token, value) => {
     expect(themes.light[`--${token}`].toUpperCase()).toBe(value);
   });
+});
+
+describe('light board values with no shadcn token', () => {
+  it.each([
+    ['foreground-secondary', '#3A3A3C'],
+    ['foreground-control', '#4A4A4F'],
+    ['foreground-tertiary', '#8E8E93'],
+    ['warning', '#FF9500'],
+    ['warning-foreground', '#B25000'],
+    ['success-foreground', '#1F8136'], // board #248A3D fails AA (4.40:1); nearest passing shade
+    ['info-foreground', '#0060DF'],
+    ['invalid', '#FF3B30'],
+    ['tooltip', '#F6F6F6'],
+    ['sheet', '#F6F6F8'],
+    ['sheet-toolbar', '#F0F0F2'],
+  ])('--%s is %s', (token, value) => {
+    expect(themes.light[`--${token}`].toUpperCase()).toBe(value);
+  });
+});
+
+const theme = (() => {
+  const start = css.indexOf('@theme inline {');
+  const end = css.indexOf('\n}', start);
+  const tokens: Record<string, string> = {};
+  for (const m of css.slice(start, end).matchAll(/(--[\w-]+):\s*([^;]+);/g)) tokens[m[1]] = m[2].trim();
+  return tokens;
+})();
+
+describe('radius scale', () => {
+  // Boards: chips 4, segments and tooltips 5, controls 6, tables 8, cards and popovers 10,
+  // sheets and windows 12. Each step is a literal so rounded-md is never 4.8px again.
+  it.each([
+    ['xs', '4px'],
+    ['sm', '5px'],
+    ['md', '6px'],
+    ['lg', '8px'],
+    ['xl', '10px'],
+    ['2xl', '12px'],
+    ['track', '7px'],
+  ])('rounded-%s is %s', (step, value) => {
+    expect(theme[`--radius-${step}`]).toBe(value);
+  });
+});
+
+describe('type scale', () => {
+  it.each([
+    ['caption', '11px'],
+    ['hint', '11.5px'],
+    ['small', '12px'],
+    ['body', '13px'],
+    ['heading', '15px'],
+    ['display', '20px'],
+  ])('text-%s is %s', (step, value) => {
+    expect(theme[`--text-${step}`]).toBe(value);
+  });
+});
+
+describe('layout tokens', () => {
+  it('the toolbar and sidebar header are 52px (h-toolbar)', () => {
+    expect(theme['--spacing-toolbar']).toBe('52px');
+  });
+});
+
+describe('shadow utilities', () => {
+  it.each(['push', 'push-accent', 'segment', 'field', 'thumb', 'check', 'tooltip', 'popover', 'card', 'sheet', 'dialog', 'window', 'hairline'])(
+    'shadow-%s reads its themed elevation token',
+    (name) => {
+      expect(theme[`--shadow-${name}`]).toBe(`var(--elevation-${name})`);
+    }
+  );
 });
 
 describe('typography', () => {
