@@ -327,7 +327,7 @@ The banner replaces the old featured-run card.
 ## Checkpoint B: Page complete in the browser
 - [ ] `npm run test -- --run`, `npm run check`, `npm run lint` and `npm run build:check` are
   clean
-- [ ] With `npm run dev` and `dev:backend`, open a workflow at 1440×900 and 375 wide, in light
+- [x] With `npm run dev` and `dev:backend`, open a workflow at 1440×900 and 375 wide, in light
   and dark: the toolbar, the banner (start `gate_only`), the steps and the history all look
   right
 - [ ] Review with Simon before Phase 4
