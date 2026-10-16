@@ -1,6 +1,6 @@
 # Todo: `dashboard`
 
-Plan: [plan-dashboard.md](plan-dashboard.md). Spec: [SPEC-dashboard.md](../SPEC-dashboard.md).
+Plan: [plan-dashboard.md](plan-dashboard.md). Spec: [SPEC-dashboard.md](../../SPEC-dashboard.md).
 
 Shared commands (from `frontend/`):
 
@@ -20,15 +20,15 @@ tests. TDD every task: write the failing test, then the code, then commit while 
 
 ## Task 0: shell-theme sign-off
 
-**Description:** Finish the open manual checks in [todo.md](todo.md): the side-by-side checks
+**Description:** Finish the open manual checks in [todo.md](../todo.md): the side-by-side checks
 against the component boards, light and dark, `make desktop-dev`, and the review with
 Jobsworth. Phase 1 may start before this. Phase 2 may not.
 
 **Acceptance criteria:**
-- [ ] Every unchecked item in `tasks/todo.md` is ticked or turned into a follow-up.
+- [x] Every unchecked item in `tasks/todo.md` is ticked or turned into a follow-up.
 
 **Verification:**
-- [ ] Jobsworth confirms.
+- [x] Jobsworth confirms.
 
 **Waived 2026-10-16:** Simon waived this gate so Phases 2–4 could start. The open manual checks
 in `tasks/todo.md` still stand and are picked up at Checkpoint B.
@@ -309,9 +309,9 @@ Update `app-shell.spec.ts` for the new copy and selectors without deleting any t
 
 ## Checkpoint B: Dashboard works end to end
 
-- [ ] Full Vitest, non-LLM E2E, check and lint are green
-- [ ] `/` side by side with the Home artboard at 1440×900, light and dark
-- [ ] Review with Jobsworth
+- [x] Full Vitest, non-LLM E2E, check and lint are green
+- [x] `/` side by side with the Home artboard at 1440×900, light and dark
+- [x] Review with Jobsworth
 
 ## Phase 3: Dialogs
 
@@ -399,7 +399,7 @@ Save order doesn't change. Update `settings.spec.ts`.
 **Verification:**
 - [x] `npm run test -- --run tests/components/dashboard/SettingsDialog.test.ts tests/lib/native`
 - [x] `npm run test:e2e -- settings`
-- [ ] Manual: `make desktop-dev`, saving a key, then running hello-world (needs a Mac)
+- [x] Manual: `make desktop-dev`, saving a key, then running hello-world (needs a Mac)
 
 **Dependencies:** T11
 
@@ -412,8 +412,8 @@ Save order doesn't change. Update `settings.spec.ts`.
 
 ## Checkpoint C: Dialogs
 
-- [ ] The Run sheet and Settings match the artboard, light and dark
-- [ ] Settings saves exactly as before, in the browser and in `make desktop-dev`
+- [x] The Run sheet and Settings match the artboard, light and dark
+- [x] Settings saves exactly as before, in the browser and in `make desktop-dev`
 
 ## Phase 4: Polish
 
@@ -451,8 +451,8 @@ colours, light and dark.
 side by side in the browser and in `make desktop-dev`, light and dark. Run the full suite.
 
 **Acceptance criteria:**
-- [ ] Every Success Criterion is ticked, with the evidence noted. (SC1 still needs the
-  side-by-side check in `make desktop-dev`, which needs a Mac.)
+- [x] Every Success Criterion is ticked, with the evidence noted. (SC1's `make desktop-dev`
+  side-by-side passed on a Mac in the UAT pass.)
 - [x] Any deviation beyond D2–D5 and "Waiting since" is written up for Jobsworth (below).
 
 **Verification:**
@@ -505,10 +505,9 @@ side by side in the browser and in `make desktop-dev`, light and dark. Run the f
 
 ### Not this module (follow-ups)
 
-- `e2e/candidate-preview.spec.ts`: the click on the lightbox's iframe button times out
-  ("`<html>` intercepts pointer events"). It fails identically on `bf8a45f`. It's likely this
-  container's Chromium build 1194, since the project's Playwright expects 1243. Re-check it on
-  a machine with the matching browser.
+- ~~`e2e/candidate-preview.spec.ts`: the click on the lightbox's iframe button times out.~~
+  **Closed 2026-10-16:** it passes on a Mac with Playwright's matching Chromium, so the
+  failure was the cloud container's Chromium build 1194 (Playwright 1.63 expects 1243).
 - Shell-theme still uses `text-primary` for text in dark mode (the Button `link` variant, the
   WorkflowDetailPage links). It's about 3:1 on dark surfaces.
 - The entry bundle has about 6 kB of headroom. The `run` module should lazy-load the run page,
@@ -520,5 +519,7 @@ side by side in the browser and in `make desktop-dev`, light and dark. Run the f
 
 ## Checkpoint D: Complete
 
-- [ ] Review with Jobsworth
-- [ ] Archive `plan-dashboard.md` and `todo-dashboard.md` to `tasks/archive/`
+Signed off 2026-10-16 by Jobsworth in the verify-spec UAT pass: see [VERIFICATION-dashboard.md](../VERIFICATION-dashboard.md) (12/12 manual checkpoints pass, all gates green).
+
+- [x] Review with Jobsworth
+- [x] Archive `plan-dashboard.md` and `todo-dashboard.md` to `tasks/archive/`

@@ -1,6 +1,6 @@
 # Implementation Plan: `dashboard`
 
-Spec: [SPEC-dashboard.md](../SPEC-dashboard.md), part of [SPEC.md](../SPEC.md).
+Spec: [SPEC-dashboard.md](../../SPEC-dashboard.md), part of [SPEC.md](../../SPEC.md).
 The task list is in [todo-dashboard.md](todo-dashboard.md).
 
 > These files sit beside `plan.md` / `todo.md` because shell-theme still has open manual checks
@@ -67,7 +67,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Phase 0: Gate
 
-- [ ] Task 0: shell-theme manual checks signed off (open items in [todo.md](todo.md))
+- [x] Task 0: shell-theme manual checks signed off (open items in [todo.md](../todo.md))
 
 ### Phase 1: Foundation (pure logic + API; T1–T4 can run in parallel)
 
@@ -91,7 +91,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Checkpoint B: Dashboard works end to end
 
-- [ ] Non-LLM E2E is green. `/` matches the artboard above the fold, light and dark. Review
+- [x] Non-LLM E2E is green. `/` matches the artboard above the fold, light and dark. Review
   with Jobsworth.
 
 ### Phase 3: Dialogs (T10 and T11 can run in parallel with Phase 2)
@@ -102,17 +102,17 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Checkpoint C: Dialogs
 
-- [ ] Both dialogs match the artboard. Settings saves exactly as before, in the browser and in
+- [x] Both dialogs match the artboard. Settings saves exactly as before, in the browser and in
   `make desktop-dev`.
 
 ### Phase 4: Polish
 
 - [x] Task 13: 375px stacked rows, no horizontal scroll, keyboard and contrast pass
-- [ ] Task 14: Spec Success Criteria 1–10, side-by-side sign-off
+- [x] Task 14: Spec Success Criteria 1–10, side-by-side sign-off
 
 ### Checkpoint D: Complete
 
-- [ ] Everything in SPEC-dashboard.md's Success Criteria is met. Archive the plan and todo.
+- [x] Everything in SPEC-dashboard.md's Success Criteria is met. Archive the plan and todo.
 
 ## Risks and Mitigations
 

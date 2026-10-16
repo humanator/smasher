@@ -55,7 +55,7 @@ system mode.
 **Verification:**
 - [x] `npm run test -- --run tests/lib/contrast.test.ts tests/lib/tokens.test.ts`
 - [x] Full Vitest green; `check`, `lint`, `build:check` clean
-- [ ] Manual: catalog page in light and dark
+- [x] Manual: catalog page in light and dark
 
 **Dependencies:** None
 
@@ -87,7 +87,7 @@ icons, light and dark ink/tint, and the "Step" fallback for unknown handlers.
 
 ## Checkpoint A: Foundation
 - [x] Full Vitest + `cargo test -p smasher-web` green; `check`, `lint`, clippy clean
-- [ ] Every page renders in new colours, light and dark
+- [x] Every page renders in new colours, light and dark
 
 ## Phase 2: Primitives
 
@@ -106,7 +106,7 @@ Restyle Badge as the 18px capsule and add an optional `dot` colour prop.
 **Verification:**
 - [x] `npm run test -- --run tests/components/ui/badge.test.ts` (new)
 - [x] Full Vitest green; `check` clean
-- [ ] Manual: side-by-side with the Button and Badge boards
+- [x] Manual: side-by-side with the Button and Badge boards
 
 **Dependencies:** T2
 
@@ -130,7 +130,7 @@ focus, invalid and disabled states.
 **Verification:**
 - [x] `npm run test -- --run tests/components/ui/input.test.ts` (new: search variant)
 - [x] Full Vitest green; `check` clean
-- [ ] Manual: side-by-side with the 5 boards
+- [x] Manual: side-by-side with the 5 boards
 
 **Dependencies:** T2
 
@@ -155,7 +155,7 @@ rotating triangle.
 **Verification:**
 - [x] `npm run test -- --run tests/components/ui/tabs.test.ts` (new: line variant)
 - [x] Full Vitest green; `check` clean
-- [ ] Manual: side-by-side with the 3 boards
+- [x] Manual: side-by-side with the 3 boards
 
 **Dependencies:** T2
 
@@ -181,7 +181,7 @@ interactive primitives ≥ 44px hit areas.
 **Verification:**
 - [x] Full Vitest green; `check` clean
 - [x] E2E: `npx playwright test e2e/node-editor.spec.ts e2e/settings.spec.ts`
-- [ ] Manual: side-by-side with the 3 boards; mobile emulation tap test
+- [x] Manual: side-by-side with the 3 boards; mobile emulation tap test
 
 **Dependencies:** T2
 
@@ -192,8 +192,8 @@ interactive primitives ≥ 44px hit areas.
 
 ## Checkpoint B: Primitives
 - [x] Existing component + non-LLM E2E tests green
-- [ ] Every component board matched 1:1, light + dark
-- [ ] Review with Jobsworth
+- [x] Every component board matched 1:1, light + dark
+- [x] Review with Jobsworth
 
 ## Phase 3: Shell
 
@@ -267,7 +267,7 @@ each page that had a parent crumb. Delete `PageHeader.svelte` and replace its te
 **Verification:**
 - [x] `npm run test -- --run tests/components/shell/SourceList.test.ts`
 - [x] `check` clean
-- [ ] Manual: side-by-side with the `Workflow` artboard sidebar
+- [x] Manual: side-by-side with the `Workflow` artboard sidebar
 
 **Dependencies:** T2, T4 (Badge pill), T8 (types only)
 
@@ -311,7 +311,7 @@ and the sidebar header. Add the drag permission to `served-origin` only if dragg
 without it.
 
 **Acceptance criteria:**
-- [ ] In `make desktop-dev`, the real traffic lights sit inside the sidebar header inset and
+- [x] In `make desktop-dev`, the real traffic lights sit inside the sidebar header inset and
   nothing overlaps them.
 - [x] The window drags from empty toolbar space. Buttons in the toolbar still click.
 - [x] In a browser, `data-native` is absent and the wordmark shows. `no-tauri-breakage.spec.ts`
@@ -320,7 +320,7 @@ without it.
 **Verification:**
 - [x] `cargo build -p smasher-desktop`, clippy clean
 - [x] `npx playwright test e2e/no-tauri-breakage.spec.ts`
-- [ ] Manual: `make desktop-dev`
+- [x] Manual: `make desktop-dev`
 
 **Dependencies:** T11
 
@@ -353,7 +353,10 @@ existing e2e specs
 **Estimated scope:** S–M
 
 ## Checkpoint C: Module complete
-- [ ] SPEC-shell-theme.md Success Criteria 1–8 all met
+
+Signed off 2026-10-16 by Jobsworth in the verify-spec UAT pass: see [VERIFICATION-shell-theme.md](VERIFICATION-shell-theme.md) (6/6 manual checkpoints pass, all gates green).
+
+- [x] SPEC-shell-theme.md Success Criteria 1–8 all met
 - [x] Full non-LLM suite green with zero warnings
-- [ ] `make desktop-dev` manual check, light + dark
-- [ ] Review with Jobsworth, then write `SPEC-dashboard.md`
+- [x] `make desktop-dev` manual check, light + dark
+- [x] Review with Jobsworth, then write `SPEC-dashboard.md`

@@ -5,7 +5,7 @@
 
 Design source: `docs/design/redesign/Home.dc.html` (plus the primitive boards `Input`, `Textarea`,
 `Select`, `Badge`, `ToggleGroup`, `Tabs`, `Accordion` `.dc.html`, which define field anatomy).
-Spec: `SPEC-dashboard.md` (D1–D5), deviations recorded in `tasks/todo-dashboard.md` §"Deviations
+Spec: `SPEC-dashboard.md` (D1–D5), deviations recorded in `tasks/archive/todo-dashboard.md` §"Deviations
 beyond D2–D5" (numbered TD1–TD6 below).
 Frontend paths are relative to `frontend/src/`. Every claim was checked against the code.
 

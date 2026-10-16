@@ -1,6 +1,6 @@
 # Spec: `dashboard`
 
-Module of [SPEC.md](SPEC.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](tasks/plan-dashboard.md).
+Module of [SPEC.md](SPEC.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](tasks/archive/plan-dashboard.md).
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`, `libraryStore`,
 `pending_questions`).
 

@@ -13,7 +13,7 @@ Specs: `SPEC.md` row `workflow-detail` (line 37), `SPEC-shell-theme.md` R1–R4.
 - No `SPEC-workflow-detail.md` exists. Root files are only `SPEC.md`, `SPEC-shell-theme.md`, `SPEC-dashboard.md`.
 - WDP's git history is 3 commits, all pre-redesign: `495d6c9` (add page), `88274f9` (featured run + history),
   `92f211a` (lazy Run sheet). The dashboard work only restyled the shared `RunTable` and explicitly kept WDP "unchanged"
-  (`tasks/todo-dashboard.md:236`, `tasks/plan-dashboard.md:43,121`).
+  (`tasks/archive/todo-dashboard.md:236`, `tasks/archive/plan-dashboard.md:43,121`).
 - **Conclusion: the workflow-detail module hasn't been rebuilt.** The page is the old layout running inside the new shell,
   as `SPEC-shell-theme.md` "Out of Scope" intends. Nearly every finding below is expected backlog, not a regression.
 

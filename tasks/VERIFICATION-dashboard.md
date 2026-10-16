@@ -1,6 +1,6 @@
 ---
 status: complete
-source: SPEC-dashboard.md, tasks/plan-dashboard.md, tasks/todo-dashboard.md
+source: SPEC-dashboard.md, tasks/archive/plan-dashboard.md, tasks/archive/todo-dashboard.md
 e2e_excluded:
   - "dashboard: search filters the workflows table by title and file name"
   - "dashboard: Run… opens the run sheet, launches, and lands on the new run"

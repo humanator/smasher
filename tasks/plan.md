@@ -60,7 +60,7 @@ T1, T2 and T9 have no dependencies on each other. T4–T7 can run in parallel on
 
 ### Checkpoint A: Foundation
 - [x] All Vitest + `cargo test -p smasher-web` green, `check`/`lint`/clippy clean
-- [ ] Every page renders in the new colours in light and dark (manual look)
+- [x] Every page renders in the new colours in light and dark (manual look)
 
 ### Phase 2: Primitives
 - [x] T4: Button and Badge (`dot`)
@@ -70,8 +70,8 @@ T1, T2 and T9 have no dependencies on each other. T4–T7 can run in parallel on
 
 ### Checkpoint B: Primitives
 - [x] Existing component + E2E tests green with no assertion changes
-- [ ] Side-by-side against each component board at 1:1, light + dark
-- [ ] Review with Jobsworth
+- [x] Side-by-side against each component board at 1:1, light + dark
+- [x] Review with Jobsworth
 
 ### Phase 3: Shell
 - [x] T8: Library store
@@ -82,10 +82,10 @@ T1, T2 and T9 have no dependencies on each other. T4–T7 can run in parallel on
 - [x] T13: App-shell E2E with the no-LLM gate fixture
 
 ### Checkpoint C: Module complete
-- [ ] All eight Success Criteria in SPEC-shell-theme.md met
+- [x] All eight Success Criteria in SPEC-shell-theme.md met
 - [x] Full non-LLM suite green, zero warnings
-- [ ] `make desktop-dev` manual check
-- [ ] Review with Jobsworth before starting the next module spec
+- [x] `make desktop-dev` manual check
+- [x] Review with Jobsworth before starting the next module spec
 
 ## Risks and Mitigations
 
