@@ -2,8 +2,10 @@
 // ABOUTME: Which statuses are terminal, how runs group for filters, how each status is badged, and a workflow's status
 
 import type { RunSummary } from './api/runs';
+import type { WorkflowSummary } from './api/workflows';
 import type { BadgeVariant } from './components/ui/badge/index.js';
 import { formatWhen } from './timeFormat';
+import { formatWorkflowName } from './utils';
 
 export const TERMINAL_STATUSES = new Set(['Completed', 'Failed', 'Aborted']);
 
@@ -14,6 +16,23 @@ export function isActive(status: string): boolean {
 /** A run that is blocked on a person: still running, with questions waiting. */
 export function isNeedsYou(run: RunSummary): boolean {
   return run.status === 'Running' && run.pending_questions > 0;
+}
+
+/** What to call a run: its workflow's title, else its graph's name, else "Unnamed workflow". */
+export function runTitle(run: RunSummary, workflows: readonly WorkflowSummary[]): string {
+  const workflow = run.workflow_id ? workflows.find((w) => w.id === run.workflow_id) : undefined;
+  if (workflow) return formatWorkflowName(workflow.name);
+  return run.graph_name?.trim() || 'Unnamed workflow';
+}
+
+/** The run that has waited on a person longest. Runs without a `waiting_since` come last. */
+export function longestWaiting(runs: readonly RunSummary[]): RunSummary | null {
+  let best: RunSummary | null = null;
+  for (const run of runs) {
+    if (!best) best = run;
+    else if (run.waiting_since && (!best.waiting_since || Date.parse(run.waiting_since) < Date.parse(best.waiting_since))) best = run;
+  }
+  return best;
 }
 
 export type RunGroup = 'active' | 'completed' | 'failed';

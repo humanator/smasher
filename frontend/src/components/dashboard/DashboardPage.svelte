@@ -17,6 +17,7 @@
   import { filterWorkflows } from '$lib/workflowSearch';
   import { libraryStore } from '../../stores/library.svelte';
   import ToolbarIconButton from '../shell/ToolbarIconButton.svelte';
+  import NeedsYouBanner from './NeedsYouBanner.svelte';
   import RunDialog from './RunDialog.svelte';
   import RunList from './RunList.svelte';
   import SettingsDialog from './SettingsDialog.svelte';
@@ -83,7 +84,7 @@
   <div class="flex items-center gap-1.5 px-6 pt-3">{@render toolbarActions()}</div>
 {/if}
 
-<!-- The needs-you banner mounts here, above the scrolling content. -->
+<NeedsYouBanner {library} />
 
 {#if mobile.current}
   <div class="border-b border-border px-4 py-2">{@render search()}</div>

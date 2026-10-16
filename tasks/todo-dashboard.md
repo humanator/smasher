@@ -263,14 +263,14 @@ features the `needsYou` run with the oldest `waiting_since` and fetches its ques
 If the questions fetch fails, it shows only the wait, with **Open Run**.
 
 **Acceptance criteria:**
-- [ ] Nothing renders when nobody is waiting. Gallery, approval and more-than-one cases each
+- [x] Nothing renders when nobody is waiting. Gallery, approval and more-than-one cases each
   render as specified.
-- [ ] The wait text refreshes at least once a minute (fake timers).
-- [ ] The landmark is `section[aria-label="Waiting for you"]`, and the button is a real link to
+- [x] The wait text refreshes at least once a minute (fake timers).
+- [x] The landmark is `section[aria-label="Waiting for you"]`, and the button is a real link to
   `/runs/{id}`.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/NeedsYouBanner.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/NeedsYouBanner.test.ts`
 
 **Dependencies:** T1, T2, T4, T6
 

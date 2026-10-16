@@ -5,9 +5,8 @@
   import type { RunSummary } from '$lib/api/runs';
   import type { WorkflowSummary } from '$lib/api/workflows';
   import { useNow } from '$lib/hooks/useNow.svelte';
-  import { isActive, isNeedsYou } from '$lib/runStatus';
+  import { isActive, isNeedsYou, runTitle } from '$lib/runStatus';
   import { formatDuration, formatWhen } from '$lib/timeFormat';
-  import { formatWorkflowName } from '$lib/utils';
   import StatusBadge from './StatusBadge.svelte';
 
   let {
@@ -27,13 +26,6 @@
 
   const clock = useNow(30_000);
   const current = $derived(now ?? clock.current);
-  const titles = $derived(new Map(workflows.map((w) => [w.id, formatWorkflowName(w.name)])));
-
-  function workflowTitle(run: RunSummary): string {
-    const title = run.workflow_id ? titles.get(run.workflow_id) : undefined;
-    return title ?? (run.graph_name?.trim() || 'Unnamed workflow');
-  }
-
   // A stopped run without an end time has no duration to show.
   function duration(run: RunSummary): string {
     return formatDuration(run.started_at, isActive(run.status) ? null : (run.completed_at ?? ''), current);
@@ -59,7 +51,7 @@
       >
         <span role="cell"><StatusBadge status={isNeedsYou(run) ? 'Needs you' : run.status} /></span>
         <span role="cell" class="flex min-w-0 items-baseline gap-2">
-          <span class="truncate text-[13px] font-medium text-foreground">{workflowTitle(run)}</span>
+          <span class="truncate text-[13px] font-medium text-foreground">{runTitle(run, workflows)}</span>
           <!-- The run id is the link; its ::after stretches over the whole row. -->
           <a
             href="/runs/{run.id}"

@@ -6,8 +6,10 @@ import {
   TERMINAL_STATUSES,
   isActive,
   isNeedsYou,
+  longestWaiting,
   pickFeaturedRun,
   runGroup,
+  runTitle,
   statusBadge,
   workflowStatus,
 } from '../../src/lib/runStatus';
@@ -161,5 +163,37 @@ describe('workflowStatus', () => {
   it('falls back to the start time when a finished run has no completed_at', () => {
     const runs = [wfRun({ status: 'Aborted', started_at: '2026-10-09T04:48:00Z', completed_at: null })];
     expect(workflowStatus('wf', runs, NOW, TZ).lastActivity).toBe('Fri 9 Oct, 3:48 pm');
+  });
+});
+
+describe('runTitle', () => {
+  const workflows = [{ id: 'w1', name: 'design_concepts_review', source_dir: 'examples', path: 'x.dot' }];
+
+  it("uses the run's workflow title when the workflow is known", () => {
+    expect(runTitle({ ...run('r', 'Running'), workflow_id: 'w1', graph_name: 'G' }, workflows)).toBe('Design Concepts Review');
+  });
+
+  it('falls back to the graph name, then "Unnamed workflow"', () => {
+    expect(runTitle({ ...run('r', 'Running'), workflow_id: 'gone', graph_name: 'Graph' }, workflows)).toBe('Graph');
+    expect(runTitle({ ...run('r', 'Running'), graph_name: '  ' }, workflows)).toBe('Unnamed workflow');
+    expect(runTitle({ ...run('r', 'Running'), graph_name: null }, [])).toBe('Unnamed workflow');
+  });
+});
+
+describe('longestWaiting', () => {
+  const waiting = (id: string, since: string | null) => ({ ...run(id, 'Running'), pending_questions: 1, waiting_since: since });
+
+  it('is null when nothing is waiting', () => {
+    expect(longestWaiting([])).toBeNull();
+  });
+
+  it('picks the earliest waiting_since', () => {
+    const runs = [waiting('a', '2026-10-16T02:00:00Z'), waiting('b', '2026-10-16T01:00:00Z'), waiting('c', '2026-10-16T03:00:00Z')];
+    expect(longestWaiting(runs)?.id).toBe('b');
+  });
+
+  it('puts runs without a waiting_since last, keeping list order between them', () => {
+    expect(longestWaiting([waiting('a', null), waiting('b', '2026-10-16T02:00:00Z')])?.id).toBe('b');
+    expect(longestWaiting([waiting('a', null), waiting('b', null)])?.id).toBe('a');
   });
 });
