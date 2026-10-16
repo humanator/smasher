@@ -30,6 +30,9 @@ Jobsworth. Phase 1 may start before this. Phase 2 may not.
 **Verification:**
 - [ ] Jobsworth confirms.
 
+**Waived 2026-10-16:** Simon waived this gate so Phases 2–4 could start. The open manual checks
+in `tasks/todo.md` still stand and are picked up at Checkpoint B.
+
 **Dependencies:** None
 
 **Estimated scope:** —
@@ -164,12 +167,12 @@ and their two test files
 - Port every case from `WorkflowCatalog.test.ts` that is about the table.
 
 **Acceptance criteria:**
-- [ ] Each state renders, queried by role and label.
-- [ ] Search matches the title and file name, ignoring case and trimming spaces.
-- [ ] Each R3 status shows in a row, with the right last-activity text.
+- [x] Each state renders, queried by role and label.
+- [x] Search matches the title and file name, ignoring case and trimming spaces.
+- [x] Each R3 status shows in a row, with the right last-activity text.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/WorkflowTable.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/WorkflowTable.test.ts`
 
 **Dependencies:** T0, T3
 
