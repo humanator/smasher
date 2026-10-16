@@ -82,8 +82,8 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Phase 2: Dashboard slices
 
-- [ ] Task 5: `WorkflowTable` (status, last activity, empty, loading, error)
-- [ ] Task 6: `DashboardPage` + toolbar (title, subtitle, search, Import, Settings, New) + swap
+- [x] Task 5: `WorkflowTable` (status, last activity, empty, loading, error)
+- [x] Task 6: `DashboardPage` + toolbar (title, subtitle, search, Import, Settings, New) + swap
   it into `App.svelte`
 - [x] Task 7: `RunList` filters, `?runs=` sync, durations; restyle `RunTable`
 - [ ] Task 8: `NeedsYouBanner`
