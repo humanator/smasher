@@ -78,7 +78,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 ### Checkpoint A: Foundation
 
-- [ ] `cargo test -p smasher-web`, clippy and the Vitest unit suite are green, with no warnings
+- [x] `cargo test -p smasher-web`, clippy and the Vitest unit suite are green, with no warnings
 
 ### Phase 2: Dashboard slices
 

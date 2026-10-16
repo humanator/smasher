@@ -147,8 +147,8 @@ and their two test files
 
 ## Checkpoint A: Foundation
 
-- [ ] `cargo test -p smasher-web`, clippy and fmt pass
-- [ ] `npm run test -- --run`, `npm run check` and `npm run lint` pass with zero warnings
+- [x] `cargo test -p smasher-web`, clippy and fmt pass
+- [x] `npm run test -- --run`, `npm run check` and `npm run lint` pass with zero warnings
 
 ## Phase 2: Dashboard slices
 
