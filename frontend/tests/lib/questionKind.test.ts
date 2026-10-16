@@ -21,16 +21,29 @@ describe('questionKind', () => {
         outgoing_edges: [],
       },
     };
-    expect(questionKind(response)).toEqual({ text: 'Pick a favourite', action: 'Review Candidates', candidates: 3 });
+    expect(questionKind(response)).toEqual({
+      text: 'Pick a favourite',
+      action: 'Review Candidates',
+      candidates: 3,
+      waitingFor: 'choose from 3 candidates',
+    });
+  });
+
+  it('says "1 candidate" when a gallery gate has one ready', () => {
+    const response: ListQuestionsResponse = {
+      questions: [],
+      gallery_gate: { question_id: 'q1', candidates: [{} as CandidateResponse], expected_count: 3, outgoing_edges: [] },
+    };
+    expect(questionKind(response)?.waitingFor).toBe('choose from 1 candidate');
   });
 
   it.each([
-    ['approval', 'Approve or reject'],
-    ['multiple_choice', 'Choose an option'],
-    ['free_form', 'Answer a question'],
-  ] as const)('words a %s question as "%s" with an Answer button', (kind, text) => {
+    ['approval', 'Approve or reject', 'approve or reject it'],
+    ['multiple_choice', 'Choose an option', 'choose an option'],
+    ['free_form', 'Answer a question', 'answer a question'],
+  ] as const)('words a %s question as "%s" with an Answer button', (kind, text, waitingFor) => {
     const response: ListQuestionsResponse = { questions: [question(kind)], gallery_gate: null };
-    expect(questionKind(response)).toEqual({ text, action: 'Answer', candidates: null });
+    expect(questionKind(response)).toEqual({ text, action: 'Answer', candidates: null, waitingFor });
   });
 
   it('words the oldest question when several are waiting', () => {

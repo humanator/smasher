@@ -67,6 +67,11 @@ export function formatWhen(iso: string | null | undefined, now: Date, timeZone?:
   return `${when.weekday} ${when.day} ${when.monthName}${year}, ${clock(when)}`;
 }
 
+/** formatWhen for mid-sentence use: "today, 10:42 am", "yesterday, 4:20 pm", "Fri 9 Oct, 3:48 pm". */
+export function formatWhenInline(iso: string | null | undefined, now: Date, timeZone?: string): string {
+  return formatWhen(iso, now, timeZone).replace(/^(Today|Yesterday)/, (day) => day.toLowerCase());
+}
+
 /** "48 s", "7 min 48 s" or "1 h 12 min"; with no end, measures to `now` and adds "so far". */
 export function formatDuration(startIso: string, endIso: string | null, now: Date): string {
   const start = parse(startIso);

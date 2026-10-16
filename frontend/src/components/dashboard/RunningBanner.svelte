@@ -8,7 +8,7 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { useNow } from '$lib/hooks/useNow.svelte';
   import { isActive, latestRunning, runTitle } from '$lib/runStatus';
-  import { formatDuration, formatWhen } from '$lib/timeFormat';
+  import { formatDuration, formatWhenInline } from '$lib/timeFormat';
   import { libraryStore } from '../../stores/library.svelte';
 
   interface Library {
@@ -38,10 +38,7 @@
 
   const detail = $derived.by(() => {
     if (!featured) return '';
-    // "Today, 1:31 pm" reads "today, 1:31 pm" mid-sentence; day names stay capitalised.
-    const when = formatWhen(featured.started_at, current, timeZone).replace(/^(Today|Yesterday)/, (d) =>
-      d.toLowerCase()
-    );
+    const when = formatWhenInline(featured.started_at, current, timeZone);
     return `Started ${when} · ${formatDuration(featured.started_at, null, current)}`;
   });
 </script>

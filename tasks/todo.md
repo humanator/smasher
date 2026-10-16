@@ -157,12 +157,12 @@ The quotes are typographic (“ ”).
   - "answer a question" for free form
 
 **Acceptance criteria:**
-- [ ] `formatWhenInline` cases pass: today, yesterday, this year and last year.
-- [ ] `waitingFor` passes for each kind, with singular and plural candidates.
-- [ ] `RunningBanner.test.ts` and `NeedsYouBanner.test.ts` pass unchanged.
+- [x] `formatWhenInline` cases pass: today, yesterday, this year and last year.
+- [x] `waitingFor` passes for each kind, with singular and plural candidates.
+- [x] `RunningBanner.test.ts` and `NeedsYouBanner.test.ts` pass unchanged.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/timeFormat.test.ts tests/lib/questionKind.test.ts tests/components/dashboard`
+- [x] `npm run test -- --run tests/lib/timeFormat.test.ts tests/lib/questionKind.test.ts tests/components/dashboard`
 
 **Dependencies:** Task 0
 

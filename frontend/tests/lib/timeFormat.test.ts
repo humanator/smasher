@@ -2,7 +2,7 @@
 // ABOUTME: Pure function tests with `now` and the time zone pinned, so they never depend on the machine's clock
 
 import { describe, it, expect } from 'vitest';
-import { formatDuration, formatWaiting, formatWhen } from '../../src/lib/timeFormat';
+import { formatDuration, formatWaiting, formatWhen, formatWhenInline } from '../../src/lib/timeFormat';
 
 // 1:00 pm on Friday 16 October 2026 in Sydney (AEDT, UTC+11).
 const NOW = new Date('2026-10-16T02:00:00Z');
@@ -108,5 +108,23 @@ describe('formatWaiting', () => {
 
   it.each([null, '', 'garbage'])('returns a dash for %j', (iso) => {
     expect(formatWaiting(iso, NOW)).toBe('—');
+  });
+});
+
+describe('formatWhenInline', () => {
+  it('lower-cases today for use mid-sentence', () => {
+    expect(formatWhenInline('2026-10-15T23:42:00Z', NOW, SYDNEY)).toBe('today, 10:42 am');
+  });
+
+  it('lower-cases yesterday for use mid-sentence', () => {
+    expect(formatWhenInline('2026-10-15T05:20:00Z', NOW, SYDNEY)).toBe('yesterday, 4:20 pm');
+  });
+
+  it('keeps day and month names capitalised this year', () => {
+    expect(formatWhenInline('2026-10-09T04:48:00Z', NOW, SYDNEY)).toBe('Fri 9 Oct, 3:48 pm');
+  });
+
+  it('keeps day and month names capitalised in an earlier year', () => {
+    expect(formatWhenInline('2025-10-09T04:48:00Z', NOW, SYDNEY)).toBe('Thu 9 Oct 2025, 3:48 pm');
   });
 });
