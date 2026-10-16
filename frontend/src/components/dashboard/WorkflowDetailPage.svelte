@@ -3,17 +3,22 @@
   // ABOUTME: Reads workflows and runs from the shared library store; fetches only the workflow's graph, once
 
   import { onMount } from 'svelte';
+  import FolderIcon from '@lucide/svelte/icons/folder';
   import PlayIcon from '@lucide/svelte/icons/play';
+  import { toast } from 'svelte-sonner';
   import { getWorkflowGraph, type EditorGraph } from '../../lib/api/workflows';
   import type { RunSummary } from '../../lib/api/runs';
   import type { WorkflowSummary } from '../../lib/api/workflows';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+  import { isTauri, revealInFinder } from '$lib/native';
   import { errorMessage } from '$lib/notify';
   import { formatWorkflowName } from '$lib/utils';
   import { describeLoops, orderSteps, stepLabel } from '$lib/workflowSteps';
   import { usePageActions, usePageBack, usePageSubtitle, usePageTitle } from '$lib/page-header.svelte';
   import { libraryStore } from '../../stores/library.svelte';
+  import ToolbarIconButton from '../shell/ToolbarIconButton.svelte';
   import ActiveRunBanner from './ActiveRunBanner.svelte';
   import LazyRunDialog from './LazyRunDialog.svelte';
   import RunTable from './RunTable.svelte';
@@ -30,6 +35,16 @@
   let { workflowId, library = libraryStore }: { workflowId: string; library?: Library } = $props();
 
   let runDialogOpen = $state(false);
+  // Finder exists only in the desktop app.
+  const native = isTauri();
+
+  async function showInFinder(path: string) {
+    try {
+      await revealInFinder(path);
+    } catch (err) {
+      toast.error(`Couldn't show the file in Finder. ${errorMessage(err, 'Something went wrong.')}`);
+    }
+  }
 
   const workflow = $derived(library.workflows.find((w) => w.id === workflowId) ?? null);
   // Newest first, as the server lists them. The banner and the history both come from this one list.
@@ -67,6 +82,11 @@
 
 {#snippet workflowActions()}
   {#if workflow}
+    {#if native}
+      <Tooltip.Provider>
+        <ToolbarIconButton label="Show in Finder" icon={FolderIcon} onclick={() => void showInFinder(workflow.path)} />
+      </Tooltip.Provider>
+    {/if}
     <Button href="/workflows/{encodeURIComponent(workflow.id)}/edit" variant="outline">Edit Workflow</Button>
     <Button onclick={() => (runDialogOpen = true)}>
       <PlayIcon aria-hidden="true" />

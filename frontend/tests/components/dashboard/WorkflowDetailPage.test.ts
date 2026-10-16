@@ -15,6 +15,8 @@ import { isNeedsYou } from '../../../src/lib/runStatus';
 import { formatWorkflowName } from '../../../src/lib/utils';
 import { createLibraryStore } from '../../../src/stores/library.svelte';
 import { ANONYMOUS_GATE, submitGraph, cancelAll } from '../../fixtures/graphs';
+import { toast } from 'svelte-sonner';
+import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 
 const runLaunchCheck = readFileSync(
   join(process.cwd(), '..', 'examples', 'run_launch_check.dot'),
@@ -129,6 +131,51 @@ describe('WorkflowDetailPage', () => {
 
       const urls = fetchSpy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input));
       expect(urls.filter((u) => /\/api\/(runs|workflows)$/.test(u))).toEqual([]);
+    });
+  });
+
+  describe('Show in Finder', () => {
+    afterEach(async () => {
+      delete window.__TAURI__;
+      toast.dismiss();
+      await waitFor(() => expect(document.querySelectorAll('[data-sonner-toast][data-removed="false"]')).toHaveLength(0));
+    });
+
+    it('is not offered in the browser', () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      expect(within(toolbar()).queryByRole('button', { name: 'Show in Finder' })).toBeNull();
+    });
+
+    it("reveals the workflow's file in the desktop app, before Edit Workflow", async () => {
+      const invoke = vi.fn(async () => undefined as never);
+      window.__TAURI__ = { core: { invoke } };
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      const button = within(toolbar()).getByRole('button', { name: 'Show in Finder' });
+      const edit = within(toolbar()).getByRole('link', { name: 'Edit Workflow' });
+      expect(button.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await fireEvent.click(button);
+
+      expect(invoke).toHaveBeenCalledWith('reveal_in_finder', { path: WORKFLOW.path });
+    });
+
+    it('says why when the file cannot be shown', async () => {
+      window.__TAURI__ = {
+        core: {
+          invoke: async () => {
+            throw new Error("That file isn't in a workflows folder.");
+          },
+        },
+      };
+      render(Toaster);
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Show in Finder' }));
+
+      expect(
+        await screen.findByText("Couldn't show the file in Finder. That file isn't in a workflows folder.")
+      ).toBeTruthy();
     });
   });
 

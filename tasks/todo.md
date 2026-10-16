@@ -381,14 +381,14 @@ The banner replaces the old featured-run card.
 - A failure shows the toast "Couldn't show the file in Finder. {message}".
 
 **Acceptance criteria:**
-- [ ] Without `__TAURI__` the button is absent. With it mocked, the button is present and calls
+- [x] Without `__TAURI__` the button is absent. With it mocked, the button is present and calls
   `invoke('reveal_in_finder', { path: workflow.path })`.
-- [ ] A rejected invoke shows the toast with the message.
-- [ ] `no-tauri-breakage.spec.ts` still passes.
+- [x] A rejected invoke shows the toast with the message.
+- [x] `no-tauri-breakage.spec.ts` still passes.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/lib/native tests/components/dashboard/WorkflowDetailPage.test.ts`
-- [ ] `npm run test:e2e -- no-tauri-breakage`
+- [x] `npm run test -- --run tests/lib/native tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm run test:e2e -- no-tauri-breakage`
 - [ ] Manual check (Mac): in `make desktop-dev`, Show in Finder reveals the `.dot` file in
   Finder
 

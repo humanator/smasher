@@ -91,4 +91,23 @@ describe('native shim', () => {
       warn.mockRestore();
     });
   });
+
+  describe('revealInFinder', () => {
+    afterEach(() => {
+      delete window.__TAURI__;
+    });
+
+    it('refuses outside the desktop app', async () => {
+      await expect(native.revealInFinder('/w/review.dot')).rejects.toThrow('Show in Finder is only available in the desktop app');
+    });
+
+    it("invokes the desktop app's reveal_in_finder command with the path", async () => {
+      const invoke = vi.fn(async () => undefined as never);
+      window.__TAURI__ = { core: { invoke } };
+
+      await native.revealInFinder('/w/review.dot');
+
+      expect(invoke).toHaveBeenCalledWith('reveal_in_finder', { path: '/w/review.dot' });
+    });
+  });
 });

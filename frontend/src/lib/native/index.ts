@@ -1,5 +1,5 @@
 // ABOUTME: Native shim for Tauri integration
-// ABOUTME: File dialogs, save/load, notifications with browser fallbacks; desktop-only LLM settings
+// ABOUTME: File dialogs, save/load, notifications with browser fallbacks; desktop-only LLM settings and Show in Finder
 
 // Type definitions for Tauri window object
 interface TauriApi {
@@ -207,10 +207,14 @@ export interface LlmSettingsUpdate {
 }
 
 /** Invoke one of smasher-desktop's own commands; throws outside the desktop app. */
-function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+function invoke<T>(
+  command: string,
+  args?: Record<string, unknown>,
+  unavailable = 'LLM settings are only available in the desktop app'
+): Promise<T> {
   const invokeFn = window.__TAURI__?.core?.invoke;
   if (!invokeFn) {
-    return Promise.reject(new Error('LLM settings are only available in the desktop app'));
+    return Promise.reject(new Error(unavailable));
   }
   return invokeFn<T>(command, args);
 }
@@ -228,4 +232,9 @@ export function saveLlmSettings(update: LlmSettingsUpdate): Promise<LlmSettings>
 /** Find the `claude` binary (`path` first; empty searches) and report its version. */
 export function detectClaudeCli(path: string): Promise<ClaudeCliDetection> {
   return invoke<ClaudeCliDetection>('detect_claude_cli', { path });
+}
+
+/** Reveal a workflow's .dot file in Finder; the app refuses paths outside its workflow folders. */
+export function revealInFinder(path: string): Promise<void> {
+  return invoke<void>('reveal_in_finder', { path }, 'Show in Finder is only available in the desktop app');
 }
