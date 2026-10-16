@@ -85,7 +85,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 - [ ] Task 5: `WorkflowTable` (status, last activity, empty, loading, error)
 - [ ] Task 6: `DashboardPage` + toolbar (title, subtitle, search, Import, Settings, New) + swap
   it into `App.svelte`
-- [ ] Task 7: `RunList` filters, `?runs=` sync, durations; restyle `RunTable`
+- [x] Task 7: `RunList` filters, `?runs=` sync, durations; restyle `RunTable`
 - [ ] Task 8: `NeedsYouBanner`
 - [ ] Task 9: `e2e/dashboard.spec.ts`, plus `app-shell.spec.ts` updates
 

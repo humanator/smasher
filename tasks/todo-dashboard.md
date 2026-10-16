@@ -230,15 +230,15 @@ Restyle `RunTable` into grid rows where each row is one link: badge, workflow ti
 id, Started, Duration. It takes an optional `now` prop that ticks every 30 s.
 
 **Acceptance criteria:**
-- [ ] Each filter shows the right rows and counts. A reload with `?runs=failed` restores the
+- [x] Each filter shows the right rows and counts. A reload with `?runs=failed` restores the
   filter. `?runs=needs-you` selects Active with needs-you runs first.
-- [ ] Durations tick for active runs (fake timers) and stay fixed for finished ones.
-- [ ] `WorkflowDetailPage` still renders its run history through `RunTable` unchanged, and its
+- [x] Durations tick for active runs (fake timers) and stay fixed for finished ones.
+- [x] `WorkflowDetailPage` still renders its run history through `RunTable` unchanged, and its
   tests pass.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/RunList.test.ts tests/components/dashboard/RunTable.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
-- [ ] `npm run test:e2e -- workflow-detail`
+- [x] `npm run test -- --run tests/components/dashboard/RunList.test.ts tests/components/dashboard/RunTable.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm run test:e2e -- workflow-detail`
 
 **Dependencies:** T0, T2, T3, T4
 
