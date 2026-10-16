@@ -98,7 +98,7 @@ All ── T13 responsive + a11y ── T14 sign-off
 
 - [x] Task 10: Run sheet restyle + `runRequest` copy; update `run-launch.spec.ts`
 - [x] Task 11: Settings window frame, browser/desktop tabs, Defaults section, saved copy
-- [ ] Task 12: Services + Claude CLI sections; update `settings.spec.ts`
+- [x] Task 12: Services + Claude CLI sections; update `settings.spec.ts`
 
 ### Checkpoint C: Dialogs
 

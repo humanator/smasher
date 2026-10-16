@@ -391,15 +391,15 @@ inline result, and **Tools AI Agent steps may use** with **Reset to Default**.
 Save order doesn't change. Update `settings.spec.ts`.
 
 **Acceptance criteria:**
-- [ ] Expanding and collapsing rows works with `aria-expanded`. Remove clears the saved key
+- [x] Expanding and collapsing rows works with `aria-expanded`. Remove clears the saved key
   through the same `saveLlmSettings` payload as before.
-- [ ] Detect shows its result, and Reset to Default restores `default_allowed_tools`.
-- [ ] `settings.spec.ts` passes.
+- [x] Detect shows its result, and Reset to Default restores `default_allowed_tools`.
+- [x] `settings.spec.ts` passes.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/SettingsDialog.test.ts tests/lib/native`
-- [ ] `npm run test:e2e -- settings`
-- [ ] Manual: `make desktop-dev`, saving a key, then running hello-world
+- [x] `npm run test -- --run tests/components/dashboard/SettingsDialog.test.ts tests/lib/native`
+- [x] `npm run test:e2e -- settings`
+- [ ] Manual: `make desktop-dev`, saving a key, then running hello-world (needs a Mac)
 
 **Dependencies:** T11
 
