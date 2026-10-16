@@ -55,7 +55,7 @@ Sidebar (shell `SourceList`, shown on the board):
 | S2 | Med | Workflow list rows have no leading document icon when expanded (icon only appears collapsed). | file icon `#6E6E73` per row (Home:46) | `SourceList.svelte:137-141` | No |
 | S3 | Low | Library icons differ: Workflow / Play / Hand vs design branch / clock / person glyphs. | Home:30, 34, 38 | `SourceList.svelte:80,93,106` | No |
 | S4 | Low | Counts are 11px; design 12px. Needs-you count uses the generic Badge (18px tall, weight 500) vs the design's 16px tall, 600 weight, min-width 18px pill. | Home:31,35,39 | `SourceList.svelte:83,96,110` | No |
-| S5 | Low | Header shows "Smasher" wordmark + Toggle sidebar button in the browser; design draws traffic lights. A "Design system" link sits above the footer (not drawn). | Home:22-26, 52 | `SourceList.svelte:45-67,163` | Traffic lights: intentional (SPEC.md "Never draw fake traffic lights"); wordmark, toggle and link: not in design |
+| S5 | Low | Header shows "Smasher" wordmark + Toggle sidebar button in the browser; design draws traffic lights. A "Design system" link sits above the footer (not drawn). | Home:22-26, 52 | `SourceList.svelte:45-67,163` | Traffic lights: intentional (CAPABILITY_MAP.md "Never draw fake traffic lights"); wordmark, toggle and link: not in design |
 
 ---
 

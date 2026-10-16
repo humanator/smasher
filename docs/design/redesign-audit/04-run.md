@@ -16,9 +16,9 @@ Severity: **High** = structural/missing capability or a functional bug; **Med** 
 
 ## 0. Status of the module
 
-- `SPEC.md:38` lists `run` as a capability-map module ("progress, activity log, decision panel
+- `CAPABILITY_MAP.md:38` lists `run` as a capability-map module ("progress, activity log, decision panel
   (candidates, note, choice), plain-language failure panel with 'What you can try', run details").
-  There is **no `SPEC-run.md`** (only `SPEC.md`, `SPEC-shell-theme.md`, `SPEC-dashboard.md` exist).
+  There is **no `SPEC-run.md`** (only `CAPABILITY_MAP.md`, `SPEC-shell-theme.md`, `SPEC-dashboard.md` exist).
 - `git log` shows no run-module work. The last commits touching the run components predate the
   redesign (`5fd6fb2` QuestionCard, `cff66fb`/`b44673b`/`0e97dc7` EventLog). Since then the only
   changes are shell-wide: `010d275` "Wrap every route in AppShell", `d5ed2ea` Toolbar,
@@ -54,7 +54,7 @@ Severity: **High** = structural/missing capability or a functional bug; **Med** 
 | 2.7 | High | **"Run Again" (toolbar, outline, `refresh` icon) is missing for completed and failed runs** (:72-74). There is no rerun capability on the run page. The API can start a run from `workflow_id` (`runs.ts:142 runWorkflow`), but `RunSummary` (runs.ts:11-25) doesn't expose the run's input **variables, model or provider**, so the rerun can't reuse its inputs. **API gap.** |
 | 2.8 | Low | **Separator.** Design: a 1×18px `rgba(0,0,0,.12)` rule between the run actions and the inspector toggle (:75). Impl: `Separator orientation="vertical" class="h-5"` (20px) between the badge and Abort (RunDetail.svelte:98). It is also in a different position, and it disappears for terminal runs. |
 | 2.9 | Low | **Settings button.** The impl appends `LazySettingsDialog` to every non-catalog page's header (App.svelte:149-151). The design's run toolbar has no settings button. Keep it as a capability, but decide where it goes. |
-| 2.10 | Med | **Resume is never offered.** `resumeRun` exists (`runs.ts:166`) but nothing in `src/` calls it (verified by grep). SPEC.md success criterion 2 lists "cancel/resume". The design has no Resume either, so this is a capability gap on both sides. |
+| 2.10 | Med | **Resume is never offered.** `resumeRun` exists (`runs.ts:166`) but nothing in `src/` calls it (verified by grep). CAPABILITY_MAP.md success criterion 2 lists "cancel/resume". The design has no Resume either, so this is a capability gap on both sides. |
 
 ## 3. Hero, per state
 
@@ -69,14 +69,14 @@ state**.
 ### 3b. Running
 | # | Sev | Finding |
 |---|---|---|
-| 3b.1 | High | Design: a `section[aria-live=polite]` card with padding 18/20, radius 10px, background `#F7F7F9` (`--muted`) and a hairline border (:94-101). It holds the kicker "Now running" (11px/600 muted), the `h2` current step label (20px/700), a description (12.5px/1.45 muted: "This step makes one AI call that reviews the candidates as a usability critic. It usually takes under a minute.") and a 4px indeterminate bar: a 35% `#BE185D` (`--primary`) slider on `rgba(0,0,0,.08)`, `wfslide 1.6s linear infinite`. The impl has none of this. The current step can be derived from the last `node_started` with no matching completion. The step **label** and a **plain-language step description** aren't in the API: events carry only `node_id` and `node_type`. "Usually takes under a minute" would be invented data (SPEC.md boundary). Drop that sentence or get typical durations from a source. |
+| 3b.1 | High | Design: a `section[aria-live=polite]` card with padding 18/20, radius 10px, background `#F7F7F9` (`--muted`) and a hairline border (:94-101). It holds the kicker "Now running" (11px/600 muted), the `h2` current step label (20px/700), a description (12.5px/1.45 muted: "This step makes one AI call that reviews the candidates as a usability critic. It usually takes under a minute.") and a 4px indeterminate bar: a 35% `#BE185D` (`--primary`) slider on `rgba(0,0,0,.08)`, `wfslide 1.6s linear infinite`. The impl has none of this. The current step can be derived from the last `node_started` with no matching completion. The step **label** and a **plain-language step description** aren't in the API: events carry only `node_id` and `node_type`. "Usually takes under a minute" would be invented data (CAPABILITY_MAP.md boundary). Drop that sentence or get typical durations from a source. |
 | 3b.2 | Med | **Iterating variant.** After "Try Again with My Notes" the design shows the running hero with "Making new candidates from your notes" / "Your decision was recorded. The workflow has gone back to Draft three concepts for another round." (:467-468). Impl: the one line `Decision recorded — resuming…` in `text-green-700` (GalleryGate.svelte:112). |
 
 ### 3c. Completed
 | # | Sev | Finding |
 |---|---|---|
 | 3c.1 | High | Design: a success card with background `#F2FAF4`, border `rgba(40,200,64,.3)`, radius 10px and padding 18/20 (:104-113). It has a 32px `#28C840` circle with a white check (stroke 3), the `h2` "Finished in 10 min 35 s" (`formatDuration` style), the line "You approved concept-a. The workflow then ran to the end." (12.5px, `#3A3A3C`; derivable from `/decisions`), and an outline Button **"Show Results in Finder"** with a `folder` icon. Impl: only the Completed badge, plus a centred `text-green-600` "Pipeline complete" line at the bottom of the event log (EventLog.svelte:149-151). |
-| 3c.2 | High | **"Show Results in Finder" has no backing.** There is no reveal-in-Finder endpoint or Tauri command; grep for `reveal`/`Finder` finds nothing in `src/`. SPEC.md:44 assigns a reveal-in-Finder API addition to the first module that needs it. The browser needs a fallback, such as copying the path or hiding the button. |
+| 3c.2 | High | **"Show Results in Finder" has no backing.** There is no reveal-in-Finder endpoint or Tauri command; grep for `reveal`/`Finder` finds nothing in `src/`. CAPABILITY_MAP.md:44 assigns a reveal-in-Finder API addition to the first module that needs it. The browser needs a fallback, such as copying the path or hiding the button. |
 | 3c.3 | Low | The completed copy is gallery-specific. Runs without a gate need generic copy, which the design doesn't define. |
 
 ### 3d. Failed
@@ -120,7 +120,7 @@ state**.
 |---|---|---|
 | 6.1 | High | **The step list is missing.** Design: a header "Progress" plus **"{n} of 7 done"** (11px muted). It is an `ol` with a white background, hairline border, radius 8 and padding 4/0. Each row has padding 6/10, gap 10, and an **18px status dot** (:230-247,404-417): done `#28C840` with a white ✓; failed `#FF3B30` with ✕; waiting `#BE185D` with "?"; running is a spinner (2px `rgba(0,0,0,.1)` border, pink top, `wfspin .9s`); pending is a white disc with a 1.5px `rgba(0,0,0,.2)` border. The label is 13px, weight 500 when active and 400/muted when pending. The meta line is 11px **"{plain kind} · {state}"**, e.g. "AI Agent · Ran twice · 2m 41s", "Ask a person · Waiting for you" (`#9D174D`), "Tool · Stopped with an error" (`#C4170F`), "Branch · Ran twice · went back once", "Ask a person · Answered · 6m 28s", "Tool · Second run in progress". Impl: none. |
 | 6.2 | High | **API gap: the run's ordered node list.** Progress needs every node, including pending ones, with id, label and handler. `GET /api/runs/{id}/graph` returns only SVG (runs.ts:178). `POST /api/graph/nodes` (runs.ts:193) needs `dot_source`, and `RunSummary` exposes neither the DOT nor the nodes. Re-reading the workflow's current DOT could drift from what the run actually executed. Proposed additive endpoint: `GET /api/runs/{id}/nodes` returning `{id,label,node_type}` in graph order. Per-node state, run count ("Ran twice"), summed durations and loops can be derived from SSE events (`node_started.node_type` is the `NodeType` Debug name, e.g. `Codergen`, engine.rs:575-578, so `stepKind()` maps it). |
-| 6.3 | Med | **Pipeline Graph (Graphviz SVG)** (RunDetail.svelte:128-142, with polling :53-66,84) is an impl capability **absent from the design**. SPEC.md "Ask first: dropping a capability…". Either keep it, for example as a "Graph" view inside Progress or Details, or get approval to drop it. The Graphviz-missing hint (`lib/graphError.ts`) goes with it. |
+| 6.3 | Med | **Pipeline Graph (Graphviz SVG)** (RunDetail.svelte:128-142, with polling :53-66,84) is an impl capability **absent from the design**. CAPABILITY_MAP.md "Ask first: dropping a capability…". Either keep it, for example as a "Graph" view inside Progress or Details, or get approval to drop it. The Graphviz-missing hint (`lib/graphError.ts`) goes with it. |
 
 ## 7. Inspector: Activity tab (event log)
 
@@ -156,7 +156,7 @@ state**.
 
 | # | Sev | Finding |
 |---|---|---|
-| 10.1 | High | The design covers only the gallery-gate decision. Free-form, multiple-choice and approval questions (QuestionCard.svelte:143-217) and the **Answered Questions** list with markdown replies (:224-241) aren't designed. They **must be kept** (SPEC.md success criterion 2: "answer gates"). Recommend reusing the waiting hero (kicker = node label · "Ask a person", `h2` = question) and the bottom decision bar (approval → "Yes"/"No" buttons; free-form → Textarea plus a primary button; multiple choice → options). |
+| 10.1 | High | The design covers only the gallery-gate decision. Free-form, multiple-choice and approval questions (QuestionCard.svelte:143-217) and the **Answered Questions** list with markdown replies (:224-241) aren't designed. They **must be kept** (CAPABILITY_MAP.md success criterion 2: "answer gates"). Recommend reusing the waiting hero (kicker = node label · "Ask a person", `h2` = question) and the bottom decision bar (approval → "Yes"/"No" buttons; free-form → Textarea plus a primary button; multiple choice → options). |
 | 10.2 | Med | **Copy and technical detail.** The headings "Pending Questions" / "Answered Questions" are Title Case. The kind badge is `uppercase` ("FREE FORM"), and the **raw question id** is printed in mono (QuestionCard.svelte:135-136). The design hides technical ids, so this conflicts with the plain-language goal. Placeholder "Enter your answer", "Submit" and "No pending questions." have no design equivalents. |
 | 10.3 | Med | **Styling.** The pending card is `border-l-4 border-primary bg-primary/5` (:133); use `bg-primary-subtle`. The answered card is `border-green-600 bg-green-50` with `text-green-700` (:227,229), with no dark-mode variants. Approval Yes is `bg-green-600 text-white hover:bg-green-700` and No is `bg-destructive text-white` (:168-180). Both are colour overrides on the `default` Button rather than variants. |
 

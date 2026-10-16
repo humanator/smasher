@@ -7,7 +7,7 @@ import { join, relative } from 'path';
 
 const SRC = join(process.cwd(), 'src');
 
-// The editor still styles nodes from nodeConfig.ts hex values; its rebuild (SPEC.md `editor`
+// The editor still styles nodes from nodeConfig.ts hex values; its rebuild (CAPABILITY_MAP.md `editor`
 // module) moves it onto stepKinds, and then it joins this list.
 const SCANNED = ['lib/components/ui', 'components/shell', 'components/dashboard', 'components/design'];
 

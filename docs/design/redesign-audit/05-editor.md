@@ -8,7 +8,7 @@ Severity: **High** = a whole design feature is missing or the screen looks or be
 
 ## 0. Status: the editor has not been rebuilt
 
-- `SPEC.md:39` lists module `editor` ("palette with search + step guide, canvas chrome, plain-language settings inspector…"). There is no `SPEC-editor.md`, only `SPEC.md`, `SPEC-shell-theme.md` and `SPEC-dashboard.md`. No editor plan exists in `tasks/` either.
+- `CAPABILITY_MAP.md:39` lists module `editor` ("palette with search + step guide, canvas chrome, plain-language settings inspector…"). There is no `SPEC-editor.md`, only `CAPABILITY_MAP.md`, `SPEC-shell-theme.md` and `SPEC-dashboard.md`. No editor plan exists in `tasks/` either.
 - `git log` shows no redesign commit under `components/node-editor/`. The latest commits there are ModelPicker and Settings work (`b12d7aa`, `1c962c8`) and older feature work (`ff89dda`, `65759cf`…). `stepKinds.ts` was added in `ebbc2d3` (shell-theme R3) but nothing in the editor uses it.
 - `stepKind()` has one consumer, `components/design/PrimitivesGallery.svelte:19,70`, plus its test. `WorkflowCanvas.svelte:20`, `Palette.svelte:6` and `convert.ts:6` all still import `nodeConfig.ts` (`NODE_KIND_CONFIG`, `THEME_COLORS`, `nodeStyleFor`, `PALETTE_GROUPS`). **(High)**
 - So the editor is the pre-redesign Svelte Flow editor with shell-theme tokens around it. Almost every section below is a gap.

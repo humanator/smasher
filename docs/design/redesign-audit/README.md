@@ -173,12 +173,12 @@ Two flaky tests are worth knowing about:
 - **The Needs-you banner says "Open Run" while loading.** The button reads "Open Run" until its
   questions fetch resolves, then changes. The spec keeps "Open Run" for a failed fetch only.
 - **Resume can't be reached.** `resumeRun` is in the API client, but no UI calls it, though
-  SPEC.md requires cancel/resume.
+  CAPABILITY_MAP.md requires cancel/resume.
 
 ## API data the unbuilt screens need
 
 The API has no endpoint or field for any of these. All would be additive, read-only additions,
-which SPEC.md allows.
+which CAPABILITY_MAP.md allows.
 
 - **Run page:**
   - the run's ordered step list (id, label, type) for Progress, step labels and the failure

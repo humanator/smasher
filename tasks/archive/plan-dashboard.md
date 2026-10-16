@@ -1,6 +1,6 @@
 # Implementation Plan: `dashboard`
 
-Spec: [SPEC-dashboard.md](SPEC-dashboard.md), part of [SPEC.md](../../SPEC.md).
+Spec: [SPEC-dashboard.md](SPEC-dashboard.md), part of [CAPABILITY_MAP.md](../CAPABILITY_MAP.md).
 The task list is in [todo-dashboard.md](todo-dashboard.md).
 
 > These files sit beside `plan.md` / `todo.md` because shell-theme still has open manual checks

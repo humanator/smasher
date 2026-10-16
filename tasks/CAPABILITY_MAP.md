@@ -1,12 +1,12 @@
-# Spec: Smasher frontend redesign
+# Capability Map: Smasher frontend redesign
 
-Status: **Capability map approved 2026-10-14.** Module specs (`SPEC-<module-id>.md`) are
-written in build order, and each one is approved before it is planned.
+Status: **Approved 2026-10-14.** Module specs (`SPEC-<module-id>.md`) sit beside this map in
+`tasks/`, are written in build order, and are each approved before planning; done ones move to `archive/`.
 
 Design source: Claude Design canvas "Smasher Workflow Editor Redesign"
 (https://claude.ai/artifact/YQ7Hstw2od9Bx5wCi2JdtZ). Artboards: `Home` (Dashboard),
 `Workflow` (Workflow detail), `Run`, `Main` (Workflow editor), `Components` + 14 component boards.
-Offline copies are in [docs/design/redesign/](docs/design/redesign/README.md).
+Offline copies are in [docs/design/redesign/](../docs/design/redesign/README.md).
 
 ## Objective
 

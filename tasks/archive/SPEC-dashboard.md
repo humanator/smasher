@@ -1,6 +1,6 @@
 # Spec: `dashboard`
 
-Module of [SPEC.md](../../SPEC.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](plan-dashboard.md).
+Module of [CAPABILITY_MAP.md](../CAPABILITY_MAP.md). Status: **Approved 2026-10-16.** Plan: [tasks/plan-dashboard.md](plan-dashboard.md).
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`, `libraryStore`,
 `pending_questions`).
 
@@ -33,7 +33,7 @@ and later from workflow-detail. The Settings dialog opens from the toolbar on ev
 | D2 | Settings copy says changes apply to the next run, because they do. Drop "Changes apply after Smasher restarts" and the **Restart Now** button. |
 | D3 | The Run sheet keeps `ModelPicker` (provider + model), restyled under the design's **Model** label and hint. Per-run provider choice stays. |
 | D4 | In a browser, Settings shows only Defaults: no tab strip and no Keychain line. The desktop app shows all three sections. |
-| D5 | The Settings window has no traffic lights. It uses a labelled close (×) icon button, per SPEC.md's "Never: draw fake window traffic lights". |
+| D5 | The Settings window has no traffic lights. It uses a labelled close (×) icon button, per CAPABILITY_MAP.md's "Never: draw fake window traffic lights". |
 
 ## Requirements
 
@@ -241,7 +241,7 @@ and drops the catalog's **New Workflow** header button, which moves into the too
 
 ## Code Style
 
-This follows SPEC.md. Keep pure logic in `lib/` so it can be unit-tested without the DOM:
+This follows CAPABILITY_MAP.md. Keep pure logic in `lib/` so it can be unit-tested without the DOM:
 
 ```ts
 // ABOUTME: Run-status helpers shared by the dashboard, workflow page and run page
@@ -300,7 +300,7 @@ TDD per task. Write the failing test first.
 
 ## Boundaries
 
-- **Always:** everything in SPEC.md's Always list; derive data from the API (counts, times
+- **Always:** everything in CAPABILITY_MAP.md's Always list; derive data from the API (counts, times
   and durations are never hard-coded); keep one status → badge mapping.
 - **Ask first:**
   - any API change beyond `waiting_since`
