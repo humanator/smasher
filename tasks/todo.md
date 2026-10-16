@@ -198,18 +198,18 @@ The quotes are typographic (“ ”).
   replace them.
 
 **Acceptance criteria:**
-- [ ] The toolbar shows the back button, the title (`h1`), the mono file-name subtitle, Edit
+- [x] The toolbar shows the back button, the title (`h1`), the mono file-name subtitle, Edit
   Workflow and Run. The loading title is "Workflow". An unknown id shows "Workflow not found"
   with the R6 copy and the back link only.
-- [ ] Run opens the sheet, and the request body is unchanged: the existing RunDialog tests and
+- [x] Run opens the sheet, and the request body is unchanged: the existing RunDialog tests and
   the "Cancel launches nothing" case pass.
-- [ ] The page makes no `/api/runs` or `/api/workflows` requests of its own. A test asserts
+- [x] The page makes no `/api/runs` or `/api/workflows` requests of its own. A test asserts
   this with a fake store.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/WorkflowDetailPage.test.ts`
   (port every existing case, and drop none)
-- [ ] `npm run check` and `npm run lint`
+- [x] `npm run check` and `npm run lint`
 
 **Dependencies:** None (it uses only existing shell-theme APIs)
 

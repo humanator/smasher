@@ -134,10 +134,17 @@ describe('App page header on other routes', () => {
   });
 
   it('every non-catalog route has a back link to the catalog and no breadcrumb', () => {
-    for (const path of ['/workflows/new', '/workflows/some-id/edit', '/workflows/some-id', '/runs/some-run']) {
+    // The workflow page names the catalog by its own title; the rest use the app's.
+    const backLabels: Record<string, string> = {
+      '/workflows/new': 'Back to Smasher Pipelines',
+      '/workflows/some-id/edit': 'Back to Smasher Pipelines',
+      '/workflows/some-id': 'Back to Workflows',
+      '/runs/some-run': 'Back to Smasher Pipelines',
+    };
+    for (const [path, name] of Object.entries(backLabels)) {
       visit(path);
       const { unmount } = render(App);
-      const link = within(screen.getByRole('banner')).getByRole('link', { name: 'Back to Smasher Pipelines' });
+      const link = within(screen.getByRole('banner')).getByRole('link', { name });
       expect(link.getAttribute('href'), path).toBe('/');
       expect(screen.queryByRole('navigation', { name: 'breadcrumb' }), path).toBeNull();
       unmount();
@@ -295,16 +302,18 @@ describe('App workflow detail route', () => {
     await waitFor(() => expect(document.title).toBe(`${title} — Smasher`), { timeout: 4000 });
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('heading', { level: 1, name: title })).toBeTruthy();
-    expect(within(header).getByRole('link', { name: 'Back to Smasher Pipelines' })).toBeTruthy();
-    expect(within(header).getByRole('button', { name: 'Run Workflow' })).toBeTruthy();
-    expect(screen.getByText(/^Source: /)).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'Back to Workflows' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Run' })).toBeTruthy();
+    expect(within(header).getByTestId('toolbar-subtitle').textContent).toMatch(/^test_AppDetail\.v1_\d+\.dot · \//);
   });
 
   it('titles an unknown workflow as not found', async () => {
     visit('/workflows/no-such-workflow');
     render(App);
 
-    expect(await screen.findByText('Workflow not found.', {}, { timeout: 5000 })).toBeTruthy();
+    expect(
+      await screen.findByText("We couldn't find that workflow. It may have been renamed or moved.", {}, { timeout: 5000 })
+    ).toBeTruthy();
     await waitFor(() => expect(document.title).toBe('Workflow not found — Smasher'));
   });
 
