@@ -101,6 +101,29 @@ describe('library store', () => {
     expect(store.workflowState('no-such-workflow')).toBeNull();
   });
 
+  it('is not loaded and has no error before the first refresh, then loaded after it', async () => {
+    const store = track(createLibraryStore());
+    expect(store.loaded).toBe(false);
+    expect(store.error).toBeNull();
+
+    await store.refresh();
+    expect(store.loaded).toBe(true);
+    expect(store.error).toBeNull();
+  });
+
+  it('reports a failed refresh as an error, and clears it on the next good one', async () => {
+    const store = track(createLibraryStore());
+    setApiBaseUrl('http://127.0.0.1:1/api');
+    await store.refresh();
+    expect(store.loaded).toBe(false);
+    expect(store.error).toBeTruthy();
+
+    setApiBaseUrl(API_URL);
+    await store.refresh();
+    expect(store.loaded).toBe(true);
+    expect(store.error).toBeNull();
+  });
+
   it('keeps the previous data when a poll fails', async () => {
     const store = track(createLibraryStore());
     await store.refresh();

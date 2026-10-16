@@ -196,16 +196,16 @@ catalog's New Workflow header button. Finish porting `WorkflowCatalog.test.ts` (
 import error), then remove `WorkflowCatalog.svelte` and its test.
 
 **Acceptance criteria:**
-- [ ] The toolbar has the title, a live subtitle (the " · k needs you" part only when k > 0),
+- [x] The toolbar has the title, a live subtitle (the " · k needs you" part only when k > 0),
   search, and three accessibly named icon buttons. Settings opens the dialog.
-- [ ] Import works as before: the browser path is tested, and an error shows inline.
-- [ ] Every `WorkflowCatalog.test.ts` case lives on in a new test file before the old one is
+- [x] Import works as before: the browser path is tested, and an error shows inline.
+- [x] Every `WorkflowCatalog.test.ts` case lives on in a new test file before the old one is
   deleted.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard tests/components/shell`
-- [ ] `npm run check`
-- [ ] Manual: `/` in the browser shows the new toolbar and table
+- [x] `npm run test -- --run tests/components/dashboard tests/components/shell`
+- [x] `npm run check`
+- [x] Manual: `/` in the browser shows the new toolbar and table
 
 **Dependencies:** T5
 

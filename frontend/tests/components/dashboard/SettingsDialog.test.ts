@@ -55,7 +55,7 @@ const modelSelect = () => screen.getByTestId('settings-model') as HTMLSelectElem
 async function openDialog() {
   const user = userEvent.setup();
   render(SettingsDialog);
-  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: 'AI model settings' }));
   await screen.findByTestId('settings-provider');
   // The test server always has the claude-cli provider.
   await waitFor(() => expect(providerSelect().querySelector('option[value="claude-cli"]')).toBeTruthy());
@@ -240,7 +240,7 @@ describe('SettingsDialog', () => {
       const user = userEvent.setup();
       render(SettingsDialog);
 
-      await user.click(screen.getByRole('button', { name: 'Settings' }));
+      await user.click(screen.getByRole('button', { name: 'AI model settings' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent('not valid settings JSON');
     });

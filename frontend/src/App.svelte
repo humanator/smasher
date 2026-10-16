@@ -1,11 +1,10 @@
 <script lang="ts">
   // ABOUTME: Root app shell - routes to components based on URL path
-  // ABOUTME: Minimal manual routing: catalog at /, run detail at /runs/{id}, workflow pages at /workflows/*
+  // ABOUTME: Minimal manual routing: dashboard at /, run detail at /runs/{id}, workflow pages at /workflows/*
 
   import './app.css';
   import { onMount } from 'svelte';
-  import WorkflowCatalog from './components/dashboard/WorkflowCatalog.svelte';
-  import RunList from './components/dashboard/RunList.svelte';
+  import DashboardPage from './components/dashboard/DashboardPage.svelte';
   import RunDetail from './components/dashboard/RunDetail.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
   import QuestionCard from './components/dashboard/QuestionCard.svelte';
@@ -15,7 +14,6 @@
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import AppShell from './components/shell/AppShell.svelte';
   import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
   import { ModeWatcher } from 'mode-watcher';
   import { providePageHeader } from '$lib/page-header.svelte';
@@ -40,7 +38,7 @@
           ? (pageHeader.title ?? 'Workflow')
           : runId
           ? `Run ${runId}`
-          : 'Smasher Pipelines'
+          : 'Workflows'
   );
   // The tab title puts the page first so truncated tabs stay readable.
   const documentTitle = $derived(
@@ -145,17 +143,12 @@
   }
 </script>
 
-{#snippet newWorkflowAction()}
-  <Button href="/workflows/new">New Workflow</Button>
-{/snippet}
-
 {#snippet headerActions()}
-  {#if isCatalog}
-    {@render newWorkflowAction()}
-  {:else}
-    {@render pageHeader.actions?.()}
+  {@render pageHeader.actions?.()}
+  <!-- The dashboard places its own settings button, between Import and New workflow. -->
+  {#if !isCatalog}
+    <SettingsDialog />
   {/if}
-  <SettingsDialog />
 {/snippet}
 
 <AppShell
@@ -234,11 +227,7 @@
       </div>
     </div>
   {:else}
-    <!-- Catalog View: Workflows and Runs stacked in the main column -->
-    <div class="mx-auto max-w-6xl px-4 sm:px-8">
-      <WorkflowCatalog />
-      <RunList />
-    </div>
+    <DashboardPage />
   {/if}
 </AppShell>
 

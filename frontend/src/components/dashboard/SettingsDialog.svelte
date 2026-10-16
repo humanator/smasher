@@ -2,6 +2,7 @@
   // ABOUTME: Settings modal: the default provider/model for new runs, plus (desktop only) API keys, base URLs and the Claude CLI
   // ABOUTME: The default goes through PUT /api/settings; desktop keys go to the Keychain via Tauri commands and never come back
 
+  import { untrack } from 'svelte';
   import SettingsIcon from '@lucide/svelte/icons/settings';
   import * as Dialog from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -34,7 +35,14 @@
     ollama: 'Ollama Cloud by default; http://localhost:11434 for a local ollama serve',
   };
 
-  let open = $state(false);
+  let {
+    open = $bindable(false),
+    trigger = true,
+  }: {
+    open?: boolean;
+    /** False when the page opens the dialog from its own button. */
+    trigger?: boolean;
+  } = $props();
   let loading = $state(false);
   let saving = $state(false);
   let saved = $state(false);
@@ -158,20 +166,29 @@
     }
   }
 
+  // Every opening reloads, whether the trigger or the page opened it.
+  let wasOpen = false;
+  $effect(() => {
+    if (open && !wasOpen) untrack(load);
+    wasOpen = open;
+  });
+
   function keyPlaceholder(p: ProviderForm): string {
     if (p.removeKey) return 'Will be removed on save';
     return p.hasKey ? 'Stored in Keychain — type to replace' : 'Not set';
   }
 </script>
 
-<Dialog.Root bind:open onOpenChange={(isOpen) => isOpen && load()}>
-  <Dialog.Trigger>
-    {#snippet child({ props })}
-      <Button variant="ghost" size="icon" aria-label="Settings" {...props}>
-        <SettingsIcon />
-      </Button>
-    {/snippet}
-  </Dialog.Trigger>
+<Dialog.Root bind:open>
+  {#if trigger}
+    <Dialog.Trigger>
+      {#snippet child({ props })}
+        <Button variant="ghost" size="icon" aria-label="AI model settings" {...props}>
+          <SettingsIcon />
+        </Button>
+      {/snippet}
+    </Dialog.Trigger>
+  {/if}
   <Dialog.Content class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
     <Dialog.Header>
       <Dialog.Title>Settings</Dialog.Title>

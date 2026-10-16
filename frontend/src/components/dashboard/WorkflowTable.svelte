@@ -74,7 +74,7 @@
       role="table"
       aria-label="All workflows"
       aria-busy={loading}
-      class="overflow-hidden rounded-lg border border-border bg-card"
+      class="relative overflow-x-auto rounded-lg border border-border bg-card"
     >
       <div role="rowgroup">
         <div role="row" class="{GRID} h-[26px] border-b border-border bg-muted text-[11px] font-semibold text-muted-foreground">

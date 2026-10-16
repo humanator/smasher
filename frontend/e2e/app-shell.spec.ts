@@ -59,7 +59,7 @@ test('sidebar links reach Workflows, Recent runs and a workflow page', async ({ 
 
   await library.getByRole('link', { name: /^Workflows/ }).click();
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('heading', { level: 1, name: 'Smasher Pipelines' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible();
 
   await library.getByRole('link', { name: /^Recent runs/ }).click();
   await expect(page).toHaveURL('/#runs');

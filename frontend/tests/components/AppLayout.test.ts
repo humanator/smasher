@@ -1,5 +1,5 @@
 // ABOUTME: Tests for the App.svelte shell: the shared page header bar and each route's layout
-// ABOUTME: Catalog (title + New Workflow, Workflows/Runs sections), workflow editor and run detail headers
+// ABOUTME: Dashboard (title, toolbar controls, workflows/runs sections), workflow editor and run detail headers
 
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/svelte/svelte5';
@@ -24,29 +24,56 @@ function visit(path: string) {
   window.history.pushState({}, '', path);
 }
 
-describe('App catalog layout', () => {
+describe('App dashboard layout', () => {
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
-  it('puts the title and New Workflow link together in the page header', () => {
+  it('titles the toolbar Workflows and puts the dashboard controls in it', () => {
     render(App);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('heading', { name: 'Smasher Pipelines' })).toBeTruthy();
-    const link = within(header).getByRole('link', { name: 'New Workflow' });
+    expect(within(header).getByRole('heading', { level: 1, name: 'Workflows' })).toBeTruthy();
+    expect(within(header).getByRole('searchbox', { name: 'Search workflows' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'Import .dot file' })).toBeTruthy();
+    const link = within(header).getByRole('link', { name: 'New workflow' });
     expect(link.getAttribute('href')).toBe('/workflows/new');
   });
 
-  it('has no back link and no breadcrumb trail on the catalog', () => {
+  it('orders the toolbar controls search, import, settings, new', () => {
+    render(App);
+    const actions = within(screen.getByTestId('page-header-actions'));
+    const names = [
+      actions.getByRole('searchbox', { name: 'Search workflows' }),
+      actions.getByRole('button', { name: 'Import .dot file' }),
+      actions.getByRole('button', { name: 'AI model settings' }),
+      actions.getByRole('link', { name: 'New workflow' }),
+    ];
+    for (let i = 1; i < names.length; i++) {
+      expect(names[i - 1].compareDocumentPosition(names[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('counts the workflows the search shows in the subtitle', async () => {
+    const user = userEvent.setup();
+    render(App);
+    const subtitle = await screen.findByTestId('toolbar-subtitle', {}, { timeout: 5000 });
+    expect(subtitle.textContent).toMatch(/^\d+ workflows( · \d+ needs you)?$/);
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search workflows' }), 'human_gate_showcase');
+    await waitFor(() => expect(screen.getByTestId('toolbar-subtitle').textContent).toMatch(/^1 workflow( · \d+ needs you)?$/));
+  });
+
+  it('has no back link and no breadcrumb trail on the dashboard', () => {
     render(App);
     const header = screen.getByRole('banner');
     expect(within(header).queryByRole('link', { name: /^Back to / })).toBeNull();
     expect(screen.queryByRole('navigation', { name: 'breadcrumb' })).toBeNull();
   });
 
-  it('renders exactly one New Workflow link', () => {
+  it('renders exactly one New workflow link and one settings button', () => {
     render(App);
-    expect(screen.getAllByRole('link', { name: /New Workflow/ })).toHaveLength(1);
+    expect(screen.getAllByRole('link', { name: /New workflow/i })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'AI model settings' })).toHaveLength(1);
   });
 
   it('drops the redundant Available Workflows heading', () => {
@@ -60,26 +87,22 @@ describe('App catalog layout', () => {
     expect(screen.queryByLabelText('DOT Source:')).toBeNull();
   });
 
-  it('renders workflows as a table, matching the Runs table', async () => {
+  it('renders the workflows table with its columns', async () => {
     render(App);
-    // Wait for a real workflow row to land before inspecting the table --
-    // the list starts empty while GET /api/workflows is in flight.
     // Scoped to main: the sidebar lists the same workflows and loads first.
     await within(screen.getByRole('main')).findByText('Human Gate Showcase', {}, { timeout: 5000 });
-    const table = screen.getByRole('heading', { name: 'Workflows' }).closest('.workflow-catalog')
-      ?.querySelector('table');
-    expect(table).toBeTruthy();
-    const headerRow = within(table as HTMLElement).getAllByRole('columnheader');
-    expect(headerRow.map((th) => th.textContent)).toEqual(
-      expect.arrayContaining(['Name', 'Source'])
+    const table = screen.getByRole('table', { name: 'All workflows' });
+    const headerRow = within(table).getAllByRole('columnheader');
+    expect(headerRow.map((th) => th.textContent?.trim())).toEqual(
+      expect.arrayContaining(['Name', 'Status', 'Last activity', 'Location'])
     );
   });
 
-  it('renders Workflows and Runs as sections under the single page heading', () => {
+  it('renders All workflows and the runs as sections under the single page heading', () => {
     render(App);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getByRole('heading', { level: 2, name: 'Workflows' })).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 2, name: 'Runs' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'All workflows' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: /Runs|Recent runs/ })).toBeTruthy();
   });
 });
 
@@ -169,14 +192,14 @@ describe('App settings button', () => {
     visit('/');
     render(App);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('button', { name: 'Settings' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'AI model settings' })).toBeTruthy();
   });
 
   it('keeps the Settings button in the header on a run page, which has no catalog actions', () => {
     visit('/runs/some-run');
     render(App);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('button', { name: 'Settings' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'AI model settings' })).toBeTruthy();
   });
 
   it('puts a Settings button in the page header in the desktop app', () => {
@@ -184,8 +207,8 @@ describe('App settings button', () => {
     visit('/');
     render(App);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('button', { name: 'Settings' })).toBeTruthy();
-    expect(within(header).getByRole('link', { name: 'New Workflow' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'AI model settings' })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'New workflow' })).toBeTruthy();
   });
 });
 
@@ -198,13 +221,13 @@ describe('App document title', () => {
     visit('/');
   });
 
-  it('is Smasher on the catalog, while the header still reads Smasher Pipelines', async () => {
+  it('is Smasher on the dashboard, while the header reads Workflows', async () => {
     visit('/');
     render(App);
 
     await waitFor(() => expect(document.title).toBe('Smasher'));
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('heading', { name: 'Smasher Pipelines' })).toBeTruthy();
+    expect(within(header).getByRole('heading', { name: 'Workflows' })).toBeTruthy();
   });
 
   it('puts the run id first on a run page', async () => {
@@ -282,11 +305,11 @@ describe('App workflow detail route', () => {
     await waitFor(() => expect(document.title).toBe('Workflow not found — Smasher'));
   });
 
-  it('falls back to the catalog for a malformed escape', () => {
+  it('falls back to the dashboard for a malformed escape', () => {
     visit('/workflows/%E0%A4%A');
     render(App);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Smasher Pipelines' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Workflows' })).toBeTruthy();
   });
 
   it('opens the editor for an id with uppercase letters and dots', async () => {
@@ -308,11 +331,11 @@ describe('App workflow detail route', () => {
     });
   });
 
-  it('falls back to the catalog for a malformed escape in an edit path', () => {
+  it('falls back to the dashboard for a malformed escape in an edit path', () => {
     visit('/workflows/%E0%A4%A/edit');
     render(App);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Smasher Pipelines' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Workflows' })).toBeTruthy();
   });
 });
 

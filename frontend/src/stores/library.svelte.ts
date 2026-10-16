@@ -3,7 +3,7 @@
 
 import { listRuns, type RunSummary } from '$lib/api/runs';
 import { listWorkflows, type WorkflowSummary } from '$lib/api/workflows';
-import { pollFailureNotifier } from '$lib/notify';
+import { errorMessage, pollFailureNotifier } from '$lib/notify';
 import { isActive, isNeedsYou } from '$lib/runStatus';
 
 export type WorkflowState = 'needs-you' | 'running' | null;
@@ -13,6 +13,8 @@ const POLL_MS = 5000;
 export function createLibraryStore(intervalMs = POLL_MS) {
   let workflows = $state<WorkflowSummary[]>([]);
   let runs = $state<RunSummary[]>([]);
+  let loaded = $state(false);
+  let error = $state<string | null>(null);
   const needsYou = $derived(runs.filter(isNeedsYou));
   const pollFailure = pollFailureNotifier('library-poll', 'Failed to load the library');
 
@@ -24,8 +26,11 @@ export function createLibraryStore(intervalMs = POLL_MS) {
       const [workflowList, runList] = await Promise.all([listWorkflows(), listRuns()]);
       workflows = workflowList.workflows;
       runs = runList.runs;
+      loaded = true;
+      error = null;
       pollFailure.ok();
     } catch (err) {
+      error = errorMessage(err, 'Failed to load the library');
       pollFailure.fail(err);
     }
   }
@@ -57,6 +62,14 @@ export function createLibraryStore(intervalMs = POLL_MS) {
     },
     get needsYou() {
       return needsYou;
+    },
+    /** True once a refresh has succeeded. */
+    get loaded() {
+      return loaded;
+    },
+    /** The last refresh's failure, or null once one succeeds. */
+    get error() {
+      return error;
     },
 
     workflowState(workflowId: string): WorkflowState {

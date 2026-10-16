@@ -7,7 +7,7 @@ test('a default saved in the Settings dialog applies to the next run', async ({ 
   let runId: string | undefined;
   try {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'AI model settings' }).click();
 
     // The test server always has the claude-cli provider.
     const provider = page.getByTestId('settings-provider');

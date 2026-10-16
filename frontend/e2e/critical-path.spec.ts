@@ -23,16 +23,16 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   // Wait for page load
   await page.waitForLoadState('networkidle');
 
-  // Wait for the app to render - look for the catalog heading
-  await expect(page.locator('h1', { hasText: 'Smasher Pipelines' })).toBeVisible({ timeout: 10000 });
+  // Wait for the app to render - look for the dashboard heading
+  await expect(page.locator('h1', { hasText: 'Workflows' })).toBeVisible({ timeout: 10000 });
 
   // Launch examples/human_gate_showcase.dot -- already on disk and listed
   // in the catalog (SMASHER_WORKFLOWS_DIR=examples) -- via its "Run
   // Workflow" button. The catalog is the only submission path now that
   // the free-form "paste DOT source" panel has been removed from the UI.
-  const row = page.locator('tr', { hasText: 'Human Gate Showcase' });
+  const row = page.getByRole('row').filter({ hasText: 'Human Gate Showcase' });
   await expect(row).toBeVisible({ timeout: 10000 });
-  await row.getByRole('button', { name: 'Run Workflow' }).click();
+  await row.getByRole('button', { name: 'Run…' }).click();
 
   // After submission, the page should navigate to /runs/{id}
   await page.waitForURL(/\/runs\/[a-z0-9-]+/);
@@ -97,7 +97,7 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   const runStatus = (await runResponse.json()).status;
   expect(runStatus).toBe('Completed');
 
-  // The WorkflowCatalog component renders its own errors with
+  // The dashboard renders its own errors with
   // role="alert" -- confirm none of those are present.
   await expect(page.locator('[role="alert"]')).toHaveCount(0);
 });
