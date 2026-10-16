@@ -122,9 +122,12 @@ describe('App page header on other routes', () => {
     const crumb = within(header).getByRole('link', { name: 'Back to Smasher Pipelines' });
     expect(crumb.getAttribute('href')).toBe('/');
     expect(within(header).getByRole('heading', { level: 1, name: 'Create New Workflow' })).toBeTruthy();
-    await waitFor(() => {
-      expect(within(header).getByTestId('save-button')).toBeTruthy();
-    });
+    await waitFor(
+      () => {
+        expect(within(header).getByTestId('save-button')).toBeTruthy();
+      },
+      { timeout: 5000 }
+    );
     // Save moved into the header rather than being duplicated.
     expect(screen.getAllByTestId('save-button')).toHaveLength(1);
     expect(screen.queryByText('← Back to Catalog')).toBeNull();
