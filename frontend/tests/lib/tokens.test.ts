@@ -92,6 +92,8 @@ const DASHBOARD_PAIRS: [string | typeof ACCENT_TEXT, string, string][] = [
   ['primary-foreground', 'primary', 'primary-subtle'], // Needs you badge on the workflow page's active-run banner
   ['destructive', 'destructive-subtle', 'card'], // Failed badge
   ['destructive', 'destructive-subtle', 'muted'],
+  ['destructive', 'card', 'card'], // a failed run's reason in the workflow page's run history
+  ['destructive', 'muted', 'muted'],
   ['foreground', 'card', 'card'], // outline badges: No runs yet, No key
   ['foreground', 'muted', 'muted'],
   [ACCENT_TEXT, 'popover', 'popover'], // Reset to Default link in Settings

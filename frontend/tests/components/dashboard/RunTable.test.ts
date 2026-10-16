@@ -146,3 +146,52 @@ describe('RunTable', () => {
     });
   });
 });
+
+describe('RunTable in workflow mode', () => {
+  const LABELS = new Map([['lint', 'Check against design system']]);
+  const FAILED = run('r-failed', 'Failed', {
+    error: "handler error: handler 'tool' failed on node 'lint': command exited with status 1",
+  });
+
+  function renderWorkflow(runs: RunSummary[]) {
+    render(RunTable, { props: { runs, columns: 'workflow', labels: LABELS, now: NOW, timeZone: 'Australia/Sydney' } });
+  }
+
+  it('has Status, Started, Run and Duration columns', () => {
+    renderWorkflow([run('r1', 'Completed')]);
+
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent?.trim());
+    expect(headers).toEqual(['Status', 'Started', 'Run', 'Duration']);
+  });
+
+  it('shows each run by start time and id, with no workflow name', () => {
+    renderWorkflow([run('r1', 'Completed')]);
+
+    const row = rowOf('r1');
+    expect(within(row).getByText('Today, 1:30 pm')).toBeTruthy();
+    expect(within(row).getByText('7 min 48 s')).toBeTruthy();
+    expect(within(row).queryByText('GraphName')).toBeNull();
+    expect(screen.getByRole('link', { name: 'r1' })).toHaveAttribute('href', '/runs/r1');
+  });
+
+  it("puts a failed run's one-line reason under its start time, in the link's name", () => {
+    renderWorkflow([FAILED]);
+
+    const reason = 'Check against design system: Command exited with status 1.';
+    const row = rowOf(`r-failed ${reason}`);
+    expect(within(row).getByText(reason)).toBeTruthy();
+    expect(screen.getByRole('link', { name: `r-failed ${reason}` })).toHaveAttribute('href', '/runs/r-failed');
+  });
+
+  it('shows no reason for runs that did not fail, or failed without an error', () => {
+    renderWorkflow([
+      run('r-done', 'Completed', { error: 'stray text' }),
+      run('r-running', 'Running', { error: 'still going' }),
+      run('r-silent', 'Failed', { error: null }),
+    ]);
+
+    expect(screen.queryByText(/Stray text|Still going/)).toBeNull();
+    expect(screen.getByRole('link', { name: 'r-silent' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'r-done' })).toBeTruthy();
+  });
+});

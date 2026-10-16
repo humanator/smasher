@@ -118,6 +118,8 @@ describe('WorkflowDetailPage', () => {
       expect(within(toolbar()).queryByTestId('toolbar-subtitle')).toBeNull();
       expect(within(toolbar()).queryByRole('button', { name: 'Run' })).toBeNull();
       expect(within(toolbar()).queryByRole('link', { name: 'Edit Workflow' })).toBeNull();
+      const history = screen.getByRole('region', { name: 'Run history' });
+      expect(within(history).getByRole('status', { name: 'Loading runs' })).toBeTruthy();
     });
 
     it('makes no workflow or run requests of its own', async () => {
@@ -154,6 +156,74 @@ describe('WorkflowDetailPage', () => {
 
       const alert = screen.getByRole('alert');
       expect(alert.textContent).toContain('Network down');
+      await fireEvent.click(within(alert).getByRole('button', { name: 'Try Again' }));
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('run history', () => {
+    function run(id: string, extra: Partial<RunSummary> = {}): RunSummary {
+      return {
+        id,
+        status: 'Completed',
+        started_at: '2026-10-16T02:31:00Z',
+        completed_at: '2026-10-16T02:38:00Z',
+        graph_name: 'design_concepts_review',
+        error: null,
+        input_tokens: 0,
+        output_tokens: 0,
+        run_working_dir: null,
+        workflow_id: WORKFLOW.id,
+        gallery_gates: [],
+        pending_questions: 0,
+        waiting_since: null,
+        ...extra,
+      };
+    }
+
+    it('lists this workflow\'s runs under its heading and intro, with a failed run\'s reason', () => {
+      const runs = [
+        run('run-failed', { status: 'Failed', error: "retry exhausted for node 'lint': exit code 2" }),
+        run('run-done'),
+        run('run-other', { workflow_id: 'someone-else' }),
+      ];
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({ runs }) } });
+
+      const history = screen.getByRole('region', { name: 'Run history' });
+      expect(within(history).getByRole('heading', { level: 2, name: 'Run history' })).toBeTruthy();
+      expect(
+        within(history).getByText('Every run of this workflow, newest first. Open one to see what happened step by step.')
+      ).toBeTruthy();
+      expect(within(history).getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual([
+        'Status',
+        'Started',
+        'Run',
+        'Duration',
+      ]);
+      expect(within(history).getByRole('link', { name: 'run-failed lint: Exit code 2.' })).toBeTruthy();
+      expect(within(history).getByRole('link', { name: 'run-done' })).toBeTruthy();
+      expect(within(history).queryByRole('link', { name: /run-other/ })).toBeNull();
+    });
+
+    it('says a workflow has not run yet, with a Run button that opens the sheet', async () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      const history = screen.getByRole('region', { name: 'Run history' });
+      expect(within(history).getByText("This workflow hasn't run yet.")).toBeTruthy();
+      await fireEvent.click(within(history).getByRole('button', { name: 'Run' }));
+      expect(await screen.findByRole('dialog', {}, { timeout: 5000 })).toBeTruthy();
+    });
+
+    it('shows a failed refresh with Try Again, keeping the runs it has', async () => {
+      const refresh = vi.fn(async () => {});
+      render(WorkflowDetailHost, {
+        props: { workflowId: WORKFLOW.id, library: fakeLibrary({ runs: [run('run-done')], error: 'Network down', refresh }) },
+      });
+
+      const history = screen.getByRole('region', { name: 'Run history' });
+      const alert = within(history).getByRole('alert');
+      expect(alert.textContent).toContain('Network down');
+      expect(within(history).getByRole('link', { name: 'run-done' })).toBeTruthy();
       await fireEvent.click(within(alert).getByRole('button', { name: 'Try Again' }));
       expect(refresh).toHaveBeenCalledOnce();
     });
@@ -213,13 +283,13 @@ describe('WorkflowDetailPage', () => {
       expect(runs.filter((r) => r.workflow_id === id)).toEqual([]);
     });
 
-    it('shows no banner and "No runs yet." for a fresh workflow', async () => {
+    it("shows no banner and says a fresh workflow hasn't run yet", async () => {
       const { id } = await importThrowaway();
       const library = await realLibrary();
 
       render(WorkflowDetailHost, { props: { workflowId: id, library } });
 
-      expect(await screen.findByText('No runs yet.', {}, { timeout: 5000 })).toBeTruthy();
+      expect(await screen.findByText("This workflow hasn't run yet.", {}, { timeout: 5000 })).toBeTruthy();
       expect(screen.queryByRole('region', { name: 'Active run' })).toBeNull();
     });
 
@@ -245,7 +315,7 @@ describe('WorkflowDetailPage', () => {
       );
       expect(within(banner).getByRole('link', { name: 'Answer' })).toHaveAttribute('href', `/runs/${newer}`);
 
-      const history = screen.getByRole('region', { name: 'Run History' });
+      const history = screen.getByRole('region', { name: 'Run history' });
       const rows = within(history).getAllByRole('row').slice(1);
       expect(rows).toHaveLength(2);
       expect(within(history).getByRole('link', { name: newer })).toBeTruthy();

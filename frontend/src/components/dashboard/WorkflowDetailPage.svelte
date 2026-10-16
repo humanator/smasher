@@ -8,6 +8,7 @@
   import type { RunSummary } from '../../lib/api/runs';
   import type { WorkflowSummary } from '../../lib/api/workflows';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Skeleton } from '$lib/components/ui/skeleton/index.js';
   import { errorMessage } from '$lib/notify';
   import { formatWorkflowName } from '$lib/utils';
   import { describeLoops, orderSteps, stepLabel } from '$lib/workflowSteps';
@@ -87,40 +88,68 @@
       <span class="min-w-0 flex-1">Couldn't load your workflows. {library.error}</span>
       <Button variant="outline" size="sm" onclick={() => void library.refresh()}>Try Again</Button>
     </div>
-  {:else if !library.loaded}
-    <p class="sr-only" role="status">Loading workflow…</p>
-  {:else if !workflow}
+  {:else if library.loaded && !workflow}
     <div class="flex flex-col items-start gap-3">
       <p class="m-0 text-body text-foreground">We couldn't find that workflow. It may have been renamed or moved.</p>
       <Button href="/" variant="outline">Back to Workflows</Button>
     </div>
   {:else}
-    {#if !actionsInHeader}
+    {#if workflow && !actionsInHeader}
       <div class="flex items-center gap-2">{@render workflowActions()}</div>
     {/if}
 
-    <div class="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+    <div class="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
       <StepList
         steps={order.steps}
         {intro}
         loading={!graph && !graphError}
         error={graphError}
-        editHref="/workflows/{encodeURIComponent(workflow.id)}/edit"
+        editHref="/workflows/{encodeURIComponent(workflowId)}/edit"
         onRetry={() => void loadGraph()}
       />
 
-      <div class="flex min-w-0 flex-col gap-6">
-        <section aria-label="Run History" class="flex flex-col gap-4">
-          <h3 class="text-base font-semibold text-foreground">Run History</h3>
-          {#if runs.length > 0}
-            <RunTable {runs} />
-          {:else}
-            <p class="text-muted-foreground">No runs yet.</p>
-          {/if}
-        </section>
-      </div>
+      <section aria-labelledby="history-heading" class="min-w-0">
+        <h2 id="history-heading" class="m-0 text-heading font-bold text-foreground">Run history</h2>
+        <p class="mt-0.5 mb-2.5 text-xs text-muted-foreground">
+          Every run of this workflow, newest first. Open one to see what happened step by step.
+        </p>
+
+        {#if library.error}
+          <div
+            role="alert"
+            class="mb-2.5 flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive"
+          >
+            <span class="min-w-0 flex-1">Couldn't refresh this workflow's runs. {library.error}</span>
+            <Button variant="outline" size="sm" onclick={() => void library.refresh()}>Try Again</Button>
+          </div>
+        {/if}
+
+        {#if !library.loaded}
+          <div role="status" aria-label="Loading runs" class="overflow-hidden rounded-lg border border-border bg-card">
+            {#each [0, 1, 2] as i (i)}
+              <div class="flex min-h-[34px] items-center gap-3 px-3 py-1.5 {i % 2 === 1 ? 'bg-muted' : ''}" aria-hidden="true">
+                <Skeleton class="h-4 w-20 rounded-full" />
+                <Skeleton class="h-3.5 w-32 rounded" />
+                <Skeleton class="ml-auto h-3.5 w-16 rounded" />
+              </div>
+            {/each}
+          </div>
+        {:else if runs.length > 0}
+          <RunTable {runs} columns="workflow" {labels} />
+        {:else}
+          <div class="rounded-lg border border-border px-3 py-6 text-center">
+            <p class="m-0 text-body text-muted-foreground">This workflow hasn't run yet.</p>
+            <Button size="sm" class="mt-3" onclick={() => (runDialogOpen = true)}>
+              <PlayIcon aria-hidden="true" />
+              Run
+            </Button>
+          </div>
+        {/if}
+      </section>
     </div>
 
-    <LazyRunDialog {workflow} bind:open={runDialogOpen} />
+    {#if workflow}
+      <LazyRunDialog {workflow} bind:open={runDialogOpen} />
+    {/if}
   {/if}
 </div>

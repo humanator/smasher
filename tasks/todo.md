@@ -306,13 +306,13 @@ The banner replaces the old featured-run card.
   - the empty state "This workflow hasn't run yet." with **Run**, which opens the sheet
 
 **Acceptance criteria:**
-- [ ] In `'workflow'` mode the headers are right, and the error line shows on Failed rows only,
+- [x] In `'workflow'` mode the headers are right, and the error line shows on Failed rows only,
   and only when the summary isn't null.
-- [ ] Dashboard mode is unchanged: `RunTable.test.ts` and `RunList.test.ts` pass with no edits.
-- [ ] Loading, error and empty states render. Each row is still one link to `/runs/{id}`.
+- [x] Dashboard mode is unchanged: `RunTable.test.ts` and `RunList.test.ts` pass with no edits.
+- [x] Loading, error and empty states render. Each row is still one link to `/runs/{id}`.
 
 **Verification:**
-- [ ] `npm run test -- --run tests/components/dashboard/RunTable.test.ts tests/components/dashboard/RunList.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
+- [x] `npm run test -- --run tests/components/dashboard/RunTable.test.ts tests/components/dashboard/RunList.test.ts tests/components/dashboard/WorkflowDetailPage.test.ts`
 
 **Dependencies:** Tasks 3 and 7
 
