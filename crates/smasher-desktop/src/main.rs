@@ -15,7 +15,7 @@ use tracing_subscriber::EnvFilter;
 
 fn main() {
     bootstrap::load_env();
-    let data_dir = PathBuf::from(bootstrap::desktop_data_dir());
+    let data_dir = PathBuf::from(smasher_web::server::default_data_dir());
     // SAFETY: still single-threaded — nothing has spawned a thread yet.
     let settings_applied =
         unsafe { settings::apply_to_env(&data_dir, &Keychain::new(KEYCHAIN_SERVICE)) };

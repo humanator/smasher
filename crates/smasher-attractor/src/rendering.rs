@@ -279,9 +279,10 @@ fn render_graph_preamble(graph: &Graph) -> Vec<String> {
     let mut lines = Vec::new();
 
     // Top-to-bottom default (not graphviz's own left-to-right): matches the
-    // web editor's client-side auto-layout default (editor-ui/src/convert.ts's
-    // DEFAULT_RANKDIR) so a graph that never sets `rankdir` explicitly lays
-    // out the same direction here as it does on canvas.
+    // web editor's client-side auto-layout default (`DEFAULT_RANKDIR` in
+    // frontend/src/components/node-editor/convert.ts) so a graph that never
+    // sets `rankdir` explicitly lays out the same direction here as it does
+    // on canvas.
     let rankdir = graph
         .graph_attrs
         .get("rankdir")

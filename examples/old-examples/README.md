@@ -144,18 +144,18 @@ check -> process [label="failure", loop_restart=true];
 
 ## How Human Gates Work
 
-Manager nodes (`shape=house`) model human-in-the-loop decision points.
-The engine pauses at a Manager node and presents the `question` attribute
-to the operator. The operator's response routes execution along the
-matching outgoing edge.
+Interviewer nodes (`shape=hexagon`) model human-in-the-loop decision points.
+The engine pauses at the node and presents the `question` attribute to the
+operator, with the outgoing edge labels as the choices. The operator's answer
+routes execution along the matching edge.
 
 ```dot
-gate [shape=house, label="Approve?", question="Do you approve this deployment?"];
-gate -> proceed  [label="success"];
-gate -> rollback [label="failure"];
+gate [shape=hexagon, label="Approve?", question="Do you approve this deployment?"];
+gate -> proceed  [label="[Y] Yes"];
+gate -> rollback [label="[N] No"];
 ```
 
-Multiple Manager nodes can be chained for multi-stage approval workflows
+Multiple Interviewer nodes can be chained for multi-stage approval workflows
 (see `multi-gate.dot`).
 
 ## How Codergen Nodes Work

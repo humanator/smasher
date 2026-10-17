@@ -19,7 +19,7 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -30,7 +30,7 @@ jobs:
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} -p smasher-cli
       - name: Upload release binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smasher-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/smasher
@@ -43,9 +43,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
       - name: Prepare release assets
@@ -58,7 +58,7 @@ jobs:
           done
           ls -la release-assets/
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           files: release-assets/*

@@ -299,7 +299,7 @@ async fn wait_for_question_id(client: &Client, base_url: &str, run_id: &str) -> 
 }
 
 /// Reads the run's `events.jsonl` (unwrapping each `{sequence, event}` entry)
-/// once the file sink has written the Exit node's `node_completed`.
+/// once the file sink has written `pipeline_completed`.
 async fn read_finished_event_log(path: &std::path::Path) -> Vec<Value> {
     let start = std::time::Instant::now();
     while start.elapsed() < Duration::from_secs(10) {
@@ -312,16 +312,13 @@ async fn read_finished_event_log(path: &std::path::Path) -> Vec<Value> {
                 entry["event"].clone()
             })
             .collect();
-        if events
-            .iter()
-            .any(|e| e["kind"] == "node_completed" && e["node_id"] == "Exit")
-        {
+        if events.iter().any(|e| e["kind"] == "pipeline_completed") {
             return events;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     panic!(
-        "events.jsonl at {} never recorded Exit's node_completed:\n{}",
+        "events.jsonl at {} never recorded pipeline_completed:\n{}",
         path.display(),
         std::fs::read_to_string(path).unwrap_or_else(|e| e.to_string())
     );
@@ -389,6 +386,15 @@ async fn test_human_gate_exchange_is_recorded_in_events_jsonl() {
             .position(|e| e["kind"] == kind && e["node_id"] == "Gate")
             .unwrap_or_else(|| panic!("no {kind} for Gate in {events:#?}"))
     };
+    // The run's final events reach the file too, not only SSE (#29).
+    assert!(
+        events
+            .iter()
+            .any(|e| e["kind"] == "checkpoint_created" && e["node_id"] == "Exit"),
+        "no checkpoint_created for Exit in {events:#?}"
+    );
+    assert_eq!(events.last().unwrap()["kind"], "pipeline_completed");
+
     let prompt = position("human_prompt_issued");
     let response = position("human_response_received");
     let completed = position("node_completed");
@@ -409,5 +415,63 @@ async fn test_human_gate_exchange_is_recorded_in_events_jsonl() {
         sse_names.contains(&"human_prompt_issued")
             && sse_names.contains(&"human_response_received"),
         "expected both exchange events on the SSE stream, got {sse_names:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_events_jsonl_is_complete_once_run_reports_completed() {
+    let data_dir = tempfile::tempdir().expect("failed to create data dir");
+    let (base_url, _server) = start_test_server_in(data_dir.path().to_str().unwrap()).await;
+    let client = Client::new();
+
+    let dot = r#"digraph Quick { Start [shape=Mdiamond]; Exit [shape=Msquare]; Start -> Exit; }"#;
+    let submit_body: Value = client
+        .post(format!("{base_url}/api/runs"))
+        .json(&json!({ "dot_source": dot, "variables": {} }))
+        .send()
+        .await
+        .expect("failed to submit pipeline")
+        .json()
+        .await
+        .expect("failed to parse submit response");
+    let run_id = submit_body["run_id"].as_str().expect("run_id").to_string();
+
+    let start = std::time::Instant::now();
+    let summary = loop {
+        let summary: Value = client
+            .get(format!("{base_url}/api/runs/{run_id}"))
+            .send()
+            .await
+            .expect("failed to get run")
+            .json()
+            .await
+            .expect("failed to parse run summary");
+        if summary["status"] != "Running" {
+            break summary;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "run never finished"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    };
+    assert_eq!(summary["status"], "Completed", "{summary}");
+
+    // Read once, without polling: the log must already be fully written.
+    let log_path = data_dir
+        .path()
+        .join(
+            summary["run_working_dir"]
+                .as_str()
+                .expect("run_working_dir"),
+        )
+        .join("events")
+        .join("events.jsonl");
+    let contents = std::fs::read_to_string(&log_path).expect("events.jsonl should exist");
+    let last: Value = serde_json::from_str(contents.lines().last().expect("at least one event"))
+        .expect("events.jsonl line should be JSON");
+    assert_eq!(
+        last["event"]["kind"], "pipeline_completed",
+        "events.jsonl should end in pipeline_completed:\n{contents}"
     );
 }

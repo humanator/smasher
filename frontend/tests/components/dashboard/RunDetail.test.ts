@@ -39,12 +39,9 @@ describe('RunDetail', () => {
   });
 
   it('shows status, token counts, and the rendered graph SVG for a real running run', async () => {
-    const submitResp = await runsApi.submitRun({
-      dot_source: humanGateDot,
-      variables: {},
-    });
+    const runId = await submitGraph(humanGateDot);
 
-    const { container } = render(RunDetail, { props: { runId: submitResp.run_id } });
+    const { container } = render(RunDetail, { props: { runId: runId } });
 
     await waitFor(
       () => {
@@ -70,12 +67,9 @@ describe('RunDetail', () => {
   });
 
   it('aborting a real run cancels it and the status badge reflects the new state', async () => {
-    const submitResp = await runsApi.submitRun({
-      dot_source: humanGateDot,
-      variables: {},
-    });
+    const runId = await submitGraph(humanGateDot);
 
-    render(RunDetail, { props: { runId: submitResp.run_id } });
+    render(RunDetail, { props: { runId: runId } });
 
     await waitFor(() => {
       expect(screen.getByText('Running')).toBeTruthy();
@@ -91,7 +85,7 @@ describe('RunDetail', () => {
       { timeout: 5000 }
     );
 
-    const realStatus = await runsApi.getRun(submitResp.run_id);
+    const realStatus = await runsApi.getRun(runId);
     expect(realStatus.status).toBe('Aborted');
   });
 

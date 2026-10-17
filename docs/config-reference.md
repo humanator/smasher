@@ -285,8 +285,9 @@ status = "success" && retries < 3
 # Grouped expressions
 (mode = "fast" || mode = "turbo") && enabled = "true"
 
-# Nested context keys (dot-separated)
-_tool_fetch.status = "success"
+# Dotted context keys, matched as written (a leading `context.` is optional).
+# Keys are flat: a dot doesn't reach inside a JSON value.
+tool.exit_code = 0
 ```
 
 ---

@@ -9,8 +9,8 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/.smasher.
-const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
+// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/Documents/smasher.
+const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
 // Same shape/attrs as examples/gallery_gate_showcase.dot's own Gate1 node,

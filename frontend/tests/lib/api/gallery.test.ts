@@ -1,13 +1,14 @@
 // ABOUTME: Tests for the gallery-gate decision REST client
 // ABOUTME: Calls the REAL smasher-web-api instance, not mocked fetch
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import * as gallery from '../../../src/lib/api/gallery';
 import * as runsApi from '../../../src/lib/api/runs';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
+import { trackRun, cancelAll } from '../../fixtures/graphs';
 
 const BASE_URL = 'http://127.0.0.1:21541';
 const API_URL = `${BASE_URL}/api`;
@@ -19,7 +20,7 @@ const galleryGateDot = readFileSync(
   'utf-8'
 ).replace(/\[shape=box,/g, '[shape=diamond,');
 
-const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
+const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
 function writeCandidateManifest(runId: string, candidateId: string) {
@@ -40,7 +41,7 @@ function writeCandidateManifest(runId: string, candidateId: string) {
 
 async function submitAndWaitForGalleryGate(): Promise<{ runId: string; questionId: string }> {
   const submitResp = await runsApi.submitRun({ dot_source: galleryGateDot, variables: {} });
-  const runId = submitResp.run_id;
+  const runId = trackRun(submitResp.run_id);
 
   // Real render_capture nodes fail on a machine with no headless Chromium
   // reachable, so the gate pauses with a plain (non-gallery) question until
@@ -65,6 +66,11 @@ async function submitAndWaitForGalleryGate(): Promise<{ runId: string; questionI
 describe('gallery API client - REAL API INTEGRATION TESTS', () => {
   beforeAll(() => {
     setApiBaseUrl(API_URL);
+  });
+
+  // A run whose decision was rejected stays at its gate; cancel it.
+  afterEach(async () => {
+    await cancelAll();
   });
 
   it('submits a real decision and resumes the paused run', async () => {

@@ -291,8 +291,9 @@ smasher run examples/old-examples/codergen.dot --var task="implement fibonacci" 
 
 ## Human Input
 
-Smasher supports human-in-the-loop interaction through **Interviewer** and **Manager** nodes. When
-the engine reaches one of these nodes, it pauses execution and prompts the operator for input.
+Smasher supports human-in-the-loop interaction through **Interviewer** nodes (`shape=hexagon`).
+When the engine reaches one, it pauses execution and prompts the operator for input. (Manager
+nodes, `shape=house`, are LLM coordinators, not human gates.)
 
 ### The Interviewer System
 
@@ -307,8 +308,8 @@ prompts to stdout.
 
 ### Human Gate in a Pipeline
 
-Manager nodes (`shape=house`) model human approval gates. The `question` attribute provides the
-prompt shown to the operator:
+Interviewer nodes (`shape=hexagon`) model human approval gates. The `question` attribute provides
+the prompt shown to the operator, and the outgoing edge labels are the choices:
 
 ```dot
 digraph HumanGate {
@@ -316,7 +317,7 @@ digraph HumanGate {
     process [shape=box, label="Process Changes"];
 
     human_gate [
-        shape=house,
+        shape=hexagon,
         label="Approval Gate",
         question="Do you approve this change?"
     ];
@@ -327,8 +328,8 @@ digraph HumanGate {
 
     start -> process;
     process -> human_gate;
-    human_gate -> approved      [label="success"];
-    human_gate -> exit_rejected [label="failure"];
+    human_gate -> approved      [label="[Y] Yes"];
+    human_gate -> exit_rejected [label="[N] No"];
     approved -> exit_success;
 }
 ```
@@ -339,12 +340,11 @@ When the pipeline reaches `human_gate`, the operator sees:
 Do you approve this change?
 ```
 
-Their response is stored in the pipeline context under the node's ID and determines which
-outgoing edge is followed (`success` or `failure`).
+Their answer picks the outgoing edge with the matching label (`[Y] Yes` or `[N] No`).
 
 ### Interviewer Nodes
 
-Interviewer nodes (`shape=oval` or `shape=ellipse`) support richer interaction with attributes:
+Interviewer nodes (`shape=hexagon`, `oval` or `ellipse`) support richer interaction with attributes:
 
 | Attribute   | Description                                          |
 |-------------|------------------------------------------------------|
@@ -356,7 +356,7 @@ The response is stored in context as `_interview_{node_id}`.
 
 ### Multi-Stage Approval
 
-Chain multiple Manager nodes for workflows requiring sign-off from different stakeholders:
+Chain multiple Interviewer nodes for workflows requiring sign-off from different stakeholders:
 
 ```bash
 smasher run examples/old-examples/multi-gate.dot
@@ -454,9 +454,11 @@ The bundle is machine-local: it serves the SPA build, examples, and design
 kit from this checkout, so keep the repo where it was built.
 
 **Data dir:** the app keeps runs, workflows, and settings in
-`~/Documents/smasher` so they're easy to browse in Finder. Set
-`SMASHER_DATA_DIR` to use another location. The CLI still defaults to
-`~/.smasher`.
+`~/Documents/smasher` so they're easy to browse in Finder. `smasher serve`
+uses the same dir, so the app and the CLI dashboard see the same runs. Set
+`SMASHER_DATA_DIR` to use another location. Older builds used `~/.smasher`;
+if it still holds runs, the server logs a warning at startup. Move them into
+`~/Documents/smasher` to see them in the dashboard.
 
 **LLM settings:** click the gear in the page header. There you set the
 default model and provider, plus each provider's API key and base URL
@@ -515,8 +517,9 @@ every PR to `main`. It fails if `FAKE_CLAUDE_LOG` isn't empty at the end.
 Playwright installs its own Chromium there. `SMASHER_LLM_TESTS` is never set
 in CI, so the two critical-path tests, which spend real tokens, stay skipped.
 
-If the desktop app is left running on that port, its data lives in
-`~/Documents/smasher` instead, and about 50 tests fail for reasons unrelated
+If the desktop app is left running on that port, its data lives in its own
+dir (`~/Documents/smasher` unless it was launched with your
+`SMASHER_DATA_DIR`), and about 50 tests fail for reasons unrelated
 to the code. The gallery tests write candidate manifests straight into
 `SMASHER_DATA_DIR`, so a mismatch shows up as "gallery gate never appeared".
 New tests should reuse the inline graphs in `frontend/tests/fixtures/graphs.ts`

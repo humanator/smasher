@@ -33,7 +33,8 @@
     {
       "files": ["src/lib/components/ui/**/*.svelte"],
       "rules": {
-        "svelte/valid-compile": "off"
+        "svelte/valid-compile": "off",
+        "no-undef": "off"
       }
     }
   ],

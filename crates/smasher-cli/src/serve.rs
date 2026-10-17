@@ -25,7 +25,7 @@ pub struct ServeArgs {
     #[arg(long)]
     pub provider: Option<String>,
 
-    /// Data directory for run artifacts. Defaults to ~/.smasher.
+    /// Data directory for run artifacts. Defaults to ~/Documents/smasher.
     #[arg(long)]
     pub data_dir: Option<PathBuf>,
 

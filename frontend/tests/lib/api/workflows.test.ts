@@ -7,6 +7,7 @@ import { join } from 'path';
 import * as workflows from '../../../src/lib/api/workflows';
 import * as runs from '../../../src/lib/api/runs';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
+import { trackRun, cancelAll } from '../../fixtures/graphs';
 
 describe('workflows API client - raw DOT export', () => {
   beforeAll(() => {
@@ -63,6 +64,8 @@ describe('workflows API client - raw DOT import', () => {
   // Imports land in the real server's {data_dir}/workflows; find each file
   // through the API so the test never assumes where that is.
   afterEach(async () => {
+    // The round-trip run parks on its gate; cancel it before removing its file.
+    await cancelAll();
     const { workflows: all } = await workflows.listWorkflows();
     for (const id of importedIds.splice(0)) {
       const found = all.find((w) => w.id === id);
@@ -80,6 +83,7 @@ describe('workflows API client - raw DOT import', () => {
     expect(all.some((w) => w.id === id)).toBe(true);
     expect(await workflows.getWorkflowDot(id)).toBe(gatedDot);
     const run = await runs.runWorkflow(id);
+    trackRun(run.run_id);
     expect(run.run_id).toBeTruthy();
   });
 

@@ -20,8 +20,8 @@ const gatedDot = `digraph CandidatePreviewGated {
   start -> gate -> done;
 }`;
 
-// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/.smasher.
-const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), '.smasher');
+// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/Documents/smasher.
+const dataDir = process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher');
 const artifactsRoot = join(dataDir, 'artifacts');
 
 // A 1×1 PNG, so the seeded screenshot is a real image file.
