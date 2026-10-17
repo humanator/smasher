@@ -6,7 +6,7 @@ import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import RunList from '../../../src/components/dashboard/RunList.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
-import { ANONYMOUS_GATE, QUESTION_KINDS, submitGraph, cancelAll } from '../../fixtures/graphs';
+import { ANONYMOUS_GATE, QUESTION_KINDS, submitGraph, trackRun, cancelAll } from '../../fixtures/graphs';
 
 // Parks on its human gate, so no LLM node ever runs.
 const gatedDot = `digraph RunListGated {
@@ -35,6 +35,7 @@ describe('RunList', () => {
       dot_source: gatedDot,
       variables: { test: 'run-list-render' },
     });
+    trackRun(submitResp.run_id);
 
     render(RunList);
 

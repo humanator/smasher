@@ -5,7 +5,7 @@
 // ABOUTME: rather than running an actual render_capture node, since that launches a
 // ABOUTME: real headless Chromium via chromiumoxide which this dev machine has none of.
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -13,6 +13,7 @@ import { homedir } from 'os';
 import CandidateGallery from '../../../src/components/dashboard/CandidateGallery.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
+import { trackRun, cancelAll } from '../../fixtures/graphs';
 
 // Parks on its human gate, so no LLM node ever runs.
 const gatedDot = `digraph CandidateGalleryGated {
@@ -54,6 +55,11 @@ describe('CandidateGallery', () => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
+  // Every run here parks on its gate; cancel it so none stays Running.
+  afterEach(async () => {
+    await cancelAll();
+  });
+
   it('renders loading state initially', () => {
     render(CandidateGallery, { props: { runId: 'nonexistent-run' } });
     expect(screen.getByText('Loading candidates...')).toBeTruthy();
@@ -64,6 +70,7 @@ describe('CandidateGallery', () => {
       dot_source: gatedDot,
       variables: { test: 'candidate-gallery-empty' },
     });
+    trackRun(submitResp.run_id);
 
     render(CandidateGallery, { props: { runId: submitResp.run_id } });
 
@@ -77,7 +84,7 @@ describe('CandidateGallery', () => {
       dot_source: gatedDot,
       variables: { test: 'candidate-gallery-real' },
     });
-    const runId = submitResp.run_id;
+    const runId = trackRun(submitResp.run_id);
 
     writeManifest(runId, 'candidate-a', { status: 'success' });
     const dirA = join(artifactsRoot, runId, 'artifacts', 'candidate-a');
@@ -136,7 +143,7 @@ describe('CandidateGallery', () => {
       dot_source: gatedDot,
       variables: { test: 'candidate-gallery-params' },
     });
-    const runId = submitResp.run_id;
+    const runId = trackRun(submitResp.run_id);
 
     writeManifest(runId, 'candidate-a', { status: 'success' }, [], {
       temperature: '0.4',
@@ -165,7 +172,7 @@ describe('CandidateGallery', () => {
       dot_source: gatedDot,
       variables: { test: 'candidate-gallery-failed-captured-at' },
     });
-    const runId = submitResp.run_id;
+    const runId = trackRun(submitResp.run_id);
 
     writeManifest(runId, 'candidate-f', { status: 'failed', reason: 'render timed out' });
     // Shown raw, exactly as the API sends it.

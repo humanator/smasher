@@ -6,6 +6,7 @@ import * as runs from '../../../src/lib/api/runs';
 import * as workflows from '../../../src/lib/api/workflows';
 import * as questions from '../../../src/lib/api/questions';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
+import { trackRun, cancelAll } from '../../fixtures/graphs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -31,6 +32,11 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
     setApiBaseUrl(API_URL);
   });
 
+  // Submitted runs park at their gate; cancel each so none stays Running.
+  afterEach(async () => {
+    await cancelAll();
+  });
+
   it('should fetch health status from real server', async () => {
     const result = await runs.getHealth();
     expect(result.status).toBe('ok');
@@ -41,6 +47,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
       dot_source: gatedDot,
       variables: { test: 'integration' },
     });
+    trackRun(response.run_id);
 
     expect(response.run_id).toBeDefined();
     expect(typeof response.run_id).toBe('string');
@@ -54,6 +61,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
       dot_source: gatedDot,
       variables: { test: 'list' },
     });
+    trackRun(submitResp.run_id);
 
     // Now list runs
     const listResp = await runs.listRuns();
@@ -72,6 +80,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
       dot_source: gatedDot,
       variables: { test: 'get' },
     });
+    trackRun(submitResp.run_id);
 
     // Get that specific run
     const getRun = await runs.getRun(submitResp.run_id);
@@ -126,6 +135,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
       dot_source: gatedDot,
       variables: { test: 'tokens' },
     });
+    trackRun(submitResp.run_id);
 
     // Get token counts
     const tokens = await runs.getTokens(submitResp.run_id);
@@ -142,6 +152,7 @@ describe('runs API client - REAL API INTEGRATION TESTS', () => {
     expect(workflow).toBeTruthy();
 
     const response = await runs.runWorkflow(workflow!.id, { variables: { test: 'run-workflow' } });
+    trackRun(response.run_id);
     expect(response.run_id).toBeTruthy();
     expect(response.status).toBe('Running');
 

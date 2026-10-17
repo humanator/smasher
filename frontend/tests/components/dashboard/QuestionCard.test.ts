@@ -351,10 +351,7 @@ describe('QuestionCard', () => {
 
   it('polls a real free_form question and submits the typed answer', async () => {
     const user = userEvent.setup();
-    const { run_id: runId } = await runsApi.submitRun({
-      dot_source: gatedPipeline('QuestionCardFreeForm', 'label="Your answer?"'),
-      variables: {},
-    });
+    const runId = await submitGraph(gatedPipeline('QuestionCardFreeForm', 'label="Your answer?"'));
 
     renderRun(runId);
 
@@ -523,10 +520,7 @@ describe('QuestionCard', () => {
 
   it('answers a real approval question with the Yes button', async () => {
     const user = userEvent.setup();
-    const { run_id: runId } = await runsApi.submitRun({
-      dot_source: gatedPipeline('QuestionCardApproval', 'label="Continue?", approve=true'),
-      variables: {},
-    });
+    const runId = await submitGraph(gatedPipeline('QuestionCardApproval', 'label="Continue?", approve=true'));
 
     renderRun(runId);
 
@@ -554,10 +548,7 @@ describe('QuestionCard', () => {
 
     it("toasts the server's message when an answer is rejected, and keeps the question", async () => {
       const user = userEvent.setup();
-      const { run_id: runId } = await runsApi.submitRun({
-        dot_source: gatedPipeline('QuestionCardRejected', 'label="Real gate?"'),
-        variables: {},
-      });
+      const runId = await submitGraph(gatedPipeline('QuestionCardRejected', 'label="Real gate?"'));
       await waitForRunStatus(runId, 'Running');
       render(Toaster);
       render(QuestionCard, { props: { runId } });

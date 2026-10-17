@@ -1,7 +1,7 @@
 // ABOUTME: Tests for DecisionHistory component
 // ABOUTME: Renders against real GET /api/runs/{id}/decisions responses, no mocked fetch
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import { readFileSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -11,6 +11,7 @@ import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
 import * as questionsApi from '../../../src/lib/api/questions';
 import * as galleryApi from '../../../src/lib/api/gallery';
+import { trackRun, cancelAll } from '../../fixtures/graphs';
 
 // The showcase's Proceed/Iterate are Codergen (box) nodes, so a decision
 // would start a real LLM call. As conditionals they just pass the run on to Exit.
@@ -40,7 +41,7 @@ function writeCandidateManifest(runId: string, candidateId: string) {
 
 async function submitRunWithRecordedDecision(): Promise<string> {
   const submitResp = await runsApi.submitRun({ dot_source: galleryGateDot, variables: {} });
-  const runId = submitResp.run_id;
+  const runId = trackRun(submitResp.run_id);
 
   let questionId: string | null = null;
   for (let i = 0; i < 40; i++) {
@@ -70,11 +71,17 @@ describe('DecisionHistory', () => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
+  // A run left at its gallery gate stays Running; cancel it.
+  afterEach(async () => {
+    await cancelAll();
+  });
+
   it('shows an empty state for a real run with no recorded decisions yet', async () => {
     const submitResp = await runsApi.submitRun({
       dot_source: galleryGateDot,
       variables: { test: 'decision-history-empty' },
     });
+    trackRun(submitResp.run_id);
 
     render(DecisionHistory, { props: { runId: submitResp.run_id } });
 

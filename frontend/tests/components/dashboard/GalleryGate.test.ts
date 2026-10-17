@@ -274,6 +274,7 @@ describe('GalleryGate', () => {
         }`,
         variables: {},
       });
+      launched.push(runId);
       render(Toaster);
       render(GalleryGate, { props: { runId } });
 

@@ -41,14 +41,20 @@ export const ANONYMOUS_GATE = `digraph {
 
 const submitted: string[] = [];
 
+// Records a run started some other way (submitRun with variables,
+// runWorkflow) so cancelAll() cleans it up too. Returns the id unchanged.
+export function trackRun(runId: string): string {
+  submitted.push(runId);
+  return runId;
+}
+
 // Submits a graph and records its run id so cancelAll() can clean it up.
 export async function submitGraph(dot: string): Promise<string> {
   const { run_id } = await runsApi.submitRun({ dot_source: dot, variables: {} });
-  submitted.push(run_id);
-  return run_id;
+  return trackRun(run_id);
 }
 
-// Cancels every run submitted so far. Call it in afterEach.
+// Cancels every run submitted or tracked so far. Call it in afterEach.
 export async function cancelAll(): Promise<void> {
   const ids = submitted.splice(0);
   await Promise.all(ids.map((id) => runsApi.cancelRun(id).catch(() => undefined)));
