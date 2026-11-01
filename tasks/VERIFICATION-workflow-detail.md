@@ -1,6 +1,6 @@
 ---
 status: complete
-source: tasks/SPEC-workflow-detail.md, tasks/plan.md, tasks/todo.md
+source: tasks/archive/SPEC-workflow-detail.md, tasks/archive/plan-workflow-detail.md, tasks/archive/todo-workflow-detail.md
 e2e_excluded:
   - "workflow-detail: goes from the dashboard to a workflow, lists its steps, launches it, and finds the run in its history"
   - "workflow-detail: a run waiting on a person raises the banner, naming where it paused, until it is answered"

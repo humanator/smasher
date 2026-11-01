@@ -1,7 +1,7 @@
 # Implementation Plan: `workflow-detail`
 
 Spec: [SPEC-workflow-detail.md](SPEC-workflow-detail.md) (approved 2026-10-16), part of
-[CAPABILITY_MAP.md](CAPABILITY_MAP.md). The task list is in [todo.md](todo.md).
+[CAPABILITY_MAP.md](../CAPABILITY_MAP.md). The task list is in [todo-workflow-detail.md](todo-workflow-detail.md).
 
 ## Overview
 
@@ -73,7 +73,7 @@ come last.
 
 ## Task List
 
-The full tasks, with acceptance criteria, verification and files, are in [todo.md](todo.md).
+The full tasks, with acceptance criteria, verification and files, are in [todo-workflow-detail.md](todo-workflow-detail.md).
 
 ### Phase 0: Gate
 - [ ] Task 0: Land the dashboard Running banner (R2a) work that's already in the tree

@@ -1,6 +1,6 @@
 # Todo: `workflow-detail`
 
-Plan: [plan.md](plan.md). Spec: [SPEC-workflow-detail.md](SPEC-workflow-detail.md).
+Plan: [plan-workflow-detail.md](plan-workflow-detail.md). Spec: [SPEC-workflow-detail.md](SPEC-workflow-detail.md).
 
 Shared commands (run from `frontend/`):
 

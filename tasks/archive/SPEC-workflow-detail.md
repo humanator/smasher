@@ -1,11 +1,11 @@
 # Spec: `workflow-detail`
 
-Module of [CAPABILITY_MAP.md](CAPABILITY_MAP.md). Status: **Approved 2026-10-16.**
+Module of [CAPABILITY_MAP.md](../CAPABILITY_MAP.md). Status: **Approved 2026-10-16.**
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`/`Toolbar`, page-header
 context, `libraryStore`). It also reuses the `dashboard` helpers (`statusBadge`, `formatWhen`,
 `formatDuration`, `questionKind`, `RunTable`, `LazyRunDialog`).
 
-Design reference: [Workflow](../docs/design/redesign/Workflow.dc.html) (1440×900). Primitives come
+Design reference: [Workflow](../../docs/design/redesign/Workflow.dc.html) (1440×900). Primitives come
 from the shell-theme component boards.
 
 ## Objective
