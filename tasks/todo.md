@@ -417,7 +417,7 @@ The banner replaces the old featured-run card.
   and update any other spec that uses them.
 
 **Acceptance criteria:**
-- [ ] E2E covers:
+- [x] E2E covers:
   - the dashboard → the workflow page → the steps in order with plain kind names
   - Run → the sheet → the run page → back, where the run is the top history row (the old
     test's intent, updated)
@@ -425,12 +425,12 @@ The banner replaces the old featured-run card.
     banner within a poll
   - `fail_tool` shows its error line naming the step by label
   - no horizontal scroll at 375 px
-- [ ] Every fixture and imported workflow is cleaned up in `finally`, and every run is
+- [x] Every fixture and imported workflow is cleaned up in `finally`, and every run is
   cancelled.
-- [ ] No spec is deleted, and no LLM workflow is used.
+- [x] No spec is deleted, and no LLM workflow is used.
 
 **Verification:**
-- [ ] `npm run test:e2e -- workflow-detail dashboard app-shell no-tauri-breakage`
+- [x] `npm run test:e2e -- workflow-detail dashboard app-shell no-tauri-breakage`
 
 **Dependencies:** Tasks 6, 7, 8 and 10
 

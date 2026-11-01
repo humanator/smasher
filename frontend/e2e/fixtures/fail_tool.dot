@@ -1,0 +1,11 @@
+// ABOUTME: Failing-tool fixture: start, one tool step that exits non-zero, exit
+// ABOUTME: Runs fail without an LLM call, so tests can show a failed run's error line for free
+
+digraph FailTool {
+  Start [shape=Mdiamond, label="Start"];
+  Check [shape=parallelogram, label="Check the build", tool_command="echo build broke; exit 1"];
+  Exit [shape=Msquare, label="Exit"];
+
+  Start -> Check;
+  Check -> Exit [condition="outcome=success"];
+}
