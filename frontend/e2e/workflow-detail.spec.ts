@@ -141,6 +141,61 @@ test('a failed run shows a one-line reason naming the step, without opening the 
   }
 });
 
+test('every action on the page can be reached with Tab and shows a focus ring', async ({ page }) => {
+  test.setTimeout(60000);
+  const name = `e2e_DetailKeys_${Date.now()}`;
+  let workflowPath: string | undefined;
+  let runId: string | undefined;
+
+  try {
+    const imported = await importWorkflow(page.request, name, gateOnlyDot);
+    workflowPath = imported.path;
+    runId = await launch(page.request, imported.id);
+
+    await page.goto(imported.url);
+    await expect(page.getByRole('region', { name: 'Active run' })).toBeVisible(POLL);
+    await expect(page.getByRole('table', { name: 'Runs' }).getByRole('link')).toBeVisible(POLL);
+
+    const wanted = ['Back to Workflows', 'Edit Workflow', 'Run', runId, 'Answer'];
+    const reached = new Set<string>();
+    const withoutRing: string[] = [];
+    for (let i = 0; i < 80 && reached.size < wanted.length; i++) {
+      await page.keyboard.press('Tab');
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body) return null;
+        const name = (el.getAttribute('aria-label') || el.textContent || '').trim();
+        // A ring is whatever focus changes: an outline or box-shadow on the element, or
+        // (for history rows, whose link covers the row) on its row. Compare with it blurred.
+        const row = el.closest('[role="row"]');
+        const look = () => {
+          // Rings fade in; read them at their end state, not mid-transition.
+          document.getAnimations().forEach((a) => a.finish());
+          const s = getComputedStyle(el);
+          return [s.outlineStyle, s.outlineWidth, s.boxShadow, row ? getComputedStyle(row).boxShadow : ''].join('|');
+        };
+        const focusedLook = look();
+        el.blur();
+        const blurredLook = look();
+        el.focus({ focusVisible: true } as FocusOptions);
+        return { name, ring: focusedLook !== blurredLook };
+      });
+      if (!focused) continue;
+      const match = wanted.find((w) => focused.name === w || focused.name.endsWith(w));
+      if (match && !reached.has(match)) {
+        reached.add(match);
+        if (!focused.ring) withoutRing.push(match);
+      }
+    }
+
+    expect([...reached].sort()).toEqual([...wanted].sort());
+    expect(withoutRing).toEqual([]);
+  } finally {
+    if (runId) await page.request.post(`${BASE}/api/runs/${runId}/cancel`);
+    if (workflowPath) rmSync(workflowPath, { force: true });
+  }
+});
+
 test.describe('at phone width', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 

@@ -176,8 +176,8 @@ The quotes are typographic (“ ”).
 **Estimated scope:** S
 
 ## Checkpoint A: Helpers
-- [ ] `npm run test -- --run` is green
-- [ ] `npm run check` and `npm run lint` are clean
+- [x] `npm run test -- --run` is green
+- [x] `npm run check` and `npm run lint` are clean
 - [ ] The dashboard looks and behaves as before (quick browser check)
 
 ## Phase 2: The page, section by section
@@ -325,7 +325,7 @@ The banner replaces the old featured-run card.
 **Estimated scope:** M
 
 ## Checkpoint B: Page complete in the browser
-- [ ] `npm run test -- --run`, `npm run check`, `npm run lint` and `npm run build:check` are
+- [x] `npm run test -- --run`, `npm run check`, `npm run lint` and `npm run build:check` are
   clean
 - [x] With `npm run dev` and `dev:backend`, open a workflow at 1440×900 and 375 wide, in light
   and dark: the toolbar, the banner (start `gate_only`), the steps and the history all look
@@ -454,16 +454,16 @@ differences. Check R7:
 - keyboard order and focus rings
 
 **Acceptance criteria:**
-- [ ] Spec success criteria 1, 6 and 7 hold. The only deviations are D4 and the browser hiding
+- [x] Spec success criteria 1, 6 and 7 hold. The only deviations are D4 and the browser hiding
   Show in Finder.
-- [ ] Contrast is at least 4.5:1 for every text and token pair the page adds, in both themes.
-- [ ] Every action is reachable by keyboard with a visible focus ring.
+- [x] Contrast is at least 4.5:1 for every text and token pair the page adds, in both themes.
+- [x] Every action is reachable by keyboard with a visible focus ring.
 
 **Verification:**
-- [ ] `npm run test -- --run`, `npm run check`, `npm run lint`, `npm run build:check`, and
+- [x] `npm run test -- --run`, `npm run check`, `npm run lint`, `npm run build:check`, and
   `npm run test:e2e` (non-LLM specs) all have zero warnings
-- [ ] `cargo test -p smasher-desktop` and clippy are clean
-- [ ] Manual check: side by side in the browser and in `make desktop-dev` (Mac)
+- [x] `cargo test -p smasher-desktop` and clippy are clean
+- [ ] Manual check (Mac, Simon): side by side in the browser and in `make desktop-dev` (Mac)
 
 **Dependencies:** Task 11
 
