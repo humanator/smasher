@@ -72,4 +72,5 @@ checkpoint: 5. A failed run's reason reads well
 expected: The reason stays a readable one-liner under the start time, at any width.
 reported: "It matches the design, but at narrower widths the reason wraps have breaks the layout"
 diagnosis: RunTable's workflow mode switches to its one-line grid at the viewport's `md` breakpoint (`frontend/src/components/dashboard/RunTable.svelte:46`, `110px / minmax(0,1fr) / 180px / 110px`), but the page's history sits beside the 340px step list from `lg` (`WorkflowDetailPage.svelte:121`) and beside the sidebar. The `1fr` Started column, which holds the reason (`RunTable.svelte:79-87`), therefore gets only a few tens of pixels between `md` and roughly `xl`. The fixed columns plus gaps take about 460px, so the reason wraps word by word and the row grows tall. Likely fix: have RunTable stack by container width (a container query) instead of the viewport breakpoint, or let the reason span the full row width under the grid. Not confirmed in a browser. Repro: open a workflow with a failed run at about 800 to 1200px wide with the sidebar open.
-status: open
+fix: confirmed by the new e2e (the reason was 96px tall at 1024px). Workflow-mode `RunTable` now stacks by its own width (`@container`, `@2xl`) instead of the viewport's `md`; dashboard mode is unchanged.
+status: fixed

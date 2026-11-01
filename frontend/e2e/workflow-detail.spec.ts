@@ -141,6 +141,35 @@ test('a failed run shows a one-line reason naming the step, without opening the 
   }
 });
 
+test.describe('at medium widths, where the history sits beside the step list', () => {
+  for (const width of [800, 1024, 1200]) {
+    test(`keeps a failed run's reason on one line at ${width}px`, async ({ page }) => {
+      test.setTimeout(60000);
+      await page.setViewportSize({ width, height: 800 });
+      const name = `e2e_DetailWrap${width}_${Date.now()}`;
+      let workflowPath: string | undefined;
+      let runId: string | undefined;
+
+      try {
+        const imported = await importWorkflow(page.request, name, failToolDot);
+        workflowPath = imported.path;
+        runId = await launch(page.request, imported.id);
+
+        await page.goto(imported.url);
+        const reason = page.getByText('Check the build: Exit code 1.');
+        await expect(reason).toBeVisible(POLL);
+        // One line of caption text is about 16px; a word-by-word wrap is several times that.
+        const { height } = (await reason.boundingBox())!;
+        expect(height, `the reason wraps over several lines at ${width}px`).toBeLessThan(30);
+        await expectNoSidewaysScroll(page);
+      } finally {
+        if (runId) await page.request.post(`${BASE}/api/runs/${runId}/cancel`);
+        if (workflowPath) rmSync(workflowPath, { force: true });
+      }
+    });
+  }
+});
+
 test('every action on the page can be reached with Tab and shows a focus ring', async ({ page }) => {
   test.setTimeout(60000);
   const name = `e2e_DetailKeys_${Date.now()}`;

@@ -39,21 +39,26 @@
     return formatDuration(run.started_at, isActive(run.status) ? null : (run.completed_at ?? ''), current);
   }
 
-  // Phones stack each row (status and workflow, then start and duration); from md up
-  // it's one line per run under the column headers.
+  // Narrow rows stack (status and workflow, then start and duration); wide ones are one
+  // line per run under the column headers. The dashboard switches at the viewport's md.
+  // The workflow page's history sits beside the step list and the sidebar, so it switches
+  // on its own width instead: the fixed columns take about 460px, and the failure reason
+  // needs room beside them.
   const GRID = $derived(
     columns === 'workflow'
-      ? 'md:grid md:grid-cols-[110px_minmax(0,1fr)_180px_110px] md:items-center md:gap-3 px-3'
+      ? '@2xl:grid @2xl:grid-cols-[110px_minmax(0,1fr)_180px_110px] @2xl:items-center @2xl:gap-3 px-3'
       : 'md:grid md:grid-cols-[130px_minmax(0,1fr)_170px_120px] md:items-center md:gap-3 px-3'
   );
   const ROW = $derived(`${GRID} flex flex-wrap items-center gap-x-3 gap-y-0.5`);
+  const SPACER = $derived(columns === 'workflow' ? '@2xl:hidden' : 'md:hidden');
+  const ROW_PAD = $derived(columns === 'workflow' ? '@2xl:py-1' : 'md:py-1');
 
   function failureReason(run: RunSummary): string | null {
     return run.status === 'Failed' ? summariseRunError(run.error, labels) : null;
   }
 </script>
 
-<div role="table" aria-label="Runs" class="relative overflow-x-auto rounded-lg border border-border bg-card">
+<div role="table" aria-label="Runs" class="@container relative overflow-x-auto rounded-lg border border-border bg-card">
   <div role="rowgroup">
     <div role="row" class="{GRID} hidden h-[26px] border-b border-border bg-muted text-caption font-semibold text-muted-foreground">
       <span role="columnheader">Status</span>
@@ -71,7 +76,7 @@
     {#each runs as run, i (run.id)}
       <div
         role="row"
-        class="{ROW} relative min-h-[34px] py-1.5 md:py-1 hover:bg-accent/60 has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-inset {i % 2 === 1 ? 'bg-muted' : 'bg-card'}"
+        class="{ROW} relative min-h-[34px] py-1.5 {ROW_PAD} hover:bg-accent/60 has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-inset {i % 2 === 1 ? 'bg-muted' : 'bg-card'}"
       >
         <span role="cell"><StatusBadge status={isNeedsYou(run) ? 'Needs you' : run.status} /></span>
         {#if columns === 'workflow'}
@@ -85,7 +90,7 @@
               </span>
             {/if}
           </span>
-          <span class="basis-full md:hidden" aria-hidden="true"></span>
+          <span class="basis-full {SPACER}" aria-hidden="true"></span>
           <span role="cell" class="min-w-0 truncate">
             <!-- The run id is the link; its ::after stretches over the whole row. -->
             <a
@@ -107,7 +112,7 @@
               >{run.id}</a
             >
           </span>
-          <span class="basis-full md:hidden" aria-hidden="true"></span>
+          <span class="basis-full {SPACER}" aria-hidden="true"></span>
           <span role="cell" class="text-xs text-foreground/80">{formatWhen(run.started_at, current, timeZone)}</span>
           <span role="cell" class="text-xs text-muted-foreground tabular-nums">{duration(run)}</span>
         {/if}
