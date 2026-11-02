@@ -1,13 +1,14 @@
 <script lang="ts">
   // ABOUTME: Run page at /runs/{id}: toolbar (back, title, status, Abort Run or Run Again) and the hero for the run's state
-  // ABOUTME: Polls the run, loads its steps once and follows its events; the sections below the hero are still the older ones
+  // ABOUTME: Polls the run, loads its steps once and follows its events; under the hero sit the question, candidates, decisions and Decision bar
 
   import { onMount, untrack } from 'svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
   import { useNow } from '$lib/hooks/useNow.svelte';
   import { errorMessage } from '$lib/notify';
-  import { heroModel, resumeStepLabel } from '$lib/runHero';
+  import { GalleryGateState } from '$lib/galleryGate.svelte';
+  import { heroModel, resumeStepLabel, stepLabels } from '$lib/runHero';
   import { isActive, isNeedsYou, runTitle } from '$lib/runStatus';
   import { formatDuration, formatWhenInline } from '$lib/timeFormat';
   import { formatWorkflowName } from '$lib/utils';
@@ -28,6 +29,9 @@
   import { libraryStore } from '../../stores/library.svelte';
   import LazyRunDialog from '../dashboard/LazyRunDialog.svelte';
   import StatusBadge from '../dashboard/StatusBadge.svelte';
+  import Candidates from './Candidates.svelte';
+  import DecisionBar from './DecisionBar.svelte';
+  import DecisionsCard from './DecisionsCard.svelte';
   import QuestionCard from './QuestionCard.svelte';
   import RunHero from './RunHero.svelte';
   import RunToolbarActions from './RunToolbarActions.svelte';
@@ -70,10 +74,21 @@
 
   const now = useNow(1000);
 
+  // The page is keyed by run, so one gate follower lives as long as the page.
+  // svelte-ignore state_referenced_locally
+  const gallery = new GalleryGateState(runId, {
+    onDecided: () => {
+      void libraryStore.refresh();
+      void refresh();
+    },
+  });
+
   const workflow = $derived(run?.workflow_id ? (library.workflows.find((w) => w.id === run?.workflow_id) ?? null) : null);
   const active = $derived(run ? isActive(run.status) : false);
   // Resume is for an ended run the server says has a checkpoint.
   const canResume = $derived(!!run?.resumable && (run.status === 'Failed' || run.status === 'Aborted'));
+  // Candidates approved by the latest approve decision.
+  const chosen = $derived([...decisions].reverse().find((d) => d.decision.trim().toLowerCase() === 'approve')?.selected ?? []);
   const hero = $derived(
     run
       ? heroModel({
@@ -162,7 +177,17 @@
     void refresh();
     void loadSteps();
     pollHandle = setInterval(() => void refresh(), POLL_INTERVAL_MS);
-    return stopPolling;
+    gallery.start();
+    return () => {
+      stopPolling();
+      gallery.stop();
+    };
+  });
+
+  // Once the run has ended, the candidates are listed one last time and then left alone.
+  const ended = $derived(run ? !isActive(run.status) : false);
+  $effect(() => {
+    if (ended) untrack(() => void gallery.refresh().finally(() => gallery.stop()));
   });
 
   // The page follows the run's events; the older event log below also fills this store, which de-duplicates.
@@ -263,6 +288,31 @@
     {/if}
 
     <QuestionCard {runId} />
+
+    {#if gallery.candidates.length > 0}
+      <Candidates
+        candidates={gallery.candidates}
+        expected={gallery.gate?.expected_count ?? null}
+        selectable={gallery.waiting}
+        selected={gallery.selected}
+        {chosen}
+        notes={gallery.notes}
+        onToggle={(id) => gallery.toggle(id)}
+        onNote={(id, note) => gallery.setNote(id, note)}
+      />
+    {/if}
+
+    <DecisionsCard {decisions} labels={stepLabels(steps)} />
+
+    {#if gallery.gate}
+      <DecisionBar
+        edges={gallery.gate.outgoing_edges}
+        selected={gallery.selected}
+        submitting={gallery.submitting}
+        error={gallery.error}
+        onDecide={(edge) => void gallery.submit(edge)}
+      />
+    {/if}
   {/if}
 
   {#if workflow}

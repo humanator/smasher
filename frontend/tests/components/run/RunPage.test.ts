@@ -5,6 +5,10 @@ import type { ComponentProps } from 'svelte';
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { rmSync } from 'fs';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/svelte/svelte5';
+import userEvent from '@testing-library/user-event';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import RunPageHost from './RunPageHost.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
@@ -13,6 +17,8 @@ import { createLibraryStore } from '../../../src/stores/library.svelte';
 import {
   ANONYMOUS_GATE,
   FAIL_TOOL,
+  GALLERY_GATE_APPROVE,
+  GALLERY_GATE_THREE_EDGES,
   QUICK_FINISH,
   RUN_FAIL_CHECK,
   SLEEPING,
@@ -20,6 +26,35 @@ import {
   submitGraph,
   trackRun,
 } from '../../fixtures/graphs';
+
+// Matches smasher-web's default_data_dir(): $SMASHER_DATA_DIR, else ~/Documents/smasher.
+const artifactsRoot = join(process.env.SMASHER_DATA_DIR ?? join(homedir(), 'Documents', 'smasher'), 'artifacts');
+
+function writeCandidate(runId: string, candidateId: string, exitStatus: Record<string, unknown> = { status: 'success' }) {
+  const dir = join(artifactsRoot, runId, 'artifacts', candidateId);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    JSON.stringify({
+      captured_at: new Date().toISOString(),
+      viewport: { width: 1280, height: 800 },
+      candidate_dir: `/tmp/${candidateId}`,
+      exit_status: exitStatus,
+      artifacts: [],
+      generation_params: {},
+    })
+  );
+}
+
+// A run parked on a gallery gate with candidates a and b (and a failed c, when asked), shown by the page.
+async function galleryRun(dot = GALLERY_GATE_APPROVE, withFailed = false) {
+  const id = await submitGraph(dot);
+  writeCandidate(id, 'candidate-a');
+  writeCandidate(id, 'candidate-b');
+  if (withFailed) writeCandidate(id, 'candidate-c', { status: 'failed', reason: 'render timed out' });
+  await renderRun(id);
+  return id;
+}
 
 const NO_WORKFLOWS = { workflows: [], loaded: true };
 
@@ -332,6 +367,125 @@ describe('RunPage', { timeout: 20_000 }, () => {
 
       expect(toggle.getAttribute('aria-pressed')).toBe(before === 'true' ? 'false' : 'true');
       expect(toggle.getAttribute('aria-expanded')).toBe(toggle.getAttribute('aria-pressed'));
+    });
+  });
+
+  describe('a run at a gallery gate', () => {
+    const decisionBar = () => screen.getByRole('region', { name: 'Decision' });
+    const select = (id: string) => screen.findByRole('button', { name: `Select ${id}` }, SLOW);
+
+    it('shows the candidates and the Decision bar under the hero, with Approve off until something is selected', async () => {
+      await galleryRun();
+
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'waiting'), SLOW);
+      expect(await screen.findByText('Expected 2, found 2', {}, SLOW)).toBeTruthy();
+      expect(screen.getByRole('heading', { level: 2, name: 'Candidates' })).toBeTruthy();
+      expect(within(decisionBar()).getByText('Nothing selected yet. Select the candidates you want to keep.')).toBeTruthy();
+      expect((within(decisionBar()).getByRole('button', { name: 'Approve Selected' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.queryByRole('heading', { name: 'Your decisions' })).toBeNull();
+    });
+
+    it('selects, notes and approves: the bar goes, the run finishes, the decision is recorded and the candidate is Chosen', async () => {
+      const user = userEvent.setup();
+      const id = await galleryRun();
+
+      await user.click(await select('candidate-b'));
+      expect(within(decisionBar()).getByText('1 selected: candidate-b')).toBeTruthy();
+      await user.click(screen.getAllByRole('button', { name: 'Add a Note…' })[1]);
+      await user.type(screen.getByLabelText('Note for candidate-b'), '  keep the header  ');
+      await user.click(within(decisionBar()).getByRole('button', { name: 'Approve Selected' }));
+
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Decision' })).toBeNull(), SLOW);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'completed'), SLOW);
+      expect(await within(hero()).findByText(/You approved candidate-b/, {}, SLOW)).toBeTruthy();
+      const { decisions } = await runsApi.listDecisions(id);
+      expect(decisions[0]).toMatchObject({
+        decision: 'approve',
+        selected: ['candidate-b'],
+        comments: { 'candidate-b': 'keep the header' },
+      });
+      // The candidates stay, now without Select, and the decision is listed.
+      const chosen = await screen.findByText('Chosen', {}, SLOW);
+      expect(chosen.closest('.candidate-card')?.textContent).toContain('candidate-b');
+      expect(screen.queryByRole('button', { name: /^Select/ })).toBeNull();
+      const card = await screen.findByRole('listitem', {}, SLOW);
+      expect(within(card).getByRole('heading', { level: 3, name: 'Pick a favourite' })).toBeTruthy();
+      expect(within(card).getByText('Approved')).toBeTruthy();
+    });
+
+    it('shows a failure inline in the bar and leaves the gate open to try again', async () => {
+      const user = userEvent.setup();
+      await galleryRun();
+
+      await user.click(await select('candidate-a'));
+      await user.click(screen.getAllByRole('button', { name: 'Add a Note…' })[0]);
+      await fireEvent.input(screen.getByLabelText('Note for candidate-a'), { target: { value: 'x'.repeat(4001) } });
+      await user.click(within(decisionBar()).getByRole('button', { name: 'Approve Selected' }));
+
+      expect((await within(decisionBar()).findByRole('alert', {}, SLOW)).textContent).toMatch(/exceeds 4000 characters/i);
+      expect((within(decisionBar()).getByRole('button', { name: 'Approve Selected' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('sends Try Again with My Notes back with nothing selected, and records Sent back', async () => {
+      const user = userEvent.setup();
+      const id = await galleryRun();
+      await select('candidate-a');
+
+      await user.click(within(decisionBar()).getByRole('button', { name: 'Try Again with My Notes' }));
+
+      await waitFor(async () => expect((await runsApi.listDecisions(id)).decisions).toHaveLength(1), SLOW);
+      expect((await runsApi.listDecisions(id)).decisions[0]).toMatchObject({ decision: 'iterate', selected: [] });
+    });
+
+    it('shows an extra button for a third edge, which needs no selection and is submitted as that edge', async () => {
+      const user = userEvent.setup();
+      const id = await galleryRun(GALLERY_GATE_THREE_EDGES);
+      await select('candidate-a');
+
+      const bar = decisionBar();
+      expect(within(bar).getByRole('button', { name: 'Try Again with My Notes' })).toBeTruthy();
+      expect(within(bar).getByRole('button', { name: 'Approve Selected' })).toBeTruthy();
+      const skip = within(bar).getByRole('button', { name: 'Skip' });
+      expect((skip as HTMLButtonElement).disabled).toBe(false);
+      await user.click(skip);
+
+      await waitFor(async () => expect((await runsApi.listDecisions(id)).decisions).toHaveLength(1), SLOW);
+      expect((await runsApi.listDecisions(id)).decisions[0]).toMatchObject({ decision: 'skip', selected: [] });
+      // An unknown decision shows as the gate named it.
+      expect(await screen.findByText('skip', {}, SLOW)).toBeTruthy();
+    });
+
+    it('lists a candidate that could not be rendered as a tile, not a card', async () => {
+      await galleryRun(GALLERY_GATE_APPROVE, true);
+
+      expect(await screen.findByText('render timed out', {}, SLOW)).toBeTruthy();
+      expect(screen.getByText('Expected 2, found 3 · 1 could not be rendered')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Select candidate-c' })).toBeNull();
+    });
+  });
+
+  describe('candidates after the run', () => {
+    it('still shows a finished run\'s candidates, with nothing to select or decide', async () => {
+      const id = await submitGraph(QUICK_FINISH);
+      writeCandidate(id, 'candidate-a');
+      await renderRun(id);
+
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'completed'), SLOW);
+      expect(await screen.findByRole('heading', { level: 2, name: 'Candidates' }, SLOW)).toBeTruthy();
+      expect(screen.getByText('candidate-a')).toBeTruthy();
+      expect(screen.queryByRole('button', { name: /^Select/ })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Decision' })).toBeNull();
+    });
+
+    it('shows no Candidates, Decision bar or decisions for a run with none', async () => {
+      const id = await submitGraph(ANONYMOUS_GATE);
+      await renderRun(id);
+
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'waiting'), SLOW);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(screen.queryByRole('heading', { name: 'Candidates' })).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Decision' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Your decisions' })).toBeNull();
     });
   });
 });
