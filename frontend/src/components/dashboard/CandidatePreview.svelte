@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: A candidate's screenshot thumbnail, opening a lightbox with the live bundle at full size
-  // ABOUTME: Shared by CandidateCard and GalleryGate; the lightbox scales the capture viewport to fit
+  // ABOUTME: Used by the run page's Candidates; the lightbox scales the capture viewport to fit
 
   import type { CandidateResponse } from '../../lib/api/runs';
   import { fitScale, viewportOf } from '../../lib/previewScale';

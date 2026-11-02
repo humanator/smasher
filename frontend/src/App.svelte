@@ -7,9 +7,6 @@
   import DashboardPage from './components/dashboard/DashboardPage.svelte';
   import RunDetail from './components/dashboard/RunDetail.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
-  import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
-  import GalleryGate from './components/dashboard/GalleryGate.svelte';
-  import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import AppShell from './components/shell/AppShell.svelte';
   import LazySettingsDialog from './components/dashboard/LazySettingsDialog.svelte';
@@ -206,20 +203,6 @@
       <div>
         <h2 class="text-xl font-semibold mb-4">Events</h2>
         <EventLog {runId} />
-      </div>
-
-      <div class="mt-8">
-        <GalleryGate {runId} />
-      </div>
-
-      <div class="mt-8">
-        <h2 class="text-xl font-semibold mb-4">Candidates</h2>
-        <CandidateGallery {runId} />
-      </div>
-
-      <div class="mt-8">
-        <h2 class="text-xl font-semibold mb-4">Decision History</h2>
-        <DecisionHistory {runId} />
       </div>
     </div>
   {:else}

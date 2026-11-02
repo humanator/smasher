@@ -1,7 +1,7 @@
 // ABOUTME: Gallery-gate E2E: real pipeline run, real candidate fixtures, real decision submit
 // ABOUTME: Candidate screenshots are written directly to disk (not via render_capture -- this
 // ABOUTME: dev environment has no headless Chromium for chromiumoxide to launch, same
-// ABOUTME: constraint CandidateGallery.test.ts already documented), the DOT graph below skips
+// ABOUTME: constraint the Candidates tests already documented), the DOT graph below skips
 // ABOUTME: render_capture nodes entirely rather than expecting them to fail gracefully
 
 import { test, expect } from '@playwright/test';
@@ -20,7 +20,7 @@ const artifactsRoot = join(dataDir, 'artifacts');
 // BrowserConfig::builder() has no explicit executable configured, and no
 // google-chrome/chromium/chromium-browser binary is on PATH here). Reaching
 // the gate directly from Start keeps this test runnable without that
-// dependency, per the same precedent CandidateGallery.test.ts/Task 13 set:
+// dependency, per the same precedent the Candidates tests set:
 // exercise the real gallery-gate API/UI against fixture files written
 // straight to the artifacts dir, not a real render_capture execution.
 // Proceed/Iterate are conditionals, not Codergen boxes, so the decision
@@ -89,25 +89,30 @@ test('submit a gallery-gate pipeline, select a candidate, and complete via the r
     writeManifest(runId, 'candidate-b', { status: 'success' });
     writeManifest(runId, 'candidate-c', { status: 'success' });
 
-    // GalleryGate.svelte polls GET /api/runs/{id}/questions every 2s.
+    // The run page's gallery state polls GET /api/runs/{id}/questions every 2s.
     await expect(page.getByText('Expected 3, found 3')).toBeVisible({ timeout: 15000 });
 
-    // All three real candidates render as checkbox cards, keyed by their
+    // All three real candidates render as cards with a Select toggle, keyed by their
     // real candidate_id from the manifest fixtures above.
-    await expect(page.getByRole('checkbox', { name: 'candidate-a', exact: true })).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: 'candidate-b', exact: true })).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: 'candidate-c', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Select candidate-a', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Select candidate-b', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Select candidate-c', exact: true })).toBeVisible();
 
-    await page.getByRole('checkbox', { name: 'candidate-b', exact: true }).check();
+    await page.getByRole('button', { name: 'Select candidate-b', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Selected candidate-b', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await page.locator('.candidate-card', { hasText: 'candidate-b' }).getByRole('button', { name: 'Add a Note…' }).click();
     await page
-      .getByLabel('Comment for candidate-b')
+      .getByLabel('Note for candidate-b')
       .fill('Playwright E2E: picking candidate-b, testing the real decision round trip.');
 
-    // Outgoing-edge decision buttons render the edge label verbatim
-    // ("proceed"/"iterate" from the DOT above).
-    await page.locator('button', { hasText: 'proceed' }).click();
+    // The Decision bar has a button per outgoing edge: "proceed" is neither iterate nor
+    // approve, so it is an extra button labelled from the edge ("Proceed" from the DOT above).
+    await page.getByRole('region', { name: 'Decision' }).getByRole('button', { name: 'Proceed' }).click();
 
-    await expect(page.getByText('Decision recorded')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Your decisions' })).toBeVisible({ timeout: 10000 });
 
     // Start -> Gate1 -> Proceed -> Exit has no LLM nodes, so the pipeline
     // finishes essentially immediately once the decision is recorded.
@@ -116,7 +121,7 @@ test('submit a gallery-gate pipeline, select a candidate, and complete via the r
     const runResponse = await page.request.get(`${baseURL || 'http://127.0.0.1:5173'}/api/runs/${runId}`);
     expect((await runResponse.json()).status).toBe('Completed');
 
-    // Task 15's decision history view shows the real recorded decision.
+    // The recorded decision, as the Your decisions card shows it.
     const decisionsResponse = await page.request.get(
       `${baseURL || 'http://127.0.0.1:5173'}/api/runs/${runId}/decisions`
     );

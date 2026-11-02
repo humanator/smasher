@@ -40,7 +40,7 @@ async function waitForRunStatus(runId: string, status: string): Promise<void> {
   );
 }
 
-// Same gate-only shape as GalleryGate.test.ts: Start goes straight to a
+// Same gate-only shape as the galleryGate tests: Start goes straight to a
 // gallery gate, and Proceed/Iterate are conditionals, so nothing reaches an LLM.
 const GALLERY_GATE = `digraph QuestionCardGallery {
   Start [shape=Mdiamond];

@@ -46,7 +46,7 @@ async function submitAndWaitForGalleryGate(): Promise<{ runId: string; questionI
   // Real render_capture nodes fail on a machine with no headless Chromium
   // reachable, so the gate pauses with a plain (non-gallery) question until
   // real candidates exist on disk. Write them directly, same technique as
-  // CandidateGallery.test.ts, then poll until the backend picks them up and
+  // Candidates.test.ts, then poll until the backend picks them up and
   // classifies the pending question as a gallery gate.
   for (let i = 0; i < 40; i++) {
     const resp = await fetch(`${API_URL}/runs/${runId}/questions`);

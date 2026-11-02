@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Lint/critic/synthesis scorecard badges for a candidate
-  // ABOUTME: Shared between CandidateCard (read-only gallery) and GalleryGate (decision UI)
+  // ABOUTME: Used by the run page's Candidates
 
   interface LintCheck {
     name: string;
