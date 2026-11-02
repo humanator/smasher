@@ -172,11 +172,12 @@ describe('App page header on other routes', () => {
       visit(`/runs/${run_id}`);
       render(App);
       const header = screen.getByRole('banner');
-      expect(within(header).getByRole('heading', { level: 1, name: `Run ${run_id}` })).toBeTruthy();
-      expect(within(header).getByRole('link', { name: 'Back to Smasher Pipelines' })).toBeTruthy();
+      expect(within(header).getByRole('heading', { level: 1, name: 'Run' })).toBeTruthy();
       await waitFor(
         () => {
-          expect(within(header).getByText('Running')).toBeTruthy();
+          expect(within(header).getByRole('heading', { level: 1, name: 'HumanGateShowcase' })).toBeTruthy();
+          expect(within(header).getByRole('link', { name: 'Back to Workflows' })).toBeTruthy();
+          expect(within(header).getByText('Needs you')).toBeTruthy();
           expect(within(header).getByRole('button', { name: /abort/i })).toBeTruthy();
         },
         { timeout: 5000 }
@@ -240,11 +241,11 @@ describe('App document title', () => {
     expect(within(header).getByRole('heading', { name: 'Workflows' })).toBeTruthy();
   });
 
-  it('puts the run id first on a run page', async () => {
+  it('names the run page after the run, or says it was not found', async () => {
     visit('/runs/no-such-run');
     render(App);
 
-    await waitFor(() => expect(document.title).toBe('Run no-such-run — Smasher'));
+    await waitFor(() => expect(document.title).toBe('Run not found — Smasher'));
   });
 
   it('is Edit Workflow — Smasher on the editor', async () => {
@@ -264,7 +265,7 @@ describe('App document title', () => {
   it('follows back navigation from a run page to the catalog', async () => {
     visit('/runs/no-such-run');
     render(App);
-    await waitFor(() => expect(document.title).toBe('Run no-such-run — Smasher'));
+    await waitFor(() => expect(document.title).toBe('Run not found — Smasher'));
 
     visit('/');
     window.dispatchEvent(new PopStateEvent('popstate'));
