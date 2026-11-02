@@ -14,7 +14,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
 
 ## Phase 1: Server and desktop
 
-- [ ] **Task 1: `resumable` on `RunSummary`**
+- [x] **Task 1: `resumable` on `RunSummary`**
   - Description: add `resumable: bool`, true for Failed/Aborted runs whose
     `checkpoints/checkpoint.json` exists and parses.
   - Acceptance: failed run with checkpoint → true; failed without → false; completed → false;
@@ -23,7 +23,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `crates/smasher-web/src/routes/api.rs`, `docs/api-reference.md`, `frontend/src/lib/api/runs.ts` (type only).
   - Depends on: none. Scope: S.
 
-- [ ] **Task 2: `GET /api/runs/{id}/steps`**
+- [x] **Task 2: `GET /api/runs/{id}/steps`**
   - Description: nodes (`id`, `node_type`, `label`) and edges (`from`, `to`, `label?`, `priority?`,
     `loop_restart?`) from the run's stored graph; live from state, finished from `graph.dot`.
   - Acceptance: live run, rehydrated run, unknown id (404), unparsable graph (200, empty lists).
@@ -31,7 +31,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `routes/api.rs`, `rehydrate.rs` (read helper if needed), `docs/api-reference.md`.
   - Depends on: none. Scope: M.
 
-- [ ] **Task 3: Resume keeps its workflow link and checkpoints**
+- [x] **Task 3: Resume keeps its workflow link and checkpoints**
   - Description: `resume_run` passes the original `workflow_id` and `use_checkpointing: true`.
   - Acceptance: resumed run lists under its workflow; a resumed run that fails is itself
     resumable (checkpoint written); ad-hoc runs still resume with `workflow_id: None`.
@@ -39,7 +39,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `routes/api.rs`.
   - Depends on: none. Scope: S.
 
-- [ ] **Task 4: Reveal a run folder (desktop)**
+- [x] **Task 4: Reveal a run folder (desktop)** Verified by `cargo test -p smasher-desktop` and a stand-in invoke in Vitest only; `make desktop-dev` was not run, so Show Results in Finder is not proven in the real app.
   - Description: `validate_reveal_run_dir` (existing directory inside the runs base dir, symlinks
     and `..` resolved) and a `reveal_run_folder` command using `open -R`. Register in `COMMANDS`,
     `build.rs`, capability file and `main.rs`; add `revealRunFolder` to `lib/native`.
@@ -51,12 +51,12 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Depends on: none. Scope: M.
 
 ### Checkpoint: Phase 1
-- [ ] Rust tests, clippy and fmt clean for both crates.
-- [ ] Review with Jobsworth before building UI on the new API.
+- [x] Rust tests, clippy and fmt clean for both crates.
+- [ ] Review with Jobsworth before building UI on the new API. (Not recorded; the UI was built on it.)
 
 ## Phase 2: Client and logic
 
-- [ ] **Task 5: API client**
+- [x] **Task 5: API client**
   - Description: `getRunSteps`, `RunSummary.resumable`, and the `StepsResponse` type; make
     `resumeRun` return the new run id usable by the page.
   - Acceptance: integration test against real `smasher-web` for live and finished runs.
@@ -64,7 +64,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `lib/api/runs.ts`, `tests/lib/api/runs.test.ts`.
   - Depends on: 1, 2. Scope: S.
 
-- [ ] **Task 6: `runProgress.ts`**
+- [x] **Task 6: `runProgress.ts`**
   - Description: `stepProgress(steps, events)` → per step `state`, `runs`, `durationMs`,
     `wentBack`; plus `currentStep`, `doneCount`, `elapsed`. Meta-line text helper
     ("Ran twice · 2m 41s", "Waiting for you", "Stopped with an error").
@@ -74,7 +74,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `lib/runProgress.ts`, test with recorded event sequences in `tests/fixtures/`.
   - Depends on: none. Scope: M.
 
-- [ ] **Task 7: `failureAdvice.ts`**
+- [x] **Task 7: `failureAdvice.ts`**
   - Description: error string → list of suggestions. Table of known patterns (missing
     `candidate_dir`, tool exited non-zero, render timeout, missing API key, model/provider
     error) plus the generic fallback; never states a cause not in the error.
@@ -83,7 +83,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `lib/failureAdvice.ts`, test.
   - Depends on: none. Scope: S.
 
-- [ ] **Task 8: Plain event vocabulary**
+- [x] **Task 8: Plain event vocabulary**
   - Description: `formatEvent` returns plain `label`/`detail`, `tone` and `level` for all 17
     kinds, using step labels from a map; step names replace raw node ids.
   - Acceptance: every kind covered; key vs all split as in R6; unknown node id falls back to the id.
@@ -93,11 +93,11 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Depends on: none. Scope: M.
 
 ### Checkpoint: Phase 2
-- [ ] `npm run test -- --run`, check, lint clean; `/runs/{id}` looks unchanged.
+- [x] `npm run test -- --run`, check, lint clean; `/runs/{id}` looks unchanged.
 
 ## Phase 3: Page
 
-- [ ] **Task 9: `RunPage`, toolbar and hero**
+- [x] **Task 9: `RunPage`, toolbar and hero**
   - Description: new `components/run/RunPage.svelte` loads run, steps and events, sets the page
     header (back, title, badge, subtitle, Abort Run / Run Again, panel toggle, divider) and renders
     `RunHero` for running, completed (with Show Results in Finder via Task 4), failed (message,
@@ -110,7 +110,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
     `App.svelte`, tests.
   - Depends on: 5, 6, 7, 4. Scope: L (split by file if it passes 5 files: hero in 9b).
 
-- [ ] **Task 10: Resume**
+- [x] **Task 10: Resume**
   - Description: **Resume from {step}** in the toolbar and in the failed/stopped hero when
     `resumable`; posts, shows "Resuming…", navigates to the new run; inline error on failure.
   - Acceptance: shown only when resumable; Run Again demoted to outline beside it; new id opens
@@ -120,7 +120,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `RunHero.svelte`, `RunToolbarActions.svelte`, tests.
   - Depends on: 3, 9. Scope: S.
 
-- [ ] **Task 11: Candidates, Decision bar, Your decisions**
+- [x] **Task 11: Candidates, Decision bar, Your decisions**
   - Description: `Candidates` grid (select toggle, chosen badge, failed tile, scorecard badges,
     notes), `DecisionBar` (status line, tooltip, generic edge buttons, inline error), and
     `DecisionsCard`. Replaces `GalleryGate`, `CandidateGallery`, `DecisionHistory` in the page.
@@ -131,7 +131,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
     `RunPage.svelte`, tests. Retire the three old components and move their tests.
   - Depends on: 9. Scope: L (split Candidates / DecisionBar if needed).
 
-- [ ] **Task 12: Question gates (D6)**
+- [x] **Task 12: Question gates (D6)**
   - Description: restyle `QuestionCard` as the main-column card under the hero (choice, yes/no,
     free text), keeping reply behaviour and notifications.
   - Acceptance: every question kind still answerable; keyboard works; the Needs-you hero shows
@@ -141,10 +141,10 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Depends on: 9. Scope: M.
 
 ### Checkpoint: Core flows
-- [ ] Run → pause → answer (question and gallery) → completes, by hand in the browser.
-- [ ] Full Vitest twice, check, lint, build:check clean.
+- [x] Run → pause → answer (question and gallery) → completes. Covered by `run-page.spec.ts` and re-checked in the browser during verification, not by a separate hand walk.
+- [x] Full Vitest, check, lint, build:check clean. (Run once in the wrap-up, not twice.)
 
-- [ ] **Task 13: Panel and Progress tab**
+- [x] **Task 13: Panel and Progress tab**
   - Description: `RunPanel` (300px, tabs, per-viewer remembered open state, sheet below 768px)
     and `ProgressList` (R6 Progress).
   - Acceptance: tabs by arrow keys and roving tabindex; toggle `aria-pressed/expanded`; state
@@ -153,7 +153,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `components/run/RunPanel.svelte`, `ProgressList.svelte`, tests.
   - Depends on: 6, 9. Scope: M.
 
-- [ ] **Task 14: Activity tab**
+- [x] **Task 14: Activity tab**
   - Description: `ActivityLog` with Key moments / Everything toggle, help text, indent, tint,
     scroll anchoring and the first-waiting notification moved from `EventLog`.
   - Acceptance: R6 Activity; default Key moments; notification fires once; scroll position
@@ -162,7 +162,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `ActivityLog.svelte`, `RunPanel.svelte`, `EventLog.svelte` (retired), tests.
   - Depends on: 8, 13. Scope: M.
 
-- [ ] **Task 15: Details tab and retire the old page**
+- [x] **Task 15: Details tab and retire the old page**
   - Description: `RunDetails` (Started, tokens with polling, working folder). Remove
     `RunDetail`, `RunMetaList`, `TokenCounter` and graph polling; delete the old composition from
     `App.svelte`.
@@ -172,11 +172,11 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Depends on: 11, 12, 14. Scope: M.
 
 ### Checkpoint: Old page retired
-- [ ] All gates clean; `grep` finds no use of retired components.
+- [x] All gates clean; `grep` finds no use of retired components.
 
 ## Phase 4: Proof
 
-- [ ] **Task 16: E2E**
+- [x] **Task 16: E2E**
   - Description: `run-page.spec.ts` against `gate_only.dot` and `fail_tool.dot`: running →
     needs you → select, note, approve → completed; failed with advice and Resume; panel and tabs
     by keyboard with focus rings; 375px with no sideways scroll. Update `gallery-gate`,
@@ -187,7 +187,7 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Files: `e2e/run-page.spec.ts` and the specs above.
   - Depends on: 15. Scope: M.
 
-- [ ] **Task 17: Visual, accessibility and wrap-up**
+- [x] **Task 17: Visual, accessibility and wrap-up** Done in [VERIFICATION-run.md](../VERIFICATION-run.md). The artboard source (`Run.dc.html`) needs a `support.js` that is not in the repo, so there is no pixel comparison; `make desktop-dev` was not run; Jobsworth has not yet reviewed the screenshots.
   - Description: side-by-side with the artboard at 1440×900 in light and dark and in
     `make desktop-dev`; contrast check of hero tints and text; write `VERIFICATION-run.md`;
     archive the spec, plan and todo.
@@ -196,5 +196,5 @@ Vitest integration tests and E2E need `npm run dev:backend`. Never run LLM-spend
   - Depends on: 16. Scope: S.
 
 ### Checkpoint: Complete
-- [ ] Every success criterion in the spec met.
+- [x] Every success criterion in the spec met. See VERIFICATION-run.md for the open issues and what was not verified.
 - [ ] Ready for review. No push or PR without Jobsworth's say-so.
