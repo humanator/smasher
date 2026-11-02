@@ -13,6 +13,8 @@ export class PageHeaderState {
   subtitle = $state<string | null>(null);
   /** Where the toolbar's back button goes; null leaves App's own. */
   back = $state<{ label: string; href: string } | null>(null);
+  /** Sits on the title line after the title, e.g. the Run page's status badge. */
+  titleAccessory = $state<Snippet | null>(null);
 }
 
 export function providePageHeader(): PageHeaderState {
@@ -84,6 +86,22 @@ export function usePageBack(back: () => { label: string; href: string } | null):
     header.back = current;
     return () => {
       if (header.back === current) header.back = null;
+    };
+  });
+}
+
+/**
+ * Places `accessory` after the toolbar title for as long as the calling
+ * component is mounted. Must be called during component initialisation.
+ */
+export function usePageTitleAccessory(accessory: () => Snippet | null): void {
+  const header = getContext<PageHeaderState | undefined>(KEY);
+  if (!header) return;
+  $effect(() => {
+    const current = accessory();
+    header.titleAccessory = current;
+    return () => {
+      if (header.titleAccessory === current) header.titleAccessory = null;
     };
   });
 }
