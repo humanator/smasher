@@ -9,9 +9,11 @@
 
   interface Props {
     runId: string;
+    /** Step names by node id, so lines say "Draft three concepts" rather than "draft". */
+    labels?: ReadonlyMap<string, string>;
   }
 
-  const { runId }: Props = $props();
+  const { runId, labels }: Props = $props();
 
   // Border and label colour per tone; tinted lines also get a background.
   const TONE_CLASSES: Record<EventTone, string> = {
@@ -33,7 +35,7 @@
 
   // Newest first.
   const lines = $derived(
-    [...eventStore.entries].reverse().map((entry) => ({ ...entry, line: formatEvent(entry.event) }))
+    [...eventStore.entries].reverse().map((entry) => ({ ...entry, line: formatEvent(entry.event, labels) }))
   );
 
   let notified = $state(false);

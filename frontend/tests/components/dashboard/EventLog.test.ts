@@ -109,12 +109,12 @@ describe('EventLog', () => {
     const { container } = render(EventLog, { props: { runId } });
 
     // The run parks on the gate right after this event.
-    await waitFor(() => expect(lineWith(container, 'gate (Interviewer)')).toBeTruthy(), {
+    await waitFor(() => expect(lineWith(container, 'gate · Ask a person')).toBeTruthy(), {
       timeout: 5000,
     });
-    expect(lineWith(container, 'Node started')).toHaveTextContent('gate (Interviewer)');
-    expect(lineWith(container, 'Pipeline started')).toHaveTextContent('EventLogGated');
-    expect(lineWith(container, 'start → gate')).toHaveTextContent('Edge');
+    expect(lineWith(container, 'Step started')).toHaveTextContent('gate · Ask a person');
+    expect(lineWith(container, 'Run started')).toHaveTextContent('EventLogGated');
+    expect(lineWith(container, 'start → gate')).toHaveTextContent('Moved on');
     expect(lines(container).length).toBe(eventStore.events.length);
   });
 
@@ -132,7 +132,7 @@ describe('EventLog', () => {
   it('shows a native notification when the pipeline aborts', async () => {
     const runId = await startGatedRun();
     const { container } = render(EventLog, { props: { runId } });
-    await waitFor(() => expect(lineWith(container, 'gate (Interviewer)')).toBeTruthy(), {
+    await waitFor(() => expect(lineWith(container, 'gate · Ask a person')).toBeTruthy(), {
       timeout: 5000,
     });
 
@@ -161,14 +161,24 @@ describe('EventLog', () => {
     const first = await answerGate(runId, 'again');
     await answerGate(runId, 'done', first);
 
-    await waitFor(() => expect(lines(container)[0]).toHaveTextContent('Pipeline completed'), {
+    await waitFor(() => expect(lines(container)[0]).toHaveTextContent('Run completed'), {
       timeout: 5000,
     });
-    expect(lineWith(container, 'Loop #1')).toHaveAttribute('data-tone', 'amber');
-    const edge = lines(container).find((l) => l.textContent?.includes('→') && l.textContent.includes('Edge'));
+    expect(lineWith(container, 'Went back (loop 1)')).toHaveAttribute('data-tone', 'amber');
+    const edge = lines(container).find((l) => l.textContent?.includes('→') && l.textContent.includes('Moved on'));
     expect(edge).toHaveAttribute('data-faded', 'true');
-    expect(lineWith(container, 'Checkpoint')).toHaveAttribute('data-faded', 'true');
-    expect(lineWith(container, 'Pipeline started')).toHaveAttribute('data-faded', 'false');
+    expect(lineWith(container, 'Progress saved')).toHaveAttribute('data-faded', 'true');
+    expect(lineWith(container, 'Run started')).toHaveAttribute('data-faded', 'false');
+  });
+
+  it('shows step names from the labels map instead of node ids', async () => {
+    const { container } = render(EventLog, {
+      props: { runId: 'no-such-run', labels: new Map([['code', 'Write the page']]) },
+    });
+
+    eventStore.add(checkpoint('code'));
+
+    await waitFor(() => expect(lineWith(container, 'Progress saved')).toHaveTextContent('Write the page'));
   });
 
   it('indents agent events', async () => {
@@ -189,7 +199,7 @@ describe('EventLog', () => {
   it('empties the log when the run changes', async () => {
     const runId = await startGatedRun();
     const { container, rerender } = render(EventLog, { props: { runId } });
-    await waitFor(() => expect(lineWith(container, 'Pipeline started')).toBeTruthy(), {
+    await waitFor(() => expect(lineWith(container, 'Run started')).toBeTruthy(), {
       timeout: 5000,
     });
 
