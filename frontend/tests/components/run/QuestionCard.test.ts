@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } fr
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
-import QuestionCard from '../../../src/components/dashboard/QuestionCard.svelte';
+import QuestionCard from '../../../src/components/run/QuestionCard.svelte';
 import EventLog from '../../../src/components/dashboard/EventLog.svelte';
 import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import * as runsApi from '../../../src/lib/api/runs';

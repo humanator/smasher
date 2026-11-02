@@ -7,7 +7,7 @@
   import DashboardPage from './components/dashboard/DashboardPage.svelte';
   import RunDetail from './components/dashboard/RunDetail.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
-  import QuestionCard from './components/dashboard/QuestionCard.svelte';
+  import QuestionCard from './components/run/QuestionCard.svelte';
   import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
