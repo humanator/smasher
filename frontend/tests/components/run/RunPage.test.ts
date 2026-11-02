@@ -459,7 +459,8 @@ describe('RunPage', { timeout: 20_000 }, () => {
       await fireEvent.click(await screen.findByRole('tab', { name: 'Activity' }));
       const activity = screen.getByRole('tabpanel');
       expect(await within(activity).findByText('Run started', {}, SLOW)).toBeTruthy();
-      expect(await within(activity).findByText(/Take a nap/, {}, SLOW)).toBeTruthy();
+      // More than one line can name the step once it has finished as well as started.
+      expect((await within(activity).findAllByText(/Take a nap/, {}, SLOW)).length).toBeGreaterThan(0);
     });
 
     it('shows when the run started, its token counts and its working folder on Details', async () => {
