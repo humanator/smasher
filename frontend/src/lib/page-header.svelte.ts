@@ -11,8 +11,8 @@ export class PageHeaderState {
   title = $state<string | null>(null);
   /** A line under the title; `backticks` set a fragment in mono. */
   subtitle = $state<string | null>(null);
-  /** Where the toolbar's back button goes; null leaves App's own. */
-  back = $state<{ label: string; href: string } | null>(null);
+  /** Where the toolbar's back button goes; null leaves App's own. Raw so usePageBack can compare by identity. */
+  back = $state.raw<{ label: string; href: string } | null>(null);
   /** Sits on the title line after the title, e.g. the Run page's status badge. */
   titleAccessory = $state<Snippet | null>(null);
 }

@@ -13,6 +13,19 @@ export const RUN_FAIL_CHECK = `digraph RunFailCheck {
   start -> bad;
 }`;
 
+// Finishes at once: start straight to exit.
+export const QUICK_FINISH = `digraph QuickFinish {
+  start [shape=Mdiamond]; exit [shape=Msquare];
+  start -> exit;
+}`;
+
+// Stays Running with no question pending: a shell command that sleeps, no LLM.
+export const SLEEPING = `digraph Sleeping {
+  start [shape=Mdiamond]; exit [shape=Msquare];
+  nap [shape=parallelogram, label="Take a nap", tool_command="sleep 60"];
+  start -> nap -> exit;
+}`;
+
 // One gate of each kind, in order: multiple choice, approval, free form.
 export const QUESTION_KINDS = `digraph QuestionKinds {
   start [shape=Mdiamond]; exit [shape=Msquare];

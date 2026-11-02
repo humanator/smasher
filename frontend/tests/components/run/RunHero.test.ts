@@ -54,8 +54,8 @@ describe('RunHero', () => {
   });
 
   it('reveals the run folder from Show Results in Finder in the desktop app', async () => {
-    const invoke = vi.fn().mockResolvedValue(undefined);
-    window.__TAURI__ = { core: { invoke } };
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke: invoke as never } };
     render(RunHero, { props: { hero: completed, resultsPath: 'artifacts/r1' } });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Show Results in Finder' }));
@@ -63,7 +63,11 @@ describe('RunHero', () => {
   });
 
   it('says so inline when Finder cannot be opened', async () => {
-    window.__TAURI__ = { core: { invoke: vi.fn().mockRejectedValue(new Error('outside the runs folder')) } };
+    window.__TAURI__ = { core: {
+        invoke: async () => {
+          throw new Error('outside the runs folder');
+        },
+      } };
     render(RunHero, { props: { hero: completed, resultsPath: 'artifacts/r1' } });
 
     await fireEvent.click(screen.getByRole('button', { name: 'Show Results in Finder' }));
@@ -71,7 +75,7 @@ describe('RunHero', () => {
   });
 
   it('hides Show Results in Finder when the run has no folder', () => {
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
+    window.__TAURI__ = { core: { invoke: vi.fn() as never } };
     render(RunHero, { props: { hero: completed } });
     expect(screen.queryByRole('button', { name: 'Show Results in Finder' })).toBeNull();
   });

@@ -31,7 +31,7 @@ const RUN: RunSummary = {
   resumable: false,
 };
 
-function inputs(over: Partial<HeroInputs> & { run?: Partial<RunSummary> } = {}): HeroInputs {
+function inputs(over: Partial<Omit<HeroInputs, 'run'>> & { run?: Partial<RunSummary> } = {}): HeroInputs {
   const { run, ...rest } = over;
   return {
     run: { ...RUN, ...run },
