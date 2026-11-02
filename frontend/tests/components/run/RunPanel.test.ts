@@ -77,6 +77,39 @@ describe('RunPanel', () => {
     expect(within(panel).getAllByText(/Pick a favourite/).length).toBeGreaterThan(0);
   });
 
+  it('shows the run\'s details on the Details tab once the run has loaded', async () => {
+    const user = userEvent.setup();
+    const run = {
+      id: 'details-run',
+      status: 'Completed',
+      started_at: '2026-11-02T10:00:00Z',
+      completed_at: '2026-11-02T10:07:00Z',
+      graph_name: null,
+      error: null,
+      input_tokens: 0,
+      output_tokens: 0,
+      run_working_dir: 'artifacts/details-run',
+      workflow_id: null,
+      gallery_gates: [],
+      pending_questions: 0,
+      waiting_since: null,
+      resumable: false,
+    };
+    render(RunPanel, { props: { open: true, steps: NODES, events: WAITING, run, active: false, now: new Date() } });
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
+    const panel = screen.getByRole('tabpanel');
+    expect(within(panel).getByText('Started')).toBeInTheDocument();
+    expect(within(panel).getByText('artifacts/details-run')).toBeInTheDocument();
+  });
+
+  it('has nothing to say on the Details tab until the run has loaded', async () => {
+    const user = userEvent.setup();
+    show();
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
+    expect(within(screen.getByRole('tabpanel')).queryByText('Started')).toBeNull();
+    expect(within(screen.getByRole('tabpanel')).getByText(/once the run has loaded/i)).toBeInTheDocument();
+  });
+
   it('keeps only the selected tab in the tab order and moves with the arrow keys', async () => {
     const user = userEvent.setup();
     show();

@@ -336,5 +336,14 @@
       <LazyRunDialog {workflow} bind:open={runDialogOpen} />
     {/if}
   </div>
-  <RunPanel open={panelOpen} onOpenChange={(open) => (panelOpen = open)} steps={orderedSteps} events={eventStore.events} labels={stepLabels(steps)} />
+  <RunPanel
+    open={panelOpen}
+    onOpenChange={(open) => (panelOpen = open)}
+    steps={orderedSteps}
+    events={eventStore.events}
+    labels={stepLabels(steps)}
+    {run}
+    {active}
+    now={now.current}
+  />
 </div>

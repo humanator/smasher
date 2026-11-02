@@ -451,6 +451,27 @@ describe('RunPage', { timeout: 20_000 }, () => {
       await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'));
       expect(localStorage.getItem('smasher.runPanel.open')).toBeNull();
     });
+
+    it('shows the run\'s events on Activity, from the one stream the page follows', async () => {
+      widen(1440);
+      const id = await submitGraph(SLEEPING);
+      await renderRun(id);
+      await fireEvent.click(await screen.findByRole('tab', { name: 'Activity' }));
+      const activity = screen.getByRole('tabpanel');
+      expect(await within(activity).findByText('Run started', {}, SLOW)).toBeTruthy();
+      expect(await within(activity).findByText(/Take a nap/, {}, SLOW)).toBeTruthy();
+    });
+
+    it('shows when the run started, its token counts and its working folder on Details', async () => {
+      widen(1440);
+      const id = await submitGraph(SLEEPING);
+      await renderRun(id);
+      await fireEvent.click(await screen.findByRole('tab', { name: 'Details' }));
+      const details = screen.getByRole('tabpanel');
+      expect(await within(details).findByText('Started', {}, SLOW)).toBeTruthy();
+      expect(await within(details).findByText('Input tokens', {}, SLOW)).toBeTruthy();
+      expect(await within(details).findByText('Working folder', {}, SLOW)).toBeTruthy();
+    });
   });
 
   describe('a run at a gallery gate', () => {

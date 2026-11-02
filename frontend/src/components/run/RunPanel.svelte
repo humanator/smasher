@@ -8,9 +8,10 @@
   import { loadPanelTab, savePanelTab, PANEL_TABS, type PanelTab } from '$lib/runPanelPrefs';
   import { stepProgress } from '$lib/runProgress';
   import type { PipelineEvent } from '../../lib/api/events';
-  import type { GraphNodeSummary } from '../../lib/api/runs';
+  import type { GraphNodeSummary, RunSummary } from '../../lib/api/runs';
   import ActivityLog from './ActivityLog.svelte';
   import ProgressList from './ProgressList.svelte';
+  import RunDetails from './RunDetails.svelte';
 
   let {
     open,
@@ -18,6 +19,9 @@
     steps,
     events,
     labels,
+    run = null,
+    active = false,
+    now = new Date(),
   }: {
     open: boolean;
     /** Called when the sheet closes itself (Escape, the close button, a tap outside). */
@@ -27,6 +31,12 @@
     events: readonly PipelineEvent[];
     /** Step names by node id, for the Activity tab's lines. */
     labels?: ReadonlyMap<string, string>;
+    /** For the Details tab; null until the run has loaded. */
+    run?: RunSummary | null;
+    /** Whether the run is still going, which keeps the token counts polling. */
+    active?: boolean;
+    /** Ticks while the run is going, so "so far" ages. */
+    now?: Date;
   } = $props();
 
   const LABELS: Record<PanelTab, string> = { progress: 'Progress', activity: 'Activity', details: 'Details' };
@@ -55,7 +65,11 @@
       <ActivityLog {events} {labels} />
     </Tabs.Content>
     <Tabs.Content value="details" class="min-h-0 flex-1 overflow-y-auto">
-      <p class="m-0 text-body text-muted-foreground">The run's details appear here.</p>
+      {#if run}
+        <RunDetails {run} {active} {now} />
+      {:else}
+        <p class="m-0 text-body text-muted-foreground">The run's details appear once the run has loaded.</p>
+      {/if}
     </Tabs.Content>
   </Tabs.Root>
 {/snippet}
