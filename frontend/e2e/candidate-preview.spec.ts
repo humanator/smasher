@@ -64,21 +64,21 @@ function seedCandidate(runId: string, candidateId: string, seed: { png: boolean;
   );
 }
 
-// The run page shows the gallery too; the gate's cards are the ones under test.
+// The cards under test are the run page's candidate cards.
 function thumbnail(page: Page, candidateId: string) {
-  return page.locator('.gate-card').getByRole('button', { name: `Open preview of ${candidateId}` });
+  return page.locator('.candidate-card').getByRole('button', { name: `Open preview of ${candidateId}` });
 }
 
 async function expectAllUnchecked(page: Page) {
   for (const id of ['cand-a', 'cand-b', 'cand-c']) {
-    await expect(page.getByRole('checkbox', { name: id, exact: true })).toHaveAttribute(
-      'aria-checked',
+    await expect(page.getByRole('button', { name: `Select ${id}`, exact: true })).toHaveAttribute(
+      'aria-pressed',
       'false'
     );
   }
 }
 
-test('gate thumbnails open a scaled, interactive lightbox that never toggles the checkbox', async ({
+test('gate thumbnails open a scaled, interactive lightbox that never toggles the selection', async ({
   page,
   baseURL,
 }) => {
@@ -111,8 +111,8 @@ test('gate thumbnails open a scaled, interactive lightbox that never toggles the
     await expect(thumbnail(page, 'cand-c')).toHaveText('No screenshot');
     await expect(page.locator('iframe')).toHaveCount(0);
 
-    // Params open inside the gate's <label> without the click reaching its checkbox.
-    const params = page.locator('.gate-card details');
+    // Params open inside the candidate card without the click reaching its Select toggle.
+    const params = page.locator('.candidate-card details');
     await params.getByText('params').click();
     await expect(params.getByText('seed: 7')).toBeVisible();
     await expectAllUnchecked(page);
