@@ -2,9 +2,9 @@
 // ABOUTME: Uses hand-written runs, steps and the recorded event sequences from the fixtures
 
 import { describe, it, expect } from 'vitest';
-import { heroModel, type HeroInputs } from '../../src/lib/runHero';
+import { heroModel, resumeStepLabel, type HeroInputs } from '../../src/lib/runHero';
 import type { RunSummary, DecisionResponse } from '../../src/lib/api/runs';
-import { SINGLE_PASS } from '../fixtures/runEvents';
+import { ABORTED, FAILED, SINGLE_PASS } from '../fixtures/runEvents';
 
 const STEPS = [
   { id: 'start', node_type: 'Start' },
@@ -144,5 +144,28 @@ describe('heroModel', () => {
       state: 'aborted',
       heading: 'Stopped by you',
     });
+  });
+});
+
+describe('resumeStepLabel', () => {
+  it('names the step that failed', () => {
+    const events = [...FAILED] as HeroInputs['events'];
+    const label = resumeStepLabel(inputs({ run: { status: 'Failed', error: "node 'lint' failed" }, events }));
+    expect(label).toBe('Check against design system');
+  });
+
+  it('names the step from the error when no events arrived', () => {
+    expect(resumeStepLabel(inputs({ run: { status: 'Failed', error: "node 'draft' failed with no available route: boom" } }))).toBe(
+      'Draft three concepts'
+    );
+  });
+
+  it('names the step that was running when the run was stopped', () => {
+    const label = resumeStepLabel(inputs({ run: { status: 'Aborted' }, events: ABORTED as HeroInputs['events'] }));
+    expect(label).toBe('Draft three concepts');
+  });
+
+  it('is null when nothing says which step', () => {
+    expect(resumeStepLabel(inputs({ run: { status: 'Failed' } }))).toBeNull();
   });
 });

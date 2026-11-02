@@ -100,3 +100,14 @@ export function heroModel({ run, steps, events, decisions, question, now }: Hero
     iterating: false,
   };
 }
+
+/**
+ * The step a resume picks up at: the one that failed, else the one an abort cut off
+ * (it started but is back to pending). Null when nothing says which.
+ */
+export function resumeStepLabel({ run, steps, events }: Pick<HeroInputs, 'run' | 'steps' | 'events'>): string | null {
+  const progress = stepProgress(steps, events);
+  const cutOff = [...progress].reverse().find((p) => p.state === 'pending' && p.runs > 0)?.id;
+  const id = progress.find((p) => p.state === 'failed')?.id ?? NODE.exec(run.error ?? '')?.[1] ?? cutOff;
+  return id ? (stepLabels(steps).get(id) ?? id) : null;
+}

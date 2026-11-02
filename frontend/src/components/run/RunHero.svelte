@@ -5,6 +5,7 @@
   import CheckIcon from '@lucide/svelte/icons/check';
   import CircleStopIcon from '@lucide/svelte/icons/circle-stop';
   import FolderOpenIcon from '@lucide/svelte/icons/folder-open';
+  import PlayIcon from '@lucide/svelte/icons/play';
   import RefreshIcon from '@lucide/svelte/icons/refresh-cw';
   import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -17,6 +18,9 @@
     resultsPath = null,
     editHref = null,
     onRunAgain = null,
+    onResume = null,
+    resumeLabel = null,
+    resuming = false,
   }: {
     hero: HeroModel;
     /** The run's working folder; Show Results in Finder needs it. */
@@ -25,6 +29,11 @@
     editHref?: string | null;
     /** Opens the Run dialog; null hides Run Again (ad-hoc runs have no workflow to run). */
     onRunAgain?: (() => void) | null;
+    /** Resumes from the last checkpoint; null hides Resume (the run is not resumable). */
+    onResume?: (() => void) | null;
+    /** The step Resume picks up at, when known. */
+    resumeLabel?: string | null;
+    resuming?: boolean;
   } = $props();
 
   // Finder exists only in the desktop app.
@@ -42,9 +51,19 @@
   }
 </script>
 
-{#snippet runAgain(variant: 'default' | 'outline')}
+{#snippet resume()}
+  {#if onResume}
+    <Button onclick={onResume} disabled={resuming}>
+      <PlayIcon aria-hidden="true" />
+      {resuming ? 'Resuming…' : resumeLabel ? `Resume from ${resumeLabel}` : 'Resume'}
+    </Button>
+  {/if}
+{/snippet}
+
+<!-- Resume is the main action when offered; Run Again steps back to an outline beside it. -->
+{#snippet runAgain()}
   {#if onRunAgain}
-    <Button {variant} onclick={onRunAgain}>
+    <Button variant={onResume ? 'outline' : 'default'} onclick={onRunAgain}>
       <RefreshIcon aria-hidden="true" />
       Run Again
     </Button>
@@ -115,12 +134,16 @@
           <li>{line}</li>
         {/each}
       </ul>
-      {#if editHref || onRunAgain}
+      {#if onResume}
+        <p class="text-small mt-0 mb-2 text-foreground-secondary">Steps that already finished aren't repeated.</p>
+      {/if}
+      {#if editHref || onRunAgain || onResume}
         <div class="flex flex-wrap gap-2">
+          {@render resume()}
           {#if editHref}
             <Button href={editHref} variant="outline">Open in Editor</Button>
           {/if}
-          {@render runAgain('default')}
+          {@render runAgain()}
         </div>
       {/if}
     </div>
@@ -135,8 +158,11 @@
     <div class="min-w-0 flex-1">
       <h2 class="text-display m-0 font-bold text-foreground">{hero.heading}</h2>
       <p class="text-small mt-1 mb-0 text-foreground-secondary">{hero.text}</p>
-      {#if onRunAgain}
-        <div class="mt-3">{@render runAgain('default')}</div>
+      {#if onRunAgain || onResume}
+        <div class="mt-3 flex flex-wrap gap-2">
+          {@render resume()}
+          {@render runAgain()}
+        </div>
       {/if}
     </div>
   </section>

@@ -109,4 +109,40 @@ describe('RunHero', () => {
     expect(screen.queryByText('What you can try')).toBeNull();
     expect(screen.getByRole('button', { name: 'Run Again' })).toBeTruthy();
   });
+
+  describe('resume', () => {
+    it('offers Resume from the step on a failed run, as the main action, with Run Again demoted to outline', async () => {
+      const onResume = vi.fn();
+      render(RunHero, { props: { hero: failed, resumeLabel: 'Check against design system', onResume, onRunAgain: () => {} } });
+
+      const resume = screen.getByRole('button', { name: 'Resume from Check against design system' });
+      expect(screen.getByText(/already finished aren't repeated/i)).toBeTruthy();
+      expect(resume.className).toContain('bg-primary');
+      expect(screen.getByRole('button', { name: 'Run Again' }).className).toContain('bg-control');
+      await fireEvent.click(resume);
+      expect(onResume).toHaveBeenCalledOnce();
+    });
+
+    it('offers Resume on a stopped run', () => {
+      render(RunHero, { props: { hero: aborted, resumeLabel: 'Take a nap', onResume: () => {}, onRunAgain: () => {} } });
+      expect(screen.getByRole('button', { name: 'Resume from Take a nap' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Run Again' }).className).toContain('bg-control');
+    });
+
+    it('says plain Resume when the step is unknown, and Resuming… while it posts', () => {
+      const { unmount } = render(RunHero, { props: { hero: failed, onResume: () => {} } });
+      expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy();
+      unmount();
+      render(RunHero, { props: { hero: failed, onResume: () => {}, resuming: true } });
+      const busy = screen.getByRole('button', { name: 'Resuming…' });
+      expect(busy).toBeDisabled();
+    });
+
+    it('offers nothing when the run is not resumable (no handler)', () => {
+      render(RunHero, { props: { hero: failed, resumeLabel: 'X', onRunAgain: () => {} } });
+      expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull();
+      expect(screen.queryByText(/aren't repeated/i)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Run Again' }).className).toContain('bg-primary');
+    });
+  });
 });
