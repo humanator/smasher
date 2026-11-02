@@ -21,15 +21,21 @@ pub fn port_for(debug: bool) -> u16 {
 /// The desktop's server config: the usual env-driven defaults for model,
 /// provider, data dir (`~/Documents/smasher`) and workflow dirs, but always loopback,
 /// and never an env-chosen port.
-/// Workflow dirs are made absolute against the workspace root, because a
-/// Finder-launched app has cwd `/` and `"examples"` would find nothing.
+/// The repo's `examples` are not shown unless `SMASHER_WORKFLOWS_DIR` asks for
+/// them, so the app lists only the workflows in the data dir. Dirs named there
+/// are made absolute against the workspace root, because a Finder-launched app
+/// has cwd `/` and a relative dir would find nothing.
 pub fn server_config() -> ServerConfig {
     let defaults = ServerConfig::default();
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let configured = match std::env::var("SMASHER_WORKFLOWS_DIR") {
+        Ok(_) => absolute_workflow_dirs(&defaults.workflow_dirs, &workspace_root),
+        Err(_) => Vec::new(),
+    };
     ServerConfig {
         host: LOOPBACK,
         port: port_for(cfg!(debug_assertions)),
-        workflow_dirs: absolute_workflow_dirs(&defaults.workflow_dirs, &workspace_root),
+        workflow_dirs: configured,
         ..defaults
     }
 }
@@ -143,8 +149,24 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn server_config_workflow_dirs_are_absolute_so_a_finder_launch_finds_examples() {
+    fn server_config_lists_no_example_workflows_by_default() {
+        unsafe {
+            std::env::remove_var("SMASHER_WORKFLOWS_DIR");
+        }
+
+        assert!(server_config().workflow_dirs.is_empty());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn server_config_makes_requested_workflow_dirs_absolute_so_a_finder_launch_finds_them() {
+        unsafe {
+            std::env::set_var("SMASHER_WORKFLOWS_DIR", "examples");
+        }
         let config = server_config();
+        unsafe {
+            std::env::remove_var("SMASHER_WORKFLOWS_DIR");
+        }
 
         assert!(!config.workflow_dirs.is_empty());
         for dir in &config.workflow_dirs {

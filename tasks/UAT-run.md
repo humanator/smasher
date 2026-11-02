@@ -47,7 +47,7 @@ checkpoint: 2 (found while setting up; not a run-page bug)
 expected: running the example makes three candidates.
 reported: "I still don't see candidates" (run 01m6dfyqm1w6558n1010vnnk57)
 diagnosis: `Render1` fails with "candidate directory has no index.html: <run dir>/crates/smasher-render-capture/fixtures/candidate". The DOT's `candidate_dir` is relative to the repo root, but the tool resolves it against the run's own folder. The gate is then reached with no candidates, so the page shows only the question (correct for that data). Fix is in the example DOT (absolute path) or the tool's path resolution.
-status: open
+status: fixed by hiding the examples in the desktop app (they are listed only when SMASHER_WORKFLOWS_DIR is set). The DOT itself still uses a repo-relative path, which works from the CLI run at the repo root.
 
 ### BUG-3: Candidates/Decision bar styling doesn't match the design
 severity: cosmetic
@@ -73,4 +73,4 @@ status: fixed
 ## Summary
 - pass: 1 (checkpoint 3). issue: 3 (checkpoints 1, 2, 5). not tested: 1 (checkpoint 4).
 - 5 bugs filed: 1 major (BUG-4), 2 minor (BUG-2, BUG-5), 2 cosmetic (BUG-1, BUG-3).
-- Fixed: BUG-1, BUG-4, BUG-5. Open: BUG-2 (needs a call on absolute path vs. resolution), BUG-3 (needs the user to name the differences).
+- Fixed: BUG-1, BUG-2, BUG-4, BUG-5. Open: BUG-3 (needs the user to name the differences).
