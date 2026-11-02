@@ -1,12 +1,12 @@
 # Spec: `run`
 
-Module of [CAPABILITY_MAP.md](CAPABILITY_MAP.md). Status: **Approved 2026-11-02.**
+Module of [CAPABILITY_MAP.md](../CAPABILITY_MAP.md). Status: **Approved 2026-11-02.**
 Depends on: `shell-theme` (tokens, primitives, `stepKinds`, `AppShell`/`Toolbar`, page-header
 context, `libraryStore`). It also reuses the `workflow-detail` and `dashboard` helpers
 (`summariseRunError`, `statusBadge`, `formatWhen`, `formatDuration`, `questionKind`, `runTitle`,
 `LazyRunDialog`, `stepLabel`).
 
-Design reference: [Run](../docs/design/redesign/Run.dc.html) (1440×900). It draws four states
+Design reference: [Run](../../docs/design/redesign/Run.dc.html) (1440×900). It draws four states
 (`waiting`, `running`, `completed`, `failed`) and one transient state (`iterating`).
 
 ## Objective

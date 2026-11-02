@@ -1,6 +1,6 @@
 # Implementation Plan: `run`
 
-Spec: [SPEC-run.md](SPEC-run.md) (approved 2026-11-02), part of [CAPABILITY_MAP.md](CAPABILITY_MAP.md).
+Spec: [SPEC-run.md](SPEC-run.md) (approved 2026-11-02), part of [CAPABILITY_MAP.md](../CAPABILITY_MAP.md).
 The task list is in [todo-run.md](todo-run.md).
 
 ## Overview
