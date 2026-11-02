@@ -7,7 +7,7 @@
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
   import { useNow } from '$lib/hooks/useNow.svelte';
   import { errorMessage } from '$lib/notify';
-  import { heroModel } from '$lib/runHero';
+  import { heroModel, resumeStepLabel } from '$lib/runHero';
   import { isActive, isNeedsYou, runTitle } from '$lib/runStatus';
   import { formatDuration, formatWhenInline } from '$lib/timeFormat';
   import { formatWorkflowName } from '$lib/utils';
@@ -37,7 +37,16 @@
     readonly loaded: boolean;
   }
 
-  let { runId, library = libraryStore }: { runId: string; library?: Library } = $props();
+  let {
+    runId,
+    library = libraryStore,
+    navigate = (url: string) => window.location.assign(url),
+  }: {
+    runId: string;
+    library?: Library;
+    /** Opens another page; the page is not a router, so this reloads onto it. */
+    navigate?: (url: string) => void;
+  } = $props();
 
   const POLL_INTERVAL_MS = 5000;
 
@@ -51,6 +60,7 @@
   let decisions = $state<DecisionResponse[]>([]);
   let question = $state<string | null>(null);
   let aborting = $state(false);
+  let resuming = $state(false);
   // The server can still report Running for a moment after it accepted the abort.
   let abortAccepted = false;
   let runDialogOpen = $state(false);
@@ -62,6 +72,8 @@
 
   const workflow = $derived(run?.workflow_id ? (library.workflows.find((w) => w.id === run?.workflow_id) ?? null) : null);
   const active = $derived(run ? isActive(run.status) : false);
+  // Resume is for an ended run the server says has a checkpoint.
+  const canResume = $derived(!!run?.resumable && (run.status === 'Failed' || run.status === 'Aborted'));
   const hero = $derived(
     run
       ? heroModel({
@@ -135,6 +147,17 @@
     }
   }
 
+  async function resume() {
+    resuming = true;
+    actionError = null;
+    try {
+      navigate(`/runs/${encodeURIComponent(await runsApi.resumeRun(runId))}`);
+    } catch (err) {
+      actionError = `Couldn't resume the run. ${errorMessage(err, 'Something went wrong.')}`;
+      resuming = false;
+    }
+  }
+
   onMount(() => {
     void refresh();
     void loadSteps();
@@ -189,6 +212,8 @@
       {aborting}
       onAbort={() => void abort()}
       onRunAgain={workflow ? () => (runDialogOpen = true) : null}
+      onResume={canResume ? () => void resume() : null}
+      {resuming}
       {panelOpen}
       onTogglePanel={() => (panelOpen = !panelOpen)}
     />
@@ -225,6 +250,9 @@
         resultsPath={run.run_working_dir}
         editHref={workflow ? `/workflows/${encodeURIComponent(workflow.id)}/edit` : null}
         onRunAgain={workflow ? () => (runDialogOpen = true) : null}
+        onResume={canResume ? () => void resume() : null}
+        resumeLabel={resumeStepLabel({ run, steps, events: eventStore.events })}
+        {resuming}
       />
     {:else if !loadError}
       <div role="status" aria-label="Loading run" class="rounded-xl border border-border px-5 py-[18px]">

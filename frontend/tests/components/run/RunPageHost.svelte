@@ -6,7 +6,7 @@
 	import Toolbar from '../../../src/components/shell/Toolbar.svelte';
 	import RunPage from '../../../src/components/run/RunPage.svelte';
 
-	let { runId, library }: ComponentProps<typeof RunPage> = $props();
+	let { runId, library, navigate }: ComponentProps<typeof RunPage> = $props();
 
 	const header = providePageHeader();
 </script>
@@ -18,4 +18,4 @@
 	titleAccessory={header.titleAccessory}
 	actions={header.actions}
 />
-<RunPage {runId} {library} />
+<RunPage {runId} {library} {navigate} />

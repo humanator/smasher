@@ -3,6 +3,7 @@
   // ABOUTME: Presentational; RunPage owns the state and passes the handlers. Needs no Tooltip.Provider above it
 
   import InspectorIcon from '@lucide/svelte/icons/panel-right';
+  import PlayIcon from '@lucide/svelte/icons/play';
   import RefreshIcon from '@lucide/svelte/icons/refresh-cw';
   import SquareIcon from '@lucide/svelte/icons/square';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -15,6 +16,8 @@
     aborting = false,
     onAbort,
     onRunAgain = null,
+    onResume = null,
+    resuming = false,
     panelOpen,
     onTogglePanel,
   }: {
@@ -24,6 +27,9 @@
     onAbort: () => void;
     /** Opens the Run dialog; null hides Run Again (ad-hoc runs have no workflow). */
     onRunAgain?: (() => void) | null;
+    /** Resumes from the last checkpoint; null hides Resume (the run is not resumable). */
+    onResume?: (() => void) | null;
+    resuming?: boolean;
     panelOpen: boolean;
     onTogglePanel: () => void;
   } = $props();
@@ -35,11 +41,19 @@
       <SquareIcon aria-hidden="true" />
       {aborting ? 'Aborting…' : 'Abort Run'}
     </Button>
-  {:else if onRunAgain}
-    <Button variant="outline" onclick={onRunAgain}>
-      <RefreshIcon aria-hidden="true" />
-      Run Again
-    </Button>
+  {:else}
+    {#if onResume}
+      <Button variant="outline" onclick={onResume} disabled={resuming}>
+        <PlayIcon aria-hidden="true" />
+        {resuming ? 'Resuming…' : 'Resume'}
+      </Button>
+    {/if}
+    {#if onRunAgain}
+      <Button variant="outline" onclick={onRunAgain}>
+        <RefreshIcon aria-hidden="true" />
+        Run Again
+      </Button>
+    {/if}
   {/if}
   <ToolbarDivider />
   <ToolbarIconButton

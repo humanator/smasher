@@ -2,7 +2,7 @@
 // ABOUTME: Real runs that cost nothing: instant finish, a sleeping command, a failing tool and a parked gate
 
 import type { ComponentProps } from 'svelte';
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { rmSync } from 'fs';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/svelte/svelte5';
 import RunPageHost from './RunPageHost.svelte';
@@ -12,6 +12,7 @@ import * as workflowsApi from '../../../src/lib/api/workflows';
 import { createLibraryStore } from '../../../src/stores/library.svelte';
 import {
   ANONYMOUS_GATE,
+  FAIL_TOOL,
   QUICK_FINISH,
   RUN_FAIL_CHECK,
   SLEEPING,
@@ -28,8 +29,12 @@ const SLOW = { timeout: 8000 };
 const toolbar = () => screen.getByRole('banner');
 const hero = () => screen.getByTestId('run-hero');
 
-function renderRun(runId: string, library: ComponentProps<typeof RunPageHost>['library'] = NO_WORKFLOWS) {
-  return render(RunPageHost, { props: { runId, library } });
+function renderRun(
+  runId: string,
+  library: ComponentProps<typeof RunPageHost>['library'] = NO_WORKFLOWS,
+  navigate?: (url: string) => void
+) {
+  return render(RunPageHost, { props: { runId, library, navigate } });
 }
 
 let stores: { stop(): void }[] = [];
@@ -40,6 +45,7 @@ describe('RunPage', { timeout: 20_000 }, () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     stores.forEach((s) => s.stop());
     stores = [];
     document.body.style.pointerEvents = '';
@@ -196,6 +202,109 @@ describe('RunPage', { timeout: 20_000 }, () => {
 
       await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Run Again' }));
       await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    });
+  });
+
+  describe('resuming', () => {
+    async function failedWorkflowRun() {
+      const name = `_test_RunPage.resume_${Date.now()}`;
+      const { id: workflowId } = await workflowsApi.importWorkflowDot(name, FAIL_TOOL);
+      const { run_id } = await runsApi.runWorkflow(workflowId);
+      trackRun(run_id);
+      const library = createLibraryStore(5000);
+      library.start();
+      stores.push(library);
+      await waitFor(() => expect(library.loaded).toBe(true), { timeout: 5000 });
+      return { workflowId, run_id, library };
+    }
+
+    it('offers Resume from the failed step in hero and toolbar, with Run Again as outline', async () => {
+      const { run_id, library } = await failedWorkflowRun();
+      await renderRun(run_id, library);
+
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'failed'), SLOW);
+      const resume = await within(hero()).findByRole('button', { name: 'Resume from work' });
+      expect(resume.className).toContain('bg-primary');
+      expect(within(hero()).getByRole('button', { name: 'Run Again' }).className).toContain('bg-control');
+      expect(within(toolbar()).getByRole('button', { name: 'Resume' })).toBeTruthy();
+      expect(within(toolbar()).getByRole('button', { name: 'Run Again' })).toBeTruthy();
+    });
+
+    it('posts the resume and opens the new run, which belongs to the same workflow', async () => {
+      const { workflowId, run_id, library } = await failedWorkflowRun();
+      const navigate = vi.fn();
+      await renderRun(run_id, library, navigate);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'failed'), SLOW);
+
+      await fireEvent.click(await within(hero()).findByRole('button', { name: 'Resume from work' }));
+
+      await waitFor(() => expect(navigate).toHaveBeenCalledOnce(), SLOW);
+      const [url] = navigate.mock.calls[0] as [string];
+      const newId = trackRun(url.replace('/runs/', ''));
+      expect(url).toBe(`/runs/${newId}`);
+      expect(newId).not.toBe(run_id);
+      expect((await runsApi.getRun(newId)).workflow_id).toBe(workflowId);
+    });
+
+    it('shows Resuming… in hero and toolbar until the server answers', async () => {
+      const { run_id, library } = await failedWorkflowRun();
+      const navigate = vi.fn();
+      await renderRun(run_id, library, navigate);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'failed'), SLOW);
+      const button = await within(hero()).findByRole('button', { name: 'Resume from work' });
+
+      // Hold the real request back so the in-flight state can be seen.
+      const real = globalThis.fetch;
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        if (String(input).endsWith('/resume')) await gate;
+        return real(input, init);
+      });
+      await fireEvent.click(button);
+
+      expect((await within(hero()).findByRole('button', { name: 'Resuming…' })) as HTMLButtonElement).toBeDisabled();
+      expect(within(toolbar()).getByRole('button', { name: 'Resuming…' })).toBeDisabled();
+      release();
+      await waitFor(() => expect(navigate).toHaveBeenCalledOnce(), SLOW);
+      trackRun((navigate.mock.calls[0] as [string])[0].replace('/runs/', ''));
+    });
+
+    it('says so inline when the server refuses, and leaves the page usable', async () => {
+      const { run_id, library } = await failedWorkflowRun();
+      const navigate = vi.fn();
+      await renderRun(run_id, library, navigate);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'failed'), SLOW);
+      await within(hero()).findByRole('button', { name: 'Resume from work' });
+
+      const real = globalThis.fetch;
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) =>
+        String(input).endsWith('/resume')
+          ? Promise.resolve(new Response(JSON.stringify({ error: 'no checkpoint' }), { status: 500 }))
+          : real(input, init)
+      );
+      await fireEvent.click(within(hero()).getByRole('button', { name: 'Resume from work' }));
+
+      const alert = await screen.findByText(/Couldn't resume the run/);
+      expect(alert.getAttribute('role')).toBe('alert');
+      expect(navigate).not.toHaveBeenCalled();
+      expect(within(hero()).getByRole('button', { name: 'Resume from work' })).not.toBeDisabled();
+      expect(within(hero()).getByRole('button', { name: 'Run Again' })).not.toBeDisabled();
+    });
+
+    it('offers nothing on a run that finished', async () => {
+      const id = await submitGraph(QUICK_FINISH);
+      await renderRun(id);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'completed'), SLOW);
+      expect(screen.queryByRole('button', { name: /^Resume/ })).toBeNull();
+    });
+
+    it('offers Resume alone on an ad-hoc run, which has no workflow to run again', async () => {
+      const id = await submitGraph(FAIL_TOOL);
+      await renderRun(id);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'failed'), SLOW);
+      await within(hero()).findByRole('button', { name: 'Resume from work' });
+      expect(screen.queryByRole('button', { name: 'Run Again' })).toBeNull();
     });
   });
 

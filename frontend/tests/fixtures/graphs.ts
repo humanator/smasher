@@ -13,6 +13,14 @@ export const RUN_FAIL_CHECK = `digraph RunFailCheck {
   start -> bad;
 }`;
 
+// Fails at its tool step with exit status 3, after a checkpoint, so the run can be resumed. No LLM.
+export const FAIL_TOOL = `digraph FailTool {
+  start [shape=Mdiamond]; exit [shape=Msquare];
+  work [shape=parallelogram, tool_command="exit 3"];
+  start -> work;
+  work -> exit [condition="outcome=success"];
+}`;
+
 // Finishes at once: start straight to exit.
 export const QUICK_FINISH = `digraph QuickFinish {
   start [shape=Mdiamond]; exit [shape=Msquare];
