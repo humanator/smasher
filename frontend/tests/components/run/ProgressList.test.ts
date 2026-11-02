@@ -61,6 +61,13 @@ describe('ProgressList', () => {
     expect(screen.getAllByRole('listitem').filter((li) => li.hasAttribute('aria-current'))).toHaveLength(1);
   });
 
+  it('darkens the current step\'s meta line so it stays 4.5:1 on the highlight', () => {
+    show(WAITING);
+    const meta = row('Pick a favourite').querySelector('.text-caption');
+    expect(meta).toHaveClass('text-foreground-secondary');
+    expect(meta).not.toHaveClass('text-muted-foreground');
+  });
+
   it('shows a failed step with its state in text', () => {
     show(FAILED);
     expect(row('Check the design system')).toHaveTextContent(/Failed.*Tool · Stopped with an error/);

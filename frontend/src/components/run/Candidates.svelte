@@ -110,7 +110,11 @@
               <p class="text-small m-0 break-words text-foreground-secondary">Your note: {notes[id]}</p>
             {/if}
             {#if selectable}
-              <Button variant="link" class="self-start" onclick={() => (editing[id] = true)}>
+              <Button
+                variant="link"
+                class="self-start dark:text-primary-subtle-foreground"
+                onclick={() => (editing[id] = true)}
+              >
                 {notes[id] ? 'Edit Note…' : 'Add a Note…'}
               </Button>
             {/if}

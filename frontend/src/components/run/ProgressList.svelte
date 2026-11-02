@@ -82,7 +82,7 @@
         </span>
         <span class="flex min-w-0 flex-col">
           <span data-testid="step-label" class="text-body font-medium break-words text-foreground">{stepLabel(step)}</span>
-          <span class="text-caption text-muted-foreground">
+          <span class={cn('text-caption', step.id === current ? 'text-foreground-secondary' : 'text-muted-foreground')}>
             <span class="sr-only">{STATE_WORD[s]}. </span>
             {metaLine(step.node_type, state)}
           </span>
