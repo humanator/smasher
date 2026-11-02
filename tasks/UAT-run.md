@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 source: tasks/archive/SPEC-run.md
 e2e_excluded: [run-page.spec.ts (all 6), gallery-gate.spec.ts, question-card.spec.ts, run-summary.spec.ts]
 started: 2026-11-02
@@ -24,13 +24,13 @@ result: issue (BUG-1)
 result: issue (BUG-3). Behaviour all present; styling doesn't match the design.
 
 ### 3. Iterate from the Decision bar ("Try Again with My Notes")
-result: pending
+result: pass
 
 ### 4. Activity: Everything adds tool calls, agent text, token lines
-result: pending
+result: not tested (needs a run that calls an LLM; Jobsworth chose the desktop app instead)
 
 ### 5. Show Results in Finder (desktop app only)
-result: pending
+result: issue (BUG-4, BUG-5)
 
 ## Issues
 
@@ -55,3 +55,22 @@ checkpoint: 2
 reported: "candidate grid is present, decision bar is present, and everything else described is present, but the visual styling doesn't match the design"
 diagnosis: needs investigation. No specifics yet, and the artboard (`docs/design/redesign/Run.dc.html`) doesn't render here (missing `support.js`), which is why `tasks/VERIFICATION-run.md` records no pixel comparison. Needs the user to name which parts differ.
 status: open
+
+### BUG-4: Show Results in Finder always fails for a run started in the desktop app
+severity: major
+checkpoint: 5
+reported: "Couldn't show the results in Finder. Something went wrong."
+diagnosis: `GET /api/runs` returns `run_working_dir` as a path relative to the data dir (`artifacts/01m6dzp1…`, which lives at `~/Documents/smasher/artifacts/…`). `RunPage.svelte:296` passes it straight to `reveal_run_folder`, and `validate_reveal_run_dir` (`crates/smasher-desktop/src/reveal.rs`) calls `canonicalize` on it, which resolves against the desktop process's working directory (`crates/smasher-desktop`), so the folder isn't found and it refuses with "That folder isn't one of this app's runs." The unit tests and the stand-in invoke used absolute paths, so none of them caught it. Likely fix: resolve a relative path against the data dir (`RunsDir`'s parent) before validating, or have the server return an absolute `run_working_dir`. `rehydrate.rs:126` shows the run root can already be absolute, so check why launched runs aren't.
+status: open
+
+### BUG-5: The real refusal reason is swallowed
+severity: minor
+checkpoint: 5
+reported: same message, with "Something went wrong." instead of a reason
+diagnosis: Tauri `invoke` rejects with a plain string, and `errorMessage` (`frontend/src/lib/notify.ts:6-8`) only reads `Error` instances, so `RunHero.svelte:47-50` falls back to "Something went wrong." and drops the "That folder isn't one of this app's runs." text the Rust side sent. Affects every native-command error that goes through `errorMessage`.
+status: open
+
+## Summary
+- pass: 1 (checkpoint 3). issue: 3 (checkpoints 1, 2, 5). not tested: 1 (checkpoint 4).
+- 5 bugs filed: 1 major (BUG-4), 2 minor (BUG-2, BUG-5), 2 cosmetic (BUG-1, BUG-3).
+- Not fixed, per the skill. Everything above is open.
