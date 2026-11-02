@@ -1,10 +1,9 @@
 <script lang="ts">
   // ABOUTME: The run panel's Activity tab: the run's events newest first, as Key moments or Everything
-  // ABOUTME: Keeps the old event log's scroll anchoring and its one native notification when the run ends
+  // ABOUTME: Keeps the old event log's scroll anchoring
 
   import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
   import { formatEvent, type EventLevel, type EventTone, type StepLabels } from '../../lib/eventFormat';
-  import { showNotification } from '../../lib/native';
   import type { PipelineEvent } from '../../lib/api/events';
 
   let {
@@ -74,29 +73,6 @@
     if (!logBox) return;
     if (atTop) logBox.scrollTop = 0;
     else logBox.scrollTop += logBox.scrollHeight - heightBefore;
-  });
-
-  let notified = $state(false);
-
-  // OS-native notification via the lib/native shim (Notification API in-browser,
-  // a real Tauri notification in smasher-desktop). Driven off the events rather
-  // than the stream callback so it fires exactly once however the terminal event
-  // arrived (live tail or replay).
-  const terminal = $derived(
-    [...events].reverse().find((e) => e.kind === 'pipeline_completed' || e.kind === 'pipeline_aborted')
-  );
-
-  $effect(() => {
-    if (!terminal) {
-      notified = false;
-    } else if (!notified) {
-      notified = true;
-      if (terminal.kind === 'pipeline_aborted') {
-        void showNotification('Pipeline aborted', { body: formatEvent(terminal).detail });
-      } else {
-        void showNotification('Pipeline complete', { body: formatEvent(terminal).detail });
-      }
-    }
   });
 </script>
 

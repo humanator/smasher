@@ -1,7 +1,7 @@
 // ABOUTME: Tests for QuestionCard component
 // ABOUTME: Answers real human-gate questions on runs against the real smasher-web API, no mocking
 
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
@@ -11,7 +11,6 @@ import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import * as runsApi from '../../../src/lib/api/runs';
 import { questionStore } from '../../../src/stores/questions.svelte';
 import { eventStore } from '../../../src/stores/events.svelte';
-import * as native from '../../../src/lib/native';
 import { submitGalleryDecision } from '../../../src/lib/api/gallery';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as questionsApi from '../../../src/lib/api/questions';
@@ -129,24 +128,15 @@ const answeredCards = () =>
   }));
 
 describe('QuestionCard', () => {
-  let notifySpy: MockInstance<
-    Parameters<typeof native.showNotification>,
-    ReturnType<typeof native.showNotification>
-  >;
-
   beforeEach(() => {
     questionStore.clear();
     eventStore.clear();
     setApiBaseUrl('http://127.0.0.1:21541/api');
-    // ActivityLog notifies when a run finishes; keep that out of the test output.
-    notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
-    // Unmount first, so a run finishing below can't notify after the spy is restored.
     cleanup();
     await cancelAll();
-    notifySpy.mockRestore();
   });
 
   it('shows the kind badge and question id straight away', async () => {

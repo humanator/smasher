@@ -38,8 +38,8 @@ test('runs with zero Tauri-only code paths breaking in a plain browser', async (
   // catalog's "paste DOT source" panel has been removed from the UI, and
   // every catalog workflow does real agentic work, so there's no UI path
   // left to launch an ad-hoc zero-LLM-call graph). Then navigate to its
-  // detail page so ActivityLog.svelte's completion-notification shim
-  // call-site (Task 20) actually executes -- a real browser has a real
+  // detail page so RunPage.svelte's run-notification shim
+  // call-site (useRunNotifications) actually executes -- a real browser has a real
   // Notification global, so showNotification's browser-fallback branch
   // runs for real here, not the jsdom "Notifications not supported"
   // warning path.

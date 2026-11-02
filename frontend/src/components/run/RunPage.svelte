@@ -8,6 +8,7 @@
   import { IsMobile } from '$lib/hooks/is-mobile.svelte';
   import { loadPanelOpen, savePanelOpen } from '$lib/runPanelPrefs';
   import { useNow } from '$lib/hooks/useNow.svelte';
+  import { useRunNotifications } from '$lib/hooks/useRunNotifications.svelte';
   import { errorMessage } from '$lib/notify';
   import { GalleryGateState } from '$lib/galleryGate.svelte';
   import { heroModel, resumeStepLabel, stepLabels } from '$lib/runHero';
@@ -80,6 +81,8 @@
   let pollHandle: ReturnType<typeof setInterval> | undefined;
 
   const now = useNow(1000);
+  // Here rather than in the Activity tab, which is not mounted while the panel is closed.
+  useRunNotifications(() => eventStore.events);
 
   // The page is keyed by run, so one gate follower lives as long as the page.
   // svelte-ignore state_referenced_locally

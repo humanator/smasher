@@ -2,9 +2,9 @@
 // ABOUTME: Real runs that cost nothing: instant finish, a sleeping command, a failing tool and a parked gate
 
 import type { ComponentProps } from 'svelte';
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { rmSync } from 'fs';
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/svelte/svelte5';
+import { cleanup, render, screen, fireEvent, within, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -13,12 +13,16 @@ import RunPageHost from './RunPageHost.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as runsApi from '../../../src/lib/api/runs';
 import * as workflowsApi from '../../../src/lib/api/workflows';
+import * as questionsApi from '../../../src/lib/api/questions';
+import * as native from '../../../src/lib/native/index';
+import { eventStore } from '../../../src/stores/events.svelte';
 import { createLibraryStore } from '../../../src/stores/library.svelte';
 import {
   ANONYMOUS_GATE,
   FAIL_TOOL,
   GALLERY_GATE_APPROVE,
   GALLERY_GATE_THREE_EDGES,
+  LOOP_CHECK,
   QUICK_FINISH,
   RUN_FAIL_CHECK,
   SLEEPING,
@@ -74,12 +78,38 @@ function renderRun(
 
 let stores: { stop(): void }[] = [];
 
+// The OS notification is the one boundary jsdom can't provide (no Tauri, no Notification API),
+// so the shim is spied rather than exercised.
+let notifySpy: MockInstance<
+  Parameters<typeof native.showNotification>,
+  ReturnType<typeof native.showNotification>
+>;
+
+async function answerGate(runId: string, answer: string, notId?: string): Promise<string> {
+  let questionId: string | undefined;
+  await waitFor(
+    async () => {
+      questionId = (await questionsApi.listQuestions(runId)).questions.find((q) => q.id !== notId)?.id;
+      expect(questionId).toBeTruthy();
+    },
+    { timeout: 5000, interval: 100 }
+  );
+  await questionsApi.answerQuestion(runId, questionId!, answer);
+  return questionId!;
+}
+
 describe('RunPage', { timeout: 20_000 }, () => {
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
+  beforeEach(() => {
+    notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
+  });
+
   afterEach(async () => {
+    // Unmount first, so a run finishing below can't notify after the spy is restored.
+    cleanup();
     vi.restoreAllMocks();
     stores.forEach((s) => s.stop());
     stores = [];
@@ -472,6 +502,74 @@ describe('RunPage', { timeout: 20_000 }, () => {
       expect(await within(details).findByText('Started', {}, SLOW)).toBeTruthy();
       expect(await within(details).findByText('Input tokens', {}, SLOW)).toBeTruthy();
       expect(await within(details).findByText('Working folder', {}, SLOW)).toBeTruthy();
+    });
+  });
+
+  describe('native notifications', () => {
+    beforeEach(() => localStorage.clear());
+    const titles = () => notifySpy.mock.calls.map(([title]) => title);
+
+    it('raises one when the run first waits for you, even with the panel closed', async () => {
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1024);
+      const id = await submitGraph(ANONYMOUS_GATE);
+      await renderRun(id);
+
+      await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(1), SLOW);
+      expect(titles()[0]).toMatch(/waiting for you/i);
+      expect(screen.queryByRole('complementary', { name: 'Run information' })).toBeNull();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not raise another for a later wait, only for the run ending', async () => {
+      const id = await submitGraph(LOOP_CHECK);
+      await renderRun(id);
+      await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(1), SLOW);
+
+      // Answering "again" loops back and the run waits a second time.
+      const first = await answerGate(id, 'again');
+      await answerGate(id, 'done', first);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'completed'), SLOW);
+
+      expect(titles()).toHaveLength(2);
+      expect(titles()[0]).toMatch(/waiting for you/i);
+      expect(titles()[1]).toMatch(/complete/i);
+    });
+
+    // A replayed history delivers events the page already has.
+    const replay = () => [...eventStore.events].forEach((event) => eventStore.add(event));
+
+    it('does not raise it again when the history is replayed', async () => {
+      const id = await submitGraph(ANONYMOUS_GATE);
+      await renderRun(id);
+      await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(1), SLOW);
+
+      replay();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      expect(notifySpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('raises one when a run finishes without ever waiting, and only one', async () => {
+      const id = await submitGraph(QUICK_FINISH);
+      await renderRun(id);
+      await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'completed'), SLOW);
+      replay();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      expect(titles()).toHaveLength(1);
+      expect(titles()[0]).toMatch(/complete/i);
+    });
+
+    it('raises one for the run being stopped after the wait', async () => {
+      const id = await submitGraph(ANONYMOUS_GATE);
+      await renderRun(id);
+      await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(1), SLOW);
+
+      await runsApi.cancelRun(id);
+
+      await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(2), SLOW);
+      expect(titles()[1]).toMatch(/abort/i);
     });
   });
 

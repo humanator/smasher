@@ -1,14 +1,12 @@
-// ABOUTME: Tests for ActivityLog, the run panel's Activity tab: Key moments / Everything, indent, tint, scroll anchoring, notification
+// ABOUTME: Tests for ActivityLog, the run panel's Activity tab: Key moments / Everything, indent, tint, scroll anchoring
 // ABOUTME: Streams real runs' SSE events (incl. replay) from the real smasher-web API through a host that fills the event store
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import type { MockInstance } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import ActivityLog from '../../../src/components/run/ActivityLog.svelte';
 import ActivityLogHost from './ActivityLogHost.svelte';
 import { eventStore } from '../../../src/stores/events.svelte';
-import * as native from '../../../src/lib/native/index';
 import * as runsApi from '../../../src/lib/api/runs';
 import * as questionsApi from '../../../src/lib/api/questions';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
@@ -82,31 +80,20 @@ function lineWith(container: HTMLElement, text: string): HTMLElement | undefined
 }
 
 describe('ActivityLog', () => {
-  // The OS notification is the one boundary jsdom can't provide (no Tauri,
-  // no Notification API), so the shim is spied rather than exercised.
-  let notifySpy: MockInstance<
-    Parameters<typeof native.showNotification>,
-    ReturnType<typeof native.showNotification>
-  >;
-
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');
   });
 
   beforeEach(() => {
     eventStore.clear();
-    notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
   });
 
   afterEach(async () => {
-    // Unmount first, so cancelling a parked run below can't notify after the
-    // spy is restored.
     cleanup();
     // Don't leave runs parked on the gate in the shared dev server.
     await Promise.all(runIds.map((id) => runsApi.cancelRun(id).catch(() => undefined)));
     runIds = [];
     await cancelAll();
-    notifySpy.mockRestore();
   });
 
   it('renders empty state initially', async () => {
@@ -130,40 +117,13 @@ describe('ActivityLog', () => {
     expect(lines(container).length).toBe(eventStore.events.length);
   });
 
-  it('shows the Run completed line and a native notification when the pipeline completes', async () => {
+  it('shows the Run completed line when the pipeline completes', async () => {
     const runId = await startGatedRun();
     render(ActivityLogHost, { props: { runId } });
 
     await answerGate(runId);
 
     await screen.findByText('Run completed', {}, { timeout: 5000 });
-    expect(notifySpy).toHaveBeenCalledTimes(1);
-    expect(notifySpy.mock.calls[0][0]).toMatch(/complete/i);
-  });
-
-  it('shows a native notification when the pipeline aborts', async () => {
-    const runId = await startGatedRun();
-    const { container } = render(ActivityLogHost, { props: { runId } });
-    await waitFor(() => expect(lineWith(container, 'gate · Ask a person')).toBeTruthy(), {
-      timeout: 5000,
-    });
-
-    await runsApi.cancelRun(runId);
-
-    await waitFor(() => expect(notifySpy).toHaveBeenCalledTimes(1), { timeout: 5000 });
-    expect(notifySpy.mock.calls[0][0]).toMatch(/abort/i);
-  });
-
-  it('does not notify twice if the component re-renders after completion', async () => {
-    const runId = await startGatedRun();
-    const { rerender } = render(ActivityLogHost, { props: { runId } });
-
-    await answerGate(runId);
-    await screen.findByText('Run completed', {}, { timeout: 5000 });
-    await rerender({ runId });
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    expect(notifySpy).toHaveBeenCalledTimes(1);
   });
 
   it('shows a looping run newest first, with bookkeeping lines faded', async () => {
