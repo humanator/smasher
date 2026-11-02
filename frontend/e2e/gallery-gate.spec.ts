@@ -116,7 +116,7 @@ test('submit a gallery-gate pipeline, select a candidate, and complete via the r
 
     // Start -> Gate1 -> Proceed -> Exit has no LLM nodes, so the pipeline
     // finishes essentially immediately once the decision is recorded.
-    await expect(page.locator('text=Pipeline completed')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('run-hero')).toContainText(/Finished in/, { timeout: 15000 });
 
     const runResponse = await page.request.get(`${baseURL || 'http://127.0.0.1:5173'}/api/runs/${runId}`);
     expect((await runResponse.json()).status).toBe('Completed');

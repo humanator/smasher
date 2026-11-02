@@ -17,7 +17,7 @@ test('a failed run shows its error in the hero and its start, duration and worki
 
     await page.goto(`${base}/runs/${runId}`);
 
-    await expect(page.getByTestId('run-hero')).toContainText('invalid JSON in args attribute', {
+    await expect(page.getByTestId('run-hero')).toContainText(/invalid JSON in args attribute/i, {
       timeout: 10000,
     });
     await page.getByRole('tab', { name: 'Details' }).click();
