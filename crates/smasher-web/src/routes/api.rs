@@ -469,7 +469,7 @@ async fn resume_run(
     Path(id): Path<String>,
 ) -> Result<Json<ResumeResponse>, WebError> {
     // Look up the existing run record to get its checkpoint and graph.
-    let (dot_source, graph, variables, checkpoint_json) = {
+    let (dot_source, graph, variables, checkpoint_json, workflow_id) = {
         let runs = state.runs.read().await;
         let record = runs
             .get(&id)
@@ -508,6 +508,7 @@ async fn resume_run(
             record.graph.clone(),
             record.variables.clone(),
             cp_json,
+            record.workflow_id.clone(),
         )
     };
 
@@ -532,8 +533,8 @@ async fn resume_run(
                 checkpoint,
                 checkpoint_dir: std::path::PathBuf::new(),
             }),
-            workflow_id: None,
-            use_checkpointing: false,
+            workflow_id,
+            use_checkpointing: true,
         },
     )
     .await?;
