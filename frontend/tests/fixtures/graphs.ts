@@ -60,6 +60,29 @@ export const ANONYMOUS_GATE = `digraph {
   start -> g -> exit
 }`;
 
+// A gallery gate straight from start (no render nodes, so no browser), expecting two candidates.
+// Its decisions are conditionals that pass the run on to exit, so a decision never reaches an LLM.
+// Seed candidate manifests in the run's artifacts dir for it to find.
+function galleryGate(edges: readonly string[], extra = ''): string {
+  const targets = edges.map((edge) => `${edge}_to [shape=diamond]; gate -> ${edge}_to [label="${edge}"]; ${edge}_to -> exit;`);
+  return `digraph GalleryGateCheck {
+  start [shape=Mdiamond]; exit [shape=Msquare];
+  gate [shape=hexagon, label="Pick a favourite", gallery="true", candidate_count=2];
+  start -> gate;
+  ${targets.join('\n  ')}
+  ${extra}
+}`;
+}
+
+// The edges the repo's own workflows use: proceed and iterate.
+export const GALLERY_GATE = galleryGate(['proceed', 'iterate']);
+
+// The two decisions the Decision bar knows by name.
+export const GALLERY_GATE_APPROVE = galleryGate(['iterate', 'approve']);
+
+// A third route beside the two known ones.
+export const GALLERY_GATE_THREE_EDGES = galleryGate(['approve', 'iterate', 'skip']);
+
 const submitted: string[] = [];
 
 // Records a run started some other way (submitRun with variables,
