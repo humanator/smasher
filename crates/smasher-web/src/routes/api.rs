@@ -141,6 +141,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/runs/{id}/resume", post(resume_run))
         .route("/api/runs/{id}/tokens", get(get_tokens))
         .route("/api/runs/{id}/graph", get(render_graph))
+        .route("/api/runs/{id}/steps", get(run_steps))
         .route("/api/runs/{id}/candidates", get(list_candidates))
         .route("/api/runs/{id}/decisions", get(list_decisions))
         .route("/api/graph/nodes", post(list_graph_nodes))
@@ -616,6 +617,70 @@ async fn render_graph(
         .into_response())
 }
 
+#[derive(Debug, Serialize)]
+struct StepNode {
+    id: String,
+    node_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct StepEdge {
+    from: String,
+    to: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<i32>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    loop_restart: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct StepsResponse {
+    nodes: Vec<StepNode>,
+    edges: Vec<StepEdge>,
+}
+
+/// The run's graph as nodes and edges in the editor-graph shape. Live and
+/// rehydrated runs both carry their resolved graph on the record (rehydration
+/// rebuilds it from `graph.dot`), so one code path serves both.
+async fn run_steps(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<StepsResponse>, WebError> {
+    let runs = state.runs.read().await;
+    let record = runs
+        .get(&id)
+        .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+
+    let nodes = record
+        .graph
+        .nodes
+        .iter()
+        .map(|node| StepNode {
+            id: node.id.clone(),
+            node_type: crate::routes::editor_api::node_type_to_str(&node.node_type).to_string(),
+            label: node.label.clone(),
+        })
+        .collect();
+    let edges = record
+        .graph
+        .edges
+        .iter()
+        .map(|edge| StepEdge {
+            from: edge.from.clone(),
+            to: edge.to.clone(),
+            label: edge.label.clone(),
+            priority: edge.priority,
+            loop_restart: edge.loop_restart,
+        })
+        .collect();
+
+    Ok(Json(StepsResponse { nodes, edges }))
+}
+
 async fn list_candidates(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -1017,6 +1082,100 @@ mod tests {
         };
         state.runs.write().await.insert(id.into(), record);
         token
+    }
+
+    async fn get_steps(app: Router, uri: &str) -> (StatusCode, serde_json::Value) {
+        let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+        )
+    }
+
+    #[tokio::test]
+    async fn run_steps_lists_nodes_and_edges_of_a_live_run() {
+        let state = test_state();
+        let _token = insert_test_record(&state, "run-steps-1", RunStatus::Running).await;
+        let dot = r#"digraph {
+  start [shape=Mdiamond];
+  work [label="Do the work"];
+  exit [shape=Msquare];
+  start -> work;
+  work -> work [label="again", priority=2, loop_restart=true];
+  work -> exit;
+}"#;
+        state
+            .runs
+            .write()
+            .await
+            .get_mut("run-steps-1")
+            .unwrap()
+            .graph = graph::resolve(&parser::parse(dot).unwrap()).unwrap();
+        let (status, json) =
+            get_steps(router().with_state(state), "/api/runs/run-steps-1/steps").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            json["nodes"],
+            serde_json::json!([
+                {"id": "start", "node_type": "Start"},
+                {"id": "work", "node_type": "Codergen", "label": "Do the work"},
+                {"id": "exit", "node_type": "Exit"},
+            ])
+        );
+        assert_eq!(
+            json["edges"],
+            serde_json::json!([
+                {"from": "start", "to": "work"},
+                {"from": "work", "to": "work", "label": "again", "priority": 2, "loop_restart": true},
+                {"from": "work", "to": "exit"},
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn run_steps_for_an_unknown_run_is_not_found() {
+        let (status, _) =
+            get_steps(router().with_state(test_state()), "/api/runs/nope/steps").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn run_steps_works_for_a_run_rehydrated_from_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = AppState::new(
+            smasher_llm::client::Client::from_env(),
+            "test-model".into(),
+            None,
+            tmp.path().display().to_string(),
+            vec![],
+        );
+        let mut run_directory = smasher_attractor::run_dir::RunDirectory::create(
+            &tmp.path().join("artifacts"),
+            "run-old",
+            "g",
+            "digraph { a -> b [label=\"go\"] }",
+        )
+        .expect("run directory");
+        run_directory
+            .persist_run_metadata(None, Some("Completed".into()), 0, 0, None)
+            .unwrap();
+        std::fs::write(
+            tmp.path().join("artifacts/run-old/graph.dot"),
+            "digraph { a -> b [label=\"go\"] }",
+        )
+        .unwrap();
+        let rehydrated = crate::rehydrate::rehydrate_runs(&tmp.path().display().to_string()).await;
+        state.runs.write().await.extend(rehydrated);
+
+        let (status, json) = get_steps(router().with_state(state), "/api/runs/run-old/steps").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["nodes"].as_array().unwrap().len(), 2);
+        assert_eq!(json["edges"][0]["label"], "go");
     }
 
     #[tokio::test]

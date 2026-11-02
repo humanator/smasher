@@ -393,6 +393,7 @@ The default server binds to `127.0.0.1:21541`.
 | `POST` | `/api/runs/{id}/resume` | Resume a completed/failed/aborted run from checkpoint. |
 | `GET` | `/api/runs/{id}/tokens` | Get input/output token counts for a run. |
 | `GET` | `/api/runs/{id}/graph` | Render the run's graph as SVG with node execution status. |
+| `GET` | `/api/runs/{id}/steps` | List the run graph's nodes and edges (editor-graph shape). |
 | `GET` | `/api/runs/{id}/events` | Stream run events as Server-Sent Events (JSON). |
 | `GET` | `/api/runs/{id}/candidates` | List gallery-gate candidate summaries with scorecards. |
 | `GET` | `/api/runs/{id}/decisions` | List recorded gallery-gate decisions, oldest first. |
@@ -548,6 +549,27 @@ because it comes from the run's graph. The SPA uses it to keep gallery picks out
 Questions, since Decision History already shows them.
 
 `status` is one of `Running`, `Completed`, `Failed`, `Aborted` (PascalCase — it's Rust's `{:?}` `Debug` output of `RunStatus`, not a lowercase string).
+
+### GET /api/runs/{id}/steps -- Run Steps
+
+The run's graph as nodes and edges, using the same field names as the workflow editor graph.
+Works for live runs and runs reloaded from disk. Unknown id returns 404.
+
+```json
+{
+  "nodes": [
+    { "id": "start", "node_type": "Start" },
+    { "id": "work", "node_type": "Codergen", "label": "Do the work" }
+  ],
+  "edges": [
+    { "from": "start", "to": "work" },
+    { "from": "work", "to": "work", "label": "again", "priority": 2, "loop_restart": true }
+  ]
+}
+```
+
+`label`, `priority` and `loop_restart` are omitted when unset. `node_type` is PascalCase
+(`Start`, `Exit`, `Codergen`, `Conditional`, `Tool`, `Interviewer`, ...).
 
 ### GET /api/runs/{id}/events -- SSE Event Stream
 
