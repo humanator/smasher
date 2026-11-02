@@ -224,6 +224,7 @@ describe('WorkflowDetailPage', () => {
         gallery_gates: [],
         pending_questions: 0,
         waiting_since: null,
+        resumable: false,
         ...extra,
       };
     }

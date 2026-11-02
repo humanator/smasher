@@ -31,6 +31,7 @@ function run(id: string, status: string): RunSummary {
     gallery_gates: [],
     pending_questions: 0,
     waiting_since: null,
+    resumable: false,
   };
 }
 

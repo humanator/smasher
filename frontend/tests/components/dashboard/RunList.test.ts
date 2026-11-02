@@ -25,6 +25,7 @@ function run(id: string, status: string, extra: Partial<RunSummary> = {}): RunSu
     gallery_gates: [],
     pending_questions: 0,
     waiting_since: null,
+    resumable: false,
     ...extra,
   };
 }

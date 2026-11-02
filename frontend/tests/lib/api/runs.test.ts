@@ -6,7 +6,7 @@ import * as runs from '../../../src/lib/api/runs';
 import * as workflows from '../../../src/lib/api/workflows';
 import * as questions from '../../../src/lib/api/questions';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
-import { trackRun, cancelAll } from '../../fixtures/graphs';
+import { trackRun, cancelAll, submitGraph, LOOP_CHECK } from '../../fixtures/graphs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -26,6 +26,27 @@ const gatedDot = `digraph RunsApiGated {
   done [shape=doublecircle];
   start -> gate -> done;
 }`;
+
+// Tool-only graphs: no LLM node, so these spend nothing.
+const toolDot = `digraph RunsApiTool {
+  start [shape=Mdiamond]; done [shape=Msquare];
+  work [shape=parallelogram, tool_command="echo ok"];
+  start -> work -> done;
+}`;
+const failingToolDot = `digraph RunsApiFailing {
+  start [shape=Mdiamond]; done [shape=Msquare];
+  work [shape=parallelogram, tool_command="exit 3"];
+  start -> work;
+  work -> done [condition="outcome=success"];
+}`;
+
+async function waitForStatus(id: string, status: string): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    if ((await runs.getRun(id)).status === status) return;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`run ${id} never reached ${status}`);
+}
 
 describe('runs API client - REAL API INTEGRATION TESTS', () => {
   beforeAll(() => {
@@ -276,5 +297,74 @@ describe('runs API client - pending_questions', () => {
     } finally {
       await runs.cancelRun(run_id).catch(() => {});
     }
+  });
+});
+
+describe('runs API client - getRunSteps', () => {
+  beforeAll(() => {
+    setApiBaseUrl(API_URL);
+  });
+
+  afterEach(async () => {
+    await cancelAll();
+  });
+
+  it('returns the graph of a live run', async () => {
+    const id = await submitGraph(gatedDot);
+
+    const steps = await runs.getRunSteps(id);
+
+    expect(steps.nodes.map((n) => n.id).sort()).toEqual(['done', 'gate', 'start']);
+    expect(steps.nodes.find((n) => n.id === 'gate')?.node_type).toBe('Interviewer');
+    expect(steps.nodes.find((n) => n.id === 'start')?.node_type).toBe('Start');
+    expect(steps.nodes.find((n) => n.id === 'done')?.node_type).toBe('Exit');
+    expect(steps.nodes.find((n) => n.id === 'gate')?.label).toBe('Proceed?');
+    expect(steps.edges.map((e) => `${e.from}>${e.to}`).sort()).toEqual(['gate>done', 'start>gate']);
+  });
+
+  it('returns the graph of a finished run', async () => {
+    const id = await submitGraph(toolDot);
+    await waitForStatus(id, 'Completed');
+
+    const steps = await runs.getRunSteps(id);
+
+    expect(steps.nodes.map((n) => n.id).sort()).toEqual(['done', 'start', 'work']);
+    expect(steps.nodes.find((n) => n.id === 'work')?.node_type).toBe('Tool');
+    expect(steps.edges).toHaveLength(2);
+  });
+
+  it('returns edge labels and loop restarts', async () => {
+    const id = await submitGraph(LOOP_CHECK);
+
+    const steps = await runs.getRunSteps(id);
+
+    const back = steps.edges.find((e) => e.from === 'gate' && e.to === 'start');
+    expect(back?.label).toBe('again');
+    expect(back?.loop_restart).toBe(true);
+  });
+
+  it('rejects with 404 for an unknown run', async () => {
+    await expect(runs.getRunSteps('no-such-run')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('runs API client - resumeRun', () => {
+  beforeAll(() => {
+    setApiBaseUrl(API_URL);
+  });
+
+  afterEach(async () => {
+    await cancelAll();
+  });
+
+  it('resolves to the id of the new run', async () => {
+    const id = await submitGraph(failingToolDot);
+    await waitForStatus(id, 'Failed');
+
+    const newId = trackRun(await runs.resumeRun(id));
+
+    expect(typeof newId).toBe('string');
+    expect(newId).not.toBe(id);
+    expect((await runs.getRun(newId)).id).toBe(newId);
   });
 });

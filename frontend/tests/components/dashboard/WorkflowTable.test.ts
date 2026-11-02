@@ -29,6 +29,7 @@ function run(workflowId: string, status: string, extra: Partial<RunSummary> = {}
     gallery_gates: [],
     pending_questions: 0,
     waiting_since: null,
+    resumable: false,
     ...extra,
   };
 }

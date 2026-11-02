@@ -29,6 +29,7 @@ function run(id: string, extra: Partial<RunSummary> = {}): RunSummary {
     gallery_gates: [],
     pending_questions: 1,
     waiting_since: '2026-10-16T02:42:00Z',
+    resumable: false,
     ...extra,
   };
 }
