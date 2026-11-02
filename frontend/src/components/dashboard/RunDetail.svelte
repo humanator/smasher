@@ -2,7 +2,7 @@
   // ABOUTME: Run detail page - status badge, token counter, abort button, graph SVG
   // ABOUTME: Composes the non-SSE, non-question parts of the run detail view
 
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, untrack } from 'svelte';
   import * as runsApi from '../../lib/api/runs';
   import type { RunSummary } from '../../lib/api/runs';
   import StatusBadge from './StatusBadge.svelte';
@@ -15,7 +15,8 @@
   import { Separator } from '$lib/components/ui/separator/index.js';
   import { usePageActions } from '$lib/page-header.svelte';
 
-  let { runId }: { runId: string } = $props();
+  // The run page's own toolbar carries the status and Abort; it turns them off here.
+  let { runId, showActions = true }: { runId: string; showActions?: boolean } = $props();
 
   const POLL_INTERVAL_MS = 5000;
   const GRAPH_POLL_INTERVAL_MS = 3000;
@@ -87,7 +88,7 @@
   onDestroy(stopPolling);
 
   // Status + Abort live in the page header when there is one.
-  const actionsInHeader = usePageActions(runActions);
+  const actionsInHeader = untrack(() => showActions) ? usePageActions(runActions) : true;
 </script>
 
 {#snippet runActions()}

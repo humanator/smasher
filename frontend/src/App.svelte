@@ -37,7 +37,7 @@
         : workflowPageType === 'detail'
           ? (pageHeader.title ?? 'Workflow')
           : runId
-          ? `Run ${runId}`
+          ? (pageHeader.title ?? 'Run')
           : 'Workflows'
   );
   // The tab title puts the page first so truncated tabs stay readable.
@@ -51,7 +51,7 @@
         : workflowPageType === 'detail'
           ? `${pageHeader.title ?? 'Workflow'} — Smasher`
           : runId
-          ? `Run ${runId} — Smasher`
+          ? `${pageHeader.title ?? 'Run'} — Smasher`
           : 'Smasher'
   );
 
@@ -156,6 +156,7 @@
   subtitle={pageHeader.subtitle}
   back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
   actions={headerActions}
+  titleAccessory={pageHeader.titleAccessory}
   currentWorkflowId={workflowPageType === 'detail' || workflowPageType === 'edit' ? workflowId : null}
 >
   <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
@@ -190,10 +191,17 @@
       <WorkflowDetailPage {workflowId} />
     {/key}
   {:else if runId}
-    <!-- Run Detail View: EventLog + QuestionCard -->
+    <!-- The run page, then the older sections it is replacing one by one -->
+    {#key runId}
+      {#await import('./components/run/RunPage.svelte') then { default: RunPage }}
+        <RunPage {runId} />
+      {:catch}
+        <p class="p-8 text-destructive">Couldn't load the run page. Reload the page to try again.</p>
+      {/await}
+    {/key}
     <div class="max-w-6xl mx-auto p-8">
       <div class="mb-8">
-        <RunDetail {runId} />
+        <RunDetail {runId} showActions={false} />
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
