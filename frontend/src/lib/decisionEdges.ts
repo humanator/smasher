@@ -1,5 +1,5 @@
 // ABOUTME: Turns a gallery gate's outgoing edges into the Decision bar's buttons, and a recorded decision into plain words
-// ABOUTME: iterate and approve are the two known decisions; any other edge becomes an extra button so no route is lost
+// ABOUTME: iterate and approve are the two known decisions (proceed counts as approve); any other edge becomes an extra button so no route is lost
 
 export type GateButtonKind = 'iterate' | 'approve' | 'other';
 
@@ -13,9 +13,15 @@ export interface GateButton {
 const ITERATE_LABEL = 'Try Again with My Notes';
 const APPROVE_LABEL = 'Approve Selected';
 
+/** The repo's own workflows spell approval `proceed`; the gallery's own spelling is `approve`. */
+export function isApproveDecision(decision: string): boolean {
+  const name = decision.trim().toLowerCase();
+  return name === 'approve' || name === 'proceed';
+}
+
 function kindOf(edge: string): GateButtonKind {
-  const name = edge.trim().toLowerCase();
-  return name === 'iterate' || name === 'approve' ? name : 'other';
+  if (isApproveDecision(edge)) return 'approve';
+  return edge.trim().toLowerCase() === 'iterate' ? 'iterate' : 'other';
 }
 
 function titleCase(edge: string): string {

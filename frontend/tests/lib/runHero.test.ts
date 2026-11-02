@@ -101,6 +101,16 @@ describe('heroModel', () => {
     expect(hero).toMatchObject({ text: 'You approved concept-a. The workflow then ran to the end.' });
   });
 
+  it('names what the person approved when the gate spelled the approval proceed', () => {
+    const hero = heroModel(
+      inputs({
+        run: { status: 'Completed', completed_at: '2026-11-02T10:10:35Z' },
+        decisions: [decision({ decision: 'proceed', selected: ['concept-b'] })],
+      })
+    );
+    expect(hero).toMatchObject({ text: 'You approved concept-b. The workflow then ran to the end.' });
+  });
+
   it('names the failed step, drops its label from the message and gives advice', () => {
     const events = [
       ...SINGLE_PASS.slice(0, 8),

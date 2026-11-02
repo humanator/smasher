@@ -50,14 +50,14 @@ describe('DecisionBar', () => {
 
     it('explains each button in a tooltip that opens on focus', async () => {
       const user = userEvent.setup();
-      renderBar({ edges: ['iterate', 'proceed', 'approve'] });
+      renderBar({ edges: ['iterate', 'skip', 'approve'] });
 
       await user.tab();
       const info = within(bar()).getByRole('button', { name: 'What the buttons do' });
       expect(document.activeElement).toBe(info);
       const tip = await tooltip();
       expect(tip.textContent).toContain('Try Again with My Notes');
-      expect(tip.textContent).toContain('Proceed');
+      expect(tip.textContent).toContain('Skip');
       expect(tip.textContent).toContain('Approve Selected');
     });
 
@@ -89,9 +89,9 @@ describe('DecisionBar', () => {
     });
 
     it('shows any other edge as an extra outline button beside the two', () => {
-      renderBar({ edges: ['iterate', 'proceed', 'approve'], selected: ['concept-a'] });
+      renderBar({ edges: ['iterate', 'skip', 'approve'], selected: ['concept-a'] });
 
-      const extra = within(bar()).getByRole('button', { name: 'Proceed' });
+      const extra = within(bar()).getByRole('button', { name: 'Skip' });
       expect(extra).toBeTruthy();
       expect(extra.className).not.toContain('bg-primary ');
       expect(tryAgain()).toBeTruthy();
@@ -100,13 +100,13 @@ describe('DecisionBar', () => {
 
     it('sends the edge the gate spelled when a button is pressed', async () => {
       const user = userEvent.setup();
-      const { onDecide } = renderBar({ edges: ['iterate', 'Proceed', 'approve'], selected: ['concept-a'] });
+      const { onDecide } = renderBar({ edges: ['iterate', 'Skip', 'approve'], selected: ['concept-a'] });
 
-      await user.click(within(bar()).getByRole('button', { name: 'Proceed' }));
+      await user.click(within(bar()).getByRole('button', { name: 'Skip' }));
       await user.click(tryAgain());
       await user.click(approve());
 
-      expect(onDecide.mock.calls).toEqual([['Proceed'], ['iterate'], ['approve']]);
+      expect(onDecide.mock.calls).toEqual([['Skip'], ['iterate'], ['approve']]);
     });
   });
 
@@ -127,16 +127,35 @@ describe('DecisionBar', () => {
       expect((approve() as HTMLButtonElement).disabled).toBe(false);
     });
 
-    it('keeps other edges available with nothing selected (only the approve edge needs a selection)', () => {
-      renderBar({ edges: ['proceed'], selected: [] });
+    it('treats a proceed edge as the approve button, needing a selection', async () => {
+      const user = userEvent.setup();
+      const { onDecide } = renderBar({ edges: ['iterate', 'proceed'], selected: [] });
 
-      expect((within(bar()).getByRole('button', { name: 'Proceed' }) as HTMLButtonElement).disabled).toBe(false);
+      expect((approve() as HTMLButtonElement).disabled).toBe(true);
+      expect(within(bar()).queryByRole('button', { name: 'Proceed' })).toBeNull();
+      await user.click(approve());
+      expect(onDecide).not.toHaveBeenCalled();
+    });
+
+    it('sends proceed as the gate spelled it when a selection exists', async () => {
+      const user = userEvent.setup();
+      const { onDecide } = renderBar({ edges: ['iterate', 'proceed'], selected: ['concept-a'] });
+
+      await user.click(approve());
+
+      expect(onDecide.mock.calls).toEqual([['proceed']]);
+    });
+
+    it('keeps other edges available with nothing selected (only the approve edge needs a selection)', () => {
+      renderBar({ edges: ['skip'], selected: [] });
+
+      expect((within(bar()).getByRole('button', { name: 'Skip' }) as HTMLButtonElement).disabled).toBe(false);
     });
   });
 
   describe('submitting', () => {
     it('disables every button while a decision is being sent', () => {
-      renderBar({ edges: ['iterate', 'proceed', 'approve'], selected: ['concept-a'], submitting: true });
+      renderBar({ edges: ['iterate', 'skip', 'approve'], selected: ['concept-a'], submitting: true });
 
       for (const button of within(bar()).getAllByRole('button')) {
         if (button.getAttribute('aria-label') === 'What the buttons do') continue;

@@ -10,6 +10,7 @@
   import { useNow } from '$lib/hooks/useNow.svelte';
   import { useRunNotifications } from '$lib/hooks/useRunNotifications.svelte';
   import { errorMessage } from '$lib/notify';
+  import { isApproveDecision } from '$lib/decisionEdges';
   import { GalleryGateState } from '$lib/galleryGate.svelte';
   import { heroModel, resumeStepLabel, stepLabels } from '$lib/runHero';
   import { isActive, isNeedsYou, runTitle } from '$lib/runStatus';
@@ -98,7 +99,7 @@
   // Resume is for an ended run the server says has a checkpoint.
   const canResume = $derived(!!run?.resumable && (run.status === 'Failed' || run.status === 'Aborted'));
   // Candidates approved by the latest approve decision.
-  const chosen = $derived([...decisions].reverse().find((d) => d.decision.trim().toLowerCase() === 'approve')?.selected ?? []);
+  const chosen = $derived([...decisions].reverse().find((d) => isApproveDecision(d.decision))?.selected ?? []);
   // The Progress tab lists steps in running order, not the order the file declares them.
   const orderedSteps = $derived(orderSteps({ nodes: steps, edges: stepEdges }).steps);
   const hero = $derived(

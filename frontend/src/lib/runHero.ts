@@ -3,6 +3,7 @@
 
 import type { PipelineEvent } from './api/events';
 import type { DecisionResponse, GraphNodeSummary, RunSummary } from './api/runs';
+import { isApproveDecision } from './decisionEdges';
 import { failureAdvice } from './failureAdvice';
 import { currentStep, stepProgress } from './runProgress';
 import { summariseRunError } from './runError';
@@ -45,7 +46,7 @@ export function heroModel({ run, steps, events, decisions, question, now }: Hero
 
   switch (run.status) {
     case 'Completed': {
-      const approved = [...decisions].reverse().find((d) => d.decision === 'approve' && d.selected.length > 0);
+      const approved = [...decisions].reverse().find((d) => isApproveDecision(d.decision) && d.selected.length > 0);
       const count = steps.length || progress.length;
       return {
         state: 'completed',

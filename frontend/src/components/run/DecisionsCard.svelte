@@ -3,7 +3,7 @@
   // ABOUTME: Presentational; renders nothing when there are no decisions. Step titles come from the labels RunPage passes
 
   import { Badge } from '$lib/components/ui/badge/index.js';
-  import { decisionLabel } from '$lib/decisionEdges';
+  import { decisionLabel, isApproveDecision } from '$lib/decisionEdges';
   import { formatWhen } from '$lib/timeFormat';
   import type { DecisionResponse } from '../../lib/api/runs';
 
@@ -28,7 +28,7 @@
         <li class="rounded-xl border border-border bg-card px-4 py-3">
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h3 class="text-body m-0 font-semibold text-foreground">{labels.get(decision.node_id) ?? decision.node_id}</h3>
-            <Badge variant={decision.decision.trim().toLowerCase() === 'approve' ? 'default' : 'secondary'}>
+            <Badge variant={isApproveDecision(decision.decision) ? 'default' : 'secondary'}>
               {decisionLabel(decision.decision)}
             </Badge>
             <time datetime={decision.timestamp} class="text-small ml-auto text-muted-foreground"
