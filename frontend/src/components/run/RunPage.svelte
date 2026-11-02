@@ -5,6 +5,8 @@
   import { onMount, untrack } from 'svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte';
+  import { loadPanelOpen, savePanelOpen } from '$lib/runPanelPrefs';
   import { useNow } from '$lib/hooks/useNow.svelte';
   import { errorMessage } from '$lib/notify';
   import { GalleryGateState } from '$lib/galleryGate.svelte';
@@ -34,6 +36,7 @@
   import DecisionsCard from './DecisionsCard.svelte';
   import QuestionCard from './QuestionCard.svelte';
   import RunHero from './RunHero.svelte';
+  import RunPanel from './RunPanel.svelte';
   import RunToolbarActions from './RunToolbarActions.svelte';
 
   interface Library {
@@ -68,8 +71,10 @@
   // The server can still report Running for a moment after it accepted the abort.
   let abortAccepted = false;
   let runDialogOpen = $state(false);
-  // The Run information panel arrives with the Progress tab; for now this only drives the toggle.
-  let panelOpen = $state(typeof window !== 'undefined' && window.innerWidth >= 1100);
+  // The Run information panel is a sheet on a phone, which always starts closed and is not remembered.
+  const mobile = new IsMobile();
+  // Remembered per viewer; with no choice yet it is open from 1100px.
+  let panelOpen = $state(!mobile.current && (loadPanelOpen() ?? window.innerWidth >= 1100));
   let pollHandle: ReturnType<typeof setInterval> | undefined;
 
   const now = useNow(1000);
@@ -145,6 +150,11 @@
     } finally {
       stepsSettled = true;
     }
+  }
+
+  function togglePanel() {
+    panelOpen = !panelOpen;
+    if (!mobile.current) savePanelOpen(panelOpen);
   }
 
   async function abort() {
@@ -240,82 +250,85 @@
       onResume={canResume ? () => void resume() : null}
       {resuming}
       {panelOpen}
-      onTogglePanel={() => (panelOpen = !panelOpen)}
+      onTogglePanel={togglePanel}
     />
   {/if}
 {/snippet}
 
-<div class="flex flex-col gap-5 px-4 pt-5 pb-8 sm:px-7 sm:pt-6">
-  {#if run && !actionsInHeader}
-    <div class="flex items-center gap-2">{@render runActions()}</div>
-  {/if}
+<div class="flex">
+  <div class="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-5 pb-8 sm:px-7 sm:pt-6">
+    {#if run && !actionsInHeader}
+      <div class="flex items-center gap-2">{@render runActions()}</div>
+    {/if}
 
-  {#if notFound}
-    <div class="flex flex-col items-start gap-3">
-      <p class="m-0 text-body text-foreground">We couldn't find that run. It may have been removed.</p>
-      <Button href="/" variant="outline">Back to Workflows</Button>
-    </div>
-  {:else}
-    {#if loadError}
-      <div
-        role="alert"
-        class="flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive"
-      >
-        <span class="min-w-0 flex-1">Couldn't load this run. {loadError}</span>
-        <Button variant="outline" size="sm" onclick={() => void refresh()}>Try Again</Button>
+    {#if notFound}
+      <div class="flex flex-col items-start gap-3">
+        <p class="m-0 text-body text-foreground">We couldn't find that run. It may have been removed.</p>
+        <Button href="/" variant="outline">Back to Workflows</Button>
       </div>
+    {:else}
+      {#if loadError}
+        <div
+          role="alert"
+          class="flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive"
+        >
+          <span class="min-w-0 flex-1">Couldn't load this run. {loadError}</span>
+          <Button variant="outline" size="sm" onclick={() => void refresh()}>Try Again</Button>
+        </div>
+      {/if}
+      {#if actionError}
+        <p role="alert" class="m-0 text-body text-destructive">{actionError}</p>
+      {/if}
+
+      {#if run && hero && stepsSettled}
+        <RunHero
+          {hero}
+          resultsPath={run.run_working_dir}
+          editHref={workflow ? `/workflows/${encodeURIComponent(workflow.id)}/edit` : null}
+          onRunAgain={workflow ? () => (runDialogOpen = true) : null}
+          onResume={canResume ? () => void resume() : null}
+          resumeLabel={resumeStepLabel({ run, steps, events: eventStore.events })}
+          {resuming}
+        />
+      {:else if !loadError}
+        <div role="status" aria-label="Loading run" class="rounded-xl border border-border px-5 py-[18px]">
+          <Skeleton class="h-3 w-20 rounded" />
+          <Skeleton class="mt-2 h-6 w-64 rounded" />
+          <Skeleton class="mt-3 h-3.5 w-80 max-w-full rounded" />
+        </div>
+      {/if}
+
+      <QuestionCard {runId} />
+
+      {#if gallery.candidates.length > 0}
+        <Candidates
+          candidates={gallery.candidates}
+          expected={gallery.gate?.expected_count ?? null}
+          selectable={gallery.waiting}
+          selected={gallery.selected}
+          {chosen}
+          notes={gallery.notes}
+          onToggle={(id) => gallery.toggle(id)}
+          onNote={(id, note) => gallery.setNote(id, note)}
+        />
+      {/if}
+
+      <DecisionsCard {decisions} labels={stepLabels(steps)} />
+
+      {#if gallery.gate}
+        <DecisionBar
+          edges={gallery.gate.outgoing_edges}
+          selected={gallery.selected}
+          submitting={gallery.submitting}
+          error={gallery.error}
+          onDecide={(edge) => void gallery.submit(edge)}
+        />
+      {/if}
     {/if}
-    {#if actionError}
-      <p role="alert" class="m-0 text-body text-destructive">{actionError}</p>
+
+    {#if workflow}
+      <LazyRunDialog {workflow} bind:open={runDialogOpen} />
     {/if}
-
-    {#if run && hero && stepsSettled}
-      <RunHero
-        {hero}
-        resultsPath={run.run_working_dir}
-        editHref={workflow ? `/workflows/${encodeURIComponent(workflow.id)}/edit` : null}
-        onRunAgain={workflow ? () => (runDialogOpen = true) : null}
-        onResume={canResume ? () => void resume() : null}
-        resumeLabel={resumeStepLabel({ run, steps, events: eventStore.events })}
-        {resuming}
-      />
-    {:else if !loadError}
-      <div role="status" aria-label="Loading run" class="rounded-xl border border-border px-5 py-[18px]">
-        <Skeleton class="h-3 w-20 rounded" />
-        <Skeleton class="mt-2 h-6 w-64 rounded" />
-        <Skeleton class="mt-3 h-3.5 w-80 max-w-full rounded" />
-      </div>
-    {/if}
-
-    <QuestionCard {runId} />
-
-    {#if gallery.candidates.length > 0}
-      <Candidates
-        candidates={gallery.candidates}
-        expected={gallery.gate?.expected_count ?? null}
-        selectable={gallery.waiting}
-        selected={gallery.selected}
-        {chosen}
-        notes={gallery.notes}
-        onToggle={(id) => gallery.toggle(id)}
-        onNote={(id, note) => gallery.setNote(id, note)}
-      />
-    {/if}
-
-    <DecisionsCard {decisions} labels={stepLabels(steps)} />
-
-    {#if gallery.gate}
-      <DecisionBar
-        edges={gallery.gate.outgoing_edges}
-        selected={gallery.selected}
-        submitting={gallery.submitting}
-        error={gallery.error}
-        onDecide={(edge) => void gallery.submit(edge)}
-      />
-    {/if}
-  {/if}
-
-  {#if workflow}
-    <LazyRunDialog {workflow} bind:open={runDialogOpen} />
-  {/if}
+  </div>
+  <RunPanel open={panelOpen} onOpenChange={(open) => (panelOpen = open)} {steps} events={eventStore.events} />
 </div>

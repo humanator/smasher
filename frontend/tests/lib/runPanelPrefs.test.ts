@@ -5,7 +5,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadPanelOpen, savePanelOpen, loadPanelTab, savePanelTab } from '../../src/lib/runPanelPrefs';
 
 beforeEach(() => localStorage.clear());
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function breakStorage() {
   vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {

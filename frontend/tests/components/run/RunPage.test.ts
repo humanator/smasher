@@ -2,7 +2,7 @@
 // ABOUTME: Real runs that cost nothing: instant finish, a sleeping command, a failing tool and a parked gate
 
 import type { ComponentProps } from 'svelte';
-import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { rmSync } from 'fs';
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
@@ -356,17 +356,88 @@ describe('RunPage', { timeout: 20_000 }, () => {
     });
   });
 
-  describe('the Run information toggle', () => {
-    it('is a pressed/expanded toggle', async () => {
+  describe('the Run information panel', () => {
+    const toggle = () => within(toolbar()).findByRole('button', { name: 'Run information' });
+    const panel = () => screen.queryByRole('complementary', { name: 'Run information' });
+    const widen = (width: number) => vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(width);
+
+    beforeEach(() => localStorage.clear());
+
+    it('starts closed below 1100px and opens from the toggle, with the run\'s steps on Progress', async () => {
+      widen(1024);
       const id = await submitGraph(QUICK_FINISH);
       await renderRun(id);
-      const toggle = await within(toolbar()).findByRole('button', { name: 'Run information' });
-      const before = toggle.getAttribute('aria-pressed');
+      const button = await toggle();
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+      expect(panel()).toBeNull();
 
-      await fireEvent.click(toggle);
+      await fireEvent.click(button);
 
-      expect(toggle.getAttribute('aria-pressed')).toBe(before === 'true' ? 'false' : 'true');
-      expect(toggle.getAttribute('aria-expanded')).toBe(toggle.getAttribute('aria-pressed'));
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(button).toHaveAttribute('aria-expanded', 'true');
+      const progress = await screen.findByRole('tabpanel');
+      expect(await within(progress).findByText(/of \d+ steps done/, {}, SLOW)).toBeTruthy();
+      expect(within(progress).getAllByRole('listitem').length).toBeGreaterThan(0);
+    });
+
+    it('starts open at 1100px and wider, beside the hero', async () => {
+      widen(1440);
+      const id = await submitGraph(QUICK_FINISH);
+      await renderRun(id);
+      expect(await toggle()).toHaveAttribute('aria-pressed', 'true');
+      await waitFor(() => expect(screen.queryByTestId('run-hero')).not.toBeNull(), SLOW);
+      expect(panel()).not.toBeNull();
+      expect(hero().compareDocumentPosition(panel()!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('remembers a choice for the next visit, over the width default', async () => {
+      widen(1440);
+      const id = await submitGraph(QUICK_FINISH);
+      const first = await renderRun(id);
+      await fireEvent.click(await toggle());
+      expect(panel()).toBeNull();
+      first.unmount();
+
+      await renderRun(id);
+      expect(await toggle()).toHaveAttribute('aria-pressed', 'false');
+      expect(panel()).toBeNull();
+    });
+
+    it('still toggles when storage throws', async () => {
+      widen(1024);
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
+      const id = await submitGraph(QUICK_FINISH);
+      await renderRun(id);
+      const button = await toggle();
+      await fireEvent.click(button);
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+      expect(panel()).not.toBeNull();
+    });
+
+    it('is a sheet on a phone, closed to start with, and closing it unpresses the toggle', async () => {
+      widen(375);
+      vi.spyOn(window, 'matchMedia').mockImplementation(
+        (query) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList
+      );
+      const id = await submitGraph(QUICK_FINISH);
+      await renderRun(id);
+      const button = await toggle();
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('dialog')).toBeNull();
+
+      await fireEvent.click(button);
+      const dialog = await screen.findByRole('dialog', { name: 'Run information' });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+
+      await fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'));
+      expect(localStorage.getItem('smasher.runPanel.open')).toBeNull();
     });
   });
 
