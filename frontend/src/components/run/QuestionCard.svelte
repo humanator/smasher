@@ -49,8 +49,7 @@
   let loaded = $state(false);
   let galleryGateShowing = $state(false);
 
-  // Answered Questions comes from the run's events (filled by the run page's
-  // EventLog), so it survives a reload. Gallery picks are left out: Decision
+  // Answered Questions comes from the run's events (filled by the run page), so it survives a reload. Gallery picks are left out: Decision
   // History shows them. Nothing shows until the run's gallery gates are known,
   // so a gallery pick never flashes up first.
   let galleryGates = $state<string[] | null>(null);

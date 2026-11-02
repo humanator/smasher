@@ -6,7 +6,6 @@
   import { onMount } from 'svelte';
   import DashboardPage from './components/dashboard/DashboardPage.svelte';
   import RunDetail from './components/dashboard/RunDetail.svelte';
-  import EventLog from './components/dashboard/EventLog.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import AppShell from './components/shell/AppShell.svelte';
   import LazySettingsDialog from './components/dashboard/LazySettingsDialog.svelte';
@@ -198,11 +197,6 @@
     <div class="max-w-6xl mx-auto p-8">
       <div class="mb-8">
         <RunDetail {runId} showActions={false} />
-      </div>
-
-      <div>
-        <h2 class="text-xl font-semibold mb-4">Events</h2>
-        <EventLog {runId} />
       </div>
     </div>
   {:else}

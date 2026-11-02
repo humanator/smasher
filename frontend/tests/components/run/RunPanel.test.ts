@@ -65,6 +65,18 @@ describe('RunPanel', () => {
     expect(within(panel).getByText(/of 5 steps done/)).toBeInTheDocument();
   });
 
+  it('shows the events on the Activity tab with the step names it was given', async () => {
+    const user = userEvent.setup();
+    render(RunPanel, {
+      props: { open: true, steps: NODES, events: WAITING, labels: new Map([['pick', 'Pick a favourite']]) },
+    });
+    await user.click(screen.getByRole('tab', { name: 'Activity' }));
+    const panel = screen.getByRole('tabpanel');
+    expect(within(panel).getByRole('radio', { name: 'Key moments' })).toBeInTheDocument();
+    expect(within(panel).getByText('Waiting for you')).toBeInTheDocument();
+    expect(within(panel).getAllByText(/Pick a favourite/).length).toBeGreaterThan(0);
+  });
+
   it('keeps only the selected tab in the tab order and moves with the arrow keys', async () => {
     const user = userEvent.setup();
     show();

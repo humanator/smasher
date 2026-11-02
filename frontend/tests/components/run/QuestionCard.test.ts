@@ -6,7 +6,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/svelte/svelte
 import userEvent from '@testing-library/user-event';
 import { toast } from 'svelte-sonner';
 import QuestionCard from '../../../src/components/run/QuestionCard.svelte';
-import EventLog from '../../../src/components/dashboard/EventLog.svelte';
+import ActivityLogHost from './ActivityLogHost.svelte';
 import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import * as runsApi from '../../../src/lib/api/runs';
 import { questionStore } from '../../../src/stores/questions.svelte';
@@ -106,9 +106,9 @@ function holdAnswers(runId: string): { release: () => void; restore: () => void 
 }
 
 // Answered Questions comes from the run's events, which the run page's
-// EventLog streams into eventStore, so tests of the answered list mount both.
+// RunPage streams into eventStore (ActivityLogHost does the same), so tests of the answered list mount both.
 function renderRun(runId: string) {
-  const log = render(EventLog, { props: { runId } });
+  const log = render(ActivityLogHost, { props: { runId } });
   const card = render(QuestionCard, { props: { runId } });
   return {
     async rerender(id: string) {
@@ -496,6 +496,8 @@ describe('QuestionCard', () => {
       const runId = await submitGraph(gatedPipeline('QuestionCardReplyLog', 'label="Anything?"'));
 
       renderRun(runId);
+      // Agent messages are listed under Everything, not Key moments.
+      await user.click(screen.getByRole('radio', { name: 'Everything' }));
       await user.type(await screen.findByPlaceholderText('Enter your answer'), 'hi{Enter}');
       await screen.findByText('Answer: hi');
       eventStore.add(agentMessage('EchoNode', '**Short** reply'));

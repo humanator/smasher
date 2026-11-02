@@ -9,6 +9,7 @@
   import { stepProgress } from '$lib/runProgress';
   import type { PipelineEvent } from '../../lib/api/events';
   import type { GraphNodeSummary } from '../../lib/api/runs';
+  import ActivityLog from './ActivityLog.svelte';
   import ProgressList from './ProgressList.svelte';
 
   let {
@@ -16,6 +17,7 @@
     onOpenChange = () => {},
     steps,
     events,
+    labels,
   }: {
     open: boolean;
     /** Called when the sheet closes itself (Escape, the close button, a tap outside). */
@@ -23,6 +25,8 @@
     /** In running order. */
     steps: readonly GraphNodeSummary[];
     events: readonly PipelineEvent[];
+    /** Step names by node id, for the Activity tab's lines. */
+    labels?: ReadonlyMap<string, string>;
   } = $props();
 
   const LABELS: Record<PanelTab, string> = { progress: 'Progress', activity: 'Activity', details: 'Details' };
@@ -47,8 +51,8 @@
     <Tabs.Content value="progress" class="min-h-0 flex-1 overflow-y-auto">
       <ProgressList {steps} {progress} />
     </Tabs.Content>
-    <Tabs.Content value="activity" class="min-h-0 flex-1 overflow-y-auto">
-      <p class="m-0 text-body text-muted-foreground">The activity log appears here.</p>
+    <Tabs.Content value="activity" class="min-h-0 flex-1 overflow-hidden">
+      <ActivityLog {events} {labels} />
     </Tabs.Content>
     <Tabs.Content value="details" class="min-h-0 flex-1 overflow-y-auto">
       <p class="m-0 text-body text-muted-foreground">The run's details appear here.</p>

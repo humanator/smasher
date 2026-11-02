@@ -206,7 +206,7 @@
     if (ended) untrack(() => void gallery.refresh().finally(() => gallery.stop()));
   });
 
-  // The page follows the run's events; the older event log below also fills this store, which de-duplicates.
+  // The page follows the run's events once; the panel's Activity tab and the hero read them from this store.
   $effect(() => {
     const id = runId;
     eventStore.clear();
@@ -336,5 +336,5 @@
       <LazyRunDialog {workflow} bind:open={runDialogOpen} />
     {/if}
   </div>
-  <RunPanel open={panelOpen} onOpenChange={(open) => (panelOpen = open)} steps={orderedSteps} events={eventStore.events} />
+  <RunPanel open={panelOpen} onOpenChange={(open) => (panelOpen = open)} steps={orderedSteps} events={eventStore.events} labels={stepLabels(steps)} />
 </div>
