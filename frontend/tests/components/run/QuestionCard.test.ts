@@ -349,6 +349,45 @@ describe('QuestionCard', () => {
     expect(screen.getByText('Is this acceptable?')).toBeTruthy();
   });
 
+  // The run page's hero already says the first open question, so the card
+  // keeps its text for screen readers only and shows the rest in full.
+  it('shows the first pending question to screen readers only, because the hero says it', async () => {
+    render(QuestionCard, { props: { runId: 'run-123' } });
+
+    questionStore.setPending([
+      { id: 'q1', question: 'Is this acceptable?', choices: [], kind: 'free_form', node_id: 'gate1' },
+      { id: 'q2', question: 'Pick a colour please', choices: ['Red', 'Blue'], kind: 'multiple_choice', node_id: 'gate2' },
+      { id: 'q3', question: 'Go ahead?', choices: [], kind: 'approval', node_id: 'gate3' },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(screen.getByText('Is this acceptable?')).toHaveClass('sr-only');
+    expect(screen.getByText('Pick a colour please')).not.toHaveClass('sr-only');
+    expect(screen.getByText('Go ahead?')).not.toHaveClass('sr-only');
+  });
+
+  it('labels the first question\'s input for assistive tech even though its text is hidden', async () => {
+    render(QuestionCard, { props: { runId: 'run-123' } });
+
+    questionStore.setPending([
+      { id: 'q1', question: 'Is this acceptable?', choices: [], kind: 'free_form', node_id: 'gate1' },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(screen.getByRole('textbox', { name: 'Is this acceptable?' })).toBeTruthy();
+  });
+
+  it('keeps a multiple-choice group named by its question when it is the first', async () => {
+    render(QuestionCard, { props: { runId: 'run-123' } });
+
+    questionStore.setPending([
+      { id: 'q1', question: 'Pick a colour please', choices: ['Red', 'Blue'], kind: 'multiple_choice', node_id: 'gate1' },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(screen.getByRole('group', { name: 'Pick a colour please' })).toBeTruthy();
+  });
+
   it('polls a real free_form question and submits the typed answer', async () => {
     const user = userEvent.setup();
     const runId = await submitGraph(gatedPipeline('QuestionCardFreeForm', 'label="Your answer?"'));

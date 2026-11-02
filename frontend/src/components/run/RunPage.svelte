@@ -28,6 +28,7 @@
   import { libraryStore } from '../../stores/library.svelte';
   import LazyRunDialog from '../dashboard/LazyRunDialog.svelte';
   import StatusBadge from '../dashboard/StatusBadge.svelte';
+  import QuestionCard from './QuestionCard.svelte';
   import RunHero from './RunHero.svelte';
   import RunToolbarActions from './RunToolbarActions.svelte';
 
@@ -232,6 +233,8 @@
         <Skeleton class="mt-3 h-3.5 w-80 max-w-full rounded" />
       </div>
     {/if}
+
+    <QuestionCard {runId} />
   {/if}
 
   {#if workflow}

@@ -7,7 +7,6 @@
   import DashboardPage from './components/dashboard/DashboardPage.svelte';
   import RunDetail from './components/dashboard/RunDetail.svelte';
   import EventLog from './components/dashboard/EventLog.svelte';
-  import QuestionCard from './components/run/QuestionCard.svelte';
   import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
   import GalleryGate from './components/dashboard/GalleryGate.svelte';
   import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
@@ -204,18 +203,9 @@
         <RunDetail {runId} showActions={false} />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Event Log on the left -->
-        <div>
-          <h2 class="text-xl font-semibold mb-4">Events</h2>
-          <EventLog {runId} />
-        </div>
-
-        <!-- Questions on the right -->
-        <div>
-          <h2 class="text-xl font-semibold mb-4">Questions</h2>
-          <QuestionCard {runId} />
-        </div>
+      <div>
+        <h2 class="text-xl font-semibold mb-4">Events</h2>
+        <EventLog {runId} />
       </div>
 
       <div class="mt-8">

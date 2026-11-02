@@ -1,6 +1,6 @@
 <script lang="ts">
-  // ABOUTME: Human-gate Q&A form - answers pending questions via API
-  // ABOUTME: Critical for Phase 3 E2E critical path
+  // ABOUTME: Human-gate Q&A card on the run page, under the hero - answers pending questions via API
+  // ABOUTME: Choice, yes/no and free text; the first open question's text is screen-reader-only because the hero says it
 
   import { questionStore } from '../../stores/questions.svelte';
   import { eventStore } from '../../stores/events.svelte';
@@ -126,18 +126,20 @@
 </script>
 
 {#if questionStore.pending.length > 0 || answered.length > 0 || (loaded && !galleryGateShowing)}
-  <div class="questions rounded-lg border border-border bg-card p-4 text-card-foreground">
+  <div class="questions flex flex-col gap-3 text-card-foreground">
     {#if questionStore.pending.length > 0}
-      <h3 class="mb-4 text-base font-semibold text-foreground">Pending Questions</h3>
-      {#each questionStore.pending as question (question.id)}
-        <div class="question-card mb-4 rounded border-l-4 border-primary bg-primary/5 p-4">
+      <h3 class="m-0 text-body font-semibold text-foreground">Pending Questions</h3>
+      {#each questionStore.pending as question, index (question.id)}
+        <!-- The hero shows the first open question, so its text stays for screen readers only. -->
+        {@const textClass = index === 0 ? 'sr-only' : 'text-body font-medium text-foreground'}
+        <div class="question-card rounded-xl border border-border bg-card px-5 py-[18px]">
           <div class="mb-2 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" class="uppercase">{KIND_LABELS[question.kind]}</Badge>
             <span class="font-mono text-xs text-muted-foreground break-all">{question.id}</span>
           </div>
           <!-- Multiple choice shows the question as its fieldset's legend instead. -->
           {#if question.kind !== 'multiple_choice'}
-            <p class="question-text mb-4 font-medium text-foreground">{question.question}</p>
+            <p id="question-text-{question.id}" class="question-text mb-4 {textClass}">{question.question}</p>
           {/if}
 
           {#if question.kind === 'free_form'}
@@ -151,6 +153,7 @@
             >
               <Input
                 type="text"
+                aria-labelledby="question-text-{question.id}"
                 placeholder="Enter your answer"
                 bind:value={() => card(question.id).text, (text) => update(question.id, { text })}
                 disabled={card(question.id).submitting}
@@ -163,7 +166,11 @@
               </Button>
             </form>
           {:else if question.kind === 'approval'}
-            <div class="button-group flex flex-wrap gap-2">
+            <div
+              class="button-group flex flex-wrap gap-2"
+              role="group"
+              aria-labelledby="question-text-{question.id}"
+            >
               <!-- Yes/No colors carry semantic meaning (approve/reject). -->
               <Button
                 onclick={() => handleAnswer(question.id, 'yes')}
@@ -188,7 +195,7 @@
               }}
             >
               <fieldset class="flex flex-col gap-2" disabled={card(question.id).submitting}>
-                <legend class="question-text mb-2 font-medium text-foreground">
+                <legend class="question-text mb-2 {textClass}">
                   {question.question}
                 </legend>
                 {#each question.choices as choice (choice)}
@@ -217,13 +224,13 @@
         </div>
       {/each}
     {:else if loaded && !galleryGateShowing}
-      <p class="p-4 text-center text-muted-foreground">No pending questions.</p>
+      <p class="m-0 text-body text-muted-foreground">No pending questions.</p>
     {/if}
 
     {#if answered.length > 0}
-      <h3 class="mb-4 text-base font-semibold text-foreground">Answered Questions</h3>
+      <h3 class="m-0 text-body font-semibold text-foreground">Answered Questions</h3>
       {#each answered as exchange, index (index)}
-        <div class="answered-card mb-4 rounded-md border-l-4 border-success bg-success-subtle p-4">
+        <div class="answered-card rounded-xl border border-success-border bg-success-subtle px-5 py-[18px]">
           <p class="question-text mb-4 font-medium text-foreground">{exchange.question}</p>
           <p class="answer-text mt-2 italic text-success-foreground">Answer: {exchange.answer}</p>
           {#each exchange.replies as reply, replyIndex (replyIndex)}
