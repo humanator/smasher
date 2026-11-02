@@ -5,7 +5,6 @@
   import './app.css';
   import { onMount } from 'svelte';
   import DashboardPage from './components/dashboard/DashboardPage.svelte';
-  import RunDetail from './components/dashboard/RunDetail.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import AppShell from './components/shell/AppShell.svelte';
   import LazySettingsDialog from './components/dashboard/LazySettingsDialog.svelte';
@@ -186,7 +185,6 @@
       <WorkflowDetailPage {workflowId} />
     {/key}
   {:else if runId}
-    <!-- The run page, then the older sections it is replacing one by one -->
     {#key runId}
       {#await import('./components/run/RunPage.svelte') then { default: RunPage }}
         <RunPage {runId} />
@@ -194,11 +192,6 @@
         <p class="p-8 text-destructive">Couldn't load the run page. Reload the page to try again.</p>
       {/await}
     {/key}
-    <div class="max-w-6xl mx-auto p-8">
-      <div class="mb-8">
-        <RunDetail {runId} showActions={false} />
-      </div>
-    </div>
   {:else}
     <DashboardPage />
   {/if}

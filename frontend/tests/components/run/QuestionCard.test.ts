@@ -138,7 +138,7 @@ describe('QuestionCard', () => {
     questionStore.clear();
     eventStore.clear();
     setApiBaseUrl('http://127.0.0.1:21541/api');
-    // EventLog notifies when a run finishes; keep that out of the test output.
+    // ActivityLog notifies when a run finishes; keep that out of the test output.
     notifySpy = vi.spyOn(native, 'showNotification').mockResolvedValue(undefined);
   });
 

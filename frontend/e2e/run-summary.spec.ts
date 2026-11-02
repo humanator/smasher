@@ -1,10 +1,10 @@
-// ABOUTME: Run-summary E2E: a failed run's details and graph, and "Unnamed workflow" in the run list
+// ABOUTME: Run-summary E2E: a failed run's error and Details tab, and "Unnamed workflow" in the run list
 // ABOUTME: Uses the shared inline test graphs, which never reach an LLM
 
 import { test, expect } from '@playwright/test';
 import { ANONYMOUS_GATE, RUN_FAIL_CHECK } from '../tests/fixtures/graphs';
 
-test('a failed run shows its error, completion time and graph', async ({ page, baseURL }) => {
+test('a failed run shows its error in the hero and its start, duration and working folder on Details', async ({ page, baseURL }) => {
   const base = baseURL || 'http://127.0.0.1:5173';
   let runId: string | undefined;
 
@@ -17,13 +17,15 @@ test('a failed run shows its error, completion time and graph', async ({ page, b
 
     await page.goto(`${base}/runs/${runId}`);
 
-    await expect(page.locator('dt:text-is("Error") + dd')).toContainText(
-      'invalid JSON in args attribute',
-      { timeout: 10000 }
-    );
-    await expect(page.locator('dt:text-is("Completed") + dd')).not.toBeEmpty();
-    await expect(page.getByRole('heading', { name: 'Pipeline Graph' })).toBeVisible();
-    await expect(page.locator('.graph svg')).toBeVisible();
+    await expect(page.getByTestId('run-hero')).toContainText('invalid JSON in args attribute', {
+      timeout: 10000,
+    });
+    await page.getByRole('tab', { name: 'Details' }).click();
+    const started = page.locator('dt:text-is("Started") + dd');
+    await expect(started).toBeVisible();
+    // An ended run gives its whole duration, not "so far".
+    await expect(started).not.toContainText('so far');
+    await expect(page.locator('dt:text-is("Working folder") + dd')).not.toBeEmpty();
   } finally {
     // The run has already failed; cancelling is a harmless no-op kept for symmetry.
     if (runId) await page.request.post(`${base}/api/runs/${runId}/cancel`);
