@@ -533,9 +533,14 @@ Response body (flat `RunSummary`, no nested `metadata` wrapper):
   "output_tokens": 0,
   "run_working_dir": "artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV",
   "workflow_id": null,
-  "gallery_gates": ["ReviewCandidates"]
+  "gallery_gates": ["ReviewCandidates"],
+  "resumable": false
 }
 ```
+
+`resumable` is `true` only for `Failed` or `Aborted` runs whose `checkpoints/checkpoint.json` exists
+and parses, so `POST /api/runs/{id}/resume` can pick them up. It is `false` otherwise (including for
+older clients' JSON that lacks the field).
 
 `gallery_gates` lists the ids of the run graph's gallery gates (Interviewer nodes with
 `gallery="true"`), sorted. It's `[]` when there are none. Runs reloaded from disk report it too,

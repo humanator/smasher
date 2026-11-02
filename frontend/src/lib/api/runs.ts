@@ -22,6 +22,7 @@ export interface RunSummary {
   gallery_gates: string[];
   pending_questions: number;
   waiting_since: string | null;
+  resumable: boolean;
 }
 
 export interface ListRunsResponse {
