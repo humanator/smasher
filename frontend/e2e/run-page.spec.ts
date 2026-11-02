@@ -1,7 +1,7 @@
 // ABOUTME: Run-page E2E: running, needs you, select/note/approve and completed; a failed run with advice and Resume; keyboard and phone width
 // ABOUTME: Uses the gate_only and fail_tool fixtures plus a tool-then-gallery-gate graph, so nothing reaches an LLM
 
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -67,6 +67,18 @@ async function cancel(request: APIRequestContext, runIds: (string | undefined)[]
 async function expectNoSidewaysScroll(page: Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow, 'page scrolls sideways').toBeLessThanOrEqual(0);
+}
+
+/**
+ * Presses Tab from the page's Back button until the target has focus. Starting there, not at
+ * the top of the document, keeps the count independent of how many workflows the sidebar lists.
+ */
+async function tabTo(page: Page, target: Locator) {
+  await page.getByRole('link', { name: /^Back to / }).focus();
+  for (let i = 0; i < 20; i++) {
+    if (await target.evaluate((el) => el === document.activeElement)) return;
+    await page.keyboard.press('Tab');
+  }
 }
 
 /** Whether the focused element looks different from its blurred self: an outline or a box-shadow. */
@@ -225,7 +237,6 @@ test('the panel and its tabs work from the keyboard, each with a visible focus r
     runId = await submit(page.request, failToolDot);
     await page.goto(`${BASE}/runs/${runId}`);
     await expect(page.getByTestId('run-hero')).toHaveAttribute('data-state', 'failed', { timeout: 10000 });
-    await page.waitForLoadState('networkidle'); // Tab presses before the page settles can land on a re-rendered element
 
     const panel = page.getByRole('complementary', { name: 'Run information' });
     const toggle = page.getByRole('button', { name: 'Run information' });
@@ -233,10 +244,7 @@ test('the panel and its tabs work from the keyboard, each with a visible focus r
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 
     // Reach the toggle with Tab, check its ring, then close and reopen the panel with Enter.
-    for (let i = 0; i < 40; i++) {
-      if (await toggle.evaluate((el) => el === document.activeElement)) break;
-      await page.keyboard.press('Tab');
-    }
+    await tabTo(page, toggle);
     await expect(toggle).toBeFocused();
     expect(await focusHasRing(page), 'Run information has no focus ring').toBe(true);
     await page.keyboard.press('Enter');
@@ -247,10 +255,7 @@ test('the panel and its tabs work from the keyboard, each with a visible focus r
 
     // Tab on into the panel: the selected tab takes focus first, and arrows move between tabs.
     const progress = panel.getByRole('tab', { name: 'Progress' });
-    for (let i = 0; i < 40; i++) {
-      if (await progress.evaluate((el) => el === document.activeElement)) break;
-      await page.keyboard.press('Tab');
-    }
+    await tabTo(page, progress);
     await expect(progress).toBeFocused();
     expect(await focusHasRing(page), 'the Progress tab has no focus ring').toBe(true);
 
@@ -286,12 +291,8 @@ test('the hero buttons of a failed run can be reached by Tab and show a focus ri
     await page.goto(`${BASE}/runs/${runId}`);
     const resume = page.getByTestId('run-hero').getByRole('button', { name: /^Resume from/ });
     await expect(resume).toBeVisible({ timeout: 10000 });
-    await page.waitForLoadState('networkidle');
 
-    for (let i = 0; i < 40; i++) {
-      if (await resume.evaluate((el) => el === document.activeElement)) break;
-      await page.keyboard.press('Tab');
-    }
+    await tabTo(page, resume);
     await expect(resume).toBeFocused();
     expect(await focusHasRing(page), 'Resume has no focus ring').toBe(true);
   } finally {
