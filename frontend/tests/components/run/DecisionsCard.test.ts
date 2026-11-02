@@ -108,12 +108,12 @@ describe('DecisionsCard', () => {
 
   it('falls back to the step id when it has no label, and words an unknown decision as the gate named it', () => {
     render(DecisionsCard, {
-      props: { decisions: [decision({ node_id: 'Gate1', decision: 'proceed' })], labels: new Map() },
+      props: { decisions: [decision({ node_id: 'Gate1', decision: 'skip' })], labels: new Map() },
     });
 
     const card = screen.getByRole('listitem');
     expect(within(card).getByRole('heading', { level: 3, name: 'Gate1' })).toBeTruthy();
-    expect(within(card).getByText('proceed')).toBeTruthy();
+    expect(within(card).getByText('skip')).toBeTruthy();
   });
 
   it('lists one card per decision, in the order recorded', () => {
