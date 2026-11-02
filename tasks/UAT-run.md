@@ -59,7 +59,7 @@ status: open
 ### BUG-4: Show Results in Finder always fails for a run started in the desktop app
 severity: major
 checkpoint: 5
-reported: "Couldn't show the results in Finder. Something went wrong."
+reported: "Couldn't show the results in Finder. Something went wrong." (run 01m6dzp1xf8fjatqw9m9wbj8dj, Completed, HumanGateShowcase)
 diagnosis: `GET /api/runs` returns `run_working_dir` as a path relative to the data dir (`artifacts/01m6dzp1…`, which lives at `~/Documents/smasher/artifacts/…`). `RunPage.svelte:296` passes it straight to `reveal_run_folder`, and `validate_reveal_run_dir` (`crates/smasher-desktop/src/reveal.rs`) calls `canonicalize` on it, which resolves against the desktop process's working directory (`crates/smasher-desktop`), so the folder isn't found and it refuses with "That folder isn't one of this app's runs." The unit tests and the stand-in invoke used absolute paths, so none of them caught it. Likely fix: resolve a relative path against the data dir (`RunsDir`'s parent) before validating, or have the server return an absolute `run_working_dir`. `rehydrate.rs:126` shows the run root can already be absolute, so check why launched runs aren't.
 status: open
 
