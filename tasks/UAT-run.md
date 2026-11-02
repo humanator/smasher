@@ -53,8 +53,17 @@ status: fixed by hiding the examples in the desktop app (they are listed only wh
 severity: cosmetic
 checkpoint: 2
 reported: "candidate grid is present, decision bar is present, and everything else described is present, but the visual styling doesn't match the design"
-diagnosis: needs investigation. No specifics yet, and the artboard (`docs/design/redesign/Run.dc.html`) doesn't render here (missing `support.js`), which is why `tasks/VERIFICATION-run.md` records no pixel comparison. Needs the user to name which parts differ.
-status: open
+diagnosis: Compared `docs/design/redesign/Run.dc.html` (source, since it doesn't render offline) with `Candidates.svelte`, `DecisionBar.svelte`, `ScorecardBadges.svelte` and `CandidatePreview.svelte`. Differences found:
+- Decision bar: the artboard's is a full-width bar under the scrolling column (bg `#F7F7F9`, top border only, padding 12/20/12/28). The page's is a sticky bordered, rounded-xl card on a white background inside the padded column.
+- Score badges: the artboard has plain-language rows stacked one per line with a coloured dot ("Design-system check: Passed", "Usability: No friction found", "Recommendation: Advance"), neutral secondary badges, and the engine name in a tooltip. The page shows flat green/red pills in a wrapping row with engine jargon ("lint: pass", "critic: success", "synthesis: advance"), and lists violations inline.
+- Preview: the artboard's is a fixed 130px box, radius 6, bg `#F2F2F4`, 1px border. The page's is aspect-ratio-driven with `bg-muted` and no border.
+- Card: the artboard has no border; it has a 1px `rgba(0,0,0,.1)` ring (2px pink when selected, 2px green when chosen) plus a `0 1px 3px` shadow, radius 10px, spacing 10px between parts. The page uses a border plus `ring-2` (doubling the edge), radius 8px, and 8px spacing.
+- Failed card: the artboard has a tinted `#FFF5F4` card with a solid red border, a 130px dashed placeholder with a warning icon, then the id and red reason. The page has a dashed amber border, no tint, no placeholder, no icon.
+- Grid gap is 14px in the artboard and 16px on the page.
+- Notes: the artboard's link toggles "Add a Note…" / "Edit Note" / "Hide Note" and the placeholder is "Notes to steer the next round (optional)", with a 2-row textarea. The page has a Done button and the placeholder "Notes to drive the next iteration (optional)".
+- The page also shows a "params" disclosure the artboard doesn't have.
+- The artboard's "Chosen" badge is the secondary variant with a green dot; the page tints it green.
+status: open (findings listed; not yet fixed)
 
 ### BUG-4: Show Results in Finder always fails for a run started in the desktop app
 severity: major
