@@ -381,6 +381,18 @@ describe('RunPage', { timeout: 20_000 }, () => {
       expect(within(progress).getAllByRole('listitem').length).toBeGreaterThan(0);
     });
 
+    it('lists the steps on Progress in running order, with the exit last', async () => {
+      widen(1440);
+      const id = await submitGraph(SLEEPING);
+      await renderRun(id);
+      const labels = await waitFor(() => {
+        const found = screen.getAllByTestId('step-label').map((el) => el.textContent);
+        expect(found).toHaveLength(3);
+        return found;
+      }, SLOW);
+      expect(labels).toEqual(['start', 'Take a nap', 'exit']);
+    });
+
     it('starts open at 1100px and wider, beside the hero', async () => {
       widen(1440);
       const id = await submitGraph(QUICK_FINISH);

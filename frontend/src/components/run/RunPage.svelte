@@ -14,6 +14,7 @@
   import { isActive, isNeedsYou, runTitle } from '$lib/runStatus';
   import { formatDuration, formatWhenInline } from '$lib/timeFormat';
   import { formatWorkflowName } from '$lib/utils';
+  import { orderSteps } from '$lib/workflowSteps';
   import {
     usePageActions,
     usePageBack,
@@ -25,7 +26,7 @@
   import * as questionsApi from '../../lib/api/questions';
   import * as runsApi from '../../lib/api/runs';
   import type { ApiError } from '../../lib/api/errors';
-  import type { DecisionResponse, GraphNodeSummary, RunSummary } from '../../lib/api/runs';
+  import type { DecisionResponse, GraphNodeSummary, RunSummary, StepEdge } from '../../lib/api/runs';
   import type { WorkflowSummary } from '../../lib/api/workflows';
   import { eventStore } from '../../stores/events.svelte';
   import { libraryStore } from '../../stores/library.svelte';
@@ -62,6 +63,7 @@
   let loadError = $state<string | null>(null);
   let actionError = $state<string | null>(null);
   let steps = $state<GraphNodeSummary[]>([]);
+  let stepEdges = $state<StepEdge[]>([]);
   // The hero counts and names steps, so it waits for them rather than flash ids.
   let stepsSettled = $state(false);
   let decisions = $state<DecisionResponse[]>([]);
@@ -94,6 +96,8 @@
   const canResume = $derived(!!run?.resumable && (run.status === 'Failed' || run.status === 'Aborted'));
   // Candidates approved by the latest approve decision.
   const chosen = $derived([...decisions].reverse().find((d) => d.decision.trim().toLowerCase() === 'approve')?.selected ?? []);
+  // The Progress tab lists steps in running order, not the order the file declares them.
+  const orderedSteps = $derived(orderSteps({ nodes: steps, edges: stepEdges }).steps);
   const hero = $derived(
     run
       ? heroModel({
@@ -144,7 +148,9 @@
 
   async function loadSteps() {
     try {
-      steps = (await runsApi.getRunSteps(runId)).nodes;
+      const loaded = await runsApi.getRunSteps(runId);
+      steps = loaded.nodes;
+      stepEdges = loaded.edges;
     } catch {
       // The hero falls back to step ids.
     } finally {
@@ -330,5 +336,5 @@
       <LazyRunDialog {workflow} bind:open={runDialogOpen} />
     {/if}
   </div>
-  <RunPanel open={panelOpen} onOpenChange={(open) => (panelOpen = open)} {steps} events={eventStore.events} />
+  <RunPanel open={panelOpen} onOpenChange={(open) => (panelOpen = open)} steps={orderedSteps} events={eventStore.events} />
 </div>
