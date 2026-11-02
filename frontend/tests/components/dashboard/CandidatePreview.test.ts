@@ -130,14 +130,15 @@ describe('CandidatePreview', () => {
       expect(document.querySelector('iframe')).toBeNull();
     });
 
-    it('takes its aspect ratio from the manifest viewport', async () => {
+    it('is a fixed-height crop of the top of the screenshot, whatever the viewport', async () => {
       const candidate = await seededCandidate('cand-phone', {
         viewport: { width: 390, height: 844 },
       });
       renderPreview(candidate);
 
       const button = screen.getByRole('button', { name: 'Open preview of cand-phone' });
-      expect(button.getAttribute('style')).toContain('aspect-ratio: 390 / 844');
+      expect(button).toHaveClass('h-32');
+      expect(button.querySelector('img')).toHaveClass('object-cover', 'object-top');
     });
   });
 

@@ -3,7 +3,7 @@
 
 import type { ComponentProps } from 'svelte';
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/svelte/svelte5';
+import { render, screen, waitFor, within } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -110,9 +110,11 @@ describe('Candidates', () => {
       renderCandidates(candidates);
 
       expect(screen.getByText('candidate-a')).toBeTruthy();
-      expect(screen.getByText('lint: fail')).toBeTruthy();
+      expect(screen.getByText('Design-system check: 1 issue')).toBeTruthy();
       expect(screen.getByText('raw hex color')).toBeTruthy();
-      expect(screen.getByText('synthesis: iterate')).toBeTruthy();
+      expect(screen.getByText('Recommendation: Iterate')).toBeTruthy();
+      // The engine's own name is the tooltip.
+      expect(screen.getByText('Recommendation: Iterate').closest('[title]')?.getAttribute('title')).toContain('synthesis');
       for (const id of ['candidate-a', 'candidate-b']) {
         const thumbnail = screen.getByRole('button', { name: `Open preview of ${id}` });
         expect(thumbnail.querySelector('img')?.getAttribute('alt')).toBe(`Candidate ${id}`);
@@ -120,37 +122,29 @@ describe('Candidates', () => {
       expect(document.querySelector('iframe')).toBeNull();
     });
 
-    it('lists generation_params in a collapsed params section, and leaves it out when empty', async () => {
+    it('reads a proceed recommendation as Advance, and a clean critic report as no friction', async () => {
       const candidates = await runWith((id, write) => {
-        write(id, 'candidate-a', { status: 'success' }, { temperature: '0.4', seed: '7' });
-        write(id, 'candidate-b');
+        const dir = write(id, 'candidate-a');
+        writeFileSync(join(dir, 'synthesis-report.json'), JSON.stringify({ recommendation: 'proceed', reasons: [] }));
+        writeFileSync(
+          join(dir, 'critic-report.json'),
+          JSON.stringify({ persona: 'p', task: 't', success: true, friction: [], notes: '' })
+        );
       });
       renderCandidates(candidates);
 
-      const summaries = screen.getAllByText('params');
-      expect(summaries.length).toBe(1);
-      const details = summaries[0].closest('details');
-      expect(details?.open).toBe(false);
-      expect(details?.closest('.candidate-card')?.textContent).toContain('candidate-a');
-      // The API sends generation_params sorted by key.
-      const rows = Array.from(details?.querySelectorAll('li') ?? []).map((li) => li.textContent);
-      expect(rows).toEqual(['seed: 7', 'temperature: 0.4']);
+      expect(screen.getByText('Recommendation: Advance')).toBeTruthy();
+      expect(screen.getByText('Usability: No friction found')).toBeTruthy();
     });
 
-    it('opens and closes the params section without toggling the selection', async () => {
+    it('does not list generation_params', async () => {
       const candidates = await runWith((id, write) => {
-        write(id, 'candidate-a', { status: 'success' }, { seed: '7' });
+        write(id, 'candidate-a', { status: 'success' }, { temperature: '0.4', seed: '7' });
       });
-      const onToggle = vi.fn();
-      renderCandidates(candidates, { selectable: true, onToggle });
+      renderCandidates(candidates);
 
-      const summary = screen.getByText('params');
-      const details = summary.closest('details');
-      await fireEvent.click(summary);
-      expect(details?.open).toBe(true);
-      await fireEvent.click(summary);
-      expect(details?.open).toBe(false);
-      expect(onToggle).not.toHaveBeenCalled();
+      expect(screen.queryByText('params')).toBeNull();
+      expect(screen.queryByText('temperature: 0.4')).toBeNull();
     });
 
     it('opens the lightbox from the thumbnail without toggling the selection', async () => {
@@ -169,7 +163,7 @@ describe('Candidates', () => {
   });
 
   describe('a candidate that could not be rendered', () => {
-    it('is a dashed tile with its id and the reason, and no captured_at, preview or Select', async () => {
+    it('is a tinted tile with a warning placeholder, its id and the reason, and no captured_at, preview or Select', async () => {
       const candidates = await runWith((id, write) => {
         write(id, 'candidate-a');
         write(id, 'candidate-c', { status: 'failed', reason: 'render timed out' });
@@ -179,7 +173,8 @@ describe('Candidates', () => {
       const tile = screen.getByText('render timed out').closest('.candidate-card') as HTMLElement;
       expect(tile.textContent).toContain('candidate-c');
       expect(tile.textContent).not.toContain('2026-09-25');
-      expect(tile.className).toContain('border-dashed');
+      expect(tile.className).toContain('bg-destructive-surface');
+      expect(tile.querySelector('.border-dashed')).not.toBeNull();
       expect(screen.getByText('render timed out').className).toContain('text-destructive');
       expect(within(tile).queryByRole('button')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Open preview of candidate-c' })).toBeNull();
@@ -252,6 +247,20 @@ describe('Candidates', () => {
       expect(screen.getByRole('button', { name: 'Add a Note…' })).toHaveClass('dark:text-primary-subtle-foreground');
     });
 
+    it('toggles the note editor from one link: Add a Note…, Hide Note, Edit Note', async () => {
+      const candidates = await runWith((id, write) => write(id, 'candidate-a'));
+      const user = userEvent.setup();
+      renderCandidates(candidates, { selectable: true });
+
+      await user.click(screen.getByRole('button', { name: 'Add a Note…' }));
+      expect(screen.getByRole('button', { name: 'Hide Note' })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByLabelText('Note for candidate-a').getAttribute('placeholder')).toBe(
+        'Notes to steer the next round (optional)'
+      );
+      await user.click(screen.getByRole('button', { name: 'Hide Note' }));
+      expect(screen.queryByLabelText('Note for candidate-a')).toBeNull();
+    });
+
     it('reads a saved note as "Your note: …" once the editor is closed, and can edit it again', async () => {
       const candidates = await runWith((id, write) => write(id, 'candidate-a'));
       const user = userEvent.setup();
@@ -259,9 +268,9 @@ describe('Candidates', () => {
 
       expect(screen.getByText('Your note: keep the header')).toBeTruthy();
       expect(screen.queryByLabelText('Note for candidate-a')).toBeNull();
-      await user.click(screen.getByRole('button', { name: 'Edit Note…' }));
+      await user.click(screen.getByRole('button', { name: 'Edit Note' }));
       expect((screen.getByLabelText('Note for candidate-a') as HTMLTextAreaElement).value).toBe('keep the header');
-      await user.click(screen.getByRole('button', { name: 'Done' }));
+      await user.click(screen.getByRole('button', { name: 'Hide Note' }));
       expect(screen.queryByLabelText('Note for candidate-a')).toBeNull();
       expect(screen.getByText('Your note: keep the header')).toBeTruthy();
     });

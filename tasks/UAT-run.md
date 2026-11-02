@@ -63,7 +63,7 @@ diagnosis: Compared `docs/design/redesign/Run.dc.html` (source, since it doesn't
 - Notes: the artboard's link toggles "Add a Note…" / "Edit Note" / "Hide Note" and the placeholder is "Notes to steer the next round (optional)", with a 2-row textarea. The page has a Done button and the placeholder "Notes to drive the next iteration (optional)".
 - The page also shows a "params" disclosure the artboard doesn't have.
 - The artboard's "Chosen" badge is the secondary variant with a green dot; the page tints it green.
-status: open (findings listed; not yet fixed)
+status: fixed. Candidates, scorecard badges, preview, failed tile, notes link and the Decision bar now follow the artboard using theme tokens (`shadow-card`, `rounded-xl`, `bg-muted`, `bg-destructive-surface`, `gap-3.5`, `h-32`); where the artboard used a raw value the nearest token was used (preview bg `#F2F2F4` → `bg-muted`). The params disclosure is gone from the run page. The engine says `proceed`; it reads "Advance" as in the artboard.
 
 ### BUG-4: Show Results in Finder always fails for a run started in the desktop app
 severity: major
@@ -82,4 +82,4 @@ status: fixed
 ## Summary
 - pass: 1 (checkpoint 3). issue: 3 (checkpoints 1, 2, 5). not tested: 1 (checkpoint 4).
 - 5 bugs filed: 1 major (BUG-4), 2 minor (BUG-2, BUG-5), 2 cosmetic (BUG-1, BUG-3).
-- Fixed: BUG-1, BUG-2, BUG-4, BUG-5. Open: BUG-3 (needs the user to name the differences).
+- All five fixed: BUG-1 to BUG-5. 

@@ -36,6 +36,13 @@ describe('DecisionBar', () => {
       expect(within(bar()).getByText('What should happen next?')).toBeTruthy();
     });
 
+    it('is a full-width bar on the muted surface with only a top border, not a rounded card', () => {
+      renderBar();
+
+      expect(bar()).toHaveClass('bg-muted', 'border-t');
+      expect(bar().className).not.toMatch(/rounded|sm:border(?!-)/);
+    });
+
     it('says nothing is selected yet, with what to do', () => {
       renderBar();
 

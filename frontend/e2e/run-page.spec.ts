@@ -140,7 +140,7 @@ test('a run goes from running to needs you to completed: select, note, approve',
     const card = page.locator('.candidate-card', { hasText: 'concept-b' });
     await card.getByRole('button', { name: 'Add a Note…' }).click();
     await page.getByLabel('Note for concept-b').fill('Playwright E2E: the calmer one.');
-    await card.getByRole('button', { name: 'Done' }).click();
+    await card.getByRole('button', { name: 'Hide Note' }).click();
     await expect(card).toContainText('Your note: Playwright E2E: the calmer one.');
 
     await approve.click();

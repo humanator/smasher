@@ -20,50 +20,63 @@
 
   const lintChecks = $derived(scorecard.lint?.checks ?? []);
   const lintPassed = $derived(lintChecks.length > 0 ? lintChecks.every((c) => c.passed) : null);
+  const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
   const lintViolations = $derived(lintChecks.flatMap((c) => c.violations));
   const criticSuccess = $derived(scorecard.critic?.success ?? null);
   const criticFriction = $derived(scorecard.critic?.friction ?? []);
   const synthesisLabel = $derived(scorecard.synthesis?.recommendation ?? null);
+  const synthesisDot = $derived(
+    synthesisLabel === 'proceed' ? 'var(--info)' : synthesisLabel === 'iterate' ? 'var(--warning)' : 'var(--muted-foreground)'
+  );
+  // The engine says "proceed"; the person reads "Advance".
+  const synthesisText = $derived(
+    synthesisLabel === 'proceed' ? 'Advance' : synthesisLabel ? synthesisLabel.charAt(0).toUpperCase() + synthesisLabel.slice(1) : ''
+  );
   const synthesisReasons = $derived(scorecard.synthesis?.reasons ?? []);
 </script>
 
-<!-- Pass/fail colors carry semantic meaning, so they stay as explicit hues. -->
-<div class="scorecard flex flex-wrap gap-1.5">
+<!-- Plain-language rows, one per line; the engine's own name is the tooltip. -->
+<div class="scorecard flex flex-col gap-1.5">
   {#if lintPassed !== null}
-    <Badge
-      class="scorecard-badge rounded font-semibold {lintPassed
-        ? 'scorecard-badge-pass bg-success-subtle text-success-foreground'
-        : 'scorecard-badge-fail bg-destructive-subtle text-destructive'}"
-    >
-      lint: {lintPassed ? 'pass' : 'fail'}
-    </Badge>
+    <div>
+      <span title="Shown as “lint” in the workflow engine" class="inline-flex">
+        <Badge variant="secondary" dot={lintPassed ? 'var(--success)' : 'var(--destructive)'}>
+          Design-system check: {lintPassed ? 'Passed' : lintViolations.length > 0 ? plural(lintViolations.length, 'issue') : 'Failed'}
+        </Badge>
+      </span>
+    </div>
     {#each lintViolations as violation (violation)}
-      <span class="scorecard-violation w-full text-xs text-muted-foreground">{violation}</span>
+      <span class="scorecard-violation text-small text-muted-foreground">{violation}</span>
     {/each}
   {/if}
 
   {#if criticSuccess !== null}
-    <Badge
-      class="scorecard-badge rounded font-semibold {criticSuccess
-        ? 'scorecard-badge-pass bg-success-subtle text-success-foreground'
-        : 'scorecard-badge-fail bg-destructive-subtle text-destructive'}"
-    >
-      critic: {criticSuccess ? 'success' : 'friction'}
-    </Badge>
+    <div>
+      <span title="Shown as “critic” in the workflow engine" class="inline-flex">
+        <Badge variant="secondary" dot={criticSuccess ? 'var(--success)' : 'var(--warning)'}>
+          Usability: {criticSuccess
+            ? 'No friction found'
+            : criticFriction.length > 0
+              ? plural(criticFriction.length, 'friction point')
+              : 'Friction found'}
+        </Badge>
+      </span>
+    </div>
     {#each criticFriction as friction (friction)}
-      <span class="scorecard-violation w-full text-xs text-muted-foreground">{friction}</span>
+      <span class="scorecard-violation text-small text-muted-foreground">{friction}</span>
     {/each}
   {/if}
 
   {#if synthesisLabel}
-    <Badge
-      variant="secondary"
-      class="scorecard-recommendation scorecard-recommendation-{synthesisLabel} rounded font-semibold"
-    >
-      synthesis: {synthesisLabel}
-    </Badge>
+    <div>
+      <span title="Shown as “synthesis” in the workflow engine" class="inline-flex">
+        <Badge variant="secondary" dot={synthesisDot}>
+          Recommendation: {synthesisText}
+        </Badge>
+      </span>
+    </div>
     {#each synthesisReasons as reason (reason)}
-      <span class="scorecard-reason w-full text-xs text-muted-foreground">{reason}</span>
+      <span class="scorecard-reason text-small text-muted-foreground">{reason}</span>
     {/each}
   {/if}
 </div>

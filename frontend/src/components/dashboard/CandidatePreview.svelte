@@ -41,8 +41,7 @@
 <button
   type="button"
   aria-label="Open preview of {candidate.candidate_id}"
-  class="candidate-thumbnail block w-full cursor-zoom-in overflow-hidden rounded bg-muted"
-  style="aspect-ratio: {viewport.width} / {viewport.height}"
+  class="candidate-thumbnail block h-32 w-full cursor-zoom-in overflow-hidden rounded-md border border-border bg-muted"
   onclick={openLightbox}
 >
   {#if thumbnailFailed}

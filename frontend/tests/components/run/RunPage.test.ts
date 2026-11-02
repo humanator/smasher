@@ -202,7 +202,7 @@ describe('RunPage', { timeout: 20_000 }, () => {
 
       await waitFor(() => expect(hero()).toHaveAttribute('data-state', 'waiting'), SLOW);
       expect(within(toolbar()).getByText('Needs you')).toBeTruthy();
-      expect(within(hero()).getByText(/· Ask a person$/)).toBeTruthy();
+      expect(within(hero()).getByText(/Ask a person$/)).toBeTruthy();
       expect(hero()).not.toHaveAttribute('aria-live');
       expect(within(toolbar()).getByRole('button', { name: 'Abort Run' })).toBeTruthy();
     });

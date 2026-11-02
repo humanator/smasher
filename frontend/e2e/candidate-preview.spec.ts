@@ -111,11 +111,8 @@ test('gate thumbnails open a scaled, interactive lightbox that never toggles the
     await expect(thumbnail(page, 'cand-c')).toHaveText('No screenshot');
     await expect(page.locator('iframe')).toHaveCount(0);
 
-    // Params open inside the candidate card without the click reaching its Select toggle.
-    const params = page.locator('.candidate-card details');
-    await params.getByText('params').click();
-    await expect(params.getByText('seed: 7')).toBeVisible();
-    await expectAllUnchecked(page);
+    // The params disclosure is gone from the cards.
+    await expect(page.locator('.candidate-card details')).toHaveCount(0);
 
     // cand-a: the live bundle, scaled down to fit a 1024×768 window.
     await thumbnail(page, 'cand-a').click();

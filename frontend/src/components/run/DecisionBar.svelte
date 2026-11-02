@@ -46,7 +46,7 @@
 
 <section
   aria-label="Decision"
-  class="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-border bg-background px-4 py-3 sm:mx-0 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:border"
+  class="sticky bottom-0 -mx-4 -mb-8 flex flex-col gap-3 border-t border-border bg-muted px-4 py-3 sm:-mx-7 sm:flex-row sm:items-center sm:justify-between sm:pr-5 sm:pl-7"
 >
   <div class="flex min-w-0 flex-col gap-0.5">
     <div class="flex items-center gap-1.5 text-body font-semibold text-foreground">

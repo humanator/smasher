@@ -3,11 +3,11 @@
   // ABOUTME: Presentational; RunPage owns the selection and notes and passes them in, with the handlers
 
   import CheckIcon from '@lucide/svelte/icons/check';
+  import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Textarea } from '$lib/components/ui/textarea/index.js';
   import type { CandidateResponse } from '../../lib/api/runs';
-  import CandidateParams from '../dashboard/CandidateParams.svelte';
   import CandidatePreview from '../dashboard/CandidatePreview.svelte';
   import ScorecardBadges, { type Scorecard } from '../dashboard/ScorecardBadges.svelte';
 
@@ -57,12 +57,19 @@
     <p class="text-small m-0 text-muted-foreground">{meta}</p>
   </div>
 
-  <div data-testid="candidate-grid" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+  <div data-testid="candidate-grid" class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3.5">
     {#each candidates as candidate (candidate.candidate_id)}
       {@const id = candidate.candidate_id}
       {#if isFailed(candidate)}
-        <div class="candidate-card flex flex-col gap-1.5 rounded-lg border border-dashed border-warning p-3">
-          <div class="font-mono text-small text-foreground">{id}</div>
+        <div
+          class="candidate-card flex flex-col gap-2.5 rounded-xl border border-destructive-border bg-destructive-surface p-3"
+        >
+          <div
+            class="flex h-32 items-center justify-center rounded-md border border-dashed border-destructive-border bg-background"
+          >
+            <TriangleAlertIcon class="size-6 text-destructive" aria-hidden="true" />
+          </div>
+          <div class="font-mono text-small font-semibold text-foreground">{id}</div>
           {#if exitStatus(candidate)?.reason}
             <p class="text-small m-0 text-destructive">{exitStatus(candidate)?.reason}</p>
           {/if}
@@ -71,17 +78,17 @@
         {@const isSelected = selected.includes(id)}
         {@const isChosen = chosen.includes(id)}
         <div
-          class="candidate-card flex flex-col gap-2 rounded-lg border bg-card p-3 text-card-foreground {isChosen
-            ? 'border-success ring-2 ring-success'
+          class="candidate-card flex flex-col gap-2.5 rounded-xl bg-card p-3 text-card-foreground {isChosen
+            ? 'shadow-card ring-2 ring-success'
             : isSelected
-              ? 'border-primary ring-2 ring-primary'
-              : 'border-border'}"
+              ? 'shadow-card ring-2 ring-primary'
+              : 'shadow-card'}"
         >
           <CandidatePreview {candidate} />
           <div class="flex items-center gap-2">
-            <span class="min-w-0 flex-1 truncate font-mono text-small text-foreground">{id}</span>
+            <span class="min-w-0 flex-1 truncate font-mono text-small font-semibold text-foreground">{id}</span>
             {#if isChosen}
-              <Badge dot="var(--success)" class="bg-success-subtle text-success-foreground">Chosen</Badge>
+              <Badge variant="secondary" dot="var(--success)">Chosen</Badge>
             {/if}
             {#if selectable}
               <Button
@@ -95,29 +102,28 @@
               </Button>
             {/if}
           </div>
-          <CandidateParams params={candidate.manifest?.generation_params as Record<string, string> | undefined} />
           <ScorecardBadges scorecard={(candidate.scorecard ?? {}) as Scorecard} />
+          {#if selectable}
+            <Button
+              variant="link"
+              size="xs"
+              class="self-start dark:text-primary-subtle-foreground"
+              aria-expanded={!!editing[id]}
+              onclick={() => (editing[id] = !editing[id])}
+            >
+              {editing[id] ? 'Hide Note' : notes[id] ? 'Edit Note' : 'Add a Note…'}
+            </Button>
+          {/if}
           {#if editing[id]}
             <Textarea
               aria-label="Note for {id}"
-              placeholder="Notes to drive the next iteration (optional)"
+              rows={2}
+              placeholder="Notes to steer the next round (optional)"
               value={notes[id] ?? ''}
               oninput={(e) => onNote(id, (e.target as HTMLTextAreaElement).value)}
             />
-            <Button size="sm" variant="outline" class="self-start" onclick={() => (editing[id] = false)}>Done</Button>
-          {:else}
-            {#if notes[id]}
-              <p class="text-small m-0 break-words text-foreground-secondary">Your note: {notes[id]}</p>
-            {/if}
-            {#if selectable}
-              <Button
-                variant="link"
-                class="self-start dark:text-primary-subtle-foreground"
-                onclick={() => (editing[id] = true)}
-              >
-                {notes[id] ? 'Edit Note…' : 'Add a Note…'}
-              </Button>
-            {/if}
+          {:else if notes[id]}
+            <p class="text-small m-0 break-words text-muted-foreground">Your note: {notes[id]}</p>
           {/if}
         </div>
       {/if}
