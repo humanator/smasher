@@ -9,6 +9,7 @@ fn main() {
         "save_llm_settings",
         "detect_claude_cli",
         "reveal_in_finder",
+        "reveal_run_folder",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))
         .expect("failed to run tauri-build");

@@ -238,3 +238,8 @@ export function detectClaudeCli(path: string): Promise<ClaudeCliDetection> {
 export function revealInFinder(path: string): Promise<void> {
   return invoke<void>('reveal_in_finder', { path }, 'Show in Finder is only available in the desktop app');
 }
+
+/** Reveal a run's folder in Finder; the app refuses paths outside its runs folder. */
+export function revealRunFolder(path: string): Promise<void> {
+  return invoke<void>('reveal_run_folder', { path }, 'Show in Finder is only available in the desktop app');
+}

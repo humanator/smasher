@@ -110,4 +110,25 @@ describe('native shim', () => {
       expect(invoke).toHaveBeenCalledWith('reveal_in_finder', { path: '/w/review.dot' });
     });
   });
+
+  describe('revealRunFolder', () => {
+    afterEach(() => {
+      delete window.__TAURI__;
+    });
+
+    it('refuses outside the desktop app', async () => {
+      await expect(native.revealRunFolder('/data/artifacts/run-1')).rejects.toThrow(
+        'Show in Finder is only available in the desktop app'
+      );
+    });
+
+    it("invokes the desktop app's reveal_run_folder command with the path", async () => {
+      const invoke = vi.fn(async () => undefined as never);
+      window.__TAURI__ = { core: { invoke } };
+
+      await native.revealRunFolder('/data/artifacts/run-1');
+
+      expect(invoke).toHaveBeenCalledWith('reveal_run_folder', { path: '/data/artifacts/run-1' });
+    });
+  });
 });

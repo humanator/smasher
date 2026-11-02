@@ -1,22 +1,23 @@
-// ABOUTME: Tauri commands the SPA invokes: read/save LLM settings, detect the Claude CLI, show a workflow in Finder.
+// ABOUTME: Tauri commands the SPA invokes: read/save LLM settings, detect the Claude CLI, show a workflow or run folder in Finder.
 // ABOUTME: Thin wrappers over `settings` and `reveal`; errors cross the IPC boundary as display strings.
 
 use std::path::{Path, PathBuf};
 
 use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
 
-use crate::reveal::validate_reveal_path;
+use crate::reveal::{validate_reveal_path, validate_reveal_run_dir};
 use crate::settings::{
     self, ClaudeCliDetection, KEYCHAIN_SERVICE, Keychain, SettingsUpdate, SettingsView,
 };
 
 /// Commands the served origin may invoke. `build.rs` turns each into an
 /// `allow-<name>` permission, which `capabilities/served-origin.json` grants.
-pub const COMMANDS: [&str; 4] = [
+pub const COMMANDS: [&str; 5] = [
     "get_llm_settings",
     "save_llm_settings",
     "detect_claude_cli",
     "reveal_in_finder",
+    "reveal_run_folder",
 ];
 
 /// Where the settings live, managed as Tauri state.
@@ -27,6 +28,10 @@ pub struct SettingsLocation {
 /// The folders Show in Finder may reveal from: the server's effective workflow
 /// dirs, imported-workflows folder included. Managed as Tauri state.
 pub struct WorkflowDirs(pub Vec<PathBuf>);
+
+/// The folder holding every run's artifacts (`{data_dir}/artifacts`), which
+/// Show Results in Finder is limited to. Managed as Tauri state.
+pub struct RunsDir(pub PathBuf);
 
 /// The running embedded server, managed as Tauri state so a saved key can be
 /// applied to it in place.
@@ -66,6 +71,14 @@ pub fn detect_claude_cli(path: String) -> ClaudeCliDetection {
 pub fn reveal_in_finder(dirs: tauri::State<WorkflowDirs>, path: String) -> Result<(), String> {
     let file = validate_reveal_path(&path, &dirs.0)?;
     reveal(&file)
+}
+
+/// Reveal a run's folder in Finder. Refuses anything that isn't an existing
+/// folder inside the runs directory.
+#[tauri::command]
+pub fn reveal_run_folder(runs: tauri::State<RunsDir>, path: String) -> Result<(), String> {
+    let dir = validate_reveal_run_dir(&path, &runs.0)?;
+    reveal(&dir)
 }
 
 #[cfg(target_os = "macos")]

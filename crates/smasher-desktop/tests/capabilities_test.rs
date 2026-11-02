@@ -151,6 +151,17 @@ fn served_origin_may_reveal_a_workflow_in_finder() {
 }
 
 #[test]
+fn served_origin_may_reveal_a_run_folder_in_finder() {
+    let granted: Vec<String> = capabilities()
+        .into_iter()
+        .filter(|(_, cap)| !remote_urls(cap).is_empty())
+        .flat_map(|(_, cap)| permission_ids(&cap))
+        .collect();
+
+    assert!(granted.iter().any(|g| g == "allow-reveal-run-folder"));
+}
+
+#[test]
 fn build_script_declares_exactly_the_app_commands() {
     // build.rs can't import the crate, so it lists the commands again; the two lists must agree.
     let build_rs =
