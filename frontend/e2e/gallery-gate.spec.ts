@@ -108,9 +108,9 @@ test('submit a gallery-gate pipeline, select a candidate, and complete via the r
       .getByLabel('Note for candidate-b')
       .fill('Playwright E2E: picking candidate-b, testing the real decision round trip.');
 
-    // The Decision bar has a button per outgoing edge: "proceed" is neither iterate nor
-    // approve, so it is an extra button labelled from the edge ("Proceed" from the DOT above).
-    await page.getByRole('region', { name: 'Decision' }).getByRole('button', { name: 'Proceed' }).click();
+    // The Decision bar treats a "proceed" edge as approve, so it reads "Approve Selected" but
+    // still submits the edge exactly as the gate spelled it.
+    await page.getByRole('region', { name: 'Decision' }).getByRole('button', { name: 'Approve Selected' }).click();
 
     await expect(page.getByRole('heading', { name: 'Your decisions' })).toBeVisible({ timeout: 10000 });
 
