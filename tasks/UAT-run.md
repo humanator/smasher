@@ -39,7 +39,7 @@ severity: cosmetic
 checkpoint: 1
 reported: "The question is repeated in the eyebrow."
 diagnosis: `frontend/src/lib/runHero.ts:81` builds the eyebrow as `{gate} · {kind}` where `gate` is the node label, and the heading as `question ?? gate`. In `examples/product_design_factory.dot` the gate's label and question are both "Human: pick direction(s)", so the same text shows twice. Not specific to the data: any gate whose label equals its question does this.
-status: open
+status: fixed
 
 ### BUG-2: gallery_gate_showcase.dot can't produce candidates when run from the app
 severity: minor
@@ -61,16 +61,16 @@ severity: major
 checkpoint: 5
 reported: "Couldn't show the results in Finder. Something went wrong." (run 01m6dzp1xf8fjatqw9m9wbj8dj, Completed, HumanGateShowcase)
 diagnosis: `GET /api/runs` returns `run_working_dir` as a path relative to the data dir (`artifacts/01m6dzp1…`, which lives at `~/Documents/smasher/artifacts/…`). `RunPage.svelte:296` passes it straight to `reveal_run_folder`, and `validate_reveal_run_dir` (`crates/smasher-desktop/src/reveal.rs`) calls `canonicalize` on it, which resolves against the desktop process's working directory (`crates/smasher-desktop`), so the folder isn't found and it refuses with "That folder isn't one of this app's runs." The unit tests and the stand-in invoke used absolute paths, so none of them caught it. Likely fix: resolve a relative path against the data dir (`RunsDir`'s parent) before validating, or have the server return an absolute `run_working_dir`. `rehydrate.rs:126` shows the run root can already be absolute, so check why launched runs aren't.
-status: open
+status: fixed
 
 ### BUG-5: The real refusal reason is swallowed
 severity: minor
 checkpoint: 5
 reported: same message, with "Something went wrong." instead of a reason
 diagnosis: Tauri `invoke` rejects with a plain string, and `errorMessage` (`frontend/src/lib/notify.ts:6-8`) only reads `Error` instances, so `RunHero.svelte:47-50` falls back to "Something went wrong." and drops the "That folder isn't one of this app's runs." text the Rust side sent. Affects every native-command error that goes through `errorMessage`.
-status: open
+status: fixed
 
 ## Summary
 - pass: 1 (checkpoint 3). issue: 3 (checkpoints 1, 2, 5). not tested: 1 (checkpoint 4).
 - 5 bugs filed: 1 major (BUG-4), 2 minor (BUG-2, BUG-5), 2 cosmetic (BUG-1, BUG-3).
-- Not fixed, per the skill. Everything above is open.
+- Fixed: BUG-1, BUG-4, BUG-5. Open: BUG-2 (needs a call on absolute path vs. resolution), BUG-3 (needs the user to name the differences).

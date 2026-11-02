@@ -4,6 +4,8 @@
 import { toast } from 'svelte-sonner';
 
 export function errorMessage(err: unknown, fallback: string): string {
+  // Tauri commands reject with a plain string.
+  if (typeof err === 'string' && err) return err;
   return err instanceof Error && err.message ? err.message : fallback;
 }
 

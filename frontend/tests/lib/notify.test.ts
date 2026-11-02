@@ -23,9 +23,16 @@ describe('errorMessage', () => {
     expect(errorMessage(new Error('boom'), 'fallback')).toBe('boom');
   });
 
-  it('uses the fallback for a non-Error or an empty message', () => {
-    expect(errorMessage('boom', 'fallback')).toBe('fallback');
+  it('uses a string rejection, as Tauri commands reject with one', () => {
+    expect(errorMessage("That folder isn't one of this app's runs.", 'fallback')).toBe(
+      "That folder isn't one of this app's runs.",
+    );
+  });
+
+  it('uses the fallback for an empty message or another kind of value', () => {
+    expect(errorMessage('', 'fallback')).toBe('fallback');
     expect(errorMessage(new Error(''), 'fallback')).toBe('fallback');
+    expect(errorMessage({ code: 1 }, 'fallback')).toBe('fallback');
   });
 });
 

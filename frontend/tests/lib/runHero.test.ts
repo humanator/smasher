@@ -86,6 +86,13 @@ describe('heroModel', () => {
     expect(hero).toEqual({ state: 'waiting', eyebrow: 'Pick a favourite · Ask a person', heading: 'Which concept?' });
   });
 
+  it('does not repeat the question in the eyebrow when the gate is titled with it', () => {
+    const hero = heroModel(
+      inputs({ run: { pending_questions: 1 }, events: SINGLE_PASS.slice(0, 12), question: 'Pick a favourite' })
+    );
+    expect(hero).toEqual({ state: 'waiting', eyebrow: 'Ask a person', heading: 'Pick a favourite' });
+  });
+
   it('says how long a completed run took and that every step ran', () => {
     const hero = heroModel(inputs({ run: { status: 'Completed', completed_at: '2026-11-02T10:10:35Z' } }));
     expect(hero).toEqual({ state: 'completed', heading: 'Finished in 10 min 35 s', text: 'All 5 steps ran to the end.' });

@@ -25,9 +25,16 @@ pub fn validate_reveal_path(path: &str, dirs: &[PathBuf]) -> Result<PathBuf, Str
 }
 
 /// The canonical form of `path` if it's an existing directory inside `runs_dir`
-/// once symlinks and `..` are resolved; otherwise the refusal message.
+/// once symlinks and `..` are resolved; otherwise the refusal message. The API
+/// reports a run folder relative to the data dir (`artifacts/{run_id}`), so a
+/// relative `path` is taken from `runs_dir`'s parent.
 pub fn validate_reveal_run_dir(path: &str, runs_dir: &Path) -> Result<PathBuf, String> {
     let refuse = || NOT_IN_RUNS_FOLDER.to_string();
+    let path = Path::new(path);
+    let path = match runs_dir.parent() {
+        Some(data_dir) if path.is_relative() => data_dir.join(path),
+        _ => path.to_path_buf(),
+    };
     let dir = std::fs::canonicalize(path).map_err(|_| refuse())?;
     // A runs folder that doesn't exist yet holds nothing.
     let base = std::fs::canonicalize(runs_dir).map_err(|_| refuse())?;
@@ -199,6 +206,31 @@ mod tests {
         let revealed = validate_reveal_run_dir(&run.display().to_string(), &runs).unwrap();
 
         assert_eq!(revealed, fs::canonicalize(&run).unwrap());
+    }
+
+    #[test]
+    fn accepts_a_run_folder_given_relative_to_the_data_dir() {
+        let root = TempDir::new();
+        let runs = root.path().join("artifacts");
+        let run = runs.join("run-1");
+        fs::create_dir_all(&run).unwrap();
+
+        let revealed = validate_reveal_run_dir("artifacts/run-1", &runs).unwrap();
+
+        assert_eq!(revealed, fs::canonicalize(&run).unwrap());
+    }
+
+    #[test]
+    fn refuses_a_relative_dot_dot_escape_from_the_runs_dir() {
+        let root = TempDir::new();
+        let runs = root.path().join("artifacts");
+        fs::create_dir_all(&runs).unwrap();
+        fs::create_dir_all(root.path().join("secrets")).unwrap();
+
+        assert_eq!(
+            validate_reveal_run_dir("artifacts/../secrets", &runs),
+            Err(NOT_IN_RUNS_FOLDER.to_string())
+        );
     }
 
     #[test]

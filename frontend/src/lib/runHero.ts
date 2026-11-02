@@ -78,7 +78,9 @@ export function heroModel({ run, steps, events, decisions, question, now }: Hero
     const kind = stepKind('Interviewer').plain;
     const gateId = waitingId ?? steps.find((s) => s.node_type === 'Interviewer')?.id;
     const gate = gateId ? name(gateId) : kind;
-    return { state: 'waiting', eyebrow: `${gate} · ${kind}`, heading: question ?? gate };
+    const heading = question ?? gate;
+    // A gate titled with its own question would say it twice.
+    return { state: 'waiting', eyebrow: heading === gate ? kind : `${gate} · ${kind}`, heading };
   }
 
   const currentId = currentStep(progress);
