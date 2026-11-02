@@ -59,6 +59,15 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     `.ai/attractor-runs/...` layout and shell variables. Rewrite their tool
     commands against smasher's (`SMASHER_RUN_DIR`, `nodes/<id>/`,
     `SMASHER_CTX_<KEY>`).
+41. **Let the editor fill in paths for the user.** A Tool node's `args` and
+    `tool_command` are free text, so a user building a workflow in the app has to
+    know that relative paths resolve against the run's own folder and write
+    absolute paths for anything else (found in the run UAT: BUG-2, where
+    `gallery_gate_showcase.dot` hard-codes a repo-relative `candidate_dir` that
+    can't resolve from a run). Add a placeholder, for example a "candidate
+    directory" token the node forms offer wherever a directory path is wanted,
+    that the engine resolves at run time. Spec it first: which nodes and fields
+    take it, what it resolves to, and how it's shown in the DOT.
 
 ## P4: Distribution and remote access
 
