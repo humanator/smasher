@@ -12,7 +12,7 @@ test('titles each page, page name first', async ({ page }) => {
   await expect(page).toHaveTitle('Smasher');
 
   await page.goto('/runs/no-such-run');
-  await expect(page).toHaveTitle('Run no-such-run — Smasher');
+  await expect(page).toHaveTitle('Run not found — Smasher');
 });
 
 test('shows the ⚡ favicon and never asks for /vite.svg', async ({ page }) => {
