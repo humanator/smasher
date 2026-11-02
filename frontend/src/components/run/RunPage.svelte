@@ -50,6 +50,8 @@
   let decisions = $state<DecisionResponse[]>([]);
   let question = $state<string | null>(null);
   let aborting = $state(false);
+  // The server can still report Running for a moment after it accepted the abort.
+  let abortAccepted = false;
   let runDialogOpen = $state(false);
   // The Run information panel arrives with the Progress tab; for now this only drives the toggle.
   let panelOpen = $state(typeof window !== 'undefined' && window.innerWidth >= 1100);
@@ -81,10 +83,11 @@
   async function refresh() {
     try {
       const latest = await runsApi.getRun(runId);
-      run = latest;
+      run = abortAccepted && isActive(latest.status) ? { ...latest, status: 'Aborted' } : latest;
       notFound = false;
       loadError = null;
       await loadDetails(latest);
+      // Stop on the server's own word, so the last fetch carries the final error and times.
       if (!isActive(latest.status)) stopPolling();
     } catch (err) {
       if ((err as ApiError).status === 404) {
@@ -121,6 +124,7 @@
     actionError = null;
     try {
       const response = await runsApi.cancelRun(runId);
+      abortAccepted = true;
       if (run) run = { ...run, status: response.status };
       await refresh();
     } catch (err) {
@@ -146,6 +150,11 @@
       unsubscribe();
       eventStore.clear();
     };
+  });
+
+  // The run's last event means it has ended: fetch it now rather than at the next poll.
+  $effect(() => {
+    if (eventStore.isComplete) untrack(() => void refresh());
   });
 
   usePageTitle(() => {
