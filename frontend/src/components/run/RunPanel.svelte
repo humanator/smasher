@@ -83,7 +83,10 @@
     </Sheet.Content>
   </Sheet.Root>
 {:else if open}
-  <aside aria-label="Run information" class="flex w-[300px] shrink-0 flex-col border-l border-border px-4 pt-5 pb-8">
-    {@render body()}
+  <!-- The inner box is as tall as the viewport and sticks, so a long log scrolls inside the panel instead of stretching the page. -->
+  <aside aria-label="Run information" class="w-[300px] shrink-0 border-l border-border">
+    <div class="sticky top-0 flex h-svh flex-col px-4 pt-5 pb-8">
+      {@render body()}
+    </div>
   </aside>
 {/if}

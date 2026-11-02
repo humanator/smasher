@@ -58,6 +58,13 @@ describe('RunPanel', () => {
     expect(screen.getByRole('complementary', { name: 'Run information' })).toBeInTheDocument();
   });
 
+  it('keeps its contents within the viewport, so a long activity log scrolls inside the panel', () => {
+    show();
+    // jsdom has no layout; the classes are what bound the panel (e2e/event-log.spec.ts checks the result).
+    const content = screen.getByRole('complementary', { name: 'Run information' }).firstElementChild;
+    expect(content).toHaveClass('sticky', 'top-0', 'h-svh');
+  });
+
   it('shows the steps on the Progress tab, from the events it was given', () => {
     show();
     const panel = screen.getByRole('tabpanel');
