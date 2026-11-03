@@ -192,6 +192,40 @@ describe('App page header on other routes', () => {
   });
 });
 
+describe('App sidebar on the editor', () => {
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(() => {
+    visit('/');
+  });
+
+  const toggle = () => screen.getByRole('button', { name: 'Toggle sidebar' });
+
+  it.each(['/workflows/new', '/workflows/examples__human_gate_showcase/edit'])(
+    'starts collapsed to the icon rail on %s, so the step library sits beside it',
+    (path) => {
+      visit(path);
+      render(App);
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    }
+  );
+
+  it('can still be expanded from its toggle on the editor', async () => {
+    visit('/workflows/new');
+    render(App);
+    await userEvent.click(toggle());
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it.each(['/', '/workflows/examples__human_gate_showcase'])('stays expanded on %s', (path) => {
+    visit(path);
+    render(App);
+    expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
 describe('App settings button', () => {
   beforeAll(() => {
     setApiBaseUrl('http://127.0.0.1:21541/api');

@@ -19,6 +19,7 @@
     actions,
     titleAccessory = null,
     currentWorkflowId = null,
+    sidebarCollapsed = false,
     children,
   }: {
     title: string;
@@ -29,6 +30,8 @@
     actions?: Snippet | null;
     titleAccessory?: Snippet | null;
     currentWorkflowId?: string | null;
+    /** Start with the sidebar folded to its icon rail, as the editor does for its step library. */
+    sidebarCollapsed?: boolean;
     children: Snippet;
   } = $props();
 
@@ -62,7 +65,7 @@
   });
 </script>
 
-<Sidebar.Provider style="--sidebar-width: 220px; --sidebar-width-icon: 76px;">
+<Sidebar.Provider open={!sidebarCollapsed} style="--sidebar-width: 220px; --sidebar-width-icon: 76px;">
   <SourceList
     {workflows}
     runCount={libraryStore.runs.length}

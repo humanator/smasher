@@ -150,6 +150,7 @@
   actions={headerActions}
   titleAccessory={pageHeader.titleAccessory}
   currentWorkflowId={workflowPageType === 'detail' || workflowPageType === 'edit' ? workflowId : null}
+  sidebarCollapsed={workflowPageType === 'edit' || workflowPageType === 'new'}
 >
   <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
        so they load as their own chunk on demand; bundling them kept the
