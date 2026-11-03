@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Canvas legend, bottom-left: what a plain connection and a dashed loop connection mean
-  // ABOUTME: Line samples match WorkflowEdge's strokes (the edge stroke token and the human-group ink)
+  // ABOUTME: Line samples match WorkflowEdge's strokes (the edge stroke token and the warning ink)
 </script>
 
 <div
@@ -10,6 +10,6 @@
     <span class="w-5 border-t-2 border-muted-foreground" aria-hidden="true"></span>Then run the next step
   </span>
   <span class="flex items-center gap-2">
-    <span class="w-5 border-t-2 border-dashed border-kind-human-ink" aria-hidden="true"></span>Go back and redo (a loop)
+    <span class="w-5 border-t-2 border-dashed border-warning-foreground" aria-hidden="true"></span>Go back and redo (a loop)
   </span>
 </div>

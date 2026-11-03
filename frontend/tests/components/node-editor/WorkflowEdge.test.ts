@@ -55,9 +55,23 @@ describe('WorkflowEdge', () => {
     expect(pill).not.toHaveClass('wf-edge-label-loop');
   });
 
-  it('gives a loop label the loop pill variant', async () => {
+  it('gives a loop label the loop pill variant, in the warning ink', async () => {
     await renderEdge(edge({ label: 'try again' }, true));
-    expect(screen.getByRole('button', { name: /labelled try again/ })).toHaveClass('wf-edge-label-loop');
+    const pill = screen.getByRole('button', { name: /labelled try again/ });
+    expect(pill).toHaveClass('wf-edge-label-loop', 'text-warning-foreground', 'border-warning-foreground');
+    expect(pill.className).not.toMatch(/kind-human/);
+  });
+
+  it('restyles as a loop, and back, when Go back and redo is toggled', async () => {
+    const { component } = await renderEdge(edge({ label: 'retry' }));
+    const path = () => document.querySelector('.svelte-flow__edge-path');
+
+    component.setEdges([edge({ label: 'retry' }, true)]);
+    await waitFor(() => expect(path()).toHaveClass('wf-edge-loop'));
+    expect(screen.getByRole('button', { name: /labelled retry/ })).toHaveClass('wf-edge-label-loop');
+
+    component.setEdges([edge({ label: 'retry' }, false)]);
+    await waitFor(() => expect(path()).not.toHaveClass('wf-edge-loop'));
   });
 
   it('has no pill when the connection has no label', async () => {

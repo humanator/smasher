@@ -28,7 +28,9 @@
   const edgeActions = getContext<WorkflowEdgeActions | undefined>(EDGE_ACTIONS_CONTEXT_KEY);
   const store = useStore();
 
-  // A loop (loop_restart=true) is dashed in the human-group ink (D7).
+  // A loop (loop_restart=true) is dashed in the warning ink (R3, D7).
+  // --warning-foreground, not --warning: the pill's text needs 4.5:1 on the
+  // card in both themes, and the orange --warning is about 2:1 on white.
   const isLoop = $derived(data?.loopRestart === true);
   const text = $derived(typeof label === 'string' ? label : '');
 
@@ -65,8 +67,8 @@
       class={[
         'wf-edge-label nodrag nopan h-5 cursor-default whitespace-nowrap rounded-full border bg-card px-2 text-caption font-medium',
         'focus-visible:outline-3 focus-visible:outline-ring',
-        isLoop ? 'wf-edge-label-loop text-kind-human-ink' : 'text-foreground-secondary',
-        selected ? 'wf-edge-label-selected border-primary' : isLoop ? 'border-kind-human-ink' : 'border-input',
+        isLoop ? 'wf-edge-label-loop text-warning-foreground' : 'text-foreground-secondary',
+        selected ? 'wf-edge-label-selected border-primary' : isLoop ? 'border-warning-foreground' : 'border-input',
       ]}
       aria-label={name}
       onclick={() => edgeActions?.onSelectEdge(id)}
@@ -81,7 +83,7 @@
      The extra .svelte-flow ancestor outranks the library's own selected rule,
      so a selected loop turns accent like any other selected connection. */
   :global(.svelte-flow__edge-path.wf-edge-loop) {
-    stroke: var(--kind-human-ink);
+    stroke: var(--warning-foreground);
     stroke-dasharray: 7 5;
   }
 

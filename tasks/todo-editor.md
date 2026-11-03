@@ -259,7 +259,7 @@ Rules for every task:
   - Files: `StructuralForm.svelte` (or replace it with `FlowForm.svelte`), `inspector/RetrySettings.svelte`, tests.
   - Depends on: T10. Scope: S.
 
-- [ ] **Task 15: Connection settings and Branch rules**
+- [x] **Task 15: Connection settings and Branch rules**
   - Description:
     - Rewrite `EdgeForm` onto `Field`: Label, Take this path when…, Priority (with the error), Go
       back and redo, the Rule syntax disclosure, and the About this connection tab.

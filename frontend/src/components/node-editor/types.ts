@@ -67,13 +67,18 @@ export interface NodeFormProps {
 // present with a value or null) and `loopRestart` is a plain boolean (loop_restart
 // itself defaults to `false` server-side per graph/mod.rs's extract_loop_restart,
 // never "absent").
+//
+// `label` is the edge's own top-level field too (EditorEdge.label, the
+// canvas pill), cleared the same way with `null`.
 export interface EdgeFormChange {
+  label?: string | null;
   condition?: string | null;
   priority?: number | null;
   loopRestart?: boolean;
 }
 
 export interface EdgeFormProps {
+  label: string | null;
   condition: string | null;
   priority: number | null;
   loopRestart: boolean;

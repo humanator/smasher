@@ -28,6 +28,10 @@
 	export function currentEdges(): Edge[] {
 		return edges;
 	}
+
+	export function setEdges(next: Edge[]) {
+		edges = next;
+	}
 </script>
 
 <div style="width: 800px; height: 600px">

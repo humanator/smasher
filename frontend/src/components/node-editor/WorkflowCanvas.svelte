@@ -43,6 +43,7 @@
   import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
   import FlowForm from './nodeForms/FlowForm.svelte';
   import RetrySettings from './inspector/RetrySettings.svelte';
+  import BranchRules, { type BranchPath } from './inspector/BranchRules.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { usePageActions } from '$lib/page-header.svelte';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -364,6 +365,7 @@
       if (e.id !== edgeId) return e;
       return {
         ...e,
+        label: patch.label !== undefined ? (patch.label ?? undefined) : e.label,
         data: {
           condition: patch.condition !== undefined ? patch.condition : (e.data?.condition ?? null),
           priority: patch.priority !== undefined ? patch.priority : (e.data?.priority ?? null),
@@ -372,6 +374,19 @@
         },
       };
     });
+  }
+
+  // A Branch's settings edit its outgoing connections' conditions (BranchRules).
+  function branchPaths(nodeId: string): BranchPath[] {
+    return edges
+      .filter((e) => e.source === nodeId)
+      .map((e) => ({
+        id: e.id,
+        target: labelById.get(e.target) ?? e.target,
+        label: typeof e.label === 'string' ? e.label : '',
+        loop: e.data?.loopRestart === true,
+        condition: e.data?.condition,
+      }));
   }
 
   // Applies a nodeForms/*.svelte onChange patch to the selected node's live
@@ -536,7 +551,12 @@
         testId="node-inspector-label"
         oninput={(label) => applyNodeFormChange(node.id, { label })}
       />
-      {#if FormComponent}
+      {#if node.data.nodeType === 'Conditional'}
+        <BranchRules
+          paths={branchPaths(node.id)}
+          onChange={(edgeId, condition) => applyEdgeFormChange(edgeId, { condition })}
+        />
+      {:else if FormComponent}
         <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
       {:else}
         <FlowForm handler={node.data.nodeType} attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
@@ -546,6 +566,7 @@
   {:else if selectedEdge}
     {@const edge = selectedEdge}
     <EdgeForm
+      label={typeof edge.label === 'string' ? edge.label : null}
       condition={edge.data?.condition ?? null}
       priority={edge.data?.priority ?? null}
       loopRestart={edge.data?.loopRestart ?? false}

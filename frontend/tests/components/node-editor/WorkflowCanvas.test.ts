@@ -735,7 +735,7 @@ describe('edge inspector (Task 8 side panel)', () => {
     const graph: EditorGraph = {
       ...sampleGraph,
       edges: [
-        { from: 'a', to: 'b', condition: 'ready', priority: 2, loop_restart: true, attrs: {} },
+        { from: 'a', to: 'b', label: 'go', condition: 'ready', priority: 2, loop_restart: true, attrs: {} },
       ],
     };
     const { component } = render(WorkflowCanvas, { props: { graph, onSave: vi.fn() } });
@@ -745,6 +745,7 @@ describe('edge inspector (Task 8 side panel)', () => {
 
     await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
     expect(screen.getByTestId('edge-form')).toBeInTheDocument();
+    expect(screen.getByTestId('edge-label')).toHaveValue('go');
     expect(screen.getByTestId('edge-condition')).toHaveValue('ready');
     expect(screen.getByTestId('edge-priority')).toHaveValue('2');
     expect(screen.getByTestId('edge-loop-restart')).toBeChecked();
@@ -764,6 +765,33 @@ describe('edge inspector (Task 8 side panel)', () => {
     expect(updated?.condition).toBe('x > 5');
     expect(updated?.priority).toBe(3);
     expect(updated?.loop_restart).toBe(true);
+  });
+
+  it('a label edit sets the connection\'s label, which its canvas pill shows, and clearing it removes the label', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-form')).toBeInTheDocument());
+
+    await fireEvent.input(screen.getByTestId('edge-label'), { target: { value: 'retry' } });
+    expect(component.currentGraph().edges[0].label).toBe('retry');
+    expect(screen.getByTestId('edge-inspector-title')).toHaveTextContent('A → B');
+
+    await fireEvent.input(screen.getByTestId('edge-label'), { target: { value: '' } });
+    expect(component.currentGraph().edges[0].label).toBeUndefined();
+  });
+
+  it('a bad priority shows the error and leaves the saved priority alone', async () => {
+    const graph: EditorGraph = { ...sampleGraph, edges: [{ from: 'a', to: 'b', priority: 2, loop_restart: false, attrs: {} }] };
+    const { component } = render(WorkflowCanvas, { props: { graph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-form')).toBeInTheDocument());
+
+    await fireEvent.input(screen.getByTestId('edge-priority'), { target: { value: 'x' } });
+
+    expect(screen.getByText('Priority must be a whole number, like 1 or 5.')).toBeInTheDocument();
+    expect(component.currentGraph().edges[0].priority).toBe(2);
   });
 
   it('selecting a node closes an open edge inspector, and vice versa', async () => {
@@ -829,6 +857,53 @@ describe('edge inspector (Task 8 side panel)', () => {
     expect(component.currentGraph().nodes).toHaveLength(2);
     expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
+  });
+});
+
+describe('Branch rules', () => {
+  const branchGraph: EditorGraph = {
+    name: 'Branchy',
+    graph_attrs: {},
+    nodes: [
+      { id: 'start', node_type: 'Start', label: 'Begin', attrs: {} },
+      { id: 'br', node_type: 'Conditional', label: 'Good enough?', attrs: {} },
+      { id: 'ok', node_type: 'Exit', label: 'Ship it', attrs: {} },
+      { id: 'draft', node_type: 'Codergen', label: 'Draft', attrs: { prompt: 'p' } },
+    ],
+    edges: [
+      { from: 'start', to: 'br', loop_restart: false, attrs: {} },
+      { from: 'br', to: 'ok', label: 'yes', condition: 'outcome=success', loop_restart: false, attrs: {} },
+      { from: 'br', to: 'draft', loop_restart: true, attrs: {} },
+    ],
+  };
+
+  it('lists one rule per outgoing connection, named after its target, with no More settings', async () => {
+    render(WorkflowCanvas, { props: { graph: branchGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Good enough?')).toBeInTheDocument());
+
+    await clickNodeByLabel('Good enough?');
+
+    expect(screen.getByRole('textbox', { name: 'Go to “Ship it” when…' })).toHaveValue('outcome=success');
+    expect(screen.getByRole('textbox', { name: 'Go to “Draft” when…' })).toHaveAccessibleDescription(
+      'This path loops back and redoes the step. Leave blank to use the label as the rule.',
+    );
+    expect(screen.queryByRole('textbox', { name: /Begin/ })).toBe(null);
+    expect(screen.getByRole('button', { name: 'Rule syntax' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More settings/ })).toBe(null);
+  });
+
+  it('edits the condition of the right connection only', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: branchGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Good enough?')).toBeInTheDocument());
+    await clickNodeByLabel('Good enough?');
+
+    await fireEvent.input(screen.getByRole('textbox', { name: 'Go to “Draft” when…' }), { target: { value: 'outcome=fail' } });
+
+    const edges = component.currentGraph().edges;
+    expect(edges.find((e) => e.to === 'draft')?.condition).toBe('outcome=fail');
+    expect(edges.find((e) => e.to === 'ok')?.condition).toBe('outcome=success');
+    expect(edges.find((e) => e.to === 'br')?.condition).toBeUndefined();
+    expect(edges.find((e) => e.to === 'draft')?.loop_restart).toBe(true);
   });
 });
 
