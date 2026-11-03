@@ -148,4 +148,16 @@ describe('Inspector: the Step guide', () => {
     expect(within(aside).queryByRole('tab')).toBeNull();
     expect(within(aside).queryByRole('button', { name: /Delete/ })).toBeNull();
   });
+
+  it('shows the kind’s About sections and settings, and Add to Canvas reports the kind', async () => {
+    const onAdd = vi.fn();
+    render(Inspector, { props: { view: { kind: 'guide', handler: 'Tool' }, onClose: vi.fn(), onDelete: vi.fn(), onAdd } });
+
+    const aside = within(screen.getByTestId('step-guide'));
+    expect(aside.getByRole('heading', { name: 'Settings in this step' })).toBeInTheDocument();
+    expect(aside.getByText('Pick the built-in tool to run.')).toBeInTheDocument();
+
+    await fireEvent.click(aside.getByRole('button', { name: 'Add to Canvas' }));
+    expect(onAdd).toHaveBeenCalledWith('Tool');
+  });
 });

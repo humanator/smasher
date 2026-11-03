@@ -13,7 +13,7 @@
     type Node as FlowNode,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { setContext, type Component, type Snippet } from 'svelte';
+  import { setContext, tick, type Component, type Snippet } from 'svelte';
   import Palette from './Palette.svelte';
   import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
   import StatusBar from './StatusBar.svelte';
@@ -453,6 +453,32 @@
     );
   });
 
+  // The Step guide's Add to Canvas (D6), the keyboard path for adding a
+  // step: it goes in the middle of the visible canvas, centred the same way
+  // a dropped step is, and is selected so its settings open straight away.
+  let canvasRegion: HTMLElement | undefined;
+  let focusStepName = false;
+
+  function addStepAtCentre(nodeType: string) {
+    if (!flow || !canvasRegion) return;
+    const rect = canvasRegion.getBoundingClientRect();
+    const centre = flow.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    const id = addNodeAtPosition(nodeType, centre);
+    if (!id) return;
+    nodes = nodes.map((n) => (n.id === id ? { ...n, style: 'visibility: hidden;' } : n));
+    nodeToCentre = id;
+    focusStepName = true;
+    selectNode(id);
+  }
+
+  // The button that was pressed has gone with the guide, so focus moves to
+  // the new step's name, the first thing a keyboard user will want to change.
+  function focusOnMount(settings: HTMLElement) {
+    if (!focusStepName) return;
+    focusStepName = false;
+    void tick().then(() => settings.querySelector('input')?.focus());
+  }
+
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
@@ -544,7 +570,7 @@
   {#if selectedNode}
     {@const node = selectedNode}
     {@const FormComponent = formComponentFor(node.data.nodeType)}
-    <div class="flex flex-col gap-5">
+    <div class="flex flex-col gap-5" use:focusOnMount>
       <Field
         spec={stepFields(node.data.nodeType)[0]}
         value={node.data.label}
@@ -613,6 +639,7 @@
     {/if}
     <div
       class="flex-1 relative"
+      bind:this={canvasRegion}
       role="region"
       aria-label="Workflow canvas drop zone"
       ondragover={handleDragOver}
@@ -656,7 +683,13 @@
        from `attrs` only once per mount (documented in each form's own
        comment), and the inspector's tab goes back to Settings. -->
   {#key inspectorKey}
-    <Inspector view={inspectorView} onClose={clearSelection} onDelete={deleteSelection} settings={inspectorSettings} />
+    <Inspector
+      view={inspectorView}
+      onClose={clearSelection}
+      onDelete={deleteSelection}
+      onAdd={addStepAtCentre}
+      settings={inspectorSettings}
+    />
   {/key}
 </div>
 

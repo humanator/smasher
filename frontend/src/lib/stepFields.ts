@@ -414,6 +414,13 @@ export const RULE_SYNTAX: { title: string; rows: { code: string; text: string }[
   ],
 };
 
+/** The Step guide's own copy (Main.dc.html), plus its Add to Canvas button (D6). */
+export const STEP_GUIDE = {
+  settingsTitle: 'Settings in this step',
+  noSettings: 'This step has no settings beyond its name.',
+  add: 'Add to Canvas',
+};
+
 /** The inspector when nothing is selected. */
 export const NOTHING_SELECTED: { heading: string; text: string; stepsTitle: string; steps: RichText[] } = {
   heading: 'Nothing selected',

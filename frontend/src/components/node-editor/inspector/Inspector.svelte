@@ -18,16 +18,20 @@
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import { CONNECTION_ABOUT, NOTHING_SELECTED, type RichText } from '$lib/stepFields';
   import { stepKind, type AboutSection } from '$lib/stepKinds';
+  import StepGuide from './StepGuide.svelte';
 
   let {
     view,
     onClose,
     onDelete,
+    onAdd = () => {},
     settings,
   }: {
     view: InspectorView;
     onClose: () => void;
     onDelete: () => void;
+    /** The Step guide's Add to Canvas, with the guide's kind. */
+    onAdd?: (handler: string) => void;
     /** The Settings tab's content for a step or connection. */
     settings?: Snippet;
   } = $props();
@@ -129,7 +133,7 @@
       </div>
       <div class="min-h-0 flex-1 overflow-auto p-5">
         {#if view.kind === 'guide'}
-          <!-- Task 16 fills in the Step guide's About sections and settings list. -->
+          <StepGuide handler={view.handler} {onAdd} />
         {:else}
           <!-- Only the open tab's content is in the page, so the form remounts on Settings. -->
           <Tabs.Content value="settings">

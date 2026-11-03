@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import WorkflowCanvas from '../../../src/components/node-editor/WorkflowCanvas.svelte';
 import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG } from '../../../src/components/node-editor/nodeConfig';
 import type { EditorGraph } from '../../../src/components/node-editor/types';
@@ -280,8 +281,8 @@ describe('create mode (no workflowId)', () => {
 });
 
 // Task 9: the step library (Palette.svelte, tested on its own in
-// Palette.test.ts) drives the canvas's `guide` selection. Until Task 16 the
-// inspector shows the guide as a placeholder heading.
+// Palette.test.ts) drives the canvas's `guide` selection, and Task 16 the
+// Step guide's Add to Canvas.
 describe('step library selection', () => {
   it('shows the Step guide for a step picked in the library, and presses it', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
@@ -327,6 +328,42 @@ describe('step library selection', () => {
 
     expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
     expect(within(screen.getByTestId('step-guide')).getByRole('heading', { name: 'Start' })).toBeInTheDocument();
+  });
+
+  it('Add to Canvas adds the step with its kind\'s default attrs, selects it and lets go of the library pick', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Add to Canvas' }));
+
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(3));
+    const created = component.currentGraph().nodes.find((n) => !['a', 'b'].includes(n.id))!;
+    expect(created.node_type).toBe('Tool');
+    expect(created.label).toBe('Tool');
+    const attrs = { ...created.attrs };
+    delete attrs.pos;
+    expect(attrs).toEqual(NODE_KIND_CONFIG.Tool.defaultAttrs);
+    expect(screen.getByTestId('node-inspector-title')).toHaveTextContent('Tool');
+    expect(screen.getByTestId('tool-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(document.querySelector(`.svelte-flow__node[data-id="${created.id}"]`)).toHaveClass('selected'));
+  });
+
+  it('adds a step from the keyboard alone: pick it in the library, then Add to Canvas', async () => {
+    const user = userEvent.setup();
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    screen.getByTestId('palette-entry-Codergen').focus();
+    await user.keyboard('{Enter}');
+    screen.getByRole('button', { name: 'Add to Canvas' }).focus();
+    await user.keyboard(' ');
+
+    await waitFor(() => expect(component.currentGraph().nodes.filter((n) => n.node_type === 'Codergen')).toHaveLength(2));
+    expect(screen.getByTestId('codergen-form')).toBeInTheDocument();
+    expect(screen.getByTestId('node-inspector-label')).toHaveFocus();
   });
 
   it('clears the guide when the empty canvas is clicked', async () => {

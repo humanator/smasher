@@ -274,7 +274,7 @@ Rules for every task:
   - Files: `EdgeForm.svelte`, `inspector/BranchRules.svelte`, `inspector/RuleSyntax.svelte`, tests.
   - Depends on: T7, T10. Scope: M.
 
-- [ ] **Task 16: Step guide and Add to Canvas**
+- [x] **Task 16: Step guide and Add to Canvas**
   - Description:
     - The `guide` selection renders the "Step guide" header, the About sections, and "Settings in
       this step", which lists every field's label, badge and help except Step name. It uses the
