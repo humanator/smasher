@@ -361,8 +361,8 @@ Rules for every task:
   - Depends on: T17. Scope: S.
 
 ### Checkpoint: Page
-- [ ] `check`, `lint`, `test -- --run` and `build:check` are clean.
-- [ ] The full edit → save → run-dialog flow works in the browser.
+- [x] `check`, `lint`, `test -- --run` and `build:check` are clean.
+- [x] The full edit → save → run-dialog flow works in the browser.
 - [ ] Review with Jobsworth.
 
 ## Phase 5: Verify
