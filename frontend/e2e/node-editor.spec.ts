@@ -121,14 +121,18 @@ test('a dropped node lands under the pointer after zooming and panning', async (
   await dragPaletteEntryOntoCanvas(page, 'Start');
   await expect(page.locator('.svelte-flow__node')).toHaveCount(1);
 
-  // That fit zooms to the maximum around one node, so zoom out once with
-  // the Controls' - button, then pan by dragging the empty pane. The
-  // viewport is then neither at zoom 1 nor at the origin.
-  await page.locator('.svelte-flow__controls-zoomout').click();
+  // That fit zooms to the maximum around one node, so zoom out with the
+  // mouse wheel (the canvas has no zoom buttons of its own; the toolbar's
+  // come later), then pan by dragging the empty pane. The viewport is then
+  // neither at zoom 1 nor at the origin.
   const pane = await page.locator('.svelte-flow__pane').boundingBox();
   expect(pane).not.toBeNull();
   const start = { x: pane!.x + pane!.width / 2, y: pane!.y + pane!.height / 2 };
+  const viewport = page.locator('.svelte-flow__viewport');
+  const before = await viewport.getAttribute('style');
   await page.mouse.move(start.x, start.y);
+  await page.mouse.wheel(0, 300);
+  await expect(viewport).not.toHaveAttribute('style', before!);
   await page.mouse.down();
   await page.mouse.move(start.x - 120, start.y - 80, { steps: 8 });
   await page.mouse.up();
@@ -207,10 +211,13 @@ test('the canvas fills the viewport below the header on the edit and new pages',
       const header = (await page.locator('header').first().boundingBox())!;
       const box = (await flow.boundingBox())!;
       const palette = (await page.getByTestId('palette-entry-Codergen').boundingBox())!;
-      // Right up to the right and bottom edges of the window, left up to the
-      // palette, and no page scroll.
+      const statusBar = (await page.locator('footer', { hasText: /steps · \d+ connections/ }).boundingBox())!;
+      // Right up to the right edge of the window, down to the status bar
+      // (which sits on the bottom edge), left up to the palette, and no
+      // page scroll.
       expect(box.x + box.width, url).toBeGreaterThan(1600 - 2);
-      expect(box.y + box.height, url).toBeGreaterThan(1000 - 2);
+      expect(Math.abs(box.y + box.height - statusBar.y), url).toBeLessThan(2);
+      expect(statusBar.y + statusBar.height, url).toBeGreaterThan(1000 - 2);
       expect(box.x - (palette.x + palette.width), url).toBeLessThan(24);
       expect(box.y - (header.y + header.height), url).toBeLessThan(80);
       const scrolls = await page.evaluate(
