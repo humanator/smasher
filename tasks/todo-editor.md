@@ -74,7 +74,7 @@ Rules for every task:
   - Files: `src/lib/nodeSummary.ts`, `tests/lib/nodeSummary.test.ts`.
   - Depends on: T2 (tool titles). Scope: S.
 
-- [ ] **Task 5: `workflowProblems`**
+- [x] **Task 5: `workflowProblems`**
   - Description: graph → `Problem[]` with `{ nodeId?, edgeId?, label?, message }`, covering the 7
     node rules, invalid JSON (`config` and `args`), a bad priority on an edge, and no Start /
     several Starts / no Finish. Results are in canvas order.
