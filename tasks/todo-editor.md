@@ -166,8 +166,8 @@ Rules for every task:
   - Depends on: T1, T2. Scope: M.
 
 ### Checkpoint: Canvas
-- [ ] All tests are green.
-- [ ] `node-editor.spec.ts` drag-create still passes (selectors updated where needed).
+- [x] All tests are green.
+- [x] `node-editor.spec.ts` drag-create still passes (selectors updated where needed).
 - [ ] Side-by-side check of the canvas and palette against `Main`.
 - [ ] Review with Jobsworth.
 
