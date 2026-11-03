@@ -211,7 +211,7 @@ Rules for every task:
   - Files: those three forms and their tests.
   - Depends on: T10. Scope: M.
 
-- [ ] **Task 12: Tool**
+- [x] **Task 12: Tool**
   - Description:
     - "What should this step run?" radio.
     - Built-in: a Tool radio with descriptions, Tool settings (JSON), and Model when the tool uses

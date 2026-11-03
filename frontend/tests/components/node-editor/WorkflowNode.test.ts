@@ -98,9 +98,10 @@ describe('step cards', () => {
     await waitFor(() => expect(within(nodeEl('cmd')).getByText('$ make lint')).toBeInTheDocument());
     expect(nodeEl('cmd')).toHaveAttribute('aria-label', 'Tool: Tests');
 
-    // ToolForm clears a blank command, which leaves a Tool with nothing to run.
+    // ToolForm keeps a blank command as an empty tool_command, so the step is
+    // still a shell command, now with nothing to run.
     await fireEvent.input(screen.getByTestId('tool-command'), { target: { value: '' } });
-    await waitFor(() => expect(within(nodeEl('cmd')).getByText('Choose a tool')).toBeInTheDocument());
+    await waitFor(() => expect(within(nodeEl('cmd')).getByText('Add a command')).toBeInTheDocument());
     expect(nodeEl('cmd')).toHaveAttribute('aria-label', 'Tool: Tests, needs attention');
     expect(within(nodeEl('cmd')).getByText('Needs attention')).toBeInTheDocument();
   });

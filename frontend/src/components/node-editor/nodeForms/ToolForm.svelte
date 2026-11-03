@@ -3,10 +3,9 @@
   // ABOUTME: Edits a built-in tool (tool/args, plus a model for LLM tools) or a shell command (tool_command/timeout)
 
   import { untrack } from 'svelte';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Label } from '$lib/components/ui/label/index.js';
-  import * as NativeSelect from '$lib/components/ui/native-select/index.js';
-  import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { toolMode } from '$lib/nodeSummary';
+  import { BUILT_IN_TOOLS, jsonError, stepFields, type FieldSpec } from '$lib/stepFields';
+  import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
   import ModelPicker from './ModelPicker.svelte';
   import { usesLlm } from './usesLlm';
@@ -15,7 +14,7 @@
   // exactly one of `tool` or `tool_command`. Neither or both fails the run
   // (lint E004/E005), and the node label is never used as a tool name.
   // Blank fields clear their attr rather than writing an empty string, the
-  // same treatment as CodergenForm's prompt.
+  // same treatment as CodergenForm's prompt -- except the command (below).
   //
   // - Built-in tool: `tool` plus `args`, a JSON-encoded string
   //   (`serde_json::from_str::<Value>`; invalid JSON fails the run with
@@ -33,182 +32,97 @@
   // static design-system lint, task_critic/synthesis run persona-based LLM
   // critique passes). Any other name reaches UnknownToolBackend and fails
   // the run, so there's no free-text tool name; a node loaded with one keeps
-  // it visible with a warning rather than silently dropping it.
-  const KNOWN_TOOLS: { value: string; description: string }[] = [
-    { value: 'render_capture', description: 'Render a candidate and capture a screenshot/manifest.' },
-    { value: 'system_lint', description: 'Run the design-system lint check against a candidate.' },
-    { value: 'task_critic', description: 'Run a persona-based usability critique of a candidate.' },
-    { value: 'synthesis', description: 'Synthesise prior critiques into a single summary.' },
-  ];
+  // it (no radio is checked) with a warning rather than silently dropping it.
+  //
+  // The mode is nodeSummary's toolMode: shell whenever `tool_command` exists,
+  // even empty, so the step card and this form always agree. Switching to a
+  // shell command therefore writes an empty `tool_command`, and clearing the
+  // command keeps it empty rather than deleting it.
 
   type Mode = 'builtin' | 'command';
-
-  function isKnownTool(name: string): boolean {
-    return KNOWN_TOOLS.some((t) => t.value === name);
-  }
 
   function attrText(value: unknown): string {
     return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
   }
 
   let { attrs, onChange }: NodeFormProps = $props();
-  const uid = $props.id();
 
-  // Seeded once on mount (the parent's {#key node.id} remounts this
-  // component when the selected node changes).
-  let mode = $state<Mode>(untrack(() => (attrText(attrs.tool_command).trim() ? 'command' : 'builtin')));
+  const fields = stepFields('Tool');
+  const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
+
+  // Seeded once on mount (the parent's {#key} remounts this component when
+  // the selected node changes).
+  let mode = $state<string>(untrack(() => toolMode(attrs)));
   let tool = $state(untrack(() => attrText(attrs.tool)));
   let argsText = $state(untrack(() => attrText(attrs.args)));
-  let argsError = $state(untrack(() => validateArgs(argsText)));
   let command = $state(untrack(() => attrText(attrs.tool_command)));
   let timeoutText = $state(untrack(() => attrText(attrs.timeout)));
-  let selectedKnownTool = $derived(KNOWN_TOOLS.find((t) => t.value === tool));
-  let unknownTool = $derived(tool !== '' && !isKnownTool(tool));
-  let showModelPicker = $derived(mode === 'builtin' && usesLlm('Tool', { tool }));
+  let unknownTool = $derived(tool !== '' && !BUILT_IN_TOOLS.some((t) => t.value === tool));
+  let showModelPicker = $derived(usesLlm('Tool', { tool }));
 
-  function validateArgs(text: string): string | null {
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    try {
-      JSON.parse(trimmed);
-      return null;
-    } catch (e) {
-      return e instanceof Error ? e.message : 'invalid JSON';
-    }
-  }
-
-  function handleModeChange(event: Event) {
-    mode = (event.target as HTMLSelectElement).value as Mode;
+  function handleModeChange(next: string) {
     // A node runs one or the other, so switching drops the other mode's attrs.
-    if (mode === 'command') {
+    if ((next as Mode) === 'command') {
       tool = '';
       argsText = '';
-      argsError = null;
-      onChange({ attrs: { tool: undefined, args: undefined } });
+      onChange({ attrs: { tool: undefined, args: undefined, tool_command: '' } });
     } else {
       command = '';
       timeoutText = '';
       onChange({ attrs: { tool_command: undefined, timeout: undefined } });
     }
   }
-
-  function handleToolChange(event: Event) {
-    tool = (event.target as HTMLSelectElement).value;
-    onChange({ attrs: { tool: tool || undefined } });
-  }
-
-  function handleArgsInput(event: Event) {
-    argsText = (event.target as HTMLTextAreaElement).value;
-    argsError = validateArgs(argsText);
-    // Written as-is (even when invalid) -- this panel surfaces the problem
-    // visibly rather than silently discarding what the human typed or
-    // blocking them from continuing to edit; the real failure (if any)
-    // surfaces at run time, same as it would for a hand-edited .dot file.
-    onChange({ attrs: { args: argsText.trim() ? argsText : undefined } });
-  }
-
-  function handleCommandInput(event: Event) {
-    command = (event.target as HTMLTextAreaElement).value;
-    onChange({ attrs: { tool_command: command.trim() ? command : undefined } });
-  }
-
-  function handleTimeoutInput(event: Event) {
-    timeoutText = (event.target as HTMLInputElement).value;
-    onChange({ attrs: { timeout: timeoutText.trim() ? timeoutText.trim() : undefined } });
-  }
 </script>
 
-<div class="flex flex-col gap-3" data-testid="tool-form">
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-mode">Runs</Label>
-    <NativeSelect.Root
-      id="{uid}-mode"
-      class="w-full"
-      data-testid="tool-mode"
-      value={mode}
-      onchange={handleModeChange}
-    >
-      <NativeSelect.Option value="builtin">Built-in tool</NativeSelect.Option>
-      <NativeSelect.Option value="command">Shell command</NativeSelect.Option>
-    </NativeSelect.Root>
-  </div>
+<div class="flex flex-col gap-5" data-testid="tool-form">
+  <Field spec={spec('tool_mode')} bind:value={mode} testId="tool-mode" oninput={handleModeChange} />
 
   {#if mode === 'builtin'}
-    <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-tool">Tool</Label>
-      <NativeSelect.Root
-        id="{uid}-tool"
-        class="w-full"
-        data-testid="tool-select"
-        value={tool}
-        onchange={handleToolChange}
-      >
-        <NativeSelect.Option value="">Select a tool…</NativeSelect.Option>
-        {#each KNOWN_TOOLS as opt (opt.value)}
-          <NativeSelect.Option value={opt.value}>{opt.value}</NativeSelect.Option>
-        {/each}
-        {#if unknownTool}
-          <NativeSelect.Option value={tool}>{tool}</NativeSelect.Option>
-        {/if}
-      </NativeSelect.Root>
-    </div>
-    {#if selectedKnownTool}
-      <p class="m-0 text-xs text-muted-foreground">{selectedKnownTool.description}</p>
-    {/if}
-    {#if unknownTool}
-      <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-unknown-warning">
-        "{tool}" is not a built-in tool, so this node will fail. Pick a built-in, or switch to a shell command.
-      </p>
-    {/if}
-    <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-args">Args (JSON)</Label>
-      <Textarea
-        id="{uid}-args"
-        class="font-mono text-xs"
-        data-testid="tool-args"
-        rows={4}
-        value={argsText}
-        oninput={handleArgsInput}
+    <div class="flex flex-col gap-2">
+      <Field
+        spec={spec('tool')}
+        bind:value={tool}
+        testId="tool-select"
+        oninput={(v) => onChange({ attrs: { tool: v || undefined } })}
       />
+      {#if unknownTool}
+        <p class="m-0 text-small text-destructive" role="alert" data-testid="tool-unknown-warning">
+          "{tool}" is not a built-in tool, so this node will fail. Pick a built-in, or switch to a shell command.
+        </p>
+      {/if}
     </div>
-    {#if argsError}
-      <p class="m-0 text-xs text-destructive" role="alert" data-testid="tool-args-error">Invalid JSON: {argsError}</p>
-    {/if}
+    <!-- Written as-is even when invalid: the error flags it without blocking
+         the edit, and the real failure (if any) surfaces at run time, same as
+         it would for a hand-edited .dot file. -->
+    <Field
+      spec={spec('args')}
+      bind:value={argsText}
+      testId="tool-args"
+      error={jsonError(argsText)}
+      oninput={(v) => onChange({ attrs: { args: v.trim() ? v : undefined } })}
+    />
     {#if showModelPicker}
-      <ModelPicker
-        idPrefix="tool"
-        provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
-        model={typeof attrs.model === 'string' ? attrs.model : undefined}
-        onChange={(patch) => onChange({ attrs: patch })}
-      />
+      <Field spec={spec('model')}>
+        <ModelPicker
+          idPrefix="tool"
+          provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
+          model={typeof attrs.model === 'string' ? attrs.model : undefined}
+          onChange={(patch) => onChange({ attrs: patch })}
+        />
+      </Field>
     {/if}
   {:else}
-    <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-command">Command</Label>
-      <Textarea
-        id="{uid}-command"
-        class="font-mono text-xs"
-        data-testid="tool-command"
-        rows={4}
-        value={command}
-        oninput={handleCommandInput}
-        placeholder="e.g. npm test"
-      />
-      <p class="m-0 text-xs text-muted-foreground">
-        Runs with <code>sh -c</code> in the run directory. Exit code 0 succeeds; its output is in
-        <code>tool.output</code>.
-      </p>
-    </div>
-    <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-timeout">Timeout</Label>
-      <Input
-        id="{uid}-timeout"
-        type="text"
-        data-testid="tool-timeout"
-        value={timeoutText}
-        oninput={handleTimeoutInput}
-        placeholder="600 (seconds), or e.g. 30s"
-      />
-    </div>
+    <Field
+      spec={spec('tool_command')}
+      bind:value={command}
+      testId="tool-command"
+      oninput={(v) => onChange({ attrs: { tool_command: v.trim() ? v : '' } })}
+    />
+    <Field
+      spec={spec('timeout')}
+      bind:value={timeoutText}
+      testId="tool-timeout"
+      oninput={(v) => onChange({ attrs: { timeout: v.trim() ? v.trim() : undefined } })}
+    />
   {/if}
 </div>

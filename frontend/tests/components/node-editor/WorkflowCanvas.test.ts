@@ -873,7 +873,7 @@ describe('canvas chrome and status bar (Task 8)', () => {
     await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
     await clickNodeByLabel('Check');
 
-    await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'system_lint' } });
+    await fireEvent.click(screen.getByTestId('tool-select-system_lint'));
 
     await waitFor(() => expect(screen.getByText('No problems found')).toBeInTheDocument());
   });
