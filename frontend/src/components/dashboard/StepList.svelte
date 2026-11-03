@@ -67,8 +67,6 @@
             class="step-chip grid size-6.5 shrink-0 place-items-center rounded-md"
             style:--ink={kind.ink}
             style:--tint={kind.tint}
-            style:--ink-dark={kind.inkDark}
-            style:--tint-dark={kind.tintDark}
           >
             <kind.icon class="size-3.5" aria-hidden="true" />
           </span>
@@ -86,9 +84,5 @@
   .step-chip {
     background: var(--tint);
     color: var(--ink);
-  }
-  :global(.dark) .step-chip {
-    background: var(--tint-dark);
-    color: var(--ink-dark);
   }
 </style>

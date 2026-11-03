@@ -45,6 +45,19 @@ describe('StepList', () => {
     expect(container.textContent).not.toMatch(/Codergen|Conditional|Interviewer|wait\.human|codergen/);
   });
 
+  it('colours each chip from the kind tokens, which app.css themes for light and dark', () => {
+    render(StepList, { props: { steps: STEPS, intro: INTRO, editHref: '/workflows/x/edit', onRetry: () => {} } });
+
+    const chips = within(section()).getAllByRole('listitem').map((li) => li.querySelector('.step-chip') as HTMLElement);
+    expect(chips.map((c) => [c.style.getPropertyValue('--ink'), c.style.getPropertyValue('--tint')])).toEqual(
+      ['edge', 'ai', 'tool', 'flow', 'human', 'edge'].map((g) => [`var(--kind-${g}-ink)`, `var(--kind-${g}-tint)`])
+    );
+    for (const chip of chips) {
+      expect(chip.style.getPropertyValue('--ink-dark')).toBe('');
+      expect(chip.style.getPropertyValue('--tint-dark')).toBe('');
+    }
+  });
+
   it('shows a skeleton while loading, and no list', () => {
     render(StepList, { props: { steps: [], intro: '', loading: true, editHref: '/e', onRetry: () => {} } });
 

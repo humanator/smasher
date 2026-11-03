@@ -19,7 +19,7 @@ Rules for every task:
 
 ## Phase 1: Foundation
 
-- [ ] **Task 1: Kind colours as CSS custom properties**
+- [x] **Task 1: Kind colours as CSS custom properties**
   - Description:
     - Add `--kind-{ai,tool,human,flow,edge}-{ink,tint}` to `app.css` in the light and dark
       blocks, with the current values, and expose them to Tailwind.

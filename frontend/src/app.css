@@ -103,6 +103,17 @@
   --elevation-dialog: 0 0 0 .5px rgba(0, 0, 0, .22), 0 24px 60px rgba(0, 0, 0, .3);
   --elevation-window: 0 0 0 .5px rgba(0, 0, 0, .25), 0 30px 80px rgba(0, 0, 0, .35);
   --elevation-hairline: inset 0 0 0 .5px rgba(0, 0, 0, .12);
+  /* Step kind colours (Main.dc.html GROUPS), exposed as text-kind-ai-ink, bg-kind-ai-tint, ... */
+  --kind-ai-ink: #3730A3;
+  --kind-ai-tint: #ECEBFB;
+  --kind-tool-ink: #0F5F5A;
+  --kind-tool-tint: #E1F1EF;
+  --kind-human-ink: #8A4B06;
+  --kind-human-tint: #FBEEDA;
+  --kind-flow-ink: #334155;
+  --kind-flow-tint: #E8EBF0;
+  --kind-edge-ink: #1E6B2E;
+  --kind-edge-tint: #E3F3E6;
 }
 .dark {
   --background: #1E1E1E;
@@ -183,6 +194,17 @@
   --elevation-dialog: 0 0 0 .5px rgba(255, 255, 255, .16), 0 24px 60px rgba(0, 0, 0, .6);
   --elevation-window: 0 0 0 .5px rgba(255, 255, 255, .18), 0 30px 80px rgba(0, 0, 0, .65);
   --elevation-hairline: inset 0 0 0 .5px rgba(255, 255, 255, .16);
+  /* Step kind colours: lighter ink on a deep tint. */
+  --kind-ai-ink: #A5B4FC;
+  --kind-ai-tint: #26264A;
+  --kind-tool-ink: #5EEAD4;
+  --kind-tool-tint: #11302E;
+  --kind-human-ink: #FCD34D;
+  --kind-human-tint: #3A2A10;
+  --kind-flow-ink: #CBD5E1;
+  --kind-flow-tint: #2A303A;
+  --kind-edge-ink: #86EFAC;
+  --kind-edge-tint: #17301D;
 }
 @theme inline {
   --font-sans: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -288,6 +310,16 @@
   --shadow-dialog: var(--elevation-dialog);
   --shadow-window: var(--elevation-window);
   --shadow-hairline: var(--elevation-hairline);
+  --color-kind-ai-ink: var(--kind-ai-ink);
+  --color-kind-ai-tint: var(--kind-ai-tint);
+  --color-kind-tool-ink: var(--kind-tool-ink);
+  --color-kind-tool-tint: var(--kind-tool-tint);
+  --color-kind-human-ink: var(--kind-human-ink);
+  --color-kind-human-tint: var(--kind-human-tint);
+  --color-kind-flow-ink: var(--kind-flow-ink);
+  --color-kind-flow-tint: var(--kind-flow-tint);
+  --color-kind-edge-ink: var(--kind-edge-ink);
+  --color-kind-edge-tint: var(--kind-edge-tint);
 }
 
 /* Rendered agent markdown (renderMarkdown), kept to the card's text-sm scale. */

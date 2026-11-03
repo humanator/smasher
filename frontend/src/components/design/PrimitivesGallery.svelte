@@ -129,7 +129,7 @@
       {#each stepHandlers as handler (handler)}
         {@const kind = stepKind(handler)}
         {@const Icon = kind.icon}
-        <div class="step-swatch inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-small" style:--ink={kind.ink} style:--tint={kind.tint} style:--ink-dark={kind.inkDark} style:--tint-dark={kind.tintDark}>
+        <div class="step-swatch inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-small" style:--ink={kind.ink} style:--tint={kind.tint}>
           <Icon class="size-[13px]" aria-hidden="true" />
           <span>{kind.plain}</span>
           <code class="font-mono text-caption opacity-70">{kind.tech}</code>
@@ -457,9 +457,5 @@
   .step-swatch {
     background: var(--tint);
     color: var(--ink);
-  }
-  :global(.dark) .step-swatch {
-    background: var(--tint-dark);
-    color: var(--ink-dark);
   }
 </style>

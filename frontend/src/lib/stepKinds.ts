@@ -30,20 +30,15 @@ export interface StepKind {
   /** One line for the step library. */
   blurb: string;
   about: AboutSection[];
+  /** A var(--kind-{group}-ink) reference; app.css themes it for light and dark. */
   ink: string;
   tint: string;
-  inkDark: string;
-  tintDark: string;
 }
 
-// Group colours from Main.dc.html GROUPS; the dark pairs are derived (lighter ink on a deep tint).
-const GROUP_COLOURS: Record<StepGroup, Pick<StepKind, 'ink' | 'tint' | 'inkDark' | 'tintDark'>> = {
-  ai: { ink: '#3730A3', tint: '#ECEBFB', inkDark: '#A5B4FC', tintDark: '#26264A' },
-  tool: { ink: '#0F5F5A', tint: '#E1F1EF', inkDark: '#5EEAD4', tintDark: '#11302E' },
-  human: { ink: '#8A4B06', tint: '#FBEEDA', inkDark: '#FCD34D', tintDark: '#3A2A10' },
-  flow: { ink: '#334155', tint: '#E8EBF0', inkDark: '#CBD5E1', tintDark: '#2A303A' },
-  edge: { ink: '#1E6B2E', tint: '#E3F3E6', inkDark: '#86EFAC', tintDark: '#17301D' },
-};
+// Group colours are the --kind-{group}-{ink,tint} tokens in app.css (light from Main.dc.html GROUPS).
+function groupColours(group: StepGroup): Pick<StepKind, 'ink' | 'tint'> {
+  return { ink: `var(--kind-${group}-ink)`, tint: `var(--kind-${group}-tint)` };
+}
 
 /** The step library's sections, in board order. */
 export const STEP_GROUPS: { id: StepGroup; title: string; kinds: string[] }[] = [
@@ -181,5 +176,5 @@ export function stepKind(handler: string): StepKind {
     blurb: '',
     about: [],
   };
-  return { ...known, handler, ...GROUP_COLOURS[known.group] };
+  return { ...known, handler, ...groupColours(known.group) };
 }
