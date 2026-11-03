@@ -1,13 +1,11 @@
 <script lang="ts">
-  // ABOUTME: Interviewer node-kind side-panel form component
-  // ABOUTME: Edits question/gallery/approve/options/candidate_count attributes
+  // ABOUTME: Interviewer (Ask a person) node-kind side-panel form component
+  // ABOUTME: Edits Question, the answer mode (approve/options), Options, the gallery and Candidates to expect
 
   import { untrack } from 'svelte';
-  import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Label } from '$lib/components/ui/label/index.js';
-  import * as NativeSelect from '$lib/components/ui/native-select/index.js';
-  import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { answerMode as answerModeOf } from '$lib/nodeSummary';
+  import { stepFields, type FieldSpec } from '$lib/stepFields';
+  import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
 
   // Grounded in interviewer.rs:690-784 (InterviewerHandler::execute) --
@@ -26,8 +24,8 @@
   //   free-form/gallery). Enabling gallery mode while Yes/No or Options is
   //   selected would write an attr the handler's own branch order would
   //   silently never reach -- worse than not offering it -- so this form
-  //   only allows the gallery toggle when Answer mode is Free-form, and
-  //   switching away from Free-form while gallery is on turns it back off.
+  //   only offers the gallery switch for Free text, and choosing another
+  //   answer while gallery is on turns it back off.
   // - `candidate_count`: confirmed absent from interviewer.rs itself by
   //   grep (matching the plan's own grounding note) -- but genuinely read
   //   by smasher-web's routes/gallery.rs (`resolve_candidate_count`),
@@ -37,153 +35,93 @@
   //   accepts either an integer literal or `phase_default(<phase>)`.
   // - `approve` (Bool `true` exactly, not the string "true") for yes/no
   //   mode; `options` (comma-separated string) for a fixed-choice list.
+  //
+  // The mode is nodeSummary's answerMode: a list whenever `options` exists,
+  // even empty, so the step card, the "needs a list of options" problem and
+  // this form always agree. Choosing Pick from a list therefore writes an
+  // empty `options`, and clearing the list keeps it empty rather than
+  // deleting it (ToolForm's `tool_command` works the same way).
   let { attrs, onChange }: NodeFormProps = $props();
-  const uid = $props.id();
 
-  type AnswerMode = 'freeform' | 'approve' | 'options';
+  const fields = stepFields('Interviewer');
+  const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
 
-  function computeAnswerMode(a: Record<string, unknown>): AnswerMode {
-    if (a.approve === true) return 'approve';
-    if (typeof a.options === 'string') return 'options';
-    return 'freeform';
+  function attrText(value: unknown): string {
+    return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
   }
 
-  function computeGallery(a: Record<string, unknown>): boolean {
-    return a.gallery === true || a.gallery === 'true';
-  }
-
-  // Seeded once per mount -- WorkflowCanvasInner remounts this component
-  // via {#key node.id} on every selection change, so "captures the initial
-  // value only" is intended, not a bug (see CodergenForm's identical note).
+  // Seeded once per mount -- the canvas remounts this component via {#key}
+  // on every selection change, so "captures the initial value only" is
+  // intended, not a bug (see CodergenForm's identical note).
   const initial = untrack(() => {
-    const answerMode = computeAnswerMode(attrs);
+    const mode = answerModeOf(attrs);
     return {
-      question: typeof attrs.question === 'string' ? attrs.question : '',
-      answerMode,
-      gallery: computeGallery(attrs) && answerMode === 'freeform',
-      candidateCount:
-        typeof attrs.candidate_count === 'string'
-          ? attrs.candidate_count
-          : typeof attrs.candidate_count === 'number'
-            ? String(attrs.candidate_count)
-            : '',
-      optionsText: typeof attrs.options === 'string' ? attrs.options : '',
+      question: attrText(attrs.question),
+      mode,
+      gallery: (attrs.gallery === true || attrs.gallery === 'true') && mode === 'freeform',
+      candidateCount: attrText(attrs.candidate_count),
+      optionsText: attrText(attrs.options),
     };
   });
 
   let question = $state(initial.question);
-  let answerMode = $state<AnswerMode>(initial.answerMode);
+  let answerMode = $state<string>(initial.mode);
   let gallery = $state(initial.gallery);
   let candidateCount = $state(initial.candidateCount);
   let optionsText = $state(initial.optionsText);
 
-  function handleQuestionInput(event: Event) {
-    question = (event.target as HTMLTextAreaElement).value;
-    onChange({ attrs: { question: question || undefined } });
-  }
-
   function handleGalleryToggle(checked: boolean) {
-    gallery = checked;
     onChange({
       attrs: {
-        gallery: gallery || undefined,
-        candidate_count: gallery ? candidateCount || undefined : undefined,
+        gallery: checked || undefined,
+        candidate_count: checked ? candidateCount || undefined : undefined,
       },
     });
   }
 
-  function handleCandidateCountInput(event: Event) {
-    candidateCount = (event.target as HTMLInputElement).value;
-    onChange({ attrs: { candidate_count: candidateCount || undefined } });
-  }
-
-  function handleAnswerModeChange(event: Event) {
-    answerMode = (event.target as HTMLSelectElement).value as AnswerMode;
-    if (answerMode !== 'freeform' && gallery) {
-      gallery = false;
-    }
+  function handleAnswerModeChange(next: string) {
+    gallery = false;
     onChange({
       attrs: {
-        approve: answerMode === 'approve' ? true : undefined,
-        options: answerMode === 'options' ? optionsText || undefined : undefined,
-        gallery: answerMode === 'freeform' && gallery ? true : undefined,
-        candidate_count: answerMode === 'freeform' && gallery ? candidateCount || undefined : undefined,
+        approve: next === 'approve' ? true : undefined,
+        options: next === 'options' ? optionsText : undefined,
+        gallery: undefined,
+        candidate_count: undefined,
       },
     });
-  }
-
-  function handleOptionsInput(event: Event) {
-    optionsText = (event.target as HTMLInputElement).value;
-    onChange({ attrs: { options: optionsText || undefined } });
   }
 </script>
 
-<div class="flex flex-col gap-3" data-testid="interviewer-form">
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-question">Question</Label>
-    <Textarea
-      id="{uid}-question"
-      class="font-mono text-xs"
-      data-testid="interviewer-question"
-      rows={3}
-      value={question}
-      oninput={handleQuestionInput}
-    />
-  </div>
-
-  <div class="flex items-center gap-2">
-    <Checkbox
-      id="{uid}-gallery"
-      data-testid="interviewer-gallery-toggle"
-      bind:checked={gallery}
-      disabled={answerMode !== 'freeform'}
-      onCheckedChange={handleGalleryToggle}
-    />
-    <Label for="{uid}-gallery">Gallery gate</Label>
-  </div>
-
-  {#if gallery}
-    <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-candidate-count">Candidate count</Label>
-      <Input
-        id="{uid}-candidate-count"
-        type="text"
-        data-testid="interviewer-candidate-count"
-        value={candidateCount}
-        oninput={handleCandidateCountInput}
-        placeholder="e.g. 3 or phase_default(discover)"
-      />
-      <span class="text-xs text-muted-foreground">Read by the gallery dashboard card only, not the interviewer step itself.</span>
-    </div>
-  {/if}
-
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-answer-mode">Answer mode</Label>
-    <NativeSelect.Root
-      id="{uid}-answer-mode"
-      class="w-full"
-      data-testid="interviewer-answer-mode"
-      value={answerMode}
-      disabled={gallery}
-      onchange={handleAnswerModeChange}
-    >
-      <NativeSelect.Option value="freeform">Free-form</NativeSelect.Option>
-      <NativeSelect.Option value="approve">Yes / No</NativeSelect.Option>
-      <NativeSelect.Option value="options">Options list</NativeSelect.Option>
-    </NativeSelect.Root>
-  </div>
+<div class="flex flex-col gap-5" data-testid="interviewer-form">
+  <Field
+    spec={spec('question')}
+    bind:value={question}
+    testId="interviewer-question"
+    oninput={(v) => onChange({ attrs: { question: v || undefined } })}
+  />
+  <Field spec={spec('answer_mode')} bind:value={answerMode} testId="interviewer-answer-mode" oninput={handleAnswerModeChange} />
 
   {#if answerMode === 'options'}
-    <div class="flex flex-col gap-1.5">
-      <Label for="{uid}-options">Options (comma-separated)</Label>
-      <Input
-        id="{uid}-options"
-        type="text"
-        data-testid="interviewer-options"
-        value={optionsText}
-        oninput={handleOptionsInput}
-        placeholder="e.g. approve, revise, reject"
+    <Field
+      spec={spec('options')}
+      bind:value={optionsText}
+      testId="interviewer-options"
+      oninput={(v) => onChange({ attrs: { options: v } })}
+    />
+  {:else if answerMode === 'freeform'}
+    <Field
+      spec={spec('gallery')}
+      bind:checked={gallery}
+      testId="interviewer-gallery-toggle"
+      onCheckedChange={handleGalleryToggle}
+    />
+    {#if gallery}
+      <Field
+        spec={spec('candidate_count')}
+        bind:value={candidateCount}
+        testId="interviewer-candidate-count"
+        oninput={(v) => onChange({ attrs: { candidate_count: v || undefined } })}
       />
-    </div>
+    {/if}
   {/if}
 </div>

@@ -182,4 +182,21 @@ describe('toEditorGraph', () => {
       loop_restart: false,
     });
   });
+
+  it('round-trips an Ask a person step\'s dotted human.* attrs and its answer attrs unchanged', () => {
+    const attrs = {
+      question: 'Ship it?',
+      gallery: true,
+      candidate_count: '3',
+      'human.timeout_secs': 3600,
+      'human.default_choice': 'approve',
+    };
+    const nodes: EditorNode[] = [{ id: 'ask', node_type: 'Interviewer', label: 'Ask', attrs }];
+
+    const result = toEditorGraph('G', {}, toFlowNodes(nodes), toFlowEdges([]));
+
+    const { pos, ...rest } = result.nodes[0].attrs!;
+    expect(typeof pos).toBe('string');
+    expect(rest).toEqual(attrs);
+  });
 });
