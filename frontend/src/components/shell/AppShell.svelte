@@ -13,6 +13,8 @@
   let {
     title,
     subtitle = null,
+    subtitleDot = null,
+    subtitleLive = false,
     back = null,
     actions,
     titleAccessory = null,
@@ -21,6 +23,8 @@
   }: {
     title: string;
     subtitle?: string | null;
+    subtitleDot?: 'success' | 'warning' | null;
+    subtitleLive?: boolean;
     back?: { label: string; href: string } | null;
     actions?: Snippet | null;
     titleAccessory?: Snippet | null;
@@ -68,7 +72,7 @@
     native={isTauri()}
   />
   <div class="flex min-w-0 flex-1 flex-col bg-background text-foreground">
-    <Toolbar {title} {subtitle} {back} {titleAccessory} {actions}>
+    <Toolbar {title} {subtitle} {subtitleDot} {subtitleLive} {back} {titleAccessory} {actions}>
       {#snippet leading()}
         <Sidebar.Trigger class="md:hidden" aria-label="Open sidebar" />
       {/snippet}

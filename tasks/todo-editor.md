@@ -298,7 +298,7 @@ Rules for every task:
 
 ## Phase 4: Page
 
-- [ ] **Task 17: Toolbar, title and save state**
+- [x] **Task 17: Toolbar, title and save state**
   - Description:
     - Add `EditorToolbarActions`: the zoom group and Fit (via `FlowBridge`), Export .dot file
       (existing behaviour), and Save (disabled when clean, "Saving…").

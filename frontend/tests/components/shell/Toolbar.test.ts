@@ -68,6 +68,20 @@ describe('Toolbar', () => {
     expect(subtitle.textContent).toBe('Workflow consensus_task.dot is running');
   });
 
+  it('puts a coloured dot ahead of the subtitle when given one', () => {
+    render(Toolbar, { props: { title: 'Design concepts review', subtitle: 'Unsaved changes', subtitleDot: 'warning' } });
+    const dot = screen.getByTestId('toolbar-subtitle').querySelector('[aria-hidden="true"]') as HTMLElement;
+    expect(dot.className.split(' ')).toContain('bg-warning');
+    expect(screen.getByTestId('toolbar-subtitle').textContent).toBe('Unsaved changes');
+  });
+
+  it('keeps a live subtitle in the page, empty, so its first change is announced', () => {
+    render(Toolbar, { props: { title: 'Design concepts review', subtitle: null, subtitleLive: true } });
+    const subtitle = screen.getByTestId('toolbar-subtitle');
+    expect(subtitle.getAttribute('aria-live')).toBe('polite');
+    expect(subtitle.textContent).toBe('');
+  });
+
   it('renders the actions snippet inside the banner', () => {
     render(Toolbar, { props: { title: 'Runs', actions: actionsSnippet } });
     expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Do the thing' })).toBeTruthy();

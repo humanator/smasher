@@ -7,10 +7,23 @@ import { fireEvent } from '@testing-library/svelte/svelte5';
 import { appendFileSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import WorkflowEditorPage from '../../../src/components/dashboard/WorkflowEditorPage.svelte';
+import EditorHost from './EditorHost.svelte';
+import { createLibraryStore } from '../../../src/stores/library.svelte';
 import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import { toast } from 'svelte-sonner';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
+
+// An edit that marks the graph unsaved, so Save is enabled: rename a step.
+async function renameStep(id: string, to: string) {
+  const node = await waitFor(() => {
+    const el = document.querySelector(`.svelte-flow__node[data-id="${id}"]`) as HTMLElement | null;
+    expect(el).not.toBeNull();
+    return el!;
+  });
+  await fireEvent.click(node);
+  await fireEvent.input(screen.getByTestId('node-inspector-label'), { target: { value: to } });
+}
 
 describe('WorkflowEditorPage', () => {
   beforeAll(() => {
@@ -132,7 +145,8 @@ describe('WorkflowEditorPage', () => {
       { timeout: 5000 }
     );
 
-    // Get the save button and click it (even without changes, this tests the PUT round-trip)
+    // Save is disabled until something changes, so rename a step first.
+    await renameStep('end', 'Finished');
     const saveButton = screen.getByTestId('save-button');
     await fireEvent.click(saveButton);
 
@@ -144,6 +158,38 @@ describe('WorkflowEditorPage', () => {
     expect(updatedGraph).toBeTruthy();
     expect(updatedGraph.nodes.length).toBe(2); // Start and End nodes
     expect(updatedGraph.edges.length).toBe(1); // Start -> End
+    expect(updatedGraph.nodes.find((n) => n.id === 'end')?.label).toBe('Finished');
+  });
+
+  describe('toolbar', () => {
+    const workflowId = 'examples__human_gate_showcase';
+
+    async function renderInToolbar() {
+      const library = createLibraryStore();
+      await library.refresh();
+      render(EditorHost, { props: { workflowId, library } });
+      await screen.findByTestId('save-button', {}, { timeout: 5000 });
+    }
+
+    it("is titled with the workflow's name, and Back goes to the workflow page", async () => {
+      await renderInToolbar();
+      const header = screen.getByRole('banner');
+
+      expect(within(header).getByRole('heading', { level: 1, name: 'Human Gate Showcase' })).toBeTruthy();
+      const back = within(header).getByRole('link', { name: 'Back to Human Gate Showcase' });
+      expect(back.getAttribute('href')).toBe(`/workflows/${workflowId}`);
+    });
+
+    it('holds the zoom group, Fit, Export .dot file and Save', async () => {
+      await renderInToolbar();
+      const header = screen.getByRole('banner');
+
+      expect(within(header).getByRole('group', { name: 'Zoom' })).toBeTruthy();
+      expect(within(header).getByRole('button', { name: 'Fit' })).toBeTruthy();
+      expect(within(header).getByRole('button', { name: 'Export .dot file' })).toBeTruthy();
+      expect(within(header).getByTestId('save-button')).toBeDisabled();
+      expect(within(header).getByTestId('toolbar-subtitle')).toHaveTextContent(/^$/);
+    });
   });
 
   describe('saving over a file that changed on disk', () => {
@@ -185,6 +231,7 @@ describe('WorkflowEditorPage', () => {
       appendFileSync(path, '// edited elsewhere\n');
       const changed = readFileSync(path, 'utf-8');
 
+      await renameStep('done', 'Finished');
       await fireEvent.click(screen.getByTestId('save-button'));
 
       const message = await screen.findByText(/changed on disk/, {}, { timeout: 5000 });
@@ -199,13 +246,17 @@ describe('WorkflowEditorPage', () => {
     it('Save anyway writes the editor version over the changed file', async () => {
       await renderLoaded();
       appendFileSync(path, '// edited elsewhere\n');
+      await renameStep('done', 'Finished');
       await fireEvent.click(screen.getByTestId('save-button'));
       await fireEvent.click(await toastButton('Save anyway'));
 
       await waitFor(() => expect(conflictToast()).toBeNull(), { timeout: 5000 });
       expect(readFileSync(path, 'utf-8')).not.toContain('edited elsewhere');
+      // Saved, so there is nothing left to save until the next edit.
+      await waitFor(() => expect(screen.getByTestId('save-button')).toBeDisabled());
 
       // The page now holds the new ETag, so a plain Save works again.
+      await renameStep('done', 'Finished again');
       await fireEvent.click(screen.getByTestId('save-button'));
       await new Promise((resolve) => setTimeout(resolve, 500));
       expect(conflictToast()).toBeNull();
@@ -215,13 +266,17 @@ describe('WorkflowEditorPage', () => {
     it('Reload shows the version on disk and clears the conflict', async () => {
       await renderLoaded();
       writeFileSync(path, scratchDot.replace('label="Done"', 'label="Done elsewhere"'));
+      await renameStep('start', 'Begin');
       await fireEvent.click(screen.getByTestId('save-button'));
       await fireEvent.click(await toastButton('Reload'));
 
       await screen.findByText('Done elsewhere', {}, { timeout: 5000 });
       await waitFor(() => expect(conflictToast()).toBeNull(), { timeout: 5000 });
+      // The reload replaced the edit, so there is nothing to save.
+      expect(screen.getByTestId('save-button')).toBeDisabled();
 
       // The reloaded ETag is current, so saving now succeeds.
+      await renameStep('start', 'Begin');
       await fireEvent.click(screen.getByTestId('save-button'));
       await new Promise((resolve) => setTimeout(resolve, 500));
       expect(conflictToast()).toBeNull();
@@ -230,9 +285,11 @@ describe('WorkflowEditorPage', () => {
 
     it('saves twice in a row with no outside change', async () => {
       await renderLoaded();
+      await renameStep('done', 'Finished');
       await fireEvent.click(screen.getByTestId('save-button'));
       await waitFor(() => expect(screen.getByTestId('save-button').textContent).toMatch(/^\s*Save\s*$/));
       await new Promise((resolve) => setTimeout(resolve, 300));
+      await renameStep('done', 'Finished again');
       await fireEvent.click(screen.getByTestId('save-button'));
       await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -244,6 +301,7 @@ describe('WorkflowEditorPage', () => {
       await renderLoaded();
       rmSync(path);
 
+      await renameStep('done', 'Finished');
       await fireEvent.click(screen.getByTestId('save-button'));
 
       const saveError = await screen.findByTestId('save-error', {}, { timeout: 5000 });

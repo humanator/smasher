@@ -2,7 +2,7 @@
 // ABOUTME: Pure function tests with `now` and the time zone pinned, so they never depend on the machine's clock
 
 import { describe, it, expect } from 'vitest';
-import { formatDuration, formatWaiting, formatWhen, formatWhenInline } from '../../src/lib/timeFormat';
+import { formatDuration, formatSavedAgo, formatWaiting, formatWhen, formatWhenInline } from '../../src/lib/timeFormat';
 
 // 1:00 pm on Friday 16 October 2026 in Sydney (AEDT, UTC+11).
 const NOW = new Date('2026-10-16T02:00:00Z');
@@ -126,5 +126,32 @@ describe('formatWhenInline', () => {
 
   it('keeps day and month names capitalised in an earlier year', () => {
     expect(formatWhenInline('2025-10-09T04:48:00Z', NOW, SYDNEY)).toBe('Thu 9 Oct 2025, 3:48 pm');
+  });
+});
+
+describe('formatSavedAgo', () => {
+  it('says just now under a minute', () => {
+    expect(formatSavedAgo('2026-10-16T01:59:01Z', NOW, SYDNEY)).toBe('just now');
+  });
+
+  it('uses the singular for one minute', () => {
+    expect(formatSavedAgo('2026-10-16T01:58:30Z', NOW, SYDNEY)).toBe('1 minute ago');
+  });
+
+  it('uses the plural for several minutes', () => {
+    expect(formatSavedAgo('2026-10-16T01:54:00Z', NOW, SYDNEY)).toBe('6 minutes ago');
+  });
+
+  it('switches to hours from an hour up', () => {
+    expect(formatSavedAgo('2026-10-16T01:00:00Z', NOW, SYDNEY)).toBe('1 hour ago');
+    expect(formatSavedAgo('2026-10-15T23:00:00Z', NOW, SYDNEY)).toBe('3 hours ago');
+  });
+
+  it('gives the day and time from a day up', () => {
+    expect(formatSavedAgo('2026-10-15T01:00:00Z', NOW, SYDNEY)).toBe('yesterday, 12:00 pm');
+  });
+
+  it('treats a time in the future as just now', () => {
+    expect(formatSavedAgo('2026-10-16T02:05:00Z', NOW, SYDNEY)).toBe('just now');
   });
 });

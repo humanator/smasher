@@ -5,12 +5,18 @@ import { getContext, setContext, type Snippet } from 'svelte';
 
 const KEY = Symbol('page-header');
 
+export type SubtitleDot = 'success' | 'warning';
+
 export class PageHeaderState {
   actions = $state<Snippet | null>(null);
   /** A title the page sets from data it loads; null leaves App's own. */
   title = $state<string | null>(null);
   /** A line under the title; `backticks` set a fragment in mono. */
   subtitle = $state<string | null>(null);
+  /** A status dot ahead of the subtitle, e.g. the editor's save state. */
+  subtitleDot = $state<SubtitleDot | null>(null);
+  /** Announce subtitle changes (aria-live), e.g. the editor's save state. */
+  subtitleLive = $state(false);
   /** Where the toolbar's back button goes; null leaves App's own. Raw so usePageBack can compare by identity. */
   back = $state.raw<{ label: string; href: string } | null>(null);
   /** Sits on the title line after the title, e.g. the Run page's status badge. */
@@ -59,10 +65,14 @@ export function usePageTitle(title: () => string | null): void {
 
 /**
  * Sets the toolbar's subtitle to `subtitle()` for as long as the calling
- * component is mounted, following it as it changes. Must be called during
+ * component is mounted, following it as it changes. `dot` puts a status dot
+ * ahead of it, and `live` announces its changes. Must be called during
  * component initialisation.
  */
-export function usePageSubtitle(subtitle: () => string | null): void {
+export function usePageSubtitle(
+  subtitle: () => string | null,
+  options: { dot?: () => SubtitleDot | null; live?: boolean } = {}
+): void {
   const header = getContext<PageHeaderState | undefined>(KEY);
   if (!header) return;
   $effect(() => {
@@ -72,6 +82,21 @@ export function usePageSubtitle(subtitle: () => string | null): void {
       if (header.subtitle === current) header.subtitle = null;
     };
   });
+  $effect(() => {
+    const dot = options.dot?.() ?? null;
+    header.subtitleDot = dot;
+    return () => {
+      if (header.subtitleDot === dot) header.subtitleDot = null;
+    };
+  });
+  if (options.live) {
+    $effect(() => {
+      header.subtitleLive = true;
+      return () => {
+        header.subtitleLive = false;
+      };
+    });
+  }
 }
 
 /**

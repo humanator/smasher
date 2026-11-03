@@ -1,16 +1,26 @@
 <script lang="ts">
-  // ABOUTME: Edit existing workflow page - fetches graph and mounts canvas in edit mode
+  // ABOUTME: Edit existing workflow page - fetches graph and mounts canvas in edit mode, titled with the workflow's name
   // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (412 -> toast with Reload / Save anyway), Export .dot to the native save shim
 
   import { onDestroy, onMount } from 'svelte';
   import { toast } from 'svelte-sonner';
   import * as workflowsApi from '../../lib/api/workflows';
   import type { EditorGraph } from '../../lib/api/workflows';
+  import type { WorkflowSummary } from '../../lib/api/workflows';
   import WorkflowCanvas from '../node-editor/WorkflowCanvas.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
   import { saveFile } from '../../lib/native';
+  import { formatWorkflowName } from '$lib/utils';
+  import { usePageBack, usePageTitle } from '$lib/page-header.svelte';
+  import { libraryStore } from '../../stores/library.svelte';
 
-  let { workflowId }: { workflowId: string } = $props();
+  let { workflowId, library = libraryStore }: { workflowId: string; library?: { readonly workflows: WorkflowSummary[] } } =
+    $props();
+
+  // Named as on the workflow page (D10); App shows "Workflow" until the library has loaded.
+  const workflow = $derived(library.workflows.find((w) => w.id === workflowId) ?? null);
+  const name = $derived(workflow ? formatWorkflowName(workflow.name) : null);
+  usePageTitle(() => name);
+  usePageBack(() => ({ label: name ?? 'Workflow', href: `/workflows/${encodeURIComponent(workflowId)}` }));
 
   let graph: EditorGraph | null = $state(null);
   let error: string | null = $state(null);
@@ -53,15 +63,17 @@
   });
 
   // Other save errors are rethrown so the canvas shows them in its own
-  // save-error slot and stays mounted with the unsaved edits.
-  async function handleSave(updatedGraph: EditorGraph) {
+  // save-error slot and stays mounted with the unsaved edits. A conflict
+  // resolves to false: nothing was written, so the edits stay unsaved.
+  async function handleSave(updatedGraph: EditorGraph): Promise<boolean> {
     clearConflict();
     try {
       etag = await workflowsApi.updateWorkflowGraph(workflowId, updatedGraph, etag ?? undefined);
+      return true;
     } catch (err) {
       if ((err as { status?: number }).status === 412) {
         showConflict();
-        return;
+        return false;
       }
       throw err;
     }
@@ -82,6 +94,7 @@
     if (!canvas) return;
     try {
       etag = await workflowsApi.updateWorkflowGraph(workflowId, canvas.currentGraph());
+      canvas.markSaved();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save workflow');
     }
@@ -97,12 +110,6 @@
   }
 </script>
 
-{#snippet extraActions()}
-  <Button variant="secondary" onclick={handleExport} data-testid="export-dot-button">
-    Export .dot
-  </Button>
-{/snippet}
-
 <div class="workflow-editor-page flex h-full flex-col">
   {#if loading}
     <p class="rounded bg-muted p-4 text-muted-foreground">Loading workflow...</p>
@@ -115,7 +122,7 @@
     </p>
   {:else if graph}
     <WorkflowCanvas
-      {extraActions}
+      onExport={handleExport}
       bind:this={canvas}
       {graph}
       {workflowId}

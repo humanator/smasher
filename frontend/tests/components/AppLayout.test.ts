@@ -137,7 +137,6 @@ describe('App page header on other routes', () => {
     // The workflow page names the catalog by its own title; the rest use the app's.
     const backLabels: Record<string, string> = {
       '/workflows/new': 'Back to Smasher Pipelines',
-      '/workflows/some-id/edit': 'Back to Smasher Pipelines',
       '/workflows/some-id': 'Back to Workflows',
       '/runs/some-run': 'Back to Smasher Pipelines',
     };
@@ -151,12 +150,16 @@ describe('App page header on other routes', () => {
     }
   });
 
-  it('edit-workflow page: title and Save in the header once the real graph loads', async () => {
+  it("edit-workflow page: the workflow's name, Back to its page, and Save in the header once the real graph loads", async () => {
     visit('/workflows/examples__consensus_task/edit');
     render(App);
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('heading', { level: 1, name: 'Edit Workflow' })).toBeTruthy();
-    expect(within(header).getByRole('link', { name: 'Back to Smasher Pipelines' })).toBeTruthy();
+    await waitFor(
+      () => expect(within(header).getByRole('heading', { level: 1, name: 'Consensus Task' })).toBeTruthy(),
+      { timeout: 5000 }
+    );
+    const back = within(header).getByRole('link', { name: 'Back to Consensus Task' });
+    expect(back.getAttribute('href')).toBe('/workflows/examples__consensus_task');
     await waitFor(
       () => {
         expect(within(header).getByTestId('save-button')).toBeTruthy();
@@ -248,11 +251,11 @@ describe('App document title', () => {
     await waitFor(() => expect(document.title).toBe('Run not found — Smasher'));
   });
 
-  it('is Edit Workflow — Smasher on the editor', async () => {
+  it("is the workflow's name — Smasher on the editor", async () => {
     visit('/workflows/examples__consensus_task/edit');
     render(App);
 
-    await waitFor(() => expect(document.title).toBe('Edit Workflow — Smasher'));
+    await waitFor(() => expect(document.title).toBe('Consensus Task — Smasher'), { timeout: 5000 });
   });
 
   it('is New Workflow — Smasher on the new-workflow page', async () => {
@@ -337,7 +340,10 @@ describe('App workflow detail route', () => {
     render(App);
 
     const header = screen.getByRole('banner');
-    expect(within(header).getByRole('heading', { level: 1, name: 'Edit Workflow' })).toBeTruthy();
+    await waitFor(
+      () => expect(within(header).getByRole('heading', { level: 1, name: formatWorkflowName(`${name}.dot`) })).toBeTruthy(),
+      { timeout: 5000 }
+    );
     // Save only appears once the real graph has loaded for the decoded id.
     await waitFor(() => expect(within(header).getByTestId('save-button')).toBeTruthy(), {
       timeout: 5000,

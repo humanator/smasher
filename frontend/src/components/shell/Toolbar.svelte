@@ -10,6 +10,8 @@
   let {
     title,
     subtitle = null,
+    subtitleDot = null,
+    subtitleLive = false,
     back = null,
     leading,
     titleAccessory,
@@ -18,6 +20,10 @@
     title: string;
     /** Backtick-quoted fragments are set in mono. */
     subtitle?: string | null;
+    /** A status dot ahead of the subtitle. */
+    subtitleDot?: 'success' | 'warning' | null;
+    /** Keeps the subtitle in the page, even when empty, and announces its changes. */
+    subtitleLive?: boolean;
     back?: { label: string; href: string } | null;
     /** Controls ahead of the back button, e.g. the phone-width sidebar button. */
     leading?: Snippet | null;
@@ -52,9 +58,18 @@
         {@render titleAccessory()}
       {/if}
     </div>
-    {#if subtitle}
-      <p data-testid="toolbar-subtitle" class="text-caption m-0 truncate text-muted-foreground">
-        {#each subtitleParts as part, i (i)}{#if i % 2 === 1}<code class="font-mono">{part}</code>{:else}{part}{/if}{/each}
+    {#if subtitle || subtitleLive}
+      <p
+        data-testid="toolbar-subtitle"
+        class="text-caption m-0 flex min-w-0 items-center gap-1.25 text-muted-foreground"
+        aria-live={subtitleLive ? 'polite' : undefined}
+      >
+        {#if subtitle && subtitleDot}<span
+            aria-hidden="true"
+            class={cn('size-1.5 shrink-0 rounded-full', subtitleDot === 'success' ? 'bg-success' : 'bg-warning')}
+          ></span>{/if}<span class="truncate"
+          >{#each subtitleParts as part, i (i)}{#if i % 2 === 1}<code class="font-mono">{part}</code>{:else}{part}{/if}{/each}</span
+        >
       </p>
     {/if}
   </div>

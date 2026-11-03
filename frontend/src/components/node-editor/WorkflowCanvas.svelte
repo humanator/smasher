@@ -13,10 +13,11 @@
     type Node as FlowNode,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { setContext, tick, type Component, type Snippet } from 'svelte';
+  import { setContext, tick, untrack, type Component } from 'svelte';
   import Palette from './Palette.svelte';
   import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
   import StatusBar from './StatusBar.svelte';
+  import EditorToolbarActions from './EditorToolbarActions.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import {
     DEFAULT_RANKDIR,
@@ -44,8 +45,9 @@
   import FlowForm from './nodeForms/FlowForm.svelte';
   import RetrySettings from './inspector/RetrySettings.svelte';
   import BranchRules, { type BranchPath } from './inspector/BranchRules.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { usePageActions } from '$lib/page-header.svelte';
+  import { usePageActions, usePageSubtitle } from '$lib/page-header.svelte';
+  import { useNow } from '$lib/hooks/useNow.svelte';
+  import { formatSavedAgo } from '$lib/timeFormat';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
@@ -99,14 +101,16 @@
   // host shell can call `createGraph` (POST, a new file) rather than
   // `saveGraph` (PUT, an existing one).
   //
-  // `extraActions` (e.g. the edit page's Export .dot) render next to Save,
-  // in the page header when there is one.
-  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, extraActions }: {
+  // `onExport` (the edit page's Export .dot file) sits in the toolbar next
+  // to Save, in the page header when there is one. `onSave` resolving to
+  // `false` means nothing was written (the edit page's conflict toast), so
+  // the changes stay unsaved.
+  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, onExport = undefined }: {
     graph?: EditorGraph;
     workflowId?: string;
     availableTargetDirs?: string[];
-    onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | Promise<void>;
-    extraActions?: Snippet;
+    onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | boolean | Promise<void | boolean>;
+    onExport?: () => void;
   } = $props();
 
   const uid = $props.id();
@@ -137,6 +141,18 @@
   const flowDirection: FlowDirection = $state({ rankdir: DEFAULT_RANKDIR });
   setContext(FLOW_DIRECTION_CONTEXT_KEY, flowDirection);
 
+  // Unsaved changes (D1): every edit bumps `revision`, and a save records
+  // the revision it wrote, so an edit made while a save is in flight stays
+  // unsaved. Loading (or reloading) a graph is a clean start.
+  let revision = $state(0);
+  let savedRevision = $state(0);
+  let savedAt = $state<Date | null>(null);
+  const dirty = $derived(revision !== savedRevision);
+
+  function markDirty() {
+    revision += 1;
+  }
+
   $effect(() => {
     if (graph) {
       nodes = toFlowNodes(graph.nodes, graph.edges, graph.graph_attrs);
@@ -144,6 +160,7 @@
       graphName = graph.name ?? null;
       graphAttrs = (graph.graph_attrs ?? {}) as Record<string, AttrValue>;
       flowDirection.rankdir = typeof (graph.graph_attrs?.rankdir) === 'string' ? (graph.graph_attrs.rankdir) : DEFAULT_RANKDIR;
+      untrack(() => (savedRevision = revision));
     }
   });
 
@@ -182,6 +199,7 @@
       data: { label: stepKind(nodeType).plain, nodeType, attrs: { ...config.defaultAttrs } },
     };
     nodes = [...nodes, newNode];
+    markDirty();
     return newNode.id;
   }
 
@@ -268,6 +286,7 @@
       const id = selection.id;
       edges = edges.filter((e) => e.id !== id);
     }
+    if (selection.kind === 'node' || selection.kind === 'edge') markDirty();
     selection = { kind: 'none' };
   }
 
@@ -282,6 +301,7 @@
     onSelectEdge: (edgeId: string) => selectEdge(edgeId),
     onDeleteEdge: (edgeId: string) => {
       edges = edges.filter((e) => e.id !== edgeId);
+      markDirty();
       if (selectedEdgeId === edgeId) selection = { kind: 'none' };
     },
   };
@@ -361,6 +381,7 @@
   // fields (not a generic attrs bag -- see types.ts's EdgeFormChange
   // comment), so each is applied only when the patch actually mentions it.
   function applyEdgeFormChange(edgeId: string, patch: EdgeFormChange) {
+    markDirty();
     edges = edges.map((e) => {
       if (e.id !== edgeId) return e;
       return {
@@ -398,6 +419,7 @@
   // patch -- see the shared Label field below -- but this function accepts
   // both so one code path handles either kind of edit.
   function applyNodeFormChange(nodeId: string, patch: NodeFormChange) {
+    markDirty();
     nodes = nodes.map((n) => {
       if (n.id !== nodeId) return n;
       const nextAttrs = { ...n.data.attrs };
@@ -422,8 +444,31 @@
   }
 
   // useSvelteFlow()'s helpers, handed up by FlowBridge (see addNodeAtPosition's
-  // comment). Its onZoom level is for the toolbar's zoom group (Task 17).
+  // comment). Its onZoom level is for the toolbar's zoom group.
   let flow: FlowApi | undefined;
+  let zoom = $state(1);
+
+  // Backspace/Delete and drawn connections change the graph inside Svelte
+  // Flow, so they are counted here. A drag counts only when it ends with a
+  // step somewhere new, because `pos` is saved; a click is not a move.
+  function handleFlowDelete({ nodes: gone, edges: goneEdges }: { nodes: FlowNode[]; edges: FlowEdge[] }) {
+    if (gone.length > 0 || goneEdges.length > 0) markDirty();
+  }
+
+  let dragStart = new Map<string, { x: number; y: number }>();
+
+  function handleNodeDragStart({ nodes: dragged }: { nodes: FlowNode[] }) {
+    dragStart = new Map(dragged.map((n) => [n.id, { ...n.position }]));
+  }
+
+  function handleNodeDragStop({ nodes: dragged }: { nodes: FlowNode[] }) {
+    const moved = dragged.some((n) => {
+      const start = dragStart.get(n.id);
+      return !start || start.x !== n.position.x || start.y !== n.position.y;
+    });
+    dragStart = new Map();
+    if (moved) markDirty();
+  }
 
   // A node's size is only known once Svelte Flow has rendered and measured
   // it, so a dropped node is placed with its top-left at the drop point and
@@ -534,6 +579,7 @@
 
   async function handleSave() {
     saveError = null;
+    const writing = revision;
     let meta: { name: string; targetDir: string } | undefined;
     if (isCreateMode) {
       const name = createName.trim();
@@ -552,7 +598,7 @@
     }
     saving = true;
     try {
-      await onSave(currentGraph(), meta);
+      if ((await onSave(currentGraph(), meta)) !== false) recordSave(writing);
     } catch (err) {
       saveError = err instanceof Error ? err.message : String(err);
     } finally {
@@ -560,7 +606,41 @@
     }
   }
 
-  const saveDisabled = $derived(saving || (isCreateMode && !createName.trim()));
+  function recordSave(writtenRevision: number) {
+    savedRevision = writtenRevision;
+    savedAt = new Date();
+  }
+
+  /** The page saved the graph itself (the conflict toast's Save anyway). */
+  export function markSaved() {
+    recordSave(revision);
+  }
+
+  // A new workflow has no file to compare with, so only its name gates Save.
+  const saveDisabled = $derived(saving || (isCreateMode ? !createName.trim() : !dirty));
+
+  // The save state under the title (D1). "Saved …" only ever follows a save
+  // made here, so nothing is claimed on load.
+  const now = useNow();
+  usePageSubtitle(
+    () => {
+      if (saving) return 'Saving…';
+      if (dirty) return 'Unsaved changes';
+      return savedAt ? `Saved ${formatSavedAgo(savedAt.toISOString(), now.current)}` : null;
+    },
+    { dot: () => (saving ? null : dirty ? 'warning' : savedAt ? 'success' : null), live: true }
+  );
+
+  // Leaving the page (any link: the router loads each page afresh) asks first.
+  $effect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  });
 
   // Save lives in the page header when there is one.
   const saveInHeader = usePageActions(saveAction);
@@ -606,10 +686,16 @@
 {/snippet}
 
 {#snippet saveAction()}
-  {@render extraActions?.()}
-  <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
-    {saving ? 'Saving…' : 'Save'}
-  </Button>
+  <EditorToolbarActions
+    {zoom}
+    onZoomIn={() => void flow?.zoomIn()}
+    onZoomOut={() => void flow?.zoomOut()}
+    onFit={() => void flow?.fitView()}
+    {onExport}
+    onSave={handleSave}
+    {saving}
+    {saveDisabled}
+  />
 {/snippet}
 
 <div class="w-full h-full flex-1 min-h-[480px] flex flex-row">
@@ -661,8 +747,12 @@
         onnodeclick={handleNodeClick}
         onpaneclick={handlePaneClick}
         onedgeclick={handleEdgeClick}
+        ondelete={handleFlowDelete}
+        onconnect={markDirty}
+        onnodedragstart={handleNodeDragStart}
+        onnodedragstop={handleNodeDragStop}
       >
-        <FlowBridge onReady={(api) => (flow = api)} />
+        <FlowBridge onReady={(api) => (flow = api)} onZoom={(level) => (zoom = level)} />
         <Background variant={BackgroundVariant.Dots} gap={20} bgColor="var(--muted)" patternColor="var(--divider)" />
         <MiniMap
           class="overflow-hidden rounded-lg shadow-tooltip"

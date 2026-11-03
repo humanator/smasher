@@ -1,4 +1,4 @@
-// ABOUTME: Time wording for the dashboard: when something happened, how long a run took, how long a run has waited
+// ABOUTME: Time wording for the dashboard and editor: when something happened or was saved, how long a run took or has waited
 // ABOUTME: Pure functions that take `now` (and optionally a time zone) so callers and tests control the clock
 
 const DASH = '—';
@@ -97,4 +97,16 @@ export function formatWaiting(iso: string | null | undefined, now: Date): string
   if (minutes < 60) return `waiting ${minutes} minute${minutes === 1 ? '' : 's'}`;
   const hours = Math.floor(minutes / 60);
   return `waiting ${hours} hour${hours === 1 ? '' : 's'}`;
+}
+
+/** For the editor's "Saved …": "just now", "1 minute ago", "6 minutes ago", "2 hours ago", then formatWhenInline. */
+export function formatSavedAgo(iso: string | null | undefined, now: Date, timeZone?: string): string {
+  const saved = parse(iso);
+  if (!saved) return DASH;
+  const minutes = Math.floor((now.getTime() - saved.getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  return formatWhenInline(iso, now, timeZone);
 }

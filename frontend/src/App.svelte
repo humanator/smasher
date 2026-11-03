@@ -26,11 +26,9 @@
       ? 'Design system'
       : workflowPageType === 'new'
       ? 'Create New Workflow'
-      : workflowPageType === 'edit'
-        ? 'Edit Workflow'
-        : workflowPageType === 'detail'
-          ? (pageHeader.title ?? 'Workflow')
-          : runId
+      : workflowPageType === 'edit' || workflowPageType === 'detail'
+        ? (pageHeader.title ?? 'Workflow')
+        : runId
           ? (pageHeader.title ?? 'Run')
           : 'Workflows'
   );
@@ -40,11 +38,9 @@
       ? 'Design system — Smasher'
       : workflowPageType === 'new'
       ? 'New Workflow — Smasher'
-      : workflowPageType === 'edit'
-        ? 'Edit Workflow — Smasher'
-        : workflowPageType === 'detail'
-          ? `${pageHeader.title ?? 'Workflow'} — Smasher`
-          : runId
+      : workflowPageType === 'edit' || workflowPageType === 'detail'
+        ? `${pageHeader.title ?? 'Workflow'} — Smasher`
+        : runId
           ? `${pageHeader.title ?? 'Run'} — Smasher`
           : 'Smasher'
   );
@@ -148,6 +144,8 @@
 <AppShell
   title={pageTitle}
   subtitle={pageHeader.subtitle}
+  subtitleDot={pageHeader.subtitleDot}
+  subtitleLive={pageHeader.subtitleLive}
   back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
   actions={headerActions}
   titleAccessory={pageHeader.titleAccessory}

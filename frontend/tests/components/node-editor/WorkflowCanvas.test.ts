@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
 import WorkflowCanvas from '../../../src/components/node-editor/WorkflowCanvas.svelte';
+import CanvasHost from './CanvasHost.svelte';
 import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG } from '../../../src/components/node-editor/nodeConfig';
 import type { EditorGraph } from '../../../src/components/node-editor/types';
 
@@ -24,6 +25,12 @@ afterEach(() => {
 async function clickNodeByLabel(label: string) {
   const el = screen.getByText(label).closest('.svelte-flow__node') as HTMLElement;
   await fireEvent.click(el);
+}
+
+// An edit that marks the graph unsaved: select the step and retype its name.
+async function renameNode(label: string, to: string) {
+  await clickNodeByLabel(label);
+  await fireEvent.input(screen.getByTestId('node-inspector-label'), { target: { value: to } });
 }
 
 describe('setting the graph prop', () => {
@@ -175,6 +182,7 @@ describe('save action (edit mode -- workflowId set)', () => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
     });
 
+    await renameNode('B', 'B');
     await fireEvent.click(screen.getByTestId('save-button'));
 
     await waitFor(() => {
@@ -193,6 +201,7 @@ describe('save action (edit mode -- workflowId set)', () => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
     });
 
+    await renameNode('B', 'B');
     await fireEvent.click(screen.getByTestId('save-button'));
 
     await waitFor(() => {
@@ -1087,5 +1096,233 @@ describe('canvas chrome and status bar (Task 8)', () => {
 
     expect(screen.getByText('This workflow has no Finish step.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
+  });
+});
+
+// Task 17: explicit Save with a save-state subtitle (D1), never autosave.
+describe('save state (Task 17)', () => {
+  const subtitle = () => screen.getByTestId('toolbar-subtitle');
+  const saveButton = () => screen.getByTestId('save-button');
+
+  async function renderHost(props: Record<string, unknown> = {}) {
+    let canvas!: ReturnType<typeof WorkflowCanvas>;
+    const result = render(CanvasHost, {
+      props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave: vi.fn(), onCanvas: (c: ReturnType<typeof WorkflowCanvas>) => (canvas = c), ...props },
+    });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    return { ...result, canvas: () => canvas };
+  }
+
+  // Svelte Flow drags with d3-drag, which listens on the event's `view`.
+  // jsdom here refuses `view` in the MouseEvent constructor, so it is set
+  // on the event afterwards. jsdom gives the canvas no size, so every
+  // pointer looks close to its edge and the drag's auto-pan loop would keep
+  // running after the test: no animation frames during a drag.
+  function startDragging() {
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+  }
+
+  function mouse(target: EventTarget, type: string, x: number, y: number) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+    Object.defineProperty(event, 'view', { value: window });
+    target.dispatchEvent(event);
+  }
+
+  // Zoom and Fit run as d3 transitions on a timer. One still running when
+  // the test unmounts the canvas throws on its next tick, which stalls the
+  // shared timer for the tests after it, so these tests let them finish.
+  const viewportSettled = () => new Promise((resolve) => setTimeout(resolve, 100));
+
+  function beforeUnloadBlocked(): boolean {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  it('says nothing and disables Save on first load', async () => {
+    await renderHost();
+
+    expect(subtitle()).toHaveTextContent(/^$/);
+    expect(subtitle()).toHaveAttribute('aria-live', 'polite');
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('shows Unsaved changes with the warning dot after an edit, and enables Save', async () => {
+    await renderHost();
+
+    await renameNode('B', 'Draft');
+
+    expect(subtitle()).toHaveTextContent('Unsaved changes');
+    expect(subtitle().querySelector('.bg-warning')).not.toBeNull();
+    expect(saveButton()).not.toBeDisabled();
+  });
+
+  it('says Saving… while the save is in flight, then Saved just now with the success dot', async () => {
+    let finish!: () => void;
+    const onSave = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    await renderHost({ onSave });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    expect(subtitle()).toHaveTextContent('Saving…');
+    expect(saveButton()).toHaveTextContent('Saving…');
+    finish();
+    await waitFor(() => expect(subtitle()).toHaveTextContent('Saved just now'));
+    expect(subtitle().querySelector('.bg-success')).not.toBeNull();
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('stays unsaved when the save fails', async () => {
+    await renderHost({ onSave: vi.fn().mockRejectedValue(new Error('workflow not found')) });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    await waitFor(() => expect(screen.getByTestId('save-error')).toBeInTheDocument());
+    expect(subtitle()).toHaveTextContent('Unsaved changes');
+    expect(saveButton()).not.toBeDisabled();
+  });
+
+  it('stays unsaved when the page reports the save did not happen (a conflict)', async () => {
+    await renderHost({ onSave: vi.fn().mockResolvedValue(false) });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^\s*Save\s*$/));
+    expect(subtitle()).toHaveTextContent('Unsaved changes');
+  });
+
+  it('is saved once the page says a later save worked (Save anyway)', async () => {
+    const { canvas } = await renderHost({ onSave: vi.fn().mockResolvedValue(false) });
+    await renameNode('B', 'Draft');
+    await fireEvent.click(saveButton());
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^\s*Save\s*$/));
+
+    canvas().markSaved();
+
+    await waitFor(() => expect(subtitle()).toHaveTextContent('Saved just now'));
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('is clean again after the graph is reloaded', async () => {
+    const { rerender } = await renderHost();
+    await renameNode('B', 'Draft');
+
+    await rerender({ graph: { ...sampleGraph } });
+
+    await waitFor(() => expect(saveButton()).toBeDisabled());
+    expect(subtitle()).toHaveTextContent(/^$/);
+  });
+
+  it('marks the graph unsaved when a step is added', async () => {
+    const { canvas } = await renderHost();
+
+    canvas().addNodeAtPosition('Tool', { x: 0, y: 0 });
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a step is deleted', async () => {
+    await renderHost();
+    await clickNodeByLabel('A');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Step' }));
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a step is deleted with Backspace', async () => {
+    await renderHost();
+    await clickNodeByLabel('A');
+
+    await fireEvent.keyDown(document, { key: 'Backspace' });
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a connection is deleted', async () => {
+    const { canvas } = await renderHost();
+
+    canvas().edgeActions.onDeleteEdge('a->b#0');
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a connection setting changes', async () => {
+    const { canvas } = await renderHost();
+    canvas().selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    await fireEvent.input(screen.getByTestId('edge-label'), { target: { value: 'next' } });
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a step is dragged somewhere new', async () => {
+    await renderHost();
+    const node = document.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
+    startDragging();
+
+    mouse(node, 'mousedown', 10, 10);
+    mouse(window, 'mousemove', 30, 20);
+    mouse(window, 'mousemove', 60, 40);
+    mouse(window, 'mouseup', 60, 40);
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('stays clean when a step is clicked without moving', async () => {
+    await renderHost();
+    const node = document.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
+    startDragging();
+
+    mouse(node, 'mousedown', 10, 10);
+    mouse(window, 'mouseup', 10, 10);
+    await fireEvent.click(node);
+
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('stays clean when zooming and fitting', async () => {
+    await renderHost();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Fit' }));
+    await viewportSettled();
+
+    expect(saveButton()).toBeDisabled();
+    expect(subtitle()).toHaveTextContent(/^$/);
+  });
+
+  it('shows the zoom level in the toolbar and follows Zoom in', async () => {
+    await renderHost();
+    const level = () => within(screen.getByRole('group', { name: 'Zoom' })).getByText(/^\d+%$/).textContent;
+    const before = level();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+
+    await waitFor(() => expect(level()).not.toBe(before));
+    await viewportSettled();
+  });
+
+  it('warns before leaving the page only while there are unsaved changes', async () => {
+    await renderHost();
+    expect(beforeUnloadBlocked()).toBe(false);
+
+    await renameNode('B', 'Draft');
+    expect(beforeUnloadBlocked()).toBe(true);
+  });
+
+  it('stops warning once the changes are saved', async () => {
+    await renderHost({ onSave: vi.fn().mockResolvedValue(undefined) });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    await waitFor(() => expect(subtitle()).toHaveTextContent('Saved just now'));
+    expect(beforeUnloadBlocked()).toBe(false);
   });
 });

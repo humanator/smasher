@@ -13,6 +13,7 @@
     onclick = undefined,
     pressed = undefined,
     expanded = undefined,
+    testId = undefined,
   }: {
     label: string;
     icon: Component;
@@ -22,13 +23,14 @@
     pressed?: boolean;
     /** When the button shows or hides a panel. */
     expanded?: boolean;
+    testId?: string;
   } = $props();
 </script>
 
 <Tooltip.Root>
   <Tooltip.Trigger>
     {#snippet child({ props })}
-      <Button {...props} {href} {onclick} variant="ghost" size="icon" aria-label={label} aria-pressed={pressed} aria-expanded={expanded}>
+      <Button {...props} {href} {onclick} variant="ghost" size="icon" aria-label={label} aria-pressed={pressed} aria-expanded={expanded} data-testid={testId}>
         <Icon aria-hidden="true" />
       </Button>
     {/snippet}
