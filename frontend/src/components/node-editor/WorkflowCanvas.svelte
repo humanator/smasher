@@ -101,16 +101,17 @@
   // host shell can call `createGraph` (POST, a new file) rather than
   // `saveGraph` (PUT, an existing one).
   //
-  // `onExport` (the edit page's Export .dot file) sits in the toolbar next
-  // to Save, in the page header when there is one. `onSave` resolving to
-  // `false` means nothing was written (the edit page's conflict toast), so
-  // the changes stay unsaved.
-  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, onExport = undefined }: {
+  // `onExport` (the edit page's Export .dot file) and `onRun` (its Run
+  // dialog) sit in the toolbar next to Save, in the page header when there
+  // is one. `onSave` resolving to `false` means nothing was written (the
+  // edit page's conflict toast), so the changes stay unsaved.
+  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, onExport = undefined, onRun = undefined }: {
     graph?: EditorGraph;
     workflowId?: string;
     availableTargetDirs?: string[];
     onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | boolean | Promise<void | boolean>;
     onExport?: () => void;
+    onRun?: () => void;
   } = $props();
 
   const uid = $props.id();
@@ -577,7 +578,8 @@
   let saving = $state(false);
   let saveError = $state<string | null>(null);
 
-  async function handleSave() {
+  /** Resolves true when the graph was written. */
+  async function handleSave(): Promise<boolean> {
     saveError = null;
     const writing = revision;
     let meta: { name: string; targetDir: string } | undefined;
@@ -588,22 +590,32 @@
         // blank-name rejection is the real enforcement, same discipline
         // create_workflow already applies.
         saveError = 'workflow name must not be blank';
-        return;
+        return false;
       }
       if (!createTargetDir) {
         saveError = 'choose a target directory';
-        return;
+        return false;
       }
       meta = { name, targetDir: createTargetDir };
     }
     saving = true;
     try {
-      if ((await onSave(currentGraph(), meta)) !== false) recordSave(writing);
+      if ((await onSave(currentGraph(), meta)) === false) return false;
+      recordSave(writing);
+      return true;
     } catch (err) {
       saveError = err instanceof Error ? err.message : String(err);
+      return false;
     } finally {
       saving = false;
     }
+  }
+
+  // Run (D11) runs what is on the canvas: unsaved changes are saved first,
+  // and the dialog opens only if that worked.
+  async function handleRun() {
+    if (dirty && !(await handleSave())) return;
+    onRun?.();
   }
 
   function recordSave(writtenRevision: number) {
@@ -692,7 +704,8 @@
     onZoomOut={() => void flow?.zoomOut()}
     onFit={() => void flow?.fitView()}
     {onExport}
-    onSave={handleSave}
+    onSave={() => void handleSave()}
+    onRun={onRun ? () => void handleRun() : undefined}
     {saving}
     {saveDisabled}
   />

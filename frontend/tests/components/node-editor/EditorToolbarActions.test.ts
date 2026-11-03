@@ -1,4 +1,4 @@
-// ABOUTME: Tests for EditorToolbarActions, the editor's toolbar controls: zoom group, Fit, Export .dot file and Save
+// ABOUTME: Tests for EditorToolbarActions, the editor's toolbar controls: zoom group, Fit, Export .dot file, Save and Run
 // ABOUTME: Rendered on its own with spies for each callback; the canvas tests cover what they drive
 
 import { describe, it, expect, vi } from 'vitest';
@@ -62,6 +62,22 @@ describe('EditorToolbarActions', () => {
 
     await rerender({ ...p, saveDisabled: true });
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  });
+
+  it('runs from a Run button after Save', async () => {
+    const onRun = vi.fn();
+    render(EditorToolbarActions, { props: props({ onRun }) });
+
+    const run = screen.getByRole('button', { name: 'Run' });
+    expect(screen.getByTestId('save-button').compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(run.querySelector('svg')).not.toBeNull();
+    await fireEvent.click(run);
+    expect(onRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no Run without a run to start', () => {
+    render(EditorToolbarActions, { props: props() });
+    expect(screen.queryByRole('button', { name: 'Run' })).toBeNull();
   });
 
   it('says Saving… while a save is in flight', () => {

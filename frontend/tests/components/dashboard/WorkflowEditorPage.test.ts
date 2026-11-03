@@ -13,6 +13,7 @@ import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 import { toast } from 'svelte-sonner';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
+import * as runsApi from '../../../src/lib/api/runs';
 
 // An edit that marks the graph unsaved, so Save is enabled: rename a step.
 async function renameStep(id: string, to: string) {
@@ -189,6 +190,75 @@ describe('WorkflowEditorPage', () => {
       expect(within(header).getByRole('button', { name: 'Export .dot file' })).toBeTruthy();
       expect(within(header).getByTestId('save-button')).toBeDisabled();
       expect(within(header).getByTestId('toolbar-subtitle')).toHaveTextContent(/^$/);
+    });
+  });
+
+  // D11: Run opens the Run dialog for this workflow, saving first when
+  // there are unsaved changes. The dialog is never submitted here.
+  describe('Run', () => {
+    const scratchDot = 'digraph { start [shape=Mdiamond, label="Start"]; done [shape=doublecircle, label="Done"]; start -> done; }';
+    let workflowId: string;
+    let path: string;
+
+    beforeEach(async () => {
+      const name = `_test_editor_run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      ({ id: workflowId } = await workflowsApi.importWorkflowDot(name, scratchDot));
+      const { workflows } = await workflowsApi.listWorkflows();
+      path = workflows.find((w) => w.id === workflowId)!.path;
+    });
+
+    afterEach(() => {
+      rmSync(path, { force: true });
+    });
+
+    async function renderLoaded() {
+      const library = createLibraryStore();
+      await library.refresh();
+      render(EditorHost, { props: { workflowId, library } });
+      await screen.findByTestId('save-button', {}, { timeout: 5000 });
+    }
+
+    const runButton = () => within(screen.getByRole('banner')).getByRole('button', { name: 'Run' });
+
+    async function runsOfThisWorkflow() {
+      const { runs } = await runsApi.listRuns();
+      return runs.filter((r) => r.workflow_id === workflowId);
+    }
+
+    it('opens the Run dialog without saving when nothing has changed', async () => {
+      await renderLoaded();
+      const before = readFileSync(path, 'utf-8');
+
+      await fireEvent.click(runButton());
+
+      const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 });
+      expect(within(dialog).getByRole('heading', { name: /^Run / })).toBeTruthy();
+      expect(readFileSync(path, 'utf-8')).toBe(before);
+      expect(await runsOfThisWorkflow()).toEqual([]);
+    });
+
+    it('saves unsaved changes first, then opens the Run dialog', async () => {
+      await renderLoaded();
+      await renameStep('done', 'Finished');
+
+      await fireEvent.click(runButton());
+
+      await screen.findByRole('dialog', {}, { timeout: 5000 });
+      expect(readFileSync(path, 'utf-8')).toContain('Finished');
+      expect(screen.getByTestId('toolbar-subtitle')).toHaveTextContent('Saved just now');
+      expect(await runsOfThisWorkflow()).toEqual([]);
+    });
+
+    it('shows the save error and opens no dialog when the save fails', async () => {
+      await renderLoaded();
+      rmSync(path);
+      await renameStep('done', 'Finished');
+
+      await fireEvent.click(runButton());
+
+      await screen.findByTestId('save-error', {}, { timeout: 5000 });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.getByTestId('toolbar-subtitle')).toHaveTextContent('Unsaved changes');
     });
   });
 

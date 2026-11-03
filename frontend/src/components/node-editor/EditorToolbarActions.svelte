@@ -1,8 +1,9 @@
 <script lang="ts">
-  // ABOUTME: The editor's toolbar controls (R1): Zoom out, zoom level, Zoom in, Fit, Export .dot file and Save
+  // ABOUTME: The editor's toolbar controls (R1): Zoom out, zoom level, Zoom in, Fit, Export .dot file, Save and Run
   // ABOUTME: Presentational; the canvas owns the viewport and the save, and hands their state and callbacks in
 
   import MinusIcon from '@lucide/svelte/icons/minus';
+  import PlayIcon from '@lucide/svelte/icons/play';
   import PlusIcon from '@lucide/svelte/icons/plus';
   import ShareIcon from '@lucide/svelte/icons/share';
   import { Button } from '$lib/components/ui/button/index.js';
@@ -17,6 +18,7 @@
     onFit,
     onExport = undefined,
     onSave,
+    onRun = undefined,
     saving,
     saveDisabled,
   }: {
@@ -28,6 +30,8 @@
     /** Absent in create mode, where there is no file to export yet. */
     onExport?: () => void;
     onSave: () => void;
+    /** Absent in create mode until the first save (D11). */
+    onRun?: () => void;
     saving: boolean;
     saveDisabled: boolean;
   } = $props();
@@ -51,4 +55,10 @@
   <Button variant="outline" onclick={onSave} disabled={saveDisabled} data-testid="save-button">
     {saving ? 'Saving…' : 'Save'}
   </Button>
+  {#if onRun}
+    <Button onclick={onRun} disabled={saving}>
+      <PlayIcon aria-hidden="true" />
+      Run
+    </Button>
+  {/if}
 </Tooltip.Provider>

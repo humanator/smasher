@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Edit existing workflow page - fetches graph and mounts canvas in edit mode, titled with the workflow's name
-  // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (412 -> toast with Reload / Save anyway), Export .dot to the native save shim
+  // ABOUTME: Wires onSave to an ETag-checked updateWorkflowGraph (412 -> toast with Reload / Save anyway), Export .dot to the native save shim, Run to the Run dialog
 
   import { onDestroy, onMount } from 'svelte';
   import { toast } from 'svelte-sonner';
@@ -12,6 +12,7 @@
   import { formatWorkflowName } from '$lib/utils';
   import { usePageBack, usePageTitle } from '$lib/page-header.svelte';
   import { libraryStore } from '../../stores/library.svelte';
+  import LazyRunDialog from './LazyRunDialog.svelte';
 
   let { workflowId, library = libraryStore }: { workflowId: string; library?: { readonly workflows: WorkflowSummary[] } } =
     $props();
@@ -20,6 +21,7 @@
   const workflow = $derived(library.workflows.find((w) => w.id === workflowId) ?? null);
   const name = $derived(workflow ? formatWorkflowName(workflow.name) : null);
   usePageTitle(() => name);
+  let runDialogOpen = $state(false);
   usePageBack(() => ({ label: name ?? 'Workflow', href: `/workflows/${encodeURIComponent(workflowId)}` }));
 
   let graph: EditorGraph | null = $state(null);
@@ -123,11 +125,14 @@
   {:else if graph}
     <WorkflowCanvas
       onExport={handleExport}
+      onRun={() => (runDialogOpen = true)}
       bind:this={canvas}
       {graph}
       {workflowId}
       availableTargetDirs={[]}
       onSave={handleSave}
     />
+    <!-- The dialog names the workflow by its file; until the library has it, the id stands in. -->
+    <LazyRunDialog workflow={{ id: workflowId, name: workflow?.name ?? workflowId }} bind:open={runDialogOpen} />
   {/if}
 </div>

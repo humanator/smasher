@@ -318,7 +318,7 @@ Rules for every task:
     `App.svelte`, tests.
   - Depends on: T8. Scope: M.
 
-- [ ] **Task 18: Run from the editor**
+- [x] **Task 18: Run from the editor**
   - Description:
     - Add a **Run** button that opens `LazyRunDialog` for this workflow.
     - When there are unsaved changes, Run saves first and opens the dialog only on success.
