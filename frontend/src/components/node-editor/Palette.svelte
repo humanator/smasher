@@ -60,7 +60,7 @@
           <button
             type="button"
             class={[
-              'mb-px flex w-full cursor-grab items-start gap-2.25 rounded-md px-2 py-1.5 text-left active:cursor-grabbing',
+              'group mb-px flex w-full cursor-grab items-start gap-2.25 rounded-md px-2 py-1.5 text-left active:cursor-grabbing',
               'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
               selected === kind.handler ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60',
             ]}
@@ -75,7 +75,15 @@
             </span>
             <span class="block min-w-0">
               <span class="block text-body font-medium text-sidebar-foreground">{kind.plain}</span>
-              <span class="mt-px block text-caption leading-snug text-sidebar-muted-foreground">{kind.blurb}</span>
+              <!-- The board's muted blurb is under 4.5:1 on the selected and hover backgrounds, so it darkens there. -->
+              <span
+                class={[
+                  'mt-px block text-caption leading-snug',
+                  selected === kind.handler ? 'text-foreground-secondary' : 'text-sidebar-muted-foreground group-hover:text-foreground-secondary',
+                ]}
+              >
+                {kind.blurb}
+              </span>
             </span>
           </button>
         {/each}

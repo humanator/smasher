@@ -116,4 +116,15 @@ describe('Palette (step library)', () => {
     await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
     expect(onSelect).toHaveBeenCalledWith(null);
   });
+
+  // The board's #636368 blurb is 4.11:1 (light) and 4.06:1 (dark) on the selected
+  // item's sidebar-accent, and 4.46:1 on the light hover, so the blurb darkens there.
+  it('darkens the blurb on the selected and hovered step so it keeps 4.5:1', () => {
+    renderPalette('Tool');
+    const blurb = (handler: string) =>
+      within(screen.getByTestId(`palette-entry-${handler}`)).getByText(/\./, { selector: 'span' });
+    expect(blurb('Tool')).toHaveClass('text-foreground-secondary');
+    expect(blurb('Tool')).not.toHaveClass('text-sidebar-muted-foreground');
+    expect(blurb('Codergen')).toHaveClass('text-sidebar-muted-foreground', 'group-hover:text-foreground-secondary');
+  });
 });
