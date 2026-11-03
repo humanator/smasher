@@ -3,7 +3,8 @@
   // ABOUTME: Collapsible groups of draggable node kinds, plus structural section
 
   import { Button } from '$lib/components/ui/button/index.js';
-  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, PALETTE_GROUPS, THEME_COLORS, type PaletteGroupId } from './nodeConfig';
+  import { stepKind } from '$lib/stepKinds';
+  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, PALETTE_GROUPS, type PaletteGroupId } from './nodeConfig';
 
   // Left-hand palette/panel (spec Assumption 2's Agent Flow reference --
   // Svelte Flow has no built-in Stencil the way X6 does, so this is
@@ -62,9 +63,10 @@
               role="listitem"
               title={config.description}
               ondragstart={(event) => handleDragStart(event, nodeType)}
-              style={`--palette-entry-color: ${THEME_COLORS[config.theme].border}; --palette-entry-bg: ${THEME_COLORS[config.theme].bg};`}
+              style:--palette-entry-color={stepKind(nodeType).ink}
+              style:--palette-entry-bg={stepKind(nodeType).tint}
             >
-              <span class="inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-sm text-white text-xs font-bold" style={`background-color: var(--palette-entry-color, #94a3b8);`} aria-hidden="true">{config.icon}</span>
+              <span class="inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-sm text-xs font-bold" style:background-color="var(--palette-entry-color)" style:color="var(--palette-entry-bg)" aria-hidden="true">{config.icon}</span>
               <span class="text-slate-900">{config.title}</span>
             </div>
           {/each}
@@ -78,7 +80,7 @@
   /* Dynamic palette entry colors can't be expressed as static Tailwind classes,
      so we keep the minimal CSS for border and background using CSS custom properties. */
   .palette-entry {
-    border-color: var(--palette-entry-color, #94a3b8);
-    background-color: var(--palette-entry-bg, #f8fafc);
+    border-color: var(--palette-entry-color);
+    background-color: var(--palette-entry-bg);
   }
 </style>

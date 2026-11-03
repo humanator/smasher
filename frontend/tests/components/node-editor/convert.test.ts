@@ -66,11 +66,11 @@ describe('toFlowNodes', () => {
     expect(byId.exit.x).toBeGreaterThan(byId.start.x);
   });
 
-  it('gives every node a kind-colored inline style (nodeConfig.THEME_COLORS)', () => {
+  it('leaves inline style unset, since the step card draws its own kind colours from tokens', () => {
     const nodes: EditorNode[] = [{ id: 'a', node_type: 'Codergen', label: 'A', attrs: {} }];
     const flow = toFlowNodes(nodes);
-    expect(flow[0].style).toContain('#e0edff');
-    expect(flow[0].style).toContain('#3b82f6');
+    expect(flow[0].style).toBeUndefined();
+    expect(flow[0].type).toBe('workflow');
   });
 
   it('leaves style undefined for an unknown/future node_type rather than crashing', () => {

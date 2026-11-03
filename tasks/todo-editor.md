@@ -92,7 +92,7 @@ Rules for every task:
 
 ## Phase 2: Canvas
 
-- [ ] **Task 6: Step cards**
+- [x] **Task 6: Step cards**
   - Description:
     - Rebuild `WorkflowNode` as a 260-wide card (chip, kind, name, summary, Needs attention
       badge) and a 160×44 pill for Start/Finish, with the selected ring.

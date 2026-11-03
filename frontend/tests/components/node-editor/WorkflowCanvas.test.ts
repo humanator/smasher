@@ -35,7 +35,7 @@ describe('setting the graph prop', () => {
     expect(component.currentGraph().edges).toHaveLength(1);
   });
 
-  it("renders each node's kind-colored background/border (nodeConfig.THEME_COLORS), not the library's uncolored default", async () => {
+  it("renders each node as a step card in its kind's colours, named by kind and step", async () => {
     const { container } = render(WorkflowCanvas, {
       props: { graph: sampleGraph, onSave: vi.fn() },
     });
@@ -44,11 +44,15 @@ describe('setting the graph prop', () => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
     });
 
-    // 'a' is a Start node (green theme), 'b' is Codergen (blue theme).
+    // 'a' is a Start node (a pill, edge group), 'b' is Codergen (a card, AI group).
     const nodeA = container.querySelector('.svelte-flow__node[data-id="a"]') as HTMLElement;
     const nodeB = container.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
-    expect(nodeA.style.backgroundColor).not.toBe('');
-    expect(nodeA.style.backgroundColor).not.toBe(nodeB.style.backgroundColor);
+    const pill = nodeA.querySelector('.wf-pill') as HTMLElement;
+    const card = nodeB.querySelector('.wf-card') as HTMLElement;
+    expect(pill.style.getPropertyValue('--tint')).toBe('var(--kind-edge-tint)');
+    expect(card.style.getPropertyValue('--tint')).toBe('var(--kind-ai-tint)');
+    expect(nodeA).toHaveAttribute('aria-label', 'Start: A');
+    expect(nodeB).toHaveAttribute('aria-label', 'AI Agent: B');
   });
 
   it('gives every node all 4 attachment points (top/bottom for long jumps, left/right for horizontal flow)', async () => {
@@ -632,46 +636,28 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
 // "call the real handler directly instead of a synthetic DOM gesture jsdom
 // can't produce" precedent `addNodeAtPosition` already set for Task 4's
 // drag-and-drop.
-describe('connection handle polish (Task 8)', () => {
-  it('marks a node with at least one edge as wf-node-connected', async () => {
-    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
-    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
-
-    const nodeA = document.querySelector('.svelte-flow__node[data-id="a"]');
-    const nodeB = document.querySelector('.svelte-flow__node[data-id="b"]');
-    expect(nodeA?.className).toContain('wf-node-connected');
-    expect(nodeB?.className).toContain('wf-node-connected');
-  });
-
-  it('does not mark an unconnected node as wf-node-connected', async () => {
+// D4 replaced Task 8's "connected nodes keep their handles lit": every
+// node's handles are hidden at rest, whether it has edges or not, and
+// WorkflowNode.css reveals them on hover/focus/selection or while a
+// connection is being drawn (see WorkflowNode.test.ts).
+describe('connection handles (D4)', () => {
+  it('gives connected and unconnected nodes the same hidden-at-rest handles', async () => {
     render(WorkflowCanvas, {
       props: {
-        graph: {
-          graph_attrs: {},
-          nodes: [{ id: 'lonely', node_type: 'Start', label: 'Lonely', attrs: {} }],
-          edges: [],
-        },
+        graph: { ...sampleGraph, nodes: [...sampleGraph.nodes, { id: 'lonely', node_type: 'Exit', label: 'Lonely', attrs: {} }] },
         onSave: vi.fn(),
       },
     });
     await waitFor(() => expect(screen.getByText('Lonely')).toBeInTheDocument());
 
-    const node = document.querySelector('.svelte-flow__node[data-id="lonely"]');
-    expect(node?.className).not.toContain('wf-node-connected');
-  });
-
-  it('removes the wf-node-connected class once its only edge is deleted', async () => {
-    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
-    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
-
-    // The id convert.ts's toFlowEdges assigns (`${from}->${to}#${i}`).
-    component.edgeActions.onDeleteEdge('a->b#0');
-
-    await waitFor(() => {
-      expect(component.currentGraph().edges).toHaveLength(0);
-    });
-    const nodeA = document.querySelector('.svelte-flow__node[data-id="a"]');
-    expect(nodeA?.className).not.toContain('wf-node-connected');
+    for (const id of ['a', 'lonely']) {
+      const handles = document.querySelectorAll(`.svelte-flow__node[data-id="${id}"] .svelte-flow__handle`);
+      expect(handles).toHaveLength(4);
+      for (const handle of handles) {
+        expect(handle).toHaveClass('wf-handle');
+        expect(handle).not.toHaveClass('wf-handle-live');
+      }
+    }
   });
 });
 

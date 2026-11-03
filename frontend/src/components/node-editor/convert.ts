@@ -3,7 +3,6 @@
 
 import dagre from '@dagrejs/dagre';
 import { MarkerType, type Edge as FlowEdge, type Node as FlowNode } from '@xyflow/svelte';
-import { nodeStyleFor } from './nodeConfig';
 import type { AttrValue, EditorEdge, EditorGraph, EditorNode } from './types';
 
 // Matches rendering.rs's own `rankdir` graph_attr default -- kept in sync so
@@ -20,15 +19,16 @@ export const DEFAULT_RANKDIR = 'TB';
 // formatted "x,y". A node with no (or an unparseable) pos gets a
 // deterministic grid position instead of stacking at (0,0).
 const GRID_COLUMNS = 4;
-const GRID_SPACING_X = 220;
-const GRID_SPACING_Y = 120;
+const GRID_SPACING_X = 300;
+const GRID_SPACING_Y = 140;
 
-// Sized to comfortably fit a themed node card's label without dagre packing
-// ranks/rows too tightly -- there's no real DOM measurement available at
-// conversion time (nodes aren't mounted yet), so this is a fixed estimate,
-// same tradeoff render_capture's own fixed-viewport screenshots accept.
-const DAGRE_NODE_WIDTH = 180;
-const DAGRE_NODE_HEIGHT = 56;
+// A step card's size (WorkflowNode.css: 260 wide, at least 96 tall), so dagre
+// doesn't pack ranks/rows too tightly -- there's no real DOM measurement
+// available at conversion time (nodes aren't mounted yet), so this is a
+// fixed estimate, same tradeoff render_capture's own fixed-viewport
+// screenshots accept.
+const DAGRE_NODE_WIDTH = 260;
+const DAGRE_NODE_HEIGHT = 96;
 const DAGRE_RANK_SEP = 90;
 const DAGRE_NODE_SEP = 60;
 
@@ -138,11 +138,6 @@ export function toFlowNodes(
     // original "default" node type it replaces.
     type: 'workflow',
     position: explicitPositions[i] ?? layout?.get(n.id) ?? defaultPosition(i),
-    // Kind-colored card background/border (see nodeConfig.ts's nodeStyleFor)
-    // -- was documented as wired up here since Task 6 but never actually
-    // called, so every node rendered in the library's uncolored default
-    // regardless of kind.
-    style: nodeStyleFor(n.node_type),
     data: { label: n.label ?? n.id, nodeType: n.node_type, attrs: n.attrs ?? {} },
   }));
 }

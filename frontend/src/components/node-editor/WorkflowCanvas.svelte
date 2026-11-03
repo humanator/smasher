@@ -14,10 +14,10 @@
     type XYPosition,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { setContext, untrack, type Component, type Snippet } from 'svelte';
+  import { setContext, type Component, type Snippet } from 'svelte';
   import Palette from './Palette.svelte';
   import FlowPositionBridge from './FlowPositionBridge.svelte';
-  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, nodeStyleFor, type NodeKindConfig } from './nodeConfig';
+  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import {
     DEFAULT_RANKDIR,
     toEditorGraph,
@@ -29,6 +29,7 @@
   import type { AttrValue, EdgeFormChange, EditorGraph, NodeFormChange, NodeFormProps } from './types';
   import { EDGE_ACTIONS_CONTEXT_KEY, type WorkflowEdgeActions } from './edgeContext';
   import { FLOW_DIRECTION_CONTEXT_KEY, type FlowDirection } from './flowDirectionContext';
+  import { NODE_STATE_CONTEXT_KEY, type WorkflowNodeState } from './nodeContext';
   import WorkflowEdge from './WorkflowEdge.svelte';
   import WorkflowNode from './WorkflowNode.svelte';
   import EdgeForm from './EdgeForm.svelte';
@@ -43,6 +44,8 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import { stepKind } from '$lib/stepKinds';
+  import { workflowProblems } from '$lib/workflowProblems';
 
   // Task 8: WorkflowEdge.svelte is the only edge type this canvas renders
   // (loaded edges via convert.ts's toFlowEdges, freshly hand-drawn ones via
@@ -51,8 +54,8 @@
   const edgeTypes = { workflow: WorkflowEdge };
 
   // WorkflowNode.svelte replaces the library's built-in "default" node type
-  // -- same look, plus left/right handles alongside top/bottom (see its own
-  // comment for why).
+  // with the step card (chip, kind, name, summary, Needs attention), plus
+  // left/right handles alongside top/bottom (see its own comment for why).
   const nodeTypes = { workflow: WorkflowNode };
 
   // Task 7: one form component per NodeType, rendered in a selected-node
@@ -170,7 +173,6 @@
       id: nextNodeId(nodeType),
       type: 'workflow',
       position,
-      style: nodeStyleFor(nodeType),
       data: { label: config.title, nodeType, attrs: {} },
     };
     nodes = [...nodes, newNode];
@@ -254,29 +256,47 @@
     edgeActions.hoveredEdgeId = null;
   }
 
-  // Task 8 (connection handle polish): handles are hidden by default and
-  // revealed on node hover via CSS alone (see the :global rules below), but
-  // "turn an accent color once connected" needs to know *which* nodes have
-  // at least one edge -- not expressible in CSS since a node's handle
-  // elements and the edges attached to it aren't DOM siblings/ancestors of
-  // each other. Recomputed only from `edges` (untracked read of `nodes`, so
-  // this doesn't re-run -- and fight the drag/selection updates `bind:nodes`
-  // applies -- every time `nodes` itself changes for unrelated reasons, e.g.
-  // a drag repositioning a node).
-  const connectedNodeIds = $derived(new Set(edges.flatMap((e) => [e.source, e.target])));
+  // Advice for the step cards (and, later, the status bar): recomputed on
+  // every graph change, never blocking Save (spec R6).
+  const problems = $derived(workflowProblems(nodes, edges));
+  const problemsByNode = $derived.by(() => {
+    const byNode = new Map<string, string[]>();
+    for (const p of problems) {
+      if (p.nodeId) byNode.set(p.nodeId, [...(byNode.get(p.nodeId) ?? []), p.message]);
+    }
+    return byNode;
+  });
+  const outgoingByNode = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const e of edges) counts.set(e.source, (counts.get(e.source) ?? 0) + 1);
+    return counts;
+  });
+  const nodeState: WorkflowNodeState = {
+    get problemsByNode() {
+      return problemsByNode;
+    },
+    get outgoingByNode() {
+      return outgoingByNode;
+    },
+  };
+  setContext(NODE_STATE_CONTEXT_KEY, nodeState);
+
+  // A card's accessible name is "{kind}: {name}", plus ", needs attention"
+  // when it has a problem. SvelteFlow's NodeWrapper (the focusable element)
+  // reads it from the node's `ariaLabel`, so it is kept in step here; the
+  // write only happens when a name actually changed, so this settles after
+  // one pass instead of fighting the drag updates `bind:nodes` applies.
+  function nodeAriaLabel(n: FlowNode<WorkflowNodeData>): string {
+    const name = `${stepKind(n.data.nodeType).plain}: ${n.data.label}`;
+    return problemsByNode.has(n.id) ? `${name}, needs attention` : name;
+  }
 
   $effect(() => {
-    const connected = connectedNodeIds;
-    const current = untrack(() => nodes);
-    const next = current.map((n) => {
-      const base = typeof n.class === 'string' ? n.class.replace(/\bwf-node-connected\b/g, '').trim() : '';
-      const withFlag = connected.has(n.id) ? (base ? `${base} wf-node-connected` : 'wf-node-connected') : base;
-      if ((n.class ?? '') === withFlag) return n;
-      return { ...n, class: withFlag || undefined };
+    const next = nodes.map((n) => {
+      const ariaLabel = nodeAriaLabel(n);
+      return n.ariaLabel === ariaLabel ? n : { ...n, ariaLabel };
     });
-    if (next.some((n, i) => n !== current[i])) {
-      nodes = next;
-    }
+    if (next.some((n, i) => n !== nodes[i])) nodes = next;
   });
 
   // Applies an EdgeForm.svelte onChange patch to the selected edge's live
@@ -354,7 +374,7 @@
       n.id === node.id
         ? {
             ...n,
-            style: nodeStyleFor(n.data.nodeType),
+            style: undefined,
             position: { x: n.position.x - width / 2, y: n.position.y - height / 2 },
           }
         : n
@@ -372,7 +392,7 @@
     if (!nodeType || !toFlowPosition) return;
     const id = addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
     if (!id) return;
-    nodes = nodes.map((n) => (n.id === id ? { ...n, style: `${n.style ?? ''} visibility: hidden;` } : n));
+    nodes = nodes.map((n) => (n.id === id ? { ...n, style: 'visibility: hidden;' } : n));
     nodeToCentre = id;
   }
 
@@ -560,37 +580,6 @@
 </div>
 
 <style>
-  /* Connection handles dim (not fully hidden -- an earlier revision hid
-     them at opacity 0 until hover, which made it impossible to discover
-     where a connection could even be dragged from) until the owning node
-     is hovered, brightened to full opacity with a plain opacity
-     transition; a node that has at least one edge (wf-node-connected,
-     computed in this file's `connectedNodeIds` $effect above) keeps its
-     handles visibly accent-colored even without hovering, so a "wired up"
-     node reads as such at a glance instead of needing a hover to confirm.
-     :global() is required here -- these elements are rendered by @xyflow/
-     svelte's own child components (DefaultNode/Handle.svelte), not by this
-     component's own template, so Svelte's default per-component style
-     scoping never reaches them. */
-  :global(.svelte-flow__handle) {
-    opacity: 0.45;
-    transition:
-      opacity 0.15s ease,
-      background-color 0.15s ease,
-      border-color 0.15s ease;
-  }
-
-  :global(.svelte-flow__node:hover .svelte-flow__handle),
-  :global(.svelte-flow__node.selected .svelte-flow__handle) {
-    opacity: 1;
-  }
-
-  :global(.svelte-flow__node.wf-node-connected .svelte-flow__handle) {
-    opacity: 1;
-    background-color: var(--primary);
-    border-color: var(--primary);
-  }
-
   /* Edge lines default to Svelte Flow's own pale-gray 1px stroke
      (--xy-edge-stroke-default: #b1b1b7), which is nearly invisible against
      this app's light canvas background -- a loaded graph with every node
