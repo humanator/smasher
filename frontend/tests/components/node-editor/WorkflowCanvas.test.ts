@@ -20,6 +20,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+async function clickNodeByLabel(label: string) {
+  const el = screen.getByText(label).closest('.svelte-flow__node') as HTMLElement;
+  await fireEvent.click(el);
+}
+
 describe('setting the graph prop', () => {
   it('renders the expected number of nodes and edges', async () => {
     const { component } = render(WorkflowCanvas, {
@@ -274,76 +279,64 @@ describe('create mode (no workflowId)', () => {
   });
 });
 
-// Task 6: node-kind visual registry + palette sidebar. Palette.svelte has
-// no @xyflow/svelte context-dependent bits of its own (the drop position
-// comes from FlowBridge.svelte, inside <SvelteFlow>, not from
-// Palette), but it's tested here, through the real integration point,
-// rather than a throwaway Palette-only render harness.
-describe('palette', () => {
-  it('renders the 3 documented groups with their entries', async () => {
+// Task 9: the step library (Palette.svelte, tested on its own in
+// Palette.test.ts) drives the canvas's `guide` selection. Until Task 16 the
+// inspector shows the guide as a placeholder heading.
+describe('step library selection', () => {
+  it('shows the Step guide for a step picked in the library, and presses it', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('palette-group-pipeline-steps')).toBeInTheDocument();
-    });
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
 
-    const pipelineSteps = within(screen.getByTestId('palette-group-pipeline-steps'));
-    expect(pipelineSteps.getByText('Codergen')).toBeInTheDocument();
-    expect(pipelineSteps.getByText('Tool')).toBeInTheDocument();
-    expect(pipelineSteps.getByText('Manager')).toBeInTheDocument();
-
-    const controlFlow = within(screen.getByTestId('palette-group-control-flow'));
-    expect(controlFlow.getByText('Human Gate')).toBeInTheDocument();
-    expect(controlFlow.getByText('Conditional')).toBeInTheDocument();
-    expect(controlFlow.getByText('Sub-Pipeline')).toBeInTheDocument();
-
-    const structural = within(screen.getByTestId('palette-group-structural'));
-    expect(structural.getByText('Start')).toBeInTheDocument();
-    expect(structural.getByText('Exit')).toBeInTheDocument();
-    expect(structural.getByText('Parallel')).toBeInTheDocument();
-    expect(structural.getByText('Fan-In')).toBeInTheDocument();
+    const guide = screen.getByTestId('step-guide');
+    expect(within(guide).getByText('Step guide')).toBeInTheDocument();
+    expect(within(guide).getByRole('heading', { name: 'Tool' })).toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('collapses and expands the Pipeline Steps group independently of Control Flow', async () => {
+  it('deselects the step when it is clicked again', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('palette-entry-Codergen')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('palette-entry-Interviewer')).toBeInTheDocument();
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
 
-    await fireEvent.click(screen.getByTestId('palette-group-toggle-pipeline-steps'));
-
-    expect(screen.queryByTestId('palette-entry-Codergen')).not.toBeInTheDocument();
-    // Control Flow wasn't touched -- stays expanded.
-    expect(screen.getByTestId('palette-entry-Interviewer')).toBeInTheDocument();
-
-    await fireEvent.click(screen.getByTestId('palette-group-toggle-pipeline-steps'));
-
-    expect(screen.getByTestId('palette-entry-Codergen')).toBeInTheDocument();
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('renders the structural group with no collapse toggle (always visible)', async () => {
+  it('deselects the step when something on the canvas is selected', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('palette-entry-Start')).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('palette-group-toggle-structural')).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+    await clickNodeByLabel('B');
+
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('marks entries draggable and puts the NodeType on the drag payload via dragstart', async () => {
+  it('replaces a selected step on the canvas with the guide', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await clickNodeByLabel('B');
 
-    const entry = await screen.findByTestId('palette-entry-Codergen');
-    expect(entry).toHaveAttribute('draggable', 'true');
+    await fireEvent.click(screen.getByTestId('palette-entry-Start'));
 
-    const setData = vi.fn();
-    await fireEvent.dragStart(entry, {
-      dataTransfer: { setData, effectAllowed: '' } as unknown as DataTransfer,
-    });
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('step-guide')).getByRole('heading', { name: 'Start' })).toBeInTheDocument();
+  });
 
-    expect(setData).toHaveBeenCalledWith(NODE_DRAG_DATA_TYPE, 'Codergen');
+  it('clears the guide when the empty canvas is clicked', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+
+    await fireEvent.click(document.querySelector('.svelte-flow__pane') as HTMLElement);
+
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
   });
 });
 
@@ -372,11 +365,6 @@ const multiKindGraph: EditorGraph = {
   edges: [],
 };
 
-async function clickNodeByLabel(label: string) {
-  const el = screen.getByText(label).closest('.svelte-flow__node') as HTMLElement;
-  await fireEvent.click(el);
-}
-
 describe('node inspector (Task 7 side panel)', () => {
   it('is absent until a node is selected', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
@@ -396,8 +384,9 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.getByTestId('codergen-prompt')).toHaveValue('write code');
     expect(screen.getByTestId('codergen-model')).toHaveValue('gpt-5');
     expect(screen.getByTestId('node-inspector-label')).toHaveValue('Generate');
+    expect(screen.getByTestId('node-inspector-title')).toHaveTextContent('AI Agent');
     expect(screen.getByTestId('node-inspector-description')).toHaveTextContent(
-      'Runs an AI coding agent from a prompt to generate or modify code.',
+      'Gives an AI model a brief and lets it do the work.',
     );
   });
 
@@ -571,7 +560,7 @@ describe('node inspector (Task 7 side panel)', () => {
 });
 
 describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
-  it('creates a new node of the given NodeType at the given position, with the config default label', async () => {
+  it("creates a new node of the given NodeType at the given position, named after the kind with its default attrs", async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
 
@@ -585,8 +574,8 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
     const created = component.currentGraph().nodes.find((n) => !['a', 'b'].includes(n.id));
     expect(created).toBeDefined();
     expect(created?.node_type).toBe('Codergen');
-    expect(created?.label).toBe(NODE_KIND_CONFIG.Codergen.title);
-    expect(created?.attrs?.pos).toBe('321,87');
+    expect(created?.label).toBe('AI Agent');
+    expect(created?.attrs).toEqual({ ...NODE_KIND_CONFIG.Codergen.defaultAttrs, pos: '321,87' });
   });
 
   it('ignores an unrecognized node type instead of crashing or adding a node', async () => {

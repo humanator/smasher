@@ -1,29 +1,27 @@
 <script lang="ts">
-  // ABOUTME: Left-hand palette/panel for draggable node-kind entries
-  // ABOUTME: Collapsible groups of draggable node kinds, plus structural section
+  // ABOUTME: Step library: searchable, grouped list of step kinds to drag onto the canvas or read about
+  // ABOUTME: Names, blurbs, groups and colours come from stepKinds; picking one opens its Step guide
 
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { stepKind } from '$lib/stepKinds';
-  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, PALETTE_GROUPS, type PaletteGroupId } from './nodeConfig';
+  import { Input } from '$lib/components/ui/input/index.js';
+  import { Label } from '$lib/components/ui/label/index.js';
+  import { STEP_GROUPS, stepKind } from '$lib/stepKinds';
+  import { NODE_DRAG_DATA_TYPE } from './nodeConfig';
 
-  // Left-hand palette/panel (spec Assumption 2's Agent Flow reference --
-  // Svelte Flow has no built-in Stencil the way X6 does, so this is
-  // custom-built): collapsible groups of draggable node-kind entries, plus
-  // a separate always-visible structural section. Purely presentational --
-  // it owns no canvas/graph state and doesn't call @xyflow/svelte's
-  // context-dependent hooks (see WorkflowCanvasInner.svelte's comment on
-  // why the drop-side position math is done by hand instead of via
-  // useSvelteFlow(), which would otherwise force this component to be
-  // rendered inside a <SvelteFlowProvider> just to exist).
-  let expanded = $state<Record<PaletteGroupId, boolean>>({
-    'pipeline-steps': true,
-    'control-flow': true,
-    structural: true,
+  // Purely presentational: the canvas owns the selection (its `guide` case)
+  // and passes it back in as `selected`.
+  let { selected, onSelect }: { selected: string | null; onSelect: (handler: string | null) => void } = $props();
+
+  const uid = $props.id();
+  let query = $state('');
+
+  // Matches the plain name, technical name and blurb, as Main.dc.html does.
+  const groups = $derived.by(() => {
+    const q = query.trim().toLowerCase();
+    return STEP_GROUPS.map((group) => ({
+      ...group,
+      kinds: group.kinds.map(stepKind).filter((k) => !q || `${k.plain} ${k.tech} ${k.blurb}`.toLowerCase().includes(q)),
+    })).filter((group) => group.kinds.length > 0);
   });
-
-  function toggleGroup(id: PaletteGroupId) {
-    expanded[id] = !expanded[id];
-  }
 
   function handleDragStart(event: DragEvent, nodeType: string) {
     event.dataTransfer?.setData(NODE_DRAG_DATA_TYPE, nodeType);
@@ -33,54 +31,56 @@
   }
 </script>
 
-<aside class="w-[200px] shrink-0 overflow-y-auto border-r border-border p-2 text-xs" data-testid="palette">
-  {#each PALETTE_GROUPS as group (group.id)}
-    <section class="mb-3" data-testid={`palette-group-${group.id}`}>
-      {#if group.collapsible}
-        <Button
-          variant="ghost"
-          size="xs"
-          class="w-full justify-start gap-1 px-1 font-semibold uppercase tracking-wider text-foreground"
-          data-testid={`palette-group-toggle-${group.id}`}
-          aria-expanded={expanded[group.id]}
-          onclick={() => toggleGroup(group.id)}
-        >
-          <span aria-hidden="true">{expanded[group.id] ? '▾' : '▸'}</span>
-          {group.label}
-        </Button>
-      {:else}
-        <h3 class="font-semibold text-xs uppercase tracking-wider text-foreground m-0">{group.label}</h3>
-      {/if}
-
-      {#if !group.collapsible || expanded[group.id]}
-        <div class="flex flex-col gap-1 mt-1">
-          {#each group.kinds as nodeType (nodeType)}
-            {@const config = NODE_KIND_CONFIG[nodeType]}
-            <div
-              class="palette-entry flex items-center gap-2 p-1 rounded-sm cursor-grab active:cursor-grabbing border"
-              data-testid={`palette-entry-${nodeType}`}
-              draggable="true"
-              role="listitem"
-              title={config.description}
-              ondragstart={(event) => handleDragStart(event, nodeType)}
-              style:--palette-entry-color={stepKind(nodeType).ink}
-              style:--palette-entry-bg={stepKind(nodeType).tint}
-            >
-              <span class="inline-flex items-center justify-center min-w-7 h-6 px-1 rounded-sm text-xs font-bold" style:background-color="var(--palette-entry-color)" style:color="var(--palette-entry-bg)" aria-hidden="true">{config.icon}</span>
-              <span class="text-slate-900">{config.title}</span>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </section>
-  {/each}
+<aside
+  aria-label="Step library"
+  class="flex w-[260px] flex-none flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground min-h-0"
+  data-testid="palette"
+>
+  <div class="flex-none px-3 pt-3 pb-2">
+    <Label for="{uid}-search" class="sr-only">Search steps</Label>
+    <Input id="{uid}-search" type="search" search placeholder="Search steps" bind:value={query} />
+    <p class="mx-1.5 mt-2 mb-0 text-caption leading-snug text-sidebar-muted-foreground">
+      Drag a step onto the canvas. Select one here to read what it does and what each of its settings means.
+    </p>
+  </div>
+  <div class="min-h-0 flex-1 overflow-auto px-2.5 pb-4">
+    {#if groups.length === 0}
+      <p class="mx-2 my-3 text-small text-sidebar-muted-foreground">No steps match that search.</p>
+    {/if}
+    {#each groups as group (group.id)}
+      <section>
+        <h3 class="mx-2 mt-3.5 mb-1 text-caption font-semibold text-sidebar-muted-foreground">{group.title}</h3>
+        {#each group.kinds as kind (kind.handler)}
+          <button
+            type="button"
+            class={[
+              'mb-px flex w-full cursor-grab items-start gap-2.25 rounded-md px-2 py-1.5 text-left active:cursor-grabbing',
+              'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
+              selected === kind.handler ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/60',
+            ]}
+            data-testid="palette-entry-{kind.handler}"
+            aria-pressed={selected === kind.handler}
+            draggable="true"
+            ondragstart={(event) => handleDragStart(event, kind.handler)}
+            onclick={() => onSelect(selected === kind.handler ? null : kind.handler)}
+          >
+            <span class="step-chip grid size-6.5 flex-none place-items-center rounded-md" style:--ink={kind.ink} style:--tint={kind.tint}>
+              <kind.icon class="size-3.75" aria-hidden="true" />
+            </span>
+            <span class="block min-w-0">
+              <span class="block text-body font-medium text-sidebar-foreground">{kind.plain}</span>
+              <span class="mt-px block text-caption leading-snug text-sidebar-muted-foreground">{kind.blurb}</span>
+            </span>
+          </button>
+        {/each}
+      </section>
+    {/each}
+  </div>
 </aside>
 
 <style>
-  /* Dynamic palette entry colors can't be expressed as static Tailwind classes,
-     so we keep the minimal CSS for border and background using CSS custom properties. */
-  .palette-entry {
-    border-color: var(--palette-entry-color);
-    background-color: var(--palette-entry-bg);
+  .step-chip {
+    background: var(--tint);
+    color: var(--ink);
   }
 </style>

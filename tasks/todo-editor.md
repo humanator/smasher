@@ -145,7 +145,7 @@ Rules for every task:
   - Files: `FlowBridge.svelte` (renamed), `StatusBar.svelte` (new), `WorkflowCanvas.svelte`, tests.
   - Depends on: T5, T6. Scope: M.
 
-- [ ] **Task 9: Step library**
+- [x] **Task 9: Step library**
   - Description: rebuild `Palette` to R2:
     - 260px wide;
     - search, with the empty state;

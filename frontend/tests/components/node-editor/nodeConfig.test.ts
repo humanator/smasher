@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, PALETTE_GROUPS } from '../../../src/components/node-editor/nodeConfig';
+import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG } from '../../../src/components/node-editor/nodeConfig';
 import type { NodeType } from '../../../src/components/node-editor/types';
 
 // Kept independent of types.ts's own NodeType union so this test still
@@ -23,46 +23,15 @@ describe('NODE_KIND_CONFIG', () => {
     expect(Object.keys(NODE_KIND_CONFIG).sort()).toEqual([...ALL_NODE_TYPES].sort());
   });
 
-  it('gives every entry a non-blank icon/title/description and a valid paletteGroup', () => {
+  it('gives every entry a default attrs object for a newly added step', () => {
     for (const nodeType of ALL_NODE_TYPES) {
-      const config = NODE_KIND_CONFIG[nodeType];
-      expect(config.icon.trim().length).toBeGreaterThan(0);
-      expect(config.title.trim().length).toBeGreaterThan(0);
-      expect(config.description.trim().length).toBeGreaterThan(0);
-      expect(['pipeline-steps', 'control-flow', 'structural']).toContain(config.paletteGroup);
+      expect(NODE_KIND_CONFIG[nodeType].defaultAttrs).toBeTypeOf('object');
     }
   });
 });
 
-describe('PALETTE_GROUPS', () => {
-  it('covers every NodeType exactly once, across the 3 documented groups', () => {
-    const seen = PALETTE_GROUPS.flatMap((g) => g.kinds);
-    expect(seen.sort()).toEqual([...ALL_NODE_TYPES].sort());
-    expect(new Set(seen).size).toBe(ALL_NODE_TYPES.length);
-  });
-
-  it("matches the spec's suggested grouping (Pipeline Steps / Control Flow / Structural)", () => {
-    const byId = Object.fromEntries(PALETTE_GROUPS.map((g) => [g.id, g]));
-    expect(byId['pipeline-steps'].kinds).toEqual(['Codergen', 'Tool', 'Manager']);
-    expect(byId['control-flow'].kinds).toEqual(['Interviewer', 'Conditional', 'SubPipeline']);
-    expect(byId['structural'].kinds).toEqual(['Start', 'Exit', 'Parallel', 'FanIn']);
-  });
-
-  it('marks only the structural group as non-collapsible (Agent Flow\'s dedicated Start/Exit cards)', () => {
-    for (const group of PALETTE_GROUPS) {
-      expect(group.collapsible).toBe(group.id !== 'structural');
-    }
-  });
-
-  it("every kind's own NODE_KIND_CONFIG.paletteGroup matches the group it's actually listed under", () => {
-    for (const group of PALETTE_GROUPS) {
-      for (const kind of group.kinds) {
-        expect(NODE_KIND_CONFIG[kind].paletteGroup).toBe(group.id);
-      }
-    }
-  });
-});
-
+// The palette groups moved to stepKinds' STEP_GROUPS; Palette.test.ts checks
+// that every NodeType is listed exactly once, in board order.
 describe('NODE_DRAG_DATA_TYPE', () => {
   it('is a non-empty, MIME-type-shaped string shared by Palette (dragstart) and the canvas (drop)', () => {
     expect(NODE_DRAG_DATA_TYPE.length).toBeGreaterThan(0);

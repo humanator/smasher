@@ -174,7 +174,7 @@
       id: nextNodeId(nodeType),
       type: 'workflow',
       position,
-      data: { label: config.title, nodeType, attrs: {} },
+      data: { label: stepKind(nodeType).plain, nodeType, attrs: { ...config.defaultAttrs } },
     };
     nodes = [...nodes, newNode];
     return newNode.id;
@@ -190,24 +190,40 @@
   // time) so the panel keeps reflecting the node's current attrs/label as
   // they're edited, and gracefully disappears if the node is deleted out
   // from under it (Backspace) instead of pointing at a stale id.
-  let selectedNodeId = $state<string | null>(null);
+  //
+  // Task 8 added the same for edges, and Task 9 the step library's guide:
+  // one inspector slot, so the selection is a single value -- selecting one
+  // thing replaces whatever was selected before.
+  type Selection =
+    | { kind: 'none' }
+    | { kind: 'node'; id: string }
+    | { kind: 'edge'; id: string }
+    | { kind: 'guide'; handler: string };
+  let selection = $state<Selection>({ kind: 'none' });
+  const selectedNodeId = $derived(selection.kind === 'node' ? selection.id : null);
+  const selectedEdgeId = $derived(selection.kind === 'edge' ? selection.id : null);
   const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
-
-  // Task 8: the same pattern, for edges -- one inspector panel slot shared
-  // between a selected node and a selected edge (never both at once:
-  // selecting either clears the other, matching this canvas having a single
-  // side panel, not two independent ones).
-  let selectedEdgeId = $state<string | null>(null);
   const selectedEdge = $derived(edges.find((e) => e.id === selectedEdgeId) ?? null);
+  const guideHandler = $derived(selection.kind === 'guide' ? selection.handler : null);
 
   function handleNodeClick({ node }: { node: FlowNode<WorkflowNodeData> }) {
-    selectedNodeId = node.id;
-    selectedEdgeId = null;
+    selection = { kind: 'node', id: node.id };
   }
 
   function handleEdgeClick({ edge }: { edge: FlowEdge<WorkflowEdgeData> }) {
-    selectedEdgeId = edge.id;
-    selectedNodeId = null;
+    selection = { kind: 'edge', id: edge.id };
+  }
+
+  // A step picked in the library (or unpicked: null). Whatever was selected
+  // on the canvas is let go, in Svelte Flow too, so no card stays ringed.
+  function selectGuide(handler: string | null) {
+    if (handler === null) {
+      selection = { kind: 'none' };
+      return;
+    }
+    nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+    edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+    selection = { kind: 'guide', handler };
   }
 
   // jsdom never renders a `.svelte-flow__edge` DOM element at all (it
@@ -226,8 +242,7 @@
   }
 
   function handlePaneClick() {
-    selectedNodeId = null;
-    selectedEdgeId = null;
+    selection = { kind: 'none' };
   }
 
   // Task 8: the select and delete callbacks WorkflowEdge.svelte reads via
@@ -241,7 +256,7 @@
     onSelectEdge: (edgeId: string) => selectEdge(edgeId),
     onDeleteEdge: (edgeId: string) => {
       edges = edges.filter((e) => e.id !== edgeId);
-      if (selectedEdgeId === edgeId) selectedEdgeId = null;
+      if (selectedEdgeId === edgeId) selection = { kind: 'none' };
     },
   };
   setContext(EDGE_ACTIONS_CONTEXT_KEY, edgeActions);
@@ -405,8 +420,7 @@
   function selectNode(nodeId: string) {
     nodes = nodes.map((n) => (!!n.selected === (n.id === nodeId) ? n : { ...n, selected: n.id === nodeId }));
     edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
-    selectedNodeId = nodeId;
-    selectedEdgeId = null;
+    selection = { kind: 'node', id: nodeId };
   }
 
   function centreOf(nodeId: string): { x: number; y: number } | null {
@@ -484,7 +498,7 @@
 {/snippet}
 
 <div class="w-full h-full flex-1 min-h-[480px] flex flex-row">
-  <Palette />
+  <Palette selected={guideHandler} onSelect={selectGuide} />
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
       <div class="flex gap-3 items-end px-3 py-2">
@@ -559,20 +573,20 @@
     <aside class={inspectorClass} data-testid="node-inspector">
       <div class="flex items-center justify-between mb-2.5">
         <span class="font-semibold text-sm text-foreground" data-testid="node-inspector-title">
-          {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.title ?? node.data.nodeType}
+          {stepKind(node.data.nodeType).plain}
         </span>
         <Button
           variant="ghost"
           size="icon-xs"
           class="text-base text-muted-foreground"
-          onclick={() => (selectedNodeId = null)}
+          onclick={() => (selection = { kind: 'none' })}
           aria-label="Close node inspector"
         >
           ×
         </Button>
       </div>
       <p class="mb-2.5 text-xs leading-snug text-muted-foreground" data-testid="node-inspector-description">
-        {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.description ?? ''}
+        {stepKind(node.data.nodeType).blurb}
       </p>
       <!-- Remount on selection change: each nodeForms/*.svelte component
            seeds its local field state from `attrs` only once per mount
@@ -603,7 +617,7 @@
           variant="ghost"
           size="icon-xs"
           class="text-base text-muted-foreground"
-          onclick={() => (selectedEdgeId = null)}
+          onclick={() => (selection = { kind: 'none' })}
           aria-label="Close edge inspector"
         >
           ×
@@ -621,6 +635,12 @@
           onChange={(patch) => applyEdgeFormChange(edge.id, patch)}
         />
       {/key}
+    </aside>
+  {:else if guideHandler}
+    <!-- Placeholder until Task 16 builds the full Step guide. -->
+    <aside class={inspectorClass} data-testid="step-guide" aria-label="Inspector">
+      <p class="m-0 text-caption font-semibold text-muted-foreground">Step guide</p>
+      <h2 class="m-0 text-heading font-bold text-foreground">{stepKind(guideHandler).plain}</h2>
     </aside>
   {/if}
 </div>
