@@ -1,5 +1,5 @@
 // ABOUTME: Guards the design system: components use theme tokens, never raw colours or font sizes
-// ABOUTME: Scans the primitives, the shell and the dashboard/run components for hex, rgba and palette classes
+// ABOUTME: Scans the primitives, the shell, the dashboard/run components and the editor for hex, rgba and palette classes
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'fs';
@@ -7,9 +7,8 @@ import { join, relative } from 'path';
 
 const SRC = join(process.cwd(), 'src');
 
-// The editor still styles nodes from nodeConfig.ts hex values; its rebuild (CAPABILITY_MAP.md `editor`
-// module) moves it onto stepKinds, and then it joins this list.
-const SCANNED = ['lib/components/ui', 'components/shell', 'components/dashboard', 'components/design'];
+// The editor takes its step colours from stepKinds' var(--kind-…) tokens, so it is held to the same rules.
+const SCANNED = ['lib/components/ui', 'components/shell', 'components/dashboard', 'components/design', 'components/node-editor'];
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {

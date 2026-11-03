@@ -870,7 +870,7 @@
 
 <style>
   /* Edge lines default to Svelte Flow's own pale-gray 1px stroke
-     (--xy-edge-stroke-default: #b1b1b7), which is nearly invisible against
+     (--xy-edge-stroke-default, a pale grey), which is nearly invisible against
      this app's light canvas background -- a loaded graph with every node
      genuinely connected read as a disconnected grid of boxes because the
      lines joining them couldn't be seen. Overriding the library's own
@@ -878,8 +878,8 @@
      hover/selected states, arrowheads, etc. all still driven by the one
      source of truth. */
   :global(.svelte-flow) {
-    /* Theme tokens so edges follow dark mode. The board draws --neutral (#AEAEB2); the editor
-       rebuild decides whether that is visible enough, so this keeps the darker muted grey for now. */
+    /* Theme tokens so edges follow dark mode. The board draws its lighter neutral grey, which is
+       under 3:1 against the canvas, so edges keep the darker muted grey. */
     --xy-edge-stroke-default: var(--muted-foreground);
     --xy-edge-stroke-width-default: 2;
     --xy-edge-stroke-selected-default: var(--primary);
