@@ -388,7 +388,7 @@ Rules for every task:
   - Files: `e2e/node-editor.spec.ts`, `e2e/node-model.spec.ts`, `e2e/editor-page.spec.ts`.
   - Depends on: T20. Scope: M.
 
-- [ ] **Task 22: Visual and accessibility pass, then archive**
+- [x] **Task 22: Visual and accessibility pass, then archive**
   - Description:
     - Check the editor against `Main` side by side at 1440×900, in light and dark, in the browser
       and in `make desktop-dev`. The agreed differences are listed in the spec's Success
