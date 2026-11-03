@@ -196,7 +196,7 @@ Rules for every task:
     `WorkflowCanvas.svelte`, tests.
   - Depends on: T2, T3, T8. Scope: M.
 
-- [ ] **Task 11: AI Agent, AI Coordinator, Nested workflow on `Field`**
+- [x] **Task 11: AI Agent, AI Coordinator, Nested workflow on `Field`**
   - Description:
     - Rewrite `CodergenForm`, `ManagerForm` and `SubPipelineForm` from `stepFields`.
     - The Model field wraps `ModelPicker` unchanged (D2).

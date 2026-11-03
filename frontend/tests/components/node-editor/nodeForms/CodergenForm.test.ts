@@ -2,7 +2,7 @@
 // ABOUTME: form for prompt/provider/model attributes (grounded in handler.rs).
 
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import CodergenForm from '../../../../src/components/node-editor/nodeForms/CodergenForm.svelte';
 import { setApiBaseUrl } from '../../../../src/lib/api/client-config';
 
@@ -19,6 +19,20 @@ describe('CodergenForm', () => {
 
   const providerSelect = () => screen.getByTestId('codergen-provider') as HTMLSelectElement;
   const modelSelect = () => screen.getByTestId('codergen-model') as HTMLSelectElement;
+
+  it('labels Instructions and Model with the catalogue copy, wrapping the model picker', () => {
+    render(CodergenForm, { props: { attrs: {}, onChange: vi.fn() } });
+
+    const prompt = screen.getByRole('textbox', { name: 'Instructions' });
+    expect(prompt).toBe(screen.getByTestId('codergen-prompt'));
+    expect(prompt).toHaveAttribute('rows', '7');
+    expect(prompt).toHaveAttribute('placeholder', 'e.g. Read the brief and draft three concepts…');
+    expect(prompt).toHaveAccessibleDescription(/^Tell the AI what to do, as if briefing a colleague/);
+    const model = screen.getByRole('group', { name: 'Model' });
+    expect(model).toHaveAccessibleDescription('Which AI model does this step’s work. Leave blank to use the workflow’s default.');
+    expect(within(model).getByTestId('codergen-provider')).toBeInTheDocument();
+    expect(within(model).getByTestId('codergen-model')).toBeInTheDocument();
+  });
 
   it('pre-populates prompt, provider and model from attrs', async () => {
     render(CodergenForm, {

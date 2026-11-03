@@ -1,10 +1,10 @@
 <script lang="ts">
-  // ABOUTME: SubPipeline node-kind side-panel form component
-  // ABOUTME: Edits pipeline attribute (path to sub-pipeline .dot file)
+  // ABOUTME: SubPipeline (Nested workflow) node-kind side-panel form component
+  // ABOUTME: Edits the Workflow file (pipeline attribute, the path to a .dot file), with copy from stepFields
 
   import { untrack } from 'svelte';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Label } from '$lib/components/ui/label/index.js';
+  import { stepFields } from '$lib/stepFields';
+  import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
 
   // Grounded in composition.rs:199-206 (SubPipelineTransform::apply):
@@ -14,26 +14,17 @@
   // the attr (surfacing that same missing-attr error at composition time)
   // rather than writing an empty-string path.
   let { attrs, onChange }: NodeFormProps = $props();
-  const uid = $props.id();
+
+  const pipelineSpec = stepFields('SubPipeline').find((f) => f.attr === 'pipeline')!;
 
   let pipeline = $state(untrack(() => (typeof attrs.pipeline === 'string' ? attrs.pipeline : '')));
-
-  function handleInput(event: Event) {
-    pipeline = (event.target as HTMLInputElement).value;
-    onChange({ attrs: { pipeline: pipeline || undefined } });
-  }
 </script>
 
-<div class="flex flex-col gap-3" data-testid="sub-pipeline-form">
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-pipeline">Pipeline file</Label>
-    <Input
-      id="{uid}-pipeline"
-      type="text"
-      data-testid="sub-pipeline-path"
-      value={pipeline}
-      oninput={handleInput}
-      placeholder="e.g. examples/sub_flow.dot"
-    />
-  </div>
+<div class="flex flex-col gap-5" data-testid="sub-pipeline-form">
+  <Field
+    spec={pipelineSpec}
+    bind:value={pipeline}
+    testId="sub-pipeline-path"
+    oninput={(v) => onChange({ attrs: { pipeline: v || undefined } })}
+  />
 </div>

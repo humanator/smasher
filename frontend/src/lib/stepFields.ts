@@ -87,6 +87,18 @@ const MODEL: FieldSpec = {
   ],
 };
 
+/** '' when the text is blank or valid JSON, otherwise the message to show under a JSON field (spec R5.2). */
+export function jsonError(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  try {
+    JSON.parse(trimmed);
+    return '';
+  } catch (e) {
+    return `That is not valid JSON yet (${e instanceof Error ? e.message : String(e)}). The step would fail when it runs.`;
+  }
+}
+
 const NOT_VALID_JSON: MoreRow = { title: 'If it is not valid JSON', text: 'The step fails when it runs. The app flags it here first.' };
 
 const KIND_FIELDS: Record<string, FieldSpec[]> = {

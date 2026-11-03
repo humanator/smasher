@@ -2,14 +2,29 @@
 // ABOUTME: form for task/config attributes (grounded in manager_handler.rs).
 
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { setApiBaseUrl } from '../../../../src/lib/api/client-config';
 import ManagerForm from '../../../../src/components/node-editor/nodeForms/ManagerForm.svelte';
 
 // Grounded in manager_handler.rs:49-90: `task` (falls back to node label)
 // and `config`, a JSON-encoded string -- same parse-and-fail-at-run-time
 // treatment as ToolForm's `args`.
+const JSON_ERROR = /^That is not valid JSON yet \(.+\)\. The step would fail when it runs\.$/;
+
 describe('ManagerForm', () => {
+  it('labels Task, Settings (JSON) and Model with the catalogue copy', () => {
+    render(ManagerForm, { props: { attrs: {}, onChange: vi.fn() } });
+
+    expect(screen.getByRole('textbox', { name: 'Task' })).toBe(screen.getByTestId('manager-task'));
+    expect(screen.getByRole('textbox', { name: 'Task' })).toHaveAccessibleDescription(
+      'What should the coordinator work out? Write it in plain language. It is sent to the AI as-is.',
+    );
+    const config = screen.getByRole('textbox', { name: 'Settings (JSON)' });
+    expect(config).toBe(screen.getByTestId('manager-config'));
+    expect(config).toHaveAttribute('placeholder', '{ }');
+    expect(within(screen.getByRole('group', { name: 'Model' })).getByTestId('manager-provider')).toBeInTheDocument();
+  });
+
   it('pre-populates task/config from attrs', () => {
     render(ManagerForm, {
       props: { attrs: { task: 'coordinate-review', config: '{"depth":2}' }, onChange: vi.fn() },
@@ -19,7 +34,7 @@ describe('ManagerForm', () => {
     const configInput = screen.getByTestId('manager-config') as HTMLTextAreaElement;
     expect(taskInput.value).toBe('coordinate-review');
     expect(configInput.value).toBe('{"depth":2}');
-    expect(screen.queryByTestId('manager-config-error')).toBe(null);
+    expect(screen.queryByText(/not valid JSON/)).toBe(null);
   });
 
   it('calls onChange with the updated task as the user types', async () => {
@@ -31,7 +46,16 @@ describe('ManagerForm', () => {
     expect(onChange).toHaveBeenCalledWith({ attrs: { task: 'fan-out-review' } });
   });
 
-  it('invalid JSON in config surfaces a visible error without throwing', async () => {
+  it('clearing the task removes the attr', async () => {
+    const onChange = vi.fn();
+    render(ManagerForm, { props: { attrs: { task: 'sync' }, onChange } });
+
+    await fireEvent.input(screen.getByTestId('manager-task'), { target: { value: '' } });
+
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { task: undefined } });
+  });
+
+  it('invalid JSON in config shows the spec message without throwing, and still writes the text', async () => {
     const onChange = vi.fn();
     render(ManagerForm, { props: { attrs: {}, onChange } });
 
@@ -39,30 +63,33 @@ describe('ManagerForm', () => {
       fireEvent.input(screen.getByTestId('manager-config'), { target: { value: '{bad' } }),
     ).resolves.not.toThrow();
 
-    expect(screen.getByTestId('manager-config-error')).toBeTruthy();
+    expect(screen.getByText(JSON_ERROR)).toHaveAttribute('role', 'alert');
+    expect(screen.getByTestId('manager-config')).toHaveAttribute('aria-invalid', 'true');
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { config: '{bad' } });
   });
 
   it('clearing config back to blank removes the attr and clears the error', async () => {
     const onChange = vi.fn();
     render(ManagerForm, { props: { attrs: { config: '{bad' }, onChange } });
-    expect(screen.getByTestId('manager-config-error')).toBeTruthy();
+    expect(screen.getByText(JSON_ERROR)).toHaveAttribute('role', 'alert');
 
     await fireEvent.input(screen.getByTestId('manager-config'), { target: { value: '' } });
 
-    expect(screen.queryByTestId('manager-config-error')).toBe(null);
+    expect(screen.queryByText(/not valid JSON/)).toBe(null);
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { config: undefined } });
   });
 
-  it('offers task suggestions via a datalist without constraining the field to them', () => {
+  it('offers task suggestions as Try chips that fill the field without constraining it', async () => {
     const onChange = vi.fn();
     render(ManagerForm, { props: { attrs: {}, onChange } });
 
-    const input = screen.getByTestId('manager-task') as HTMLInputElement;
-    expect(input.getAttribute('list')).toBe('manager-task-suggestions');
-    const options = document.querySelectorAll('#manager-task-suggestions option');
-    const values = Array.from(options).map((o) => o.getAttribute('value'));
-    expect(values).toContain('coordinate-review');
+    for (const chip of ['coordinate-review', 'delegate-subtask', 'aggregate-results', 'escalate-to-human']) {
+      expect(screen.getByRole('button', { name: chip })).toBeInTheDocument();
+    }
+    await fireEvent.click(screen.getByRole('button', { name: 'aggregate-results' }));
+
+    expect(screen.getByTestId('manager-task')).toHaveValue('aggregate-results');
+    expect(onChange).toHaveBeenLastCalledWith({ attrs: { task: 'aggregate-results' } });
   });
 
   it('shows the provider and model pickers and writes their changes as attrs', async () => {

@@ -1,11 +1,10 @@
 <script lang="ts">
-  // ABOUTME: Manager node-kind side-panel form component
-  // ABOUTME: Edits task/config attributes and the provider/model that runs it
+  // ABOUTME: Manager (AI Coordinator) node-kind side-panel form component
+  // ABOUTME: Edits Task, Settings (JSON) and the Model that runs it, with copy from stepFields
 
   import { untrack } from 'svelte';
-  import { Input } from '$lib/components/ui/input/index.js';
-  import { Label } from '$lib/components/ui/label/index.js';
-  import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { jsonError, stepFields, type FieldSpec } from '$lib/stepFields';
+  import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
   import ModelPicker from './ModelPicker.svelte';
   import { usesLlm } from './usesLlm';
@@ -22,80 +21,42 @@
   // vocabulary anywhere in the engine: `LlmManagerBackend::coordinate`
   // (crates/smasher-web/src/backend.rs) sends it straight into an LLM
   // prompt as free-form text ("Task: {task}"), so a `<select>` here would
-  // misrepresent it as a closed enum. `list=`/`<datalist>` gives a native
-  // dropdown of suggestions while keeping this a genuine free-text field --
-  // picking one, editing one, or ignoring them entirely all work.
-  const TASK_SUGGESTIONS = ['coordinate-review', 'delegate-subtask', 'aggregate-results', 'escalate-to-human'];
+  // misrepresent it as a closed enum. The catalogue's Try chips suggest
+  // tasks while keeping this a genuine free-text field -- picking one,
+  // editing one, or ignoring them entirely all work.
 
   let { attrs, onChange }: NodeFormProps = $props();
-  const uid = $props.id();
+
+  const fields = stepFields('Manager');
+  const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
 
   let task = $state(untrack(() => (typeof attrs.task === 'string' ? attrs.task : '')));
   let configText = $state(untrack(() => (typeof attrs.config === 'string' ? attrs.config : '')));
-  let configError = $state(untrack(() => validateConfig(configText)));
-
-  function validateConfig(text: string): string | null {
-    const trimmed = text.trim();
-    if (!trimmed) return null;
-    try {
-      JSON.parse(trimmed);
-      return null;
-    } catch (e) {
-      return e instanceof Error ? e.message : 'invalid JSON';
-    }
-  }
-
-  function handleTaskInput(event: Event) {
-    task = (event.target as HTMLInputElement).value;
-    onChange({ attrs: { task: task || undefined } });
-  }
-
-  function handleConfigInput(event: Event) {
-    configText = (event.target as HTMLTextAreaElement).value;
-    configError = validateConfig(configText);
-    onChange({ attrs: { config: configText.trim() ? configText : undefined } });
-  }
 </script>
 
-<div class="flex flex-col gap-3" data-testid="manager-form">
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-task">Task</Label>
-    <Input
-      id="{uid}-task"
-      type="text"
-      data-testid="manager-task"
-      list="manager-task-suggestions"
-      value={task}
-      oninput={handleTaskInput}
-      placeholder="e.g. coordinate-review"
-    />
-    <datalist id="manager-task-suggestions">
-      {#each TASK_SUGGESTIONS as suggestion (suggestion)}
-        <option value={suggestion}></option>
-      {/each}
-    </datalist>
-  </div>
-  <p class="m-0 text-xs text-muted-foreground">A free-text description of the coordination task, sent to the LLM as-is -- the suggestions above are starting points, not fixed options.</p>
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-config">Config (JSON)</Label>
-    <Textarea
-      id="{uid}-config"
-      class="font-mono text-xs"
-      data-testid="manager-config"
-      rows={4}
-      value={configText}
-      oninput={handleConfigInput}
-    />
-  </div>
-  {#if configError}
-    <p class="m-0 text-xs text-destructive" role="alert" data-testid="manager-config-error">Invalid JSON: {configError}</p>
-  {/if}
+<div class="flex flex-col gap-5" data-testid="manager-form">
+  <Field
+    spec={spec('task')}
+    bind:value={task}
+    testId="manager-task"
+    oninput={(v) => onChange({ attrs: { task: v || undefined } })}
+  />
+  <!-- Written as-is even when invalid: the error flags it without blocking the edit. -->
+  <Field
+    spec={spec('config')}
+    bind:value={configText}
+    testId="manager-config"
+    error={jsonError(configText)}
+    oninput={(v) => onChange({ attrs: { config: v.trim() ? v : undefined } })}
+  />
   {#if usesLlm('Manager', attrs)}
-    <ModelPicker
-      idPrefix="manager"
-      provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
-      model={typeof attrs.model === 'string' ? attrs.model : undefined}
-      onChange={(patch) => onChange({ attrs: patch })}
-    />
+    <Field spec={spec('model')}>
+      <ModelPicker
+        idPrefix="manager"
+        provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
+        model={typeof attrs.model === 'string' ? attrs.model : undefined}
+        onChange={(patch) => onChange({ attrs: patch })}
+      />
+    </Field>
   {/if}
 </div>

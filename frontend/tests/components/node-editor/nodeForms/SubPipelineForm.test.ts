@@ -8,6 +8,17 @@ import SubPipelineForm from '../../../../src/components/node-editor/nodeForms/Su
 // Grounded in composition.rs:199-206: `pipeline`, a file path string to
 // another .dot file. Missing -> CompositionError::MissingPipelineAttr.
 describe('SubPipelineForm', () => {
+  it('labels the required Workflow file field with the catalogue copy', () => {
+    render(SubPipelineForm, { props: { attrs: {}, onChange: vi.fn() } });
+
+    const path = screen.getByRole('textbox', { name: 'Workflow file' });
+    expect(path).toBe(screen.getByTestId('sub-pipeline-path'));
+    expect(path).toHaveAttribute('placeholder', 'examples/sub_flow.dot');
+    expect(path).toHaveAttribute('aria-required', 'true');
+    expect(path).toHaveAccessibleDescription('The path to the workflow (.dot file) to run as part of this one.');
+    expect(screen.getByText('Required')).toBeInTheDocument();
+  });
+
   it('pre-populates pipeline from attrs', () => {
     render(SubPipelineForm, {
       props: { attrs: { pipeline: 'examples/sub_flow.dot' }, onChange: vi.fn() },

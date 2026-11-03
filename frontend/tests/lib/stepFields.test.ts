@@ -15,6 +15,7 @@ import {
   NOTHING_SELECTED,
   branchRuleField,
   priorityError,
+  jsonError,
   type FieldSpec,
 } from '../../src/lib/stepFields';
 
@@ -387,6 +388,22 @@ describe('priorityError', () => {
 
   it.each(['1.5', 'x', ' ', '1e3', '+1', '--1'])('rejects %j with the board message', (value) => {
     expect(priorityError(value)).toBe('Priority must be a whole number, like 1 or 5.');
+  });
+});
+
+describe('jsonError', () => {
+  it.each(['', '   ', '{}', '{"candidate_dir": "candidates/a"}', '[1, 2]'])('accepts %j', (value) => {
+    expect(jsonError(value)).toBe('');
+  });
+
+  it('quotes the parser message in the board sentence', () => {
+    let parserMessage = '';
+    try {
+      JSON.parse('{bad');
+    } catch (e) {
+      parserMessage = (e as Error).message;
+    }
+    expect(jsonError('{bad')).toBe(`That is not valid JSON yet (${parserMessage}). The step would fail when it runs.`);
   });
 });
 
