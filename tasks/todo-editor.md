@@ -113,7 +113,7 @@ Rules for every task:
     (pass `problemsByNode`), tests.
   - Depends on: T1, T4, T5. Scope: M.
 
-- [ ] **Task 7: Smoothstep connections and legend**
+- [x] **Task 7: Smoothstep connections and legend**
   - Description:
     - `WorkflowEdge` uses `getSmoothStepPath`.
     - Labels are pills, with normal, loop and selected variants.

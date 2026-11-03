@@ -746,7 +746,9 @@ describe('edge inspector (Task 8 side panel)', () => {
   });
 });
 
-describe('edge deletion via edgeActions (Task 8 hover-revealed delete)', () => {
+// The hover-revealed × is gone (D3); edgeActions.onDeleteEdge stays the one
+// path for deleting a connection, alongside Backspace (see WorkflowEdge.test.ts).
+describe('edge deletion via edgeActions', () => {
   it('removes the edge from graph state when onDeleteEdge is invoked', async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
@@ -771,13 +773,27 @@ describe('edge deletion via edgeActions (Task 8 hover-revealed delete)', () => {
       expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
     });
   });
+});
 
-  it('tracks hover state via edgeActions.hoveredEdgeId', async () => {
+describe('connection labels and legend (Task 7)', () => {
+  it('opens the edge inspector when a label pill reports a click (edgeActions.onSelectEdge)', async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    const nodeA = screen.getByText('A').closest('.svelte-flow__node') as HTMLElement;
+    await fireEvent.click(nodeA);
 
-    expect(component.edgeActions.hoveredEdgeId).toBeNull();
-    component.edgeActions.hoveredEdgeId = 'a->b#0';
-    expect(component.edgeActions.hoveredEdgeId).toBe('a->b#0');
+    component.edgeActions.onSelectEdge('a->b#0');
+
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('shows the legend on the canvas', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    const canvas = within(screen.getByRole('region', { name: 'Workflow canvas drop zone' }));
+    expect(canvas.getByText('Then run the next step')).toBeInTheDocument();
+    expect(canvas.getByText('Go back and redo (a loop)')).toBeInTheDocument();
   });
 });

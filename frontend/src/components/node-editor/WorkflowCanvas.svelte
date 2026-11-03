@@ -27,10 +27,11 @@
     type WorkflowNodeData,
   } from './convert';
   import type { AttrValue, EdgeFormChange, EditorGraph, NodeFormChange, NodeFormProps } from './types';
-  import { EDGE_ACTIONS_CONTEXT_KEY, type WorkflowEdgeActions } from './edgeContext';
+  import { EDGE_ACTIONS_CONTEXT_KEY, connectionName, type WorkflowEdgeActions } from './edgeContext';
   import { FLOW_DIRECTION_CONTEXT_KEY, type FlowDirection } from './flowDirectionContext';
   import { NODE_STATE_CONTEXT_KEY, type WorkflowNodeState } from './nodeContext';
   import WorkflowEdge from './WorkflowEdge.svelte';
+  import Legend from './Legend.svelte';
   import WorkflowNode from './WorkflowNode.svelte';
   import EdgeForm from './EdgeForm.svelte';
   import CodergenForm from './nodeForms/CodergenForm.svelte';
@@ -229,32 +230,21 @@
     selectedEdgeId = null;
   }
 
-  // Task 8: hover state + the delete callback WorkflowEdge.svelte reads via
+  // Task 8: the select and delete callbacks WorkflowEdge.svelte reads via
   // Svelte context (see edgeContext.ts's own comment on why context, not a
-  // prop, is needed here). A single reactive ($state) object set once via
-  // setContext -- every WorkflowEdge instance reads the same live object.
+  // prop, is needed here). A label pill click selects its connection in
+  // Svelte Flow itself but isn't an edge click, so it reports here too.
   // Exported for the same jsdom-can't-render-edges reason as selectEdge
-  // above: WorkflowEdge.svelte (the real consumer, via Svelte context --
-  // see edgeContext.ts) can't be driven by a real pointer-hover/click DOM
-  // event in a test, so tests call `.onDeleteEdge(...)`/set
-  // `.hoveredEdgeId` on this same live object directly instead of
-  // duplicating its logic in a separate test-only helper.
-  export const edgeActions: WorkflowEdgeActions = $state({
-    hoveredEdgeId: null,
+  // above: tests call `.onDeleteEdge(...)`/`.onSelectEdge(...)` on this
+  // same object directly instead of duplicating its logic in a test helper.
+  export const edgeActions: WorkflowEdgeActions = {
+    onSelectEdge: (edgeId: string) => selectEdge(edgeId),
     onDeleteEdge: (edgeId: string) => {
       edges = edges.filter((e) => e.id !== edgeId);
       if (selectedEdgeId === edgeId) selectedEdgeId = null;
     },
-  });
+  };
   setContext(EDGE_ACTIONS_CONTEXT_KEY, edgeActions);
-
-  function handleEdgePointerEnter({ edge }: { edge: FlowEdge<WorkflowEdgeData> }) {
-    edgeActions.hoveredEdgeId = edge.id;
-  }
-
-  function handleEdgePointerLeave() {
-    edgeActions.hoveredEdgeId = null;
-  }
 
   // Advice for the step cards (and, later, the status bar): recomputed on
   // every graph change, never blocking Save (spec R6).
@@ -297,6 +287,18 @@
       return n.ariaLabel === ariaLabel ? n : { ...n, ariaLabel };
     });
     if (next.some((n, i) => n !== nodes[i])) nodes = next;
+  });
+
+  // The same for connections: "Connection from {a} to {b}[, labelled {label}]".
+  const labelById = $derived(new Map(nodes.map((n) => [n.id, n.data.label])));
+
+  $effect(() => {
+    const next = edges.map((e) => {
+      const label = typeof e.label === 'string' ? e.label : undefined;
+      const ariaLabel = connectionName(labelById.get(e.source) ?? e.source, labelById.get(e.target) ?? e.target, label);
+      return e.ariaLabel === ariaLabel ? e : { ...e, ariaLabel };
+    });
+    if (next.some((e, i) => e !== edges[i])) edges = next;
   });
 
   // Applies an EdgeForm.svelte onChange patch to the selected edge's live
@@ -491,14 +493,13 @@
         onnodeclick={handleNodeClick}
         onpaneclick={handlePaneClick}
         onedgeclick={handleEdgeClick}
-        onedgepointerenter={handleEdgePointerEnter}
-        onedgepointerleave={handleEdgePointerLeave}
       >
         <FlowPositionBridge onReady={(fn) => (toFlowPosition = fn)} />
         <Background />
         <Controls />
         <MiniMap />
       </SvelteFlow>
+      <Legend />
     </div>
     {#if !saveInHeader}
       {@render saveAction()}
