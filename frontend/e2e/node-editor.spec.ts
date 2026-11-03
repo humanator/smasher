@@ -212,10 +212,12 @@ test('the canvas fills the viewport below the header on the edit and new pages',
       const box = (await flow.boundingBox())!;
       const palette = (await page.getByTestId('palette-entry-Codergen').boundingBox())!;
       const statusBar = (await page.locator('footer', { hasText: /steps · \d+ connections/ }).boundingBox())!;
-      // Right up to the right edge of the window, down to the status bar
-      // (which sits on the bottom edge), left up to the palette, and no
-      // page scroll.
-      expect(box.x + box.width, url).toBeGreaterThan(1600 - 2);
+      const inspector = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
+      // Right up to the inspector (which is always present at this width and
+      // reaches the right edge of the window), down to the status bar (which
+      // sits on the bottom edge), left up to the palette, and no page scroll.
+      expect(Math.abs(box.x + box.width - inspector.x), url).toBeLessThan(2);
+      expect(inspector.x + inspector.width, url).toBeGreaterThan(1600 - 2);
       expect(Math.abs(box.y + box.height - statusBar.y), url).toBeLessThan(2);
       expect(statusBar.y + statusBar.height, url).toBeGreaterThan(1000 - 2);
       expect(box.x - (palette.x + palette.width), url).toBeLessThan(24);
@@ -233,8 +235,10 @@ test('the canvas fills the viewport below the header on the edit and new pages',
 test('a wide graph fits inside the canvas on first load', async ({ page, baseURL }) => {
   const base = baseURL || 'http://127.0.0.1:5173';
   // consensus_task.dot is wide enough that Svelte Flow's default minZoom of
-  // 0.5 stopped fitView short, leaving nodes off both edges.
-  await page.setViewportSize({ width: 1280, height: 800 });
+  // 0.5 stopped fitView short, leaving nodes off both edges. With the
+  // 360px inspector always beside the canvas, 1280 wide leaves the canvas
+  // narrower than this graph at the 0.1 minZoom, so the window is wider.
+  await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(`${base}/workflows/examples__consensus_task/edit`);
   const nodes = page.locator('.svelte-flow__node');
   await expect(nodes.first()).toBeVisible({ timeout: 10000 });
