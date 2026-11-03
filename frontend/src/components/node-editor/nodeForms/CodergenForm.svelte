@@ -4,6 +4,7 @@
 
   import { untrack } from 'svelte';
   import { stepFields, type FieldSpec } from '$lib/stepFields';
+  import { fieldProblem } from '$lib/workflowProblems';
   import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
   import ModelPicker from './ModelPicker.svelte';
@@ -17,7 +18,7 @@
   // optional override, and `provider` picks which LLM provider serves it;
   // both are edited by the shared ModelPicker. `backend` is also read by the
   // real handler but stays a power-user override outside this form.
-  let { attrs, onChange }: NodeFormProps = $props();
+  let { attrs, onChange, problems = [] }: NodeFormProps = $props();
 
   const fields = stepFields('Codergen');
   const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
@@ -35,6 +36,7 @@
     spec={spec('prompt')}
     bind:value={prompt}
     testId="codergen-prompt"
+    error={fieldProblem('Codergen', 'prompt', problems)}
     oninput={(v) => onChange({ attrs: { prompt: v || undefined } })}
   />
   <Field spec={spec('model')}>

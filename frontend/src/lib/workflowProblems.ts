@@ -31,6 +31,24 @@ export interface Problem {
 // Not in the spec or Main.dc.html (D9 names the rule but gives no message); wording agreed 2026-11-03.
 const BAD_PRIORITY = 'has a priority that is not a whole number';
 
+// The node rules that each belong to one field, by kind and attr. The inspector shows the message
+// on that field while the rule fires (spec R5: a Required field left empty shows the R6 message).
+const FIELD_RULES: Record<string, Record<string, string>> = {
+  Codergen: { prompt: 'is missing instructions' },
+  Manager: { task: 'is missing a task' },
+  Tool: { tool: 'needs a tool chosen', tool_command: 'needs a command' },
+  SubPipeline: { pipeline: 'needs a workflow file' },
+  Interviewer: { options: 'needs a list of options' },
+};
+const rule = (kind: string, attr: string) => FIELD_RULES[kind][attr];
+
+/** The field's own problem among a step's problem messages, as a sentence ("Needs a command."), or ''. */
+export function fieldProblem(handler: string, attr: string, messages: string[]): string {
+  const message = FIELD_RULES[handler]?.[attr];
+  if (!message || !messages.includes(message)) return '';
+  return `${message[0].toUpperCase()}${message.slice(1)}.`;
+}
+
 function blank(value: AttrValue | undefined): boolean {
   return value === undefined || String(value).trim() === '';
 }
@@ -52,25 +70,25 @@ function nodeMessages(node: ProblemNode): string[] {
   const out: string[] = [];
   switch (nodeType) {
     case 'Codergen':
-      if (blank(a.prompt) && unnamed) out.push('is missing instructions');
+      if (blank(a.prompt) && unnamed) out.push(rule('Codergen', 'prompt'));
       break;
     case 'Manager':
-      if (blank(a.task) && unnamed) out.push('is missing a task');
+      if (blank(a.task) && unnamed) out.push(rule('Manager', 'task'));
       if (invalidJson(a.config)) out.push('has settings that are not valid JSON');
       break;
     case 'Tool':
       if (toolMode(a) === 'command') {
-        if (blank(a.tool_command)) out.push('needs a command');
+        if (blank(a.tool_command)) out.push(rule('Tool', 'tool_command'));
       } else {
-        if (blank(a.tool)) out.push('needs a tool chosen');
+        if (blank(a.tool)) out.push(rule('Tool', 'tool'));
         if (invalidJson(a.args)) out.push('has settings that are not valid JSON');
       }
       break;
     case 'SubPipeline':
-      if (blank(a.pipeline)) out.push('needs a workflow file');
+      if (blank(a.pipeline)) out.push(rule('SubPipeline', 'pipeline'));
       break;
     case 'Interviewer':
-      if (answerMode(a) === 'options' && blank(a.options)) out.push('needs a list of options');
+      if (answerMode(a) === 'options' && blank(a.options)) out.push(rule('Interviewer', 'options'));
       break;
   }
   return out;

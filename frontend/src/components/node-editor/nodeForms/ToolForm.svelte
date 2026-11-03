@@ -5,6 +5,7 @@
   import { untrack } from 'svelte';
   import { toolMode } from '$lib/nodeSummary';
   import { BUILT_IN_TOOLS, jsonError, stepFields, type FieldSpec } from '$lib/stepFields';
+  import { fieldProblem } from '$lib/workflowProblems';
   import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
   import ModelPicker from './ModelPicker.svelte';
@@ -45,7 +46,7 @@
     return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
   }
 
-  let { attrs, onChange }: NodeFormProps = $props();
+  let { attrs, onChange, problems = [] }: NodeFormProps = $props();
 
   const fields = stepFields('Tool');
   const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
@@ -83,6 +84,7 @@
         spec={spec('tool')}
         bind:value={tool}
         testId="tool-select"
+        error={fieldProblem('Tool', 'tool', problems)}
         oninput={(v) => onChange({ attrs: { tool: v || undefined } })}
       />
       {#if unknownTool}
@@ -116,6 +118,7 @@
       spec={spec('tool_command')}
       bind:value={command}
       testId="tool-command"
+      error={fieldProblem('Tool', 'tool_command', problems)}
       oninput={(v) => onChange({ attrs: { tool_command: v.trim() ? v : '' } })}
     />
     <Field

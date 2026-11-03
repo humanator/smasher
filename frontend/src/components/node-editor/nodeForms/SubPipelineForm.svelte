@@ -4,6 +4,7 @@
 
   import { untrack } from 'svelte';
   import { stepFields } from '$lib/stepFields';
+  import { fieldProblem } from '$lib/workflowProblems';
   import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
 
@@ -13,7 +14,7 @@
   // CompositionError::MissingPipelineAttr, so an empty field here removes
   // the attr (surfacing that same missing-attr error at composition time)
   // rather than writing an empty-string path.
-  let { attrs, onChange }: NodeFormProps = $props();
+  let { attrs, onChange, problems = [] }: NodeFormProps = $props();
 
   const pipelineSpec = stepFields('SubPipeline').find((f) => f.attr === 'pipeline')!;
 
@@ -25,6 +26,7 @@
     spec={pipelineSpec}
     bind:value={pipeline}
     testId="sub-pipeline-path"
+    error={fieldProblem('SubPipeline', 'pipeline', problems)}
     oninput={(v) => onChange({ attrs: { pipeline: v || undefined } })}
   />
 </div>

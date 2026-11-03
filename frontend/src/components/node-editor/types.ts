@@ -52,6 +52,8 @@ export interface NodeFormChange {
 export interface NodeFormProps {
   attrs: Record<string, AttrValue>;
   onChange: (patch: NodeFormChange) => void;
+  /** The step's live problem messages (workflowProblems), shown on the field each belongs to. */
+  problems?: string[];
 }
 
 // Task 8 (edge polish + edge attrs form): the `onChange` contract EdgeForm.svelte

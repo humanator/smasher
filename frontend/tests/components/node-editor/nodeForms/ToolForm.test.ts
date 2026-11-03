@@ -257,4 +257,27 @@ describe('ToolForm', () => {
       expect(screen.queryByTestId('tool-model')).toBe(null);
     });
   });
+
+  it('shows the "needs a tool chosen" problem on Tool, describing the group with it', () => {
+    render(ToolForm, { props: { attrs: {}, problems: ['needs a tool chosen'], onChange: vi.fn() } });
+
+    const group = screen.getByTestId('tool-select');
+    expect(group).toHaveAccessibleDescription(expect.stringContaining('Needs a tool chosen.'));
+    expect(within(group).getByRole('alert')).toHaveTextContent('Needs a tool chosen.');
+  });
+
+  it('shows the "needs a command" problem on Command when the canvas reports it', () => {
+    render(ToolForm, { props: { attrs: { tool_command: '' }, problems: ['needs a command'], onChange: vi.fn() } });
+
+    const command = screen.getByTestId('tool-command');
+    expect(command).toHaveAttribute('aria-invalid', 'true');
+    expect(command).toHaveAccessibleDescription(expect.stringContaining('Needs a command.'));
+  });
+
+  it('shows no problem on Tool or Command when none is reported', () => {
+    render(ToolForm, { props: { attrs: { tool: 'system_lint' }, problems: [], onChange: vi.fn() } });
+
+    expect(screen.queryByText('Needs a tool chosen.')).toBe(null);
+    expect(screen.getByTestId('tool-select')).toHaveAccessibleDescription('Pick the built-in tool to run.');
+  });
 });

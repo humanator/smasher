@@ -107,4 +107,19 @@ describe('CodergenForm', () => {
 
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { prompt: undefined } });
   });
+
+  it('shows the "missing instructions" problem on Instructions when the canvas reports it', () => {
+    render(CodergenForm, { props: { attrs: {}, problems: ['is missing instructions'], onChange: vi.fn() } });
+
+    const prompt = screen.getByTestId('codergen-prompt');
+    expect(prompt).toHaveAttribute('aria-invalid', 'true');
+    expect(prompt).toHaveAccessibleDescription(expect.stringContaining('Is missing instructions.'));
+  });
+
+  it('shows no problem on Instructions when none is reported', () => {
+    render(CodergenForm, { props: { attrs: {}, problems: [], onChange: vi.fn() } });
+
+    expect(screen.getByTestId('codergen-prompt')).not.toHaveAttribute('aria-invalid');
+    expect(screen.queryByText('Is missing instructions.')).toBe(null);
+  });
 });

@@ -641,6 +641,36 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(updated?.attrs?.question).toBe('ok?');
   });
 
+  it('shows a Required field\'s problem inline only while it fires, following live edits', async () => {
+    render(WorkflowCanvas, {
+      props: {
+        graph: {
+          graph_attrs: {},
+          nodes: [
+            { id: 'gen', node_type: 'Codergen', label: 'Generate', attrs: {} },
+            { id: 'run', node_type: 'Tool', label: 'Run', attrs: { tool_command: '' } },
+          ],
+          edges: [],
+        },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+
+    // Instructions fall back to the step name, so the rule fires only once both are empty.
+    await clickNodeByLabel('Generate');
+    expect(screen.getByTestId('codergen-prompt')).not.toHaveAttribute('aria-invalid');
+    await fireEvent.input(screen.getByTestId('node-inspector-label'), { target: { value: '' } });
+    expect(screen.getByTestId('codergen-prompt')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Is missing instructions.')).toBeInTheDocument();
+
+    await clickNodeByLabel('Run');
+    expect(screen.getByText('Needs a command.')).toBeInTheDocument();
+    await fireEvent.input(screen.getByTestId('tool-command'), { target: { value: 'make' } });
+    expect(screen.queryByText('Needs a command.')).toBe(null);
+    expect(screen.getByTestId('tool-command')).not.toHaveAttribute('aria-invalid');
+  });
+
   it('switching selection to a different node swaps the form and shows that node\'s own attrs, not the previous selection\'s', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());

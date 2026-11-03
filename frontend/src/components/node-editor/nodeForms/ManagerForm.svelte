@@ -4,6 +4,7 @@
 
   import { untrack } from 'svelte';
   import { jsonError, stepFields, type FieldSpec } from '$lib/stepFields';
+  import { fieldProblem } from '$lib/workflowProblems';
   import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
   import ModelPicker from './ModelPicker.svelte';
@@ -25,7 +26,7 @@
   // tasks while keeping this a genuine free-text field -- picking one,
   // editing one, or ignoring them entirely all work.
 
-  let { attrs, onChange }: NodeFormProps = $props();
+  let { attrs, onChange, problems = [] }: NodeFormProps = $props();
 
   const fields = stepFields('Manager');
   const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
@@ -39,6 +40,7 @@
     spec={spec('task')}
     bind:value={task}
     testId="manager-task"
+    error={fieldProblem('Manager', 'task', problems)}
     oninput={(v) => onChange({ attrs: { task: v || undefined } })}
   />
   <!-- Written as-is even when invalid: the error flags it without blocking the edit. -->

@@ -218,4 +218,20 @@ describe('InterviewerForm', () => {
       expect(screen.queryByTestId('interviewer-gallery-toggle')).toBe(null);
     });
   });
+
+  describe('problems', () => {
+    it('shows the "needs a list of options" problem on Options when the canvas reports it', () => {
+      render(InterviewerForm, { props: { attrs: { options: '' }, problems: ['needs a list of options'], onChange: vi.fn() } });
+
+      const options = screen.getByTestId('interviewer-options');
+      expect(options).toHaveAttribute('aria-invalid', 'true');
+      expect(options).toHaveAccessibleDescription(expect.stringContaining('Needs a list of options.'));
+    });
+
+    it('shows no problem on Options when none is reported', () => {
+      render(InterviewerForm, { props: { attrs: { options: 'a, b' }, problems: [], onChange: vi.fn() } });
+
+      expect(screen.getByTestId('interviewer-options')).not.toHaveAttribute('aria-invalid');
+    });
+  });
 });

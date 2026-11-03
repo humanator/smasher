@@ -2,7 +2,7 @@
 // ABOUTME: Each node rule, invalid JSON, edge priority, Start/Finish counts, ordering and the clean sample graph
 
 import { describe, it, expect } from 'vitest';
-import { workflowProblems, type ProblemNode, type ProblemEdge } from '../../src/lib/workflowProblems';
+import { fieldProblem, workflowProblems, type ProblemNode, type ProblemEdge } from '../../src/lib/workflowProblems';
 import type { AttrValue } from '../../src/lib/api/workflows';
 
 function n(id: string, nodeType: string, label: string, attrs: Record<string, AttrValue> = {}): ProblemNode {
@@ -162,5 +162,39 @@ describe('workflowProblems', () => {
 
   it('ignores kinds with no rules', () => {
     expect(problems(n('p', 'Parallel', ''), n('j', 'FanIn', ''), n('c', 'Conditional', ''), n('x', 'Mystery', ''))).toEqual([]);
+  });
+});
+
+describe('fieldProblem', () => {
+  it.each([
+    ['Codergen', 'prompt', 'is missing instructions', 'Is missing instructions.'],
+    ['Manager', 'task', 'is missing a task', 'Is missing a task.'],
+    ['Tool', 'tool', 'needs a tool chosen', 'Needs a tool chosen.'],
+    ['Tool', 'tool_command', 'needs a command', 'Needs a command.'],
+    ['SubPipeline', 'pipeline', 'needs a workflow file', 'Needs a workflow file.'],
+    ['Interviewer', 'options', 'needs a list of options', 'Needs a list of options.'],
+  ])('%s %s shows "%s" as a sentence', (handler, attr, message, sentence) => {
+    expect(fieldProblem(handler, attr, [message])).toBe(sentence);
+  });
+
+  it('is blank when the field\'s own problem has not fired', () => {
+    expect(fieldProblem('Tool', 'tool_command', ['needs a tool chosen'])).toBe('');
+    expect(fieldProblem('Tool', 'args', ['has settings that are not valid JSON'])).toBe('');
+    expect(fieldProblem('Codergen', 'prompt', [])).toBe('');
+  });
+
+  it('matches the messages workflowProblems gives for each empty field', () => {
+    const cases: [ProblemNode, string][] = [
+      [n('a', 'Codergen', ''), 'prompt'],
+      [n('m', 'Manager', ''), 'task'],
+      [n('t', 'Tool', 'T'), 'tool'],
+      [n('c', 'Tool', 'C', { tool_command: '' }), 'tool_command'],
+      [n('s', 'SubPipeline', 'S'), 'pipeline'],
+      [n('i', 'Interviewer', 'I', { options: '' }), 'options'],
+    ];
+    for (const [node, attr] of cases) {
+      const messages = problems(node).filter((p) => p.nodeId === node.id).map((p) => p.message);
+      expect(fieldProblem(node.data.nodeType, attr, messages), `${node.data.nodeType} ${attr}`).not.toBe('');
+    }
   });
 });

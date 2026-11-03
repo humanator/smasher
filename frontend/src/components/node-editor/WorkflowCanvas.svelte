@@ -583,7 +583,11 @@
           onChange={(edgeId, condition) => applyEdgeFormChange(edgeId, { condition })}
         />
       {:else if FormComponent}
-        <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
+        <FormComponent
+          attrs={node.data.attrs}
+          problems={problemsByNode.get(node.id) ?? []}
+          onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)}
+        />
       {:else}
         <FlowForm handler={node.data.nodeType} attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
       {/if}

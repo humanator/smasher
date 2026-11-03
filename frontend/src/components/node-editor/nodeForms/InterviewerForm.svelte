@@ -5,6 +5,7 @@
   import { untrack } from 'svelte';
   import { answerMode as answerModeOf } from '$lib/nodeSummary';
   import { stepFields, type FieldSpec } from '$lib/stepFields';
+  import { fieldProblem } from '$lib/workflowProblems';
   import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
 
@@ -41,7 +42,7 @@
   // this form always agree. Choosing Pick from a list therefore writes an
   // empty `options`, and clearing the list keeps it empty rather than
   // deleting it (ToolForm's `tool_command` works the same way).
-  let { attrs, onChange }: NodeFormProps = $props();
+  let { attrs, onChange, problems = [] }: NodeFormProps = $props();
 
   const fields = stepFields('Interviewer');
   const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
@@ -106,6 +107,7 @@
       spec={spec('options')}
       bind:value={optionsText}
       testId="interviewer-options"
+      error={fieldProblem('Interviewer', 'options', problems)}
       oninput={(v) => onChange({ attrs: { options: v } })}
     />
   {:else if answerMode === 'freeform'}

@@ -104,4 +104,21 @@ describe('ManagerForm', () => {
 
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { model: 'claude-sonnet' } });
   });
+
+  it('shows the "missing a task" problem on Task when the canvas reports it, and not the JSON one', () => {
+    render(ManagerForm, {
+      props: { attrs: { config: '{' }, problems: ['is missing a task', 'has settings that are not valid JSON'], onChange: vi.fn() },
+    });
+
+    const task = screen.getByTestId('manager-task');
+    expect(task).toHaveAttribute('aria-invalid', 'true');
+    expect(task).toHaveAccessibleDescription(expect.stringContaining('Is missing a task.'));
+    expect(screen.queryByText('Has settings that are not valid JSON.')).toBe(null);
+  });
+
+  it('shows no problem on Task when none is reported', () => {
+    render(ManagerForm, { props: { attrs: {}, onChange: vi.fn() } });
+
+    expect(screen.getByTestId('manager-task')).not.toHaveAttribute('aria-invalid');
+  });
 });

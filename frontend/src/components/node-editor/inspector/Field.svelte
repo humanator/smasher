@@ -60,7 +60,9 @@
 </script>
 
 {#snippet header(asLegend: boolean)}
-  <!-- A choice field's label is its fieldset's legend; the fieldset is named by the label text alone. -->
+  <!-- A choice field's label is its fieldset's legend; the fieldset is named by the label text alone.
+       Neither a fieldset (group) nor a radio supports aria-invalid, so a choice's error is announced
+       through aria-describedby and the error's alert role only. -->
   <svelte:element this={asLegend ? 'legend' : 'div'} class="mb-1 flex w-full items-center gap-2">
     {#if spec.control === 'choice' || spec.control === 'model'}
       <span id={labelId} class="text-body font-medium text-foreground">{spec.label}</span>

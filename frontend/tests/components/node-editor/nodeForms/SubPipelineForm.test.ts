@@ -47,4 +47,18 @@ describe('SubPipelineForm', () => {
 
     expect(onChange).toHaveBeenLastCalledWith({ attrs: { pipeline: undefined } });
   });
+
+  it('shows the "needs a workflow file" problem on Workflow file when the canvas reports it', () => {
+    render(SubPipelineForm, { props: { attrs: {}, problems: ['needs a workflow file'], onChange: vi.fn() } });
+
+    const path = screen.getByTestId('sub-pipeline-path');
+    expect(path).toHaveAttribute('aria-invalid', 'true');
+    expect(path).toHaveAccessibleDescription(expect.stringContaining('Needs a workflow file.'));
+  });
+
+  it('shows no problem on Workflow file when none is reported', () => {
+    render(SubPipelineForm, { props: { attrs: { pipeline: 'a.dot' }, problems: [], onChange: vi.fn() } });
+
+    expect(screen.getByTestId('sub-pipeline-path')).not.toHaveAttribute('aria-invalid');
+  });
 });
