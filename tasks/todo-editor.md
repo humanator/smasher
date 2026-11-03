@@ -173,7 +173,7 @@ Rules for every task:
 
 ## Phase 3: Inspector
 
-- [ ] **Task 10: Inspector shell and `Field`**
+- [x] **Task 10: Inspector shell and `Field`**
   - Description:
     - Extract `inspector/Inspector.svelte`, 360px wide: header (chip, kicker, title, "Also called…",
       Close), segmented tabs with roving tabindex, the Nothing selected state, and the About tab

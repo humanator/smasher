@@ -373,6 +373,17 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
   });
 
+  it('shows Nothing selected in the inspector until something is selected', async () => {
+    render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+
+    const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+    expect(within(inspector).getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
+
+    await clickNodeByLabel('Generate');
+    expect(screen.queryByRole('heading', { name: 'Nothing selected' })).not.toBeInTheDocument();
+  });
+
   it('shows CodergenForm for a Codergen node, pre-populated from its attrs', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
@@ -384,10 +395,10 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.getByTestId('codergen-prompt')).toHaveValue('write code');
     expect(screen.getByTestId('codergen-model')).toHaveValue('gpt-5');
     expect(screen.getByTestId('node-inspector-label')).toHaveValue('Generate');
-    expect(screen.getByTestId('node-inspector-title')).toHaveTextContent('AI Agent');
-    expect(screen.getByTestId('node-inspector-description')).toHaveTextContent(
-      'Gives an AI model a brief and lets it do the work.',
-    );
+    expect(screen.getByTestId('node-inspector-title')).toHaveTextContent('Generate');
+    const inspector = within(screen.getByTestId('node-inspector'));
+    expect(inspector.getByText('AI Agent')).toBeInTheDocument();
+    expect(inspector.getByText('Also called “Codergen” in workflow files.')).toBeInTheDocument();
   });
 
   it('shows InterviewerForm for an Interviewer node', async () => {
@@ -475,9 +486,23 @@ describe('node inspector (Task 7 side panel)', () => {
     await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
     await clickNodeByLabel('Generate');
 
-    await fireEvent.click(screen.getByLabelText('Close node inspector'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
 
     expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
+  });
+
+  it('Delete Step removes the step and its connections, and clears the selection', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await clickNodeByLabel('B');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Step' }));
+
+    expect(component.currentGraph().nodes.map((n) => n.id)).toEqual(['a']);
+    expect(component.currentGraph().edges).toHaveLength(0);
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
   });
 
   it('editing a kind-specific field updates the node\'s attrs in live graph state immediately', async () => {
@@ -729,9 +754,32 @@ describe('edge inspector (Task 8 side panel)', () => {
     component.selectEdge('a->b#0');
     await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
 
-    await fireEvent.click(screen.getByLabelText('Close edge inspector'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
 
     expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+  });
+
+  it('titles the connection by the steps it joins', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+
+    await waitFor(() => expect(screen.getByTestId('edge-inspector-title')).toHaveTextContent('A → B'));
+    expect(within(screen.getByTestId('edge-inspector')).getByText('Connection')).toBeInTheDocument();
+  });
+
+  it('Delete Connection removes the connection and clears the selection', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Connection' }));
+
+    expect(component.currentGraph().edges).toHaveLength(0);
+    expect(component.currentGraph().nodes).toHaveLength(2);
+    expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
   });
 });
 

@@ -34,6 +34,8 @@
   import Legend from './Legend.svelte';
   import WorkflowNode from './WorkflowNode.svelte';
   import EdgeForm from './EdgeForm.svelte';
+  import Inspector, { type InspectorView } from './inspector/Inspector.svelte';
+  import Field from './inspector/Field.svelte';
   import CodergenForm from './nodeForms/CodergenForm.svelte';
   import InterviewerForm from './nodeForms/InterviewerForm.svelte';
   import ToolForm from './nodeForms/ToolForm.svelte';
@@ -45,6 +47,7 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import { stepFields } from '$lib/stepFields';
   import { stepKind } from '$lib/stepKinds';
   import { workflowProblems, type Problem } from '$lib/workflowProblems';
 
@@ -245,6 +248,27 @@
     selection = { kind: 'none' };
   }
 
+  // Close inspector: let go of the selection, in Svelte Flow too.
+  function clearSelection() {
+    nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+    edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+    selection = { kind: 'none' };
+  }
+
+  // The inspector's Delete Step / Delete Connection (D3). A step takes its
+  // connections with it, as Backspace does.
+  export function deleteSelection() {
+    if (selection.kind === 'node') {
+      const id = selection.id;
+      nodes = nodes.filter((n) => n.id !== id);
+      edges = edges.filter((e) => e.source !== id && e.target !== id);
+    } else if (selection.kind === 'edge') {
+      const id = selection.id;
+      edges = edges.filter((e) => e.id !== id);
+    }
+    selection = { kind: 'none' };
+  }
+
   // Task 8: the select and delete callbacks WorkflowEdge.svelte reads via
   // Svelte context (see edgeContext.ts's own comment on why context, not a
   // prop, is needed here). A label pill click selects its connection in
@@ -306,6 +330,19 @@
 
   // The same for connections: "Connection from {a} to {b}[, labelled {label}]".
   const labelById = $derived(new Map(nodes.map((n) => [n.id, n.data.label])));
+
+  // A selection whose node or edge has gone (Backspace) shows Nothing selected.
+  const inspectorView: InspectorView = $derived.by(() => {
+    if (selectedNode) return { kind: 'node', handler: selectedNode.data.nodeType, title: selectedNode.data.label };
+    if (selectedEdge) {
+      const from = labelById.get(selectedEdge.source) ?? selectedEdge.source;
+      const to = labelById.get(selectedEdge.target) ?? selectedEdge.target;
+      return { kind: 'edge', title: `${from} → ${to}` };
+    }
+    if (guideHandler) return { kind: 'guide', handler: guideHandler };
+    return { kind: 'none' };
+  });
+  const inspectorKey = $derived(inspectorView.kind === 'none' ? 'none' : `${selection.kind}:${'id' in selection ? selection.id : guideHandler}`);
 
   $effect(() => {
     const next = edges.map((e) => {
@@ -485,10 +522,31 @@
 
   // Save lives in the page header when there is one.
   const saveInHeader = usePageActions(saveAction);
-
-  // Shared by the node and edge inspector <aside>s (one side-panel slot).
-  const inspectorClass = 'w-[260px] flex-[0_0_260px] overflow-y-auto border-l border-border p-2.5 box-border';
 </script>
+
+{#snippet inspectorSettings()}
+  {#if selectedNode}
+    {@const node = selectedNode}
+    {@const FormComponent = formComponentFor(node.data.nodeType)}
+    <div class="flex flex-col gap-5">
+      <Field
+        spec={stepFields(node.data.nodeType)[0]}
+        value={node.data.label}
+        testId="node-inspector-label"
+        oninput={(label) => applyNodeFormChange(node.id, { label })}
+      />
+      <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
+    </div>
+  {:else if selectedEdge}
+    {@const edge = selectedEdge}
+    <EdgeForm
+      condition={edge.data?.condition ?? null}
+      priority={edge.data?.priority ?? null}
+      loopRestart={edge.data?.loopRestart ?? false}
+      onChange={(patch) => applyEdgeFormChange(edge.id, patch)}
+    />
+  {/if}
+{/snippet}
 
 {#snippet saveAction()}
   {@render extraActions?.()}
@@ -567,82 +625,12 @@
       <p role="alert" data-testid="save-error" class="text-destructive text-sm px-3 py-2">{saveError}</p>
     {/if}
   </div>
-  {#if selectedNode}
-    {@const node = selectedNode}
-    {@const FormComponent = formComponentFor(node.data.nodeType)}
-    <aside class={inspectorClass} data-testid="node-inspector">
-      <div class="flex items-center justify-between mb-2.5">
-        <span class="font-semibold text-sm text-foreground" data-testid="node-inspector-title">
-          {stepKind(node.data.nodeType).plain}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          class="text-base text-muted-foreground"
-          onclick={() => (selection = { kind: 'none' })}
-          aria-label="Close node inspector"
-        >
-          ×
-        </Button>
-      </div>
-      <p class="mb-2.5 text-xs leading-snug text-muted-foreground" data-testid="node-inspector-description">
-        {stepKind(node.data.nodeType).blurb}
-      </p>
-      <!-- Remount on selection change: each nodeForms/*.svelte component
-           seeds its local field state from `attrs` only once per mount
-           (documented in each form's own comment) -- {#key} forces a fresh
-           instance instead of letting a prop update slip past that
-           intentional one-time read when the user selects a different node. -->
-      {#key node.id}
-        <div class="mb-2.5 flex flex-col gap-1.5">
-          <Label for="{uid}-node-label">Label</Label>
-          <Input
-            id="{uid}-node-label"
-            type="text"
-            data-testid="node-inspector-label"
-            value={node.data.label}
-            oninput={(event) =>
-              applyNodeFormChange(node.id, { label: (event.target as HTMLInputElement).value })}
-          />
-        </div>
-        <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
-      {/key}
-    </aside>
-  {:else if selectedEdge}
-    {@const edge = selectedEdge}
-    <aside class={inspectorClass} data-testid="edge-inspector">
-      <div class="flex items-center justify-between mb-2.5">
-        <span class="font-semibold text-sm text-foreground" data-testid="edge-inspector-title">Edge</span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          class="text-base text-muted-foreground"
-          onclick={() => (selection = { kind: 'none' })}
-          aria-label="Close edge inspector"
-        >
-          ×
-        </Button>
-      </div>
-      <!-- Remount on selection change, same reasoning as the node
-           inspector's own {#key} above -- EdgeForm.svelte seeds its local
-           field state from condition/priority/loopRestart only once per
-           mount. -->
-      {#key edge.id}
-        <EdgeForm
-          condition={edge.data?.condition ?? null}
-          priority={edge.data?.priority ?? null}
-          loopRestart={edge.data?.loopRestart ?? false}
-          onChange={(patch) => applyEdgeFormChange(edge.id, patch)}
-        />
-      {/key}
-    </aside>
-  {:else if guideHandler}
-    <!-- Placeholder until Task 16 builds the full Step guide. -->
-    <aside class={inspectorClass} data-testid="step-guide" aria-label="Inspector">
-      <p class="m-0 text-caption font-semibold text-muted-foreground">Step guide</p>
-      <h2 class="m-0 text-heading font-bold text-foreground">{stepKind(guideHandler).plain}</h2>
-    </aside>
-  {/if}
+  <!-- Remount on selection change: each form seeds its local field state
+       from `attrs` only once per mount (documented in each form's own
+       comment), and the inspector's tab goes back to Settings. -->
+  {#key inspectorKey}
+    <Inspector view={inspectorView} onClose={clearSelection} onDelete={deleteSelection} settings={inspectorSettings} />
+  {/key}
 </div>
 
 <style>
