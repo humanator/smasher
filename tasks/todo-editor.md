@@ -291,8 +291,8 @@ Rules for every task:
 
 ### Checkpoint: Inspector
 - [ ] Every R5 field reads and writes its attr.
-- [ ] All tests are green.
-- [ ] `node-model.spec.ts` passes.
+- [x] All tests are green.
+- [x] `node-model.spec.ts` passes.
 - [ ] Side-by-side check of every inspector state.
 - [ ] Review with Jobsworth.
 
