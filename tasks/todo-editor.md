@@ -34,7 +34,7 @@ Rules for every task:
     `src/components/design/PrimitivesGallery.svelte`, `tests/lib/stepKinds.test.ts`.
   - Depends on: none. Scope: S.
 
-- [ ] **Task 2: `stepFields` catalogue for step kinds**
+- [x] **Task 2: `stepFields` catalogue for step kinds**
   - Description:
     - Add the `FieldSpec` type and a per-handler field list (R5.2) with the spec's exact labels,
       help, placeholders, More about rows, Try chips, Required flags and `advanced` (More
