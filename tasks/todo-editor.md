@@ -65,7 +65,7 @@ Rules for every task:
   - Files: `src/lib/stepFields.ts`, `tests/lib/stepFields.test.ts`.
   - Depends on: T2. Scope: S.
 
-- [ ] **Task 4: `nodeSummary`**
+- [x] **Task 4: `nodeSummary`**
   - Description: node → summary line, using the per-kind rules in R3 (60/50/36 character
     truncation, empty states, "{n} paths out" from the outgoing edge count).
   - Acceptance: one case per kind, truncation at each boundary, the empty states, and no summary
