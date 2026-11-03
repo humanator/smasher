@@ -51,7 +51,7 @@ Rules for every task:
   - Files: `src/lib/stepFields.ts`, `tests/lib/stepFields.test.ts`.
   - Depends on: none. Scope: M.
 
-- [ ] **Task 3: Connection fields, rule syntax, inspector copy**
+- [x] **Task 3: Connection fields, rule syntax, inspector copy**
   - Description: add the following to `stepFields`:
     - `CONNECTION_FIELDS` (Label, Take this path when…, Priority, Go back and redo);
     - `RULE_SYNTAX` (the 8 rows plus the footer);

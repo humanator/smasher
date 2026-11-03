@@ -1,6 +1,8 @@
 // ABOUTME: Plain-language field catalogue for every step kind the editor can show
 // ABOUTME: Palette, inspector and Step guide all read labels, help and chips from here
 
+import type { AboutSection } from './stepKinds';
+
 /** One choice in a radio-group field, e.g. a built-in tool. */
 export interface ChoiceOption {
   value: string;
@@ -311,4 +313,112 @@ export function stepFields(handler: string): FieldSpec[] {
   const own = KIND_FIELDS[handler];
   if (!own) return [stepName(handler)];
   return [stepName(handler), ...own, ...(NO_RETRIES.has(handler) ? [] : retryFields(handler))];
+}
+
+// Connections: Main.dc.html edgeFields, SYNTAX and the inspector's connection and empty states.
+
+const CONDITION_CHIPS = ['outcome=success', 'outcome=fail'];
+
+export const CONNECTION_FIELDS: FieldSpec[] = [
+  {
+    attr: 'label',
+    label: 'Label',
+    control: 'text',
+    placeholder: 'e.g. Yes, continue',
+    help: 'The name shown on the connection. Labels like success, yes or true also tell the workflow this path is for a good result; failure, error, no or false for a bad one.',
+  },
+  {
+    attr: 'condition',
+    label: 'Take this path when…',
+    control: 'text',
+    placeholder: 'e.g. outcome=success',
+    help: 'A rule that must be true for the workflow to follow this connection. If left blank, the label is used.',
+    tryChips: CONDITION_CHIPS,
+    more: [
+      { title: 'Examples', text: 'outcome=success · status!=ready · count>10 · auth=valid && quota=ok' },
+      { title: 'Reading saved values', text: 'Use the name of any saved value, such as tool.output. A value that was never saved makes the rule false.' },
+      { title: 'Need the full syntax?', text: 'Open “Rule syntax” below.' },
+    ],
+  },
+  {
+    attr: 'priority',
+    label: 'Priority',
+    control: 'text',
+    placeholder: '0',
+    help: 'If more than one connection’s rule is true, the highest number wins. Whole numbers only. The default is 0.',
+  },
+  {
+    attr: 'loop_restart',
+    label: 'Go back and redo',
+    control: 'switch',
+    help: 'When on, following this connection clears the target step’s saved results and runs it again from scratch. Use it for “try again” loops.',
+    more: [
+      { title: 'Not the same as retries', text: 'Retries re-run a step after a failure. This is a deliberate loop you draw on the canvas.' },
+      { title: 'Safety stop', text: 'A run stops after 1000 step visits, so a loop can never run forever.' },
+    ],
+  },
+];
+
+/** The About this connection tab. */
+export const CONNECTION_ABOUT: AboutSection[] = [
+  ['What it does', 'A connection decides what runs next. When a step finishes, the workflow follows the connection whose rule matches.'],
+  ['Rules', 'A rule can look at how the previous step went (outcome) or at any saved value. With no rule, the connection is always allowed.'],
+  ['Labels', 'Labels success, yes or true match a good result. Labels failure, error, no or false match a bad one.'],
+  ['When more than one matches', 'The connection with the highest priority wins. The default priority is 0.'],
+  ['Loops', 'Turn on Go back and redo to run the target step again from scratch. Loops are drawn dashed on the canvas.'],
+];
+
+/** '' when the priority is blank or a whole number, otherwise the message to show under the field. */
+export function priorityError(value: string): string {
+  return value === '' || /^-?\d+$/.test(value) ? '' : 'Priority must be a whole number, like 1 or 5.';
+}
+
+/** Text with inline code or bold runs, e.g. ['It begins at ', { strong: 'Start' }, '.']. */
+export type RichText = (string | { code: string } | { strong: string })[];
+
+export const RULE_SYNTAX: { title: string; rows: { code: string; text: string }[]; footer: RichText } = {
+  title: 'Rule syntax',
+  rows: [
+    { code: 'status=ready', text: 'equals' },
+    { code: 'status!=ready', text: 'does not equal' },
+    { code: 'count>10', text: 'greater than (numbers)' },
+    { code: 'count<10', text: 'less than (numbers)' },
+    { code: 'a=1 && b=2', text: 'both must be true' },
+    { code: 'a=1 || b=2', text: 'either can be true' },
+    { code: '!a=1', text: 'not' },
+    { code: '(a=1 || b=2) && c=3', text: 'group with brackets' },
+  ],
+  footer: [
+    'After every step, ', { code: 'outcome' }, ' is ', { code: 'success' }, ', ', { code: 'fail' }, ', ',
+    { code: 'retry' }, ' or ', { code: 'skip' }, '. A value that was never saved makes a rule false.',
+  ],
+};
+
+/** The inspector when nothing is selected. */
+export const NOTHING_SELECTED: { heading: string; text: string; stepsTitle: string; steps: RichText[] } = {
+  heading: 'Nothing selected',
+  text: 'Select a step or a connection on the canvas to change its settings. Every setting comes with a plain-language explanation.',
+  stepsTitle: 'How a workflow runs',
+  steps: [
+    ['It begins at ', { strong: 'Start' }, ' and runs one step at a time.'],
+    ['When a step finishes, a ', { strong: 'connection' }, ' decides what runs next. Rules on connections can look at how the step went.'],
+    ['Steps can ask a person, call an AI model, or run a tool. Results are saved so later steps can use them.'],
+    ['It ends when it reaches a ', { strong: 'Finish' }, ' step.'],
+  ],
+};
+
+/** A Branch's rule field for one outgoing connection; it edits that edge's condition. */
+export function branchRuleField(edge: { target: string; label: string; loop: boolean }): FieldSpec {
+  const help =
+    (edge.label ? `Connection label: ${edge.label}. ` : '') +
+    (edge.loop ? 'This path loops back and redoes the step. ' : '') +
+    'Leave blank to use the label as the rule.';
+  return {
+    attr: 'condition',
+    label: `Go to “${edge.target}” when…`,
+    control: 'text',
+    placeholder: 'e.g. outcome=success',
+    help,
+    tryChips: CONDITION_CHIPS,
+  };
 }

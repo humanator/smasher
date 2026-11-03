@@ -1,5 +1,5 @@
 // ABOUTME: Tests for the step field catalogue the inspector and Step guide read their copy from
-// ABOUTME: Coverage of every step kind, unique attrs, More settings placement and Main board copy
+// ABOUTME: Covers every step kind, connections, rule syntax and the empty inspector, against Main board copy
 
 import { describe, it, expect } from 'vitest';
 import { STEP_GROUPS } from '../../src/lib/stepKinds';
@@ -9,6 +9,12 @@ import {
   TOOL_MODES,
   BUILT_IN_TOOLS,
   ANSWER_MODES,
+  CONNECTION_FIELDS,
+  CONNECTION_ABOUT,
+  RULE_SYNTAX,
+  NOTHING_SELECTED,
+  branchRuleField,
+  priorityError,
   type FieldSpec,
 } from '../../src/lib/stepFields';
 
@@ -320,5 +326,127 @@ describe('stepFields', () => {
           'A branch has no rule of its own. Each path leaving it carries a rule, and the workflow follows the first path whose rule is true (the highest priority wins a tie). Edit those rules here, or select a connection on the canvas.',
       });
     });
+  });
+});
+
+describe('connection fields', () => {
+  it('lists Label, Take this path when…, Priority and Go back and redo', () => {
+    expect(CONNECTION_FIELDS.map((f) => [f.attr, f.label, f.control])).toEqual([
+      ['label', 'Label', 'text'],
+      ['condition', 'Take this path when…', 'text'],
+      ['priority', 'Priority', 'text'],
+      ['loop_restart', 'Go back and redo', 'switch'],
+    ]);
+  });
+
+  it('has the board copy for each field', () => {
+    const [label, condition, priority, loop] = CONNECTION_FIELDS;
+    expect(label).toMatchObject({
+      placeholder: 'e.g. Yes, continue',
+      help: 'The name shown on the connection. Labels like success, yes or true also tell the workflow this path is for a good result; failure, error, no or false for a bad one.',
+    });
+    expect(condition).toMatchObject({
+      placeholder: 'e.g. outcome=success',
+      help: 'A rule that must be true for the workflow to follow this connection. If left blank, the label is used.',
+      tryChips: ['outcome=success', 'outcome=fail'],
+      more: [
+        { title: 'Examples', text: 'outcome=success · status!=ready · count>10 · auth=valid && quota=ok' },
+        { title: 'Reading saved values', text: 'Use the name of any saved value, such as tool.output. A value that was never saved makes the rule false.' },
+        { title: 'Need the full syntax?', text: 'Open “Rule syntax” below.' },
+      ],
+    });
+    expect(priority).toMatchObject({
+      placeholder: '0',
+      help: 'If more than one connection’s rule is true, the highest number wins. Whole numbers only. The default is 0.',
+    });
+    expect(loop).toMatchObject({
+      help: 'When on, following this connection clears the target step’s saved results and runs it again from scratch. Use it for “try again” loops.',
+      more: [
+        { title: 'Not the same as retries', text: 'Retries re-run a step after a failure. This is a deliberate loop you draw on the canvas.' },
+        { title: 'Safety stop', text: 'A run stops after 1000 step visits, so a loop can never run forever.' },
+      ],
+    });
+    for (const f of CONNECTION_FIELDS) expect(f.required).toBeFalsy();
+  });
+
+  it('has the five About this connection sections', () => {
+    expect(CONNECTION_ABOUT).toEqual([
+      ['What it does', 'A connection decides what runs next. When a step finishes, the workflow follows the connection whose rule matches.'],
+      ['Rules', 'A rule can look at how the previous step went (outcome) or at any saved value. With no rule, the connection is always allowed.'],
+      ['Labels', 'Labels success, yes or true match a good result. Labels failure, error, no or false match a bad one.'],
+      ['When more than one matches', 'The connection with the highest priority wins. The default priority is 0.'],
+      ['Loops', 'Turn on Go back and redo to run the target step again from scratch. Loops are drawn dashed on the canvas.'],
+    ]);
+  });
+});
+
+describe('priorityError', () => {
+  it.each(['', '0', '1', '5', '-3', '42'])('accepts %j', (value) => {
+    expect(priorityError(value)).toBe('');
+  });
+
+  it.each(['1.5', 'x', ' ', '1e3', '+1', '--1'])('rejects %j with the board message', (value) => {
+    expect(priorityError(value)).toBe('Priority must be a whole number, like 1 or 5.');
+  });
+});
+
+describe('RULE_SYNTAX', () => {
+  it('has the eight rows in board order', () => {
+    expect(RULE_SYNTAX.rows).toEqual([
+      { code: 'status=ready', text: 'equals' },
+      { code: 'status!=ready', text: 'does not equal' },
+      { code: 'count>10', text: 'greater than (numbers)' },
+      { code: 'count<10', text: 'less than (numbers)' },
+      { code: 'a=1 && b=2', text: 'both must be true' },
+      { code: 'a=1 || b=2', text: 'either can be true' },
+      { code: '!a=1', text: 'not' },
+      { code: '(a=1 || b=2) && c=3', text: 'group with brackets' },
+    ]);
+  });
+
+  it('has the footer, with its code words marked', () => {
+    expect(RULE_SYNTAX.title).toBe('Rule syntax');
+    expect(RULE_SYNTAX.footer).toEqual([
+      'After every step, ', { code: 'outcome' }, ' is ', { code: 'success' }, ', ', { code: 'fail' }, ', ',
+      { code: 'retry' }, ' or ', { code: 'skip' }, '. A value that was never saved makes a rule false.',
+    ]);
+  });
+});
+
+describe('NOTHING_SELECTED', () => {
+  it('has the heading, the explanation and the four steps of How a workflow runs', () => {
+    expect(NOTHING_SELECTED.heading).toBe('Nothing selected');
+    expect(NOTHING_SELECTED.text).toBe(
+      'Select a step or a connection on the canvas to change its settings. Every setting comes with a plain-language explanation.'
+    );
+    expect(NOTHING_SELECTED.stepsTitle).toBe('How a workflow runs');
+    expect(NOTHING_SELECTED.steps).toEqual([
+      ['It begins at ', { strong: 'Start' }, ' and runs one step at a time.'],
+      ['When a step finishes, a ', { strong: 'connection' }, ' decides what runs next. Rules on connections can look at how the step went.'],
+      ['Steps can ask a person, call an AI model, or run a tool. Results are saved so later steps can use them.'],
+      ['It ends when it reaches a ', { strong: 'Finish' }, ' step.'],
+    ]);
+  });
+});
+
+describe('branchRuleField', () => {
+  it('labels the rule with the target step and edits the edge condition', () => {
+    expect(branchRuleField({ target: 'Pick a favourite', label: '', loop: false })).toEqual({
+      attr: 'condition',
+      label: 'Go to “Pick a favourite” when…',
+      control: 'text',
+      placeholder: 'e.g. outcome=success',
+      help: 'Leave blank to use the label as the rule.',
+      tryChips: ['outcome=success', 'outcome=fail'],
+    });
+  });
+
+  it('mentions the connection label and the loop in the help', () => {
+    expect(branchRuleField({ target: 'Draft three concepts', label: 'No, try again', loop: true }).help).toBe(
+      'Connection label: No, try again. This path loops back and redoes the step. Leave blank to use the label as the rule.'
+    );
+    expect(branchRuleField({ target: 'Pick a favourite', label: 'Yes, continue', loop: false }).help).toBe(
+      'Connection label: Yes, continue. Leave blank to use the label as the rule.'
+    );
   });
 });
