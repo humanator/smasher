@@ -244,7 +244,7 @@ Rules for every task:
   - Files: `InterviewerForm.svelte`, its test, `convert.test.ts`.
   - Depends on: T10. Scope: S.
 
-- [ ] **Task 14: Split, Join, Start, Finish, and More settings for all kinds**
+- [x] **Task 14: Split, Join, Start, Finish, and More settings for all kinds**
   - Description:
     - Split `StructuralForm` into per-kind rendering. Split gets At most at once and Stop
       everything if one fails. Join, Start and Finish get their notes.

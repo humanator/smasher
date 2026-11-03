@@ -441,17 +441,66 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.getByTestId('sub-pipeline-path')).toHaveValue('sub.dot');
   });
 
-  it('shows StructuralForm (label-only) for a Start node', async () => {
+  it('shows FlowForm with the no-settings note, and no More settings, for a Start node', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
 
     await clickNodeByLabel('Begin');
 
-    expect(screen.getByTestId('structural-form')).toBeInTheDocument();
+    expect(screen.getByTestId('flow-form')).toHaveTextContent('This step has no settings beyond its name.');
     expect(screen.getByTestId('node-inspector-label')).toHaveValue('Begin');
+    expect(screen.queryByRole('button', { name: /More settings/ })).toBe(null);
   });
 
-  it('shows StructuralForm as a fallback for an unrecognized node_type string', async () => {
+  it('shows More settings after the kind\'s own fields for a step that can retry', async () => {
+    render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+
+    await clickNodeByLabel('Generate');
+
+    const more = screen.getByRole('button', { name: /More settings/ });
+    expect(more).toHaveTextContent('4 settings');
+    expect(screen.getByTestId('codergen-form').compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps a legacy retries attr when Retries is edited and the workflow saved', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(WorkflowCanvas, {
+      props: {
+        graph: { ...sampleGraph, nodes: sampleGraph.nodes.map((n) => (n.id === 'b' ? { ...n, attrs: { ...n.attrs, retries: 3 } } : n)) },
+        workflowId: 'existing-workflow',
+        onSave,
+      },
+    });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await clickNodeByLabel('B');
+
+    await fireEvent.click(screen.getByRole('button', { name: /More settings/ }));
+    await fireEvent.input(screen.getByTestId('more-max_retries'), { target: { value: '2' } });
+    await fireEvent.click(screen.getByTestId('save-button'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const saved = (onSave.mock.calls[0][0] as EditorGraph).nodes.find((n) => n.id === 'b');
+    expect(saved?.attrs).toMatchObject({ retries: 3, max_retries: 2 });
+  });
+
+  it('writes a Split\'s settings to its attrs', async () => {
+    const { component } = render(WorkflowCanvas, {
+      props: {
+        graph: { graph_attrs: {}, nodes: [{ id: 'fan', node_type: 'Parallel', label: 'Fan out', attrs: {} }], edges: [] },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Fan out')).toBeInTheDocument());
+    await clickNodeByLabel('Fan out');
+
+    await fireEvent.input(screen.getByTestId('parallel-max-concurrency'), { target: { value: '4' } });
+    await fireEvent.click(screen.getByTestId('parallel-fail-fast'));
+
+    expect(component.currentGraph().nodes[0].attrs).toMatchObject({ max_concurrency: 4, fail_fast: true });
+  });
+
+  it('shows FlowForm as a fallback for an unrecognized node_type string', async () => {
     render(WorkflowCanvas, {
       props: {
         graph: {
@@ -466,7 +515,7 @@ describe('node inspector (Task 7 side panel)', () => {
 
     await clickNodeByLabel('Mystery');
 
-    expect(screen.getByTestId('structural-form')).toBeInTheDocument();
+    expect(screen.getByTestId('flow-form')).toBeInTheDocument();
   });
 
   it('closes when the pane (not a node) is clicked', async () => {

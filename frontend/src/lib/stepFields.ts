@@ -320,6 +320,14 @@ function retryFields(handler: string): FieldSpec[] {
 
 const NO_RETRIES = new Set(['Start', 'Exit', 'Conditional']);
 
+/**
+ * Board fields the engine no longer reads: interviewer.rs ignores both (see its
+ * human_gate_ignores_legacy_timeout_and_default_choice_attrs test). The inspector and Step guide
+ * leave them out until it is decided whether to ship them, since the spec says to ask before
+ * writing attrs the engine doesn't read.
+ */
+export const UNREAD_ATTRS = new Set(['human.timeout_secs', 'human.default_choice']);
+
 /** Every field a step of this kind shows, in board order: Step name, the kind's own, then More settings. */
 export function stepFields(handler: string): FieldSpec[] {
   const own = KIND_FIELDS[handler];

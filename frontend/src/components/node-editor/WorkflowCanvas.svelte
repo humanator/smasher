@@ -41,7 +41,8 @@
   import ToolForm from './nodeForms/ToolForm.svelte';
   import ManagerForm from './nodeForms/ManagerForm.svelte';
   import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
-  import StructuralForm from './nodeForms/StructuralForm.svelte';
+  import FlowForm from './nodeForms/FlowForm.svelte';
+  import RetrySettings from './inspector/RetrySettings.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { usePageActions } from '$lib/page-header.svelte';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -64,11 +65,11 @@
 
   // Task 7: one form component per NodeType, rendered in a selected-node
   // side panel. Start/Exit/Parallel/FanIn/Conditional (no kind-specific
-  // attrs per grounding) *and* any unrecognized/future node_type string
-  // (same "don't crash on unknown kind" convention Task 4/6 already
-  // established for canvas rendering/the palette) fall back to
-  // StructuralForm via the `default` arm below.
-  function formComponentFor(nodeType: string): Component<NodeFormProps> {
+  // attrs per grounding, except Split's two) *and* any unrecognized/future
+  // node_type string (same "don't crash on unknown kind" convention Task 4/6
+  // already established for canvas rendering/the palette) fall back to
+  // FlowForm, which also needs the kind, via the `null` arm below.
+  function formComponentFor(nodeType: string): Component<NodeFormProps> | null {
     switch (nodeType) {
       case 'Codergen':
         return CodergenForm;
@@ -81,7 +82,7 @@
       case 'SubPipeline':
         return SubPipelineForm;
       default:
-        return StructuralForm;
+        return null;
     }
   }
 
@@ -535,7 +536,12 @@
         testId="node-inspector-label"
         oninput={(label) => applyNodeFormChange(node.id, { label })}
       />
-      <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
+      {#if FormComponent}
+        <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
+      {:else}
+        <FlowForm handler={node.data.nodeType} attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
+      {/if}
+      <RetrySettings handler={node.data.nodeType} attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
     </div>
   {:else if selectedEdge}
     {@const edge = selectedEdge}
