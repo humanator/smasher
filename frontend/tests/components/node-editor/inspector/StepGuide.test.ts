@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import StepGuide from '../../../../src/components/node-editor/inspector/StepGuide.svelte';
-import { stepFields, UNREAD_ATTRS } from '../../../../src/lib/stepFields';
+import { stepFields } from '../../../../src/lib/stepFields';
 import { STEP_GROUPS, stepKind } from '../../../../src/lib/stepKinds';
 
 const HANDLERS = STEP_GROUPS.flatMap((g) => g.kinds);
@@ -28,7 +28,7 @@ describe('StepGuide', () => {
   it.each(HANDLERS.filter((h) => !NO_SETTINGS.includes(h)))('%s lists every setting but Step name, with its help', (handler) => {
     render(StepGuide, { props: { handler, onAdd: vi.fn() } });
 
-    const expected = stepFields(handler).filter((f) => f.attr !== 'label' && !UNREAD_ATTRS.has(f.attr));
+    const expected = stepFields(handler).filter((f) => f.attr !== 'label');
     const items = within(settingsList()).getAllByRole('listitem');
     expect(items).toHaveLength(expected.length);
     expected.forEach((field, i) => {

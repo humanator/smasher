@@ -228,14 +228,14 @@ Rules for every task:
   - Files: `ToolForm.svelte`, its test.
   - Depends on: T10. Scope: S.
 
-- [ ] **Task 13: Ask a person**
+- [x] **Task 13: Ask a person**
   - Description:
     - Question, then "How should they answer?" (Free text / Yes or no / Pick from a list).
     - Pick from a list requires Options.
     - Free text adds the gallery switch, which reveals Candidates to expect. Choosing a
       non-free-text answer turns the gallery off and clears `candidate_count`.
-    - More settings: Stop waiting after [`human.timeout_secs`] and Fallback answer
-      [`human.default_choice`].
+    - ~~More settings: Stop waiting after and Fallback answer~~ dropped 2026-11-03: the engine no
+      longer reads `human.timeout_secs` / `human.default_choice`.
   - Acceptance:
     - Each mode writes the same attrs as today's form.
     - The gallery rules hold.

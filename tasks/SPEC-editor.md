@@ -47,7 +47,7 @@ artboard's mock lights are not drawn.
 | D9 | Validation is a pure client-side function, `lib/workflowProblems.ts`: graph → `{ nodeId?, edgeId?, message }[]`. It covers the design's seven node rules, invalid JSON, a non-integer priority, plus "no Start step", "more than one Start step" and "no Finish step". The server's save-time validation stays authoritative, and its error still shows in an alert. |
 | D10 | The toolbar title is the workflow's name, and Back goes to the workflow page (`/workflows/{id}`, "Back to {name}"). Create mode is titled "New workflow", Back goes to Workflows, and the Name + Folder fields sit in a slim bar above the canvas, restyled. |
 | D11 | **Run** opens the existing Run dialog for this workflow. With unsaved changes it saves first and opens the dialog only if the save succeeds. A failed save shows the usual error. Hidden in create mode until the first save. |
-| D12 | The "New" fields the design marks (connection **Label**, **Retries**/**Wait between attempts**/**Longest wait**/**Randomise the wait**, **Stop waiting after**/**Fallback answer**, **At most at once**, **Stop everything if one fails**) are built. They are plain DOT attributes the engine already reads (`retry.rs`, `interviewer.rs`, `parallel.rs`), and the server round-trips unknown attrs, so no API change is needed. The "New" badge and its tooltip are not shipped: once the app shows the setting, the badge is no longer true. |
+| D12 | The "New" fields the design marks (connection **Label**, **Retries**/**Wait between attempts**/**Longest wait**/**Randomise the wait**, **At most at once**, **Stop everything if one fails**) are built. They are plain DOT attributes the engine already reads (`retry.rs`, `parallel.rs`), and the server round-trips unknown attrs, so no API change is needed. The "New" badge and its tooltip are not shipped: once the app shows the setting, the badge is no longer true. |
 | D13 | Phone width (<768px): the palette and inspector become sheets opened from toolbar buttons ("Steps", "Inspector"), the canvas fills the screen, and zoom collapses to Fit only. No sideways page scroll. Editing on a phone works but isn't the primary target. |
 
 ## Requirements
@@ -143,8 +143,9 @@ tabindex.
    - **Ask a person:** Question [`question`], "How should they answer?" (Free text / Yes or no /
      Pick from a list). Pick from a list needs Options. Free text adds the **Show a gallery of
      candidates** switch, which reveals Candidates to expect [`candidate_count`]. Choosing a
-     non-free-text answer turns the gallery off and clears `candidate_count`. More settings holds
-     Stop waiting after [`human.timeout_secs`] and Fallback answer [`human.default_choice`].
+     non-free-text answer turns the gallery off and clears `candidate_count`. (Amended 2026-11-03:
+     the board's Stop waiting after and Fallback answer are dropped, because `interviewer.rs` no
+     longer reads `human.timeout_secs` or `human.default_choice` since 445bf80a.)
    - **Nested workflow:** Workflow file [`pipeline`].
    - **Split:** At most at once [`max_concurrency`], Stop everything if one fails [`fail_fast`].
    - **Join / Start / Finish:** the design's no-settings notes.

@@ -4,14 +4,14 @@
 
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
-  import { STEP_GUIDE, stepFields, UNREAD_ATTRS } from '$lib/stepFields';
+  import { STEP_GUIDE, stepFields } from '$lib/stepFields';
   import { stepKind } from '$lib/stepKinds';
 
   let { handler, onAdd }: { handler: string; onAdd: (handler: string) => void } = $props();
 
   const uid = $props.id();
   const about = $derived(stepKind(handler).about);
-  const fields = $derived(stepFields(handler).filter((f) => f.attr !== 'label' && !UNREAD_ATTRS.has(f.attr)));
+  const fields = $derived(stepFields(handler).filter((f) => f.attr !== 'label'));
 </script>
 
 {#each about as [heading, text] (heading)}

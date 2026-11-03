@@ -3,7 +3,7 @@
   // ABOUTME: Every kind except Start, Finish and Branch gets it; values are written in the types retry.rs reads
 
   import { untrack } from 'svelte';
-  import { stepFields, UNREAD_ATTRS } from '$lib/stepFields';
+  import { stepFields } from '$lib/stepFields';
   import type { NodeFormProps } from '../types';
   import { attrText, numberOrText } from './attrText';
   import Field from './Field.svelte';
@@ -19,7 +19,7 @@
 
   let { handler, attrs, onChange }: NodeFormProps & { handler: string } = $props();
 
-  const fields = $derived(stepFields(handler).filter((f) => f.advanced && !UNREAD_ATTRS.has(f.attr)));
+  const fields = $derived(stepFields(handler).filter((f) => f.advanced));
 
   // Seeded once per mount (the canvas remounts the inspector on every selection change).
   const values = $state<Record<string, string>>(

@@ -59,7 +59,7 @@ describe('stepFields', () => {
   it('counts More settings per kind', () => {
     const counts = Object.fromEntries(HANDLERS.map((h) => [h, stepFields(h).filter((f) => f.advanced).length]));
     expect(counts).toEqual({
-      Codergen: 4, Manager: 4, Tool: 4, Interviewer: 6, Conditional: 0,
+      Codergen: 4, Manager: 4, Tool: 4, Interviewer: 4, Conditional: 0,
       Parallel: 4, FanIn: 4, SubPipeline: 4, Start: 0, Exit: 0,
     });
   });
@@ -252,7 +252,6 @@ describe('stepFields', () => {
     it('lists Question, the answer mode, Options, the gallery and its count, then More settings', () => {
       expect(stepFields('Interviewer').map((f) => f.attr)).toEqual([
         'label', 'question', 'answer_mode', 'options', 'gallery', 'candidate_count',
-        'human.timeout_secs', 'human.default_choice',
         'max_retries', 'retry_delay', 'max_retry_delay', 'retry_jitter',
       ]);
     });
@@ -272,7 +271,7 @@ describe('stepFields', () => {
       ]);
     });
 
-    it('has the gallery and fallback copy', () => {
+    it('has the gallery copy', () => {
       expect(field('Interviewer', 'gallery')).toMatchObject({
         label: 'Show a gallery of candidates',
         control: 'switch',
@@ -280,19 +279,13 @@ describe('stepFields', () => {
       });
       expect(field('Interviewer', 'candidate_count')).toMatchObject({ label: 'Candidates to expect', placeholder: '3' });
       expect(field('Interviewer', 'options')).toMatchObject({ label: 'Options', placeholder: 'approve, revise, reject', help: 'Separate the choices with commas.' });
-      expect(field('Interviewer', 'human.timeout_secs')).toMatchObject({
-        label: 'Stop waiting after (seconds)',
-        placeholder: 'e.g. 3600',
-        help: 'If nobody answers in time, the step carries on with the fallback answer below. Free text answers only.',
-        advanced: true,
-      });
-      expect(field('Interviewer', 'human.default_choice')).toMatchObject({
-        label: 'Fallback answer',
-        placeholder: 'e.g. approve',
-        help: 'The answer to use when the wait runs out.',
-        advanced: true,
-      });
     });
+  });
+
+  it('leaves out the human.* wait settings the engine no longer reads', () => {
+    const attrs = stepFields('Interviewer').map((f) => f.attr);
+    expect(attrs).not.toContain('human.timeout_secs');
+    expect(attrs).not.toContain('human.default_choice');
   });
 
   describe('flow kinds', () => {

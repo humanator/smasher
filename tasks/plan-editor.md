@@ -49,8 +49,9 @@ replacement, and the old forms stay mounted until their kind's new form lands.
   - `WorkflowEditorPage.test.ts`;
   - `e2e/node-editor.spec.ts` and `e2e/node-model.spec.ts`.
 - **Engine attributes:** the engine reads every new attribute the inspector writes. `max_retries`,
-  `retry_delay`, `max_retry_delay` and `retry_jitter` are in `retry.rs`; `human.timeout_secs` and
-  `human.default_choice` in `interviewer.rs`; `max_concurrency` and `fail_fast` in `parallel.rs`.
+  `retry_delay`, `max_retry_delay` and `retry_jitter` are in `retry.rs`; `max_concurrency` and
+  `fail_fast` in `parallel.rs`. (`human.timeout_secs` and `human.default_choice` are no longer read
+  by `interviewer.rs`, so those two board fields were dropped on 2026-11-03.)
 
 ## Architecture Decisions
 

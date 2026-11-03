@@ -249,22 +249,6 @@ const KIND_FIELDS: Record<string, FieldSpec[]> = {
         { title: 'Good to know', text: 'Only used for the gallery display and its warnings. It does not limit how many candidates the run makes.' },
       ],
     },
-    {
-      attr: 'human.timeout_secs',
-      label: 'Stop waiting after (seconds)',
-      control: 'text',
-      advanced: true,
-      placeholder: 'e.g. 3600',
-      help: 'If nobody answers in time, the step carries on with the fallback answer below. Free text answers only.',
-    },
-    {
-      attr: 'human.default_choice',
-      label: 'Fallback answer',
-      control: 'text',
-      advanced: true,
-      placeholder: 'e.g. approve',
-      help: 'The answer to use when the wait runs out.',
-    },
   ],
   SubPipeline: [
     {
@@ -319,14 +303,6 @@ function retryFields(handler: string): FieldSpec[] {
 }
 
 const NO_RETRIES = new Set(['Start', 'Exit', 'Conditional']);
-
-/**
- * Board fields the engine no longer reads: interviewer.rs ignores both (see its
- * human_gate_ignores_legacy_timeout_and_default_choice_attrs test). The inspector and Step guide
- * leave them out until it is decided whether to ship them, since the spec says to ask before
- * writing attrs the engine doesn't read.
- */
-export const UNREAD_ATTRS = new Set(['human.timeout_secs', 'human.default_choice']);
 
 /** Every field a step of this kind shows, in board order: Step name, the kind's own, then More settings. */
 export function stepFields(handler: string): FieldSpec[] {
