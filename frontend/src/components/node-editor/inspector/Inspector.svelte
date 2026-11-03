@@ -15,6 +15,7 @@
   import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
   import XIcon from '@lucide/svelte/icons/x';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { cn } from '$lib/utils.js';
   import * as Tabs from '$lib/components/ui/tabs/index.js';
   import { CONNECTION_ABOUT, NOTHING_SELECTED, type RichText } from '$lib/stepFields';
   import { stepKind, type AboutSection } from '$lib/stepKinds';
@@ -26,6 +27,7 @@
     onDelete,
     onAdd = () => {},
     settings,
+    class: className = undefined,
   }: {
     view: InspectorView;
     onClose: () => void;
@@ -34,6 +36,8 @@
     onAdd?: (handler: string) => void;
     /** The Settings tab's content for a step or connection. */
     settings?: Snippet;
+    /** Restyles the frame, e.g. to fill the phone-width sheet. */
+    class?: string;
   } = $props();
 
   let tab = $state('settings');
@@ -87,7 +91,7 @@
 
 <aside
   aria-label="Inspector"
-  class="flex min-h-0 w-[360px] flex-none flex-col border-l border-border bg-muted"
+  class={cn('flex min-h-0 w-[360px] flex-none flex-col border-l border-border bg-muted', className)}
   data-testid={testId}
 >
   {#if !header}

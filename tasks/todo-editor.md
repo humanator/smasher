@@ -345,7 +345,7 @@ Rules for every task:
   - Files: `NewWorkflowPage.svelte`, `WorkflowCanvas.svelte`, tests.
   - Depends on: T17. Scope: S.
 
-- [ ] **Task 20: Phone width**
+- [x] **Task 20: Phone width**
   - Description:
     - Below 768px, the palette and inspector render in `Sheet`s, opened from the toolbar's
       **Steps** and **Inspector** buttons.

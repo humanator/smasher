@@ -1335,3 +1335,137 @@ describe('save state (Task 17)', () => {
     expect(beforeUnloadBlocked()).toBe(false);
   });
 });
+
+// Task 20 (D13): below 768px the step library and inspector are sheets
+// opened from the toolbar, and zoom collapses to Fit; from 768px to 1100px
+// the inspector sits beside the canvas but can be closed.
+describe('narrow widths (Task 20)', () => {
+  let restoreMatchMedia: (() => void) | undefined;
+
+  // Answers each `max-width: Npx` query for a window `width` wide; any
+  // other query (Svelte Flow's colour scheme) doesn't match.
+  function viewport(width: number) {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => {
+      const max = /max-width:\s*(\d+)px/.exec(query);
+      return {
+        matches: max ? width <= Number(max[1]) : false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      };
+    }) as typeof window.matchMedia;
+    restoreMatchMedia = () => (window.matchMedia = original);
+  }
+
+  afterEach(() => {
+    restoreMatchMedia?.();
+    restoreMatchMedia = undefined;
+  });
+
+  async function renderAt(width: number) {
+    viewport(width);
+    render(CanvasHost, { props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+  }
+
+  const toolbar = () => screen.getByRole('banner');
+
+  describe('on a phone (375px)', () => {
+    it('keeps the step library and inspector off the page, with Steps and Inspector in the toolbar', async () => {
+      await renderAt(375);
+
+      expect(screen.queryByTestId('palette')).toBeNull();
+      expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+      expect(within(toolbar()).getByRole('button', { name: 'Steps' })).toHaveAttribute('aria-expanded', 'false');
+      expect(within(toolbar()).getByRole('button', { name: 'Inspector' })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('collapses zoom to Fit', async () => {
+      await renderAt(375);
+
+      expect(within(toolbar()).queryByRole('group', { name: 'Zoom' })).toBeNull();
+      expect(within(toolbar()).getByRole('button', { name: 'Fit' })).toBeInTheDocument();
+    });
+
+    it('opens the step library in a sheet from Steps, and picking a step shows its guide in the Inspector sheet', async () => {
+      await renderAt(375);
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Steps' }));
+      const library = await screen.findByRole('dialog', { name: 'Step library' });
+      await fireEvent.click(within(library).getByTestId('palette-entry-Tool'));
+
+      const inspector = await screen.findByRole('dialog', { name: 'Inspector' });
+      expect(within(inspector).getByTestId('step-guide')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Step library' })).toBeNull());
+    });
+
+    it('opens the Inspector sheet when a step is selected', async () => {
+      await renderAt(375);
+
+      await clickNodeByLabel('B');
+
+      const inspector = await screen.findByRole('dialog', { name: 'Inspector' });
+      expect(within(inspector).getByTestId('node-inspector-label')).toHaveValue('B');
+    });
+
+    it('opens the Inspector sheet from the toolbar, and Close inspector closes it', async () => {
+      await renderAt(375);
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Inspector' }));
+      const inspector = await screen.findByRole('dialog', { name: 'Inspector' });
+      expect(within(inspector).getByTestId('nothing-selected')).toBeInTheDocument();
+
+      await clickNodeByLabel('B');
+      await fireEvent.click(within(screen.getByRole('dialog', { name: 'Inspector' })).getByRole('button', { name: 'Close inspector' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Inspector' })).toBeNull());
+    });
+  });
+
+  describe('on a tablet (900px)', () => {
+    it('shows the step library and inspector beside the canvas, with the zoom group', async () => {
+      await renderAt(900);
+
+      expect(screen.getByTestId('palette')).toBeInTheDocument();
+      expect(screen.getByRole('complementary', { name: 'Inspector' })).toBeInTheDocument();
+      expect(within(toolbar()).getByRole('group', { name: 'Zoom' })).toBeInTheDocument();
+      expect(within(toolbar()).queryByRole('button', { name: 'Steps' })).toBeNull();
+    });
+
+    it('closes the inspector with Close inspector, and brings it back from the toolbar or a selection', async () => {
+      await renderAt(900);
+      await clickNodeByLabel('B');
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
+      expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+      const toggle = within(toolbar()).getByRole('button', { name: 'Inspector' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+      await fireEvent.click(toggle);
+      expect(screen.getByTestId('nothing-selected')).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+      // Nothing selected has no header to close from, so the toolbar puts it away.
+      await fireEvent.click(toggle);
+      expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+      await clickNodeByLabel('A');
+      expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the inspector at 1100px and up, with no Steps or Inspector buttons', async () => {
+    await renderAt(1440);
+    await clickNodeByLabel('B');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
+
+    expect(screen.getByTestId('nothing-selected')).toBeInTheDocument();
+    expect(within(toolbar()).queryByRole('button', { name: 'Steps' })).toBeNull();
+    expect(within(toolbar()).queryByRole('button', { name: 'Inspector' })).toBeNull();
+  });
+});

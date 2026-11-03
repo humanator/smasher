@@ -51,6 +51,8 @@
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import * as Sheet from '$lib/components/ui/sheet/index.js';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte';
   import { stepFields } from '$lib/stepFields';
   import { stepKind } from '$lib/stepKinds';
   import { workflowProblems, type Problem } from '$lib/workflowProblems';
@@ -271,12 +273,33 @@
     selection = { kind: 'none' };
   }
 
-  // Close inspector: let go of the selection, in Svelte Flow too.
+  // Close inspector: let go of the selection, in Svelte Flow too. Below
+  // 1100px it also puts the inspector away.
   function clearSelection() {
     nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
     edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
     selection = { kind: 'none' };
+    inspectorOpen = false;
   }
+
+  // D13: below 768px the step library and the inspector are sheets opened
+  // from the toolbar, and zoom collapses to Fit. From 768px to 1100px the
+  // inspector sits beside the canvas but can be put away. Selecting
+  // anything (a step picked in the library included) shows it again.
+  const phone = new IsMobile();
+  const narrow = new IsMobile(1100);
+  let stepsOpen = $state(false);
+  // Beside the canvas it starts out shown; a phone's sheet starts closed.
+  let inspectorOpen = $state(!phone.current);
+  const inspectorShown = $derived(!narrow.current || inspectorOpen);
+
+  $effect(() => {
+    if (selection.kind === 'none') return;
+    untrack(() => {
+      inspectorOpen = true;
+      if (selection.kind === 'guide') stepsOpen = false;
+    });
+  });
 
   // The inspector's Delete Step / Delete Connection (D3). A step takes its
   // connections with it, as Backspace does.
@@ -710,11 +733,56 @@
     onRun={onRun && !isCreateMode ? () => void handleRun() : undefined}
     {saving}
     {saveDisabled}
+    compact={phone.current}
+    onSteps={phone.current ? () => (stepsOpen = !stepsOpen) : undefined}
+    {stepsOpen}
+    onInspector={narrow.current ? () => (inspectorOpen = !inspectorOpen) : undefined}
+    {inspectorOpen}
   />
 {/snippet}
 
+<!-- Remount on selection change: each form seeds its local field state
+     from `attrs` only once per mount (documented in each form's own
+     comment), and the inspector's tab goes back to Settings. -->
+{#snippet inspectorPanel(className?: string)}
+  {#key inspectorKey}
+    <Inspector
+      view={inspectorView}
+      onClose={clearSelection}
+      onDelete={deleteSelection}
+      onAdd={addStepAtCentre}
+      settings={inspectorSettings}
+      class={className}
+    />
+  {/key}
+{/snippet}
+
 <div class="w-full h-full flex-1 min-h-[480px] flex flex-row">
-  <Palette selected={guideHandler} onSelect={selectGuide} />
+  {#if phone.current}
+    <Sheet.Root bind:open={stepsOpen}>
+      <!-- A step picked here opens its guide in the Inspector sheet, which takes focus; don't hand it back to Steps. -->
+      <Sheet.Content
+        side="left"
+        showCloseButton={false}
+        aria-label="Step library"
+        class="w-[280px] gap-0 p-0"
+        onCloseAutoFocus={(event) => {
+          if (inspectorOpen) event.preventDefault();
+        }}
+      >
+        <Sheet.Title class="sr-only">Step library</Sheet.Title>
+        <Palette selected={guideHandler} onSelect={selectGuide} class="w-full flex-1 border-r-0" />
+      </Sheet.Content>
+    </Sheet.Root>
+    <Sheet.Root bind:open={inspectorOpen}>
+      <Sheet.Content side="right" showCloseButton={false} aria-label="Inspector" class="w-full gap-0 p-0 data-[side=right]:max-w-[360px]">
+        <Sheet.Title class="sr-only">Inspector</Sheet.Title>
+        {@render inspectorPanel('w-full flex-1 border-l-0')}
+      </Sheet.Content>
+    </Sheet.Root>
+  {:else}
+    <Palette selected={guideHandler} onSelect={selectGuide} />
+  {/if}
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
       <!-- D10: a new workflow's Name and Folder sit in a slim bar above the canvas. -->
@@ -794,18 +862,9 @@
       <p role="alert" data-testid="save-error" class="text-destructive text-sm px-3 py-2">{saveError}</p>
     {/if}
   </div>
-  <!-- Remount on selection change: each form seeds its local field state
-       from `attrs` only once per mount (documented in each form's own
-       comment), and the inspector's tab goes back to Settings. -->
-  {#key inspectorKey}
-    <Inspector
-      view={inspectorView}
-      onClose={clearSelection}
-      onDelete={deleteSelection}
-      onAdd={addStepAtCentre}
-      settings={inspectorSettings}
-    />
-  {/key}
+  {#if !phone.current && inspectorShown}
+    {@render inspectorPanel()}
+  {/if}
 </div>
 
 <style>

@@ -4,12 +4,18 @@
 
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
+  import { cn } from '$lib/utils.js';
   import { STEP_GROUPS, stepKind } from '$lib/stepKinds';
   import { NODE_DRAG_DATA_TYPE } from './nodeConfig';
 
   // Purely presentational: the canvas owns the selection (its `guide` case)
   // and passes it back in as `selected`.
-  let { selected, onSelect }: { selected: string | null; onSelect: (handler: string | null) => void } = $props();
+  // `class` restyles the frame, e.g. to fill the phone-width sheet.
+  let {
+    selected,
+    onSelect,
+    class: className = undefined,
+  }: { selected: string | null; onSelect: (handler: string | null) => void; class?: string } = $props();
 
   const uid = $props.id();
   let query = $state('');
@@ -33,7 +39,7 @@
 
 <aside
   aria-label="Step library"
-  class="flex w-[260px] flex-none flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground min-h-0"
+  class={cn('flex w-[260px] flex-none flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground min-h-0', className)}
   data-testid="palette"
 >
   <div class="flex-none px-3 pt-3 pb-2">

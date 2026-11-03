@@ -1,4 +1,4 @@
-// ABOUTME: Tests for EditorToolbarActions, the editor's toolbar controls: zoom group, Fit, Export .dot file, Save and Run
+// ABOUTME: Tests for EditorToolbarActions, the editor's toolbar controls: zoom group, Fit, Export .dot file, Save, Run, Steps and Inspector
 // ABOUTME: Rendered on its own with spies for each callback; the canvas tests cover what they drive
 
 import { describe, it, expect, vi } from 'vitest';
@@ -78,6 +78,33 @@ describe('EditorToolbarActions', () => {
   it('has no Run without a run to start', () => {
     render(EditorToolbarActions, { props: props() });
     expect(screen.queryByRole('button', { name: 'Run' })).toBeNull();
+  });
+
+  it('collapses zoom to Fit when compact (phone width)', () => {
+    render(EditorToolbarActions, { props: props({ compact: true }) });
+    expect(screen.queryByRole('group', { name: 'Zoom' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Fit' })).toBeInTheDocument();
+  });
+
+  it('opens the step library and inspector from Steps and Inspector, saying whether each is open', async () => {
+    const onSteps = vi.fn();
+    const onInspector = vi.fn();
+    render(EditorToolbarActions, { props: props({ onSteps, stepsOpen: false, onInspector, inspectorOpen: true }) });
+
+    const steps = screen.getByRole('button', { name: 'Steps' });
+    const inspector = screen.getByRole('button', { name: 'Inspector' });
+    expect(steps).toHaveAttribute('aria-expanded', 'false');
+    expect(inspector).toHaveAttribute('aria-expanded', 'true');
+    await fireEvent.click(steps);
+    await fireEvent.click(inspector);
+    expect(onSteps).toHaveBeenCalledTimes(1);
+    expect(onInspector).toHaveBeenCalledTimes(1);
+  });
+
+  it('has no Steps or Inspector buttons at full width', () => {
+    render(EditorToolbarActions, { props: props() });
+    expect(screen.queryByRole('button', { name: 'Steps' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Inspector' })).toBeNull();
   });
 
   it('says Saving… while a save is in flight', () => {
