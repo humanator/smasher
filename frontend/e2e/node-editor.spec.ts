@@ -122,17 +122,20 @@ test('a dropped node lands under the pointer after zooming and panning', async (
   await expect(page.locator('.svelte-flow__node')).toHaveCount(1);
 
   // That fit zooms to the maximum around one node, so zoom out with the
-  // mouse wheel (the canvas has no zoom buttons of its own; the toolbar's
-  // come later), then pan by dragging the empty pane. The viewport is then
-  // neither at zoom 1 nor at the origin.
+  // toolbar's Zoom out, then pan by dragging the empty pane. The viewport is
+  // then neither at zoom 1 nor at the origin.
   const pane = await page.locator('.svelte-flow__pane').boundingBox();
   expect(pane).not.toBeNull();
   const start = { x: pane!.x + pane!.width / 2, y: pane!.y + pane!.height / 2 };
   const viewport = page.locator('.svelte-flow__viewport');
   const before = await viewport.getAttribute('style');
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.wheel(0, 300);
+  const zoom = page.getByRole('group', { name: 'Zoom' });
+  const level = await zoom.textContent();
+  await zoom.getByRole('button', { name: 'Zoom out' }).click();
+  await zoom.getByRole('button', { name: 'Zoom out' }).click();
   await expect(viewport).not.toHaveAttribute('style', before!);
+  await expect(zoom).not.toHaveText(level!);
+  await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(start.x - 120, start.y - 80, { steps: 8 });
   await page.mouse.up();
@@ -187,6 +190,35 @@ test('saving over a file changed on disk toasts the conflict, and Save anyway wr
     const saved = readFileSync(path, 'utf-8');
     expect(saved).toContain('Done in editor');
     expect(saved).not.toContain('Done elsewhere');
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
+test('saving over a file changed on disk toasts the conflict, and Reload shows the version on disk', async ({
+  page,
+  baseURL,
+}) => {
+  const base = baseURL || 'http://127.0.0.1:5173';
+  const name = `_test_node_editor_reload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const dot = 'digraph { start [shape=Mdiamond, label="Start"]; done [shape=doublecircle, label="Done"]; start -> done; }';
+  const { id } = await (await page.request.post(`${base}/api/workflows/import`, { data: { name, dot } })).json();
+  const listed = await (await page.request.get(`${base}/api/workflows`)).json();
+  const path: string = listed.workflows.find((w: { id: string }) => w.id === id).path;
+
+  try {
+    await page.goto(`${base}/workflows/${id}/edit`);
+    await expect(page.locator('.svelte-flow__node')).toHaveCount(2, { timeout: 10000 });
+    await page.locator('.svelte-flow__node[data-id="done"]').click();
+    await page.getByTestId('node-inspector-label').fill('Done in editor');
+    writeFileSync(path, dot.replace('label="Done"', 'label="Done elsewhere"'));
+
+    await page.getByTestId('save-button').click();
+    const toast = page.locator('[data-sonner-toast]', { hasText: 'changed on disk' });
+    await toast.getByRole('button', { name: 'Reload' }).click();
+    await expect(toast).toHaveCount(0);
+    await expect(page.locator('.svelte-flow__node[data-id="done"]')).toContainText('Done elsewhere');
+    expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
   } finally {
     rmSync(path, { force: true });
   }

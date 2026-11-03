@@ -367,7 +367,7 @@ Rules for every task:
 
 ## Phase 5: Verify
 
-- [ ] **Task 21: E2E**
+- [x] **Task 21: E2E**
   - Description:
     - Update `node-editor.spec.ts` and `node-model.spec.ts` to the new selectors, keeping every
       scenario.
