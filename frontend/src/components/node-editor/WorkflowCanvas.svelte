@@ -4,19 +4,19 @@
 
   import {
     Background,
+    BackgroundVariant,
     ConnectionMode,
-    Controls,
     MarkerType,
     MiniMap,
     SvelteFlow,
     type Edge as FlowEdge,
     type Node as FlowNode,
-    type XYPosition,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { setContext, type Component, type Snippet } from 'svelte';
   import Palette from './Palette.svelte';
-  import FlowPositionBridge from './FlowPositionBridge.svelte';
+  import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
+  import StatusBar from './StatusBar.svelte';
   import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import {
     DEFAULT_RANKDIR,
@@ -46,7 +46,7 @@
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
   import { stepKind } from '$lib/stepKinds';
-  import { workflowProblems } from '$lib/workflowProblems';
+  import { workflowProblems, type Problem } from '$lib/workflowProblems';
 
   // Task 8: WorkflowEdge.svelte is the only edge type this canvas renders
   // (loaded edges via convert.ts's toFlowEdges, freshly hand-drawn ones via
@@ -150,8 +150,8 @@
   // The drop point is converted to flow coordinates (pan and zoom applied)
   // with useSvelteFlow()'s screenToFlowPosition. That hook only works in a
   // descendant of <SvelteFlow>, and this component's own <script> runs
-  // outside that context, so FlowPositionBridge.svelte (rendered inside
-  // <SvelteFlow> below) hands the function back up via `toFlowPosition`.
+  // outside that context, so FlowBridge.svelte (rendered inside <SvelteFlow>
+  // below) hands it -- with the other viewport helpers -- back up via `flow`.
   let nodeIdCounter = 0;
 
   function nextNodeId(nodeType: string): string {
@@ -353,7 +353,9 @@
     });
   }
 
-  let toFlowPosition: ((screen: XYPosition) => XYPosition) | undefined;
+  // useSvelteFlow()'s helpers, handed up by FlowBridge (see addNodeAtPosition's
+  // comment). Its onZoom level is for the toolbar's zoom group (Task 17).
+  let flow: FlowApi | undefined;
 
   // A node's size is only known once Svelte Flow has rendered and measured
   // it, so a dropped node is placed with its top-left at the drop point and
@@ -391,11 +393,47 @@
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
-    if (!nodeType || !toFlowPosition) return;
-    const id = addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
+    if (!nodeType || !flow) return;
+    const id = addNodeAtPosition(nodeType, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }));
     if (!id) return;
     nodes = nodes.map((n) => (n.id === id ? { ...n, style: 'visibility: hidden;' } : n));
     nodeToCentre = id;
+  }
+
+  // Review in the status bar: select the problem's step or connection, in
+  // Svelte Flow too (so its ring shows), and pan to it at the current zoom.
+  function selectNode(nodeId: string) {
+    nodes = nodes.map((n) => (!!n.selected === (n.id === nodeId) ? n : { ...n, selected: n.id === nodeId }));
+    edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+    selectedNodeId = nodeId;
+    selectedEdgeId = null;
+  }
+
+  function centreOf(nodeId: string): { x: number; y: number } | null {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    return {
+      x: node.position.x + (node.measured?.width ?? 0) / 2,
+      y: node.position.y + (node.measured?.height ?? 0) / 2,
+    };
+  }
+
+  function reviewProblem(problem: Problem) {
+    let centre: { x: number; y: number } | null = null;
+    if (problem.nodeId) {
+      selectNode(problem.nodeId);
+      centre = centreOf(problem.nodeId);
+    } else if (problem.edgeId) {
+      const edge = edges.find((e) => e.id === problem.edgeId);
+      if (!edge) return;
+      nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+      edges = edges.map((e) => (!!e.selected === (e.id === edge.id) ? e : { ...e, selected: e.id === edge.id }));
+      selectEdge(edge.id);
+      const a = centreOf(edge.source);
+      const b = centreOf(edge.target);
+      if (a && b) centre = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+    if (centre && flow) void flow.setCenter(centre.x, centre.y, { zoom: flow.getZoom(), duration: 200 });
   }
 
   let saving = $state(false);
@@ -494,13 +532,20 @@
         onpaneclick={handlePaneClick}
         onedgeclick={handleEdgeClick}
       >
-        <FlowPositionBridge onReady={(fn) => (toFlowPosition = fn)} />
-        <Background />
-        <Controls />
-        <MiniMap />
+        <FlowBridge onReady={(api) => (flow = api)} />
+        <Background variant={BackgroundVariant.Dots} gap={20} bgColor="var(--muted)" patternColor="var(--divider)" />
+        <MiniMap
+          class="overflow-hidden rounded-lg shadow-tooltip"
+          bgColor="var(--card)"
+          maskColor="var(--scrim-faint)"
+          nodeColor={(n) => stepKind(String(n.data.nodeType)).tint}
+          nodeStrokeColor={(n) => stepKind(String(n.data.nodeType)).ink}
+          nodeStrokeWidth={1}
+        />
       </SvelteFlow>
       <Legend />
     </div>
+    <StatusBar stepCount={nodes.length} connectionCount={edges.length} {problems} onReview={reviewProblem} />
     {#if !saveInHeader}
       {@render saveAction()}
     {/if}

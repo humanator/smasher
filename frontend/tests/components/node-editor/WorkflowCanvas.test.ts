@@ -276,7 +276,7 @@ describe('create mode (no workflowId)', () => {
 
 // Task 6: node-kind visual registry + palette sidebar. Palette.svelte has
 // no @xyflow/svelte context-dependent bits of its own (the drop position
-// comes from FlowPositionBridge.svelte, inside <SvelteFlow>, not from
+// comes from FlowBridge.svelte, inside <SvelteFlow>, not from
 // Palette), but it's tested here, through the real integration point,
 // rather than a throwaway Palette-only render harness.
 describe('palette', () => {
@@ -353,7 +353,7 @@ describe('palette', () => {
 // by calling the underlying handler directly. jsdom can't do real viewport
 // maths either, so whether a drop lands under the pointer at any pan/zoom
 // is proven by e2e/node-editor.spec.ts; the one synthetic `drop` test
-// below only covers the wiring through FlowPositionBridge.svelte.
+// below only covers the wiring through FlowBridge.svelte.
 // Task 7: node-kind form components + the selected-node side panel that
 // swaps between them. `sampleGraph` above only has Start/Codergen; this
 // fixture adds one node per interesting kind so each form's testid can be
@@ -597,7 +597,7 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
     expect(component.currentGraph().nodes).toHaveLength(2);
   });
 
-  it('turns a drop event into a node via the flow-position bridge', async () => {
+  it('turns a drop event into a node via the flow bridge', async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
 
@@ -795,5 +795,69 @@ describe('connection labels and legend (Task 7)', () => {
     const canvas = within(screen.getByRole('region', { name: 'Workflow canvas drop zone' }));
     expect(canvas.getByText('Then run the next step')).toBeInTheDocument();
     expect(canvas.getByText('Go back and redo (a loop)')).toBeInTheDocument();
+  });
+});
+
+// Task 8: canvas chrome and the status bar under it.
+describe('canvas chrome and status bar (Task 8)', () => {
+  const problemGraph: EditorGraph = {
+    name: 'Problems',
+    graph_attrs: {},
+    nodes: [
+      { id: 'start', node_type: 'Start', label: 'Begin', attrs: {} },
+      { id: 'check', node_type: 'Tool', label: 'Check', attrs: {} },
+      { id: 'end', node_type: 'Exit', label: 'Done', attrs: {} },
+    ],
+    edges: [
+      { from: 'start', to: 'check', loop_restart: false, attrs: {} },
+      { from: 'check', to: 'end', loop_restart: false, attrs: {} },
+    ],
+  };
+
+  it('draws a dot grid, a MiniMap and no xyflow Controls', async () => {
+    const { container } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    expect(container.querySelector('.svelte-flow__background pattern circle')).not.toBeNull();
+    expect(container.querySelector('.svelte-flow__minimap')).not.toBeNull();
+    expect(container.querySelector('.svelte-flow__controls')).toBeNull();
+  });
+
+  it('shows the counts and the problem in the status bar', async () => {
+    render(WorkflowCanvas, { props: { graph: problemGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+
+    expect(screen.getByText('3 steps · 2 connections')).toBeInTheDocument();
+    expect(screen.getByText('“Check” needs a tool chosen.')).toBeInTheDocument();
+  });
+
+  it('says No problems found once the problem is fixed', async () => {
+    render(WorkflowCanvas, { props: { graph: problemGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+    await clickNodeByLabel('Check');
+
+    await fireEvent.change(screen.getByTestId('tool-select'), { target: { value: 'system_lint' } });
+
+    await waitFor(() => expect(screen.getByText('No problems found')).toBeInTheDocument());
+  });
+
+  it('selects the first problem step when Review is pressed', async () => {
+    render(WorkflowCanvas, { props: { graph: problemGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+
+    await waitFor(() => expect(screen.getByTestId('node-inspector')).toBeInTheDocument());
+    expect(screen.getByTestId('node-inspector-label')).toHaveValue('Check');
+    expect(document.querySelector('.svelte-flow__node[data-id="check"]')).toHaveClass('selected');
+  });
+
+  it('hides Review for a workflow-level problem', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    expect(screen.getByText('This workflow has no Finish step.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
   });
 });

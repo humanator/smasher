@@ -130,7 +130,7 @@ Rules for every task:
   - Files: `WorkflowEdge.svelte`, `Legend.svelte` (new), `WorkflowCanvas.svelte`, tests.
   - Depends on: T1. Scope: S.
 
-- [ ] **Task 8: Canvas chrome, FlowBridge and status bar**
+- [x] **Task 8: Canvas chrome, FlowBridge and status bar**
   - Description:
     - Dot-grid background and a token-coloured MiniMap. Remove `Controls`.
     - Widen `FlowPositionBridge` into `FlowBridge` (zoom in/out, fit, setCenter, zoom level).
