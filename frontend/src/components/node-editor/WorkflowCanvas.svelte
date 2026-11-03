@@ -242,6 +242,29 @@
     selection = { kind: 'edge', id: edge.id };
   }
 
+  // Enter or Space on a focused step or connection selects it in Svelte Flow
+  // with no click, so the inspector follows that key too (SC5). Svelte Flow
+  // ignores the keys inside form controls, and so does this.
+  function handleCanvasKeyDown(event: KeyboardEvent) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target as HTMLElement;
+    if (target.closest('input, textarea, select, button')) return;
+    const node = target.closest<HTMLElement>('.svelte-flow__node');
+    const edge = target.closest<SVGElement>('.svelte-flow__edge');
+    const id = (node ?? edge)?.dataset.id;
+    if (!id) return;
+    if (node && nodes.some((n) => n.id === id)) selection = { kind: 'node', id };
+    else if (edge && edges.some((e) => e.id === id)) selection = { kind: 'edge', id };
+  }
+
+  // Delegated from the canvas region, whose focusable children are the steps and connections.
+  $effect(() => {
+    const region = canvasRegion;
+    if (!region) return;
+    region.addEventListener('keydown', handleCanvasKeyDown);
+    return () => region.removeEventListener('keydown', handleCanvasKeyDown);
+  });
+
   // A step picked in the library (or unpicked: null). Whatever was selected
   // on the canvas is let go, in Svelte Flow too, so no card stays ringed.
   function selectGuide(handler: string | null) {

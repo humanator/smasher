@@ -240,6 +240,73 @@ test('Run saves unsaved changes and opens the Run dialog without starting a run'
   expect(runs.filter((r: { graph_name: string }) => r.graph_name === workflow.graphName)).toEqual([]);
 });
 
+// Presses Tab (or Shift+Tab) until the locator has focus, so the test moves
+// the way a keyboard user does rather than jumping straight to the control.
+async function tabTo(page: Page, target: ReturnType<Page['locator']>, back = false) {
+  for (let i = 0; i < 60; i++) {
+    if (await target.evaluate((el) => el === document.activeElement).catch(() => false)) return;
+    await page.keyboard.press(back ? 'Shift+Tab' : 'Tab');
+  }
+  throw new Error('never reached the target with the keyboard');
+}
+
+test('keyboard only: add a step, edit its fields, select it, delete it and save', async ({ page }) => {
+  await page.getByRole('searchbox', { name: 'Search steps' }).focus();
+  await tabTo(page, page.getByTestId('palette-entry-Tool'));
+  await page.keyboard.press('Enter');
+  await tabTo(page, inspector(page).getByRole('button', { name: 'Add to Canvas' }));
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.svelte-flow__node')).toHaveCount(3);
+
+  const name = page.getByTestId('node-inspector-label');
+  await expect(name).toBeFocused();
+  await name.press('ControlOrMeta+a');
+  await page.keyboard.type('Keyboard tool');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('ArrowDown');
+  await expect(inspector(page).getByRole('radio', { name: /Shell command/ })).toBeChecked();
+  await tabTo(page, page.getByTestId('tool-command'));
+  await page.keyboard.type('echo keys');
+  await tabTo(page, page.getByTestId('tool-timeout'));
+  await page.keyboard.type('20s');
+  await tabTo(page, inspector(page).getByRole('button', { name: /^More settings/ }));
+  await page.keyboard.press('Enter');
+  await tabTo(page, page.getByTestId('more-max_retries'));
+  await page.keyboard.type('3');
+  await tabTo(page, page.getByTestId('more-retry_jitter'));
+  const jitter = await page.getByTestId('more-retry_jitter').getAttribute('aria-checked');
+  await page.keyboard.press('Space');
+  await expect(page.getByTestId('more-retry_jitter')).not.toHaveAttribute('aria-checked', jitter!);
+
+  // Select Finish, then the new step again, from the keyboard.
+  await tabTo(page, page.getByRole('group', { name: 'Finish: Finish' }), true);
+  await page.keyboard.press('Enter');
+  await expect(name).toHaveValue('Finish');
+  await tabTo(page, page.getByRole('group', { name: 'Tool: Keyboard tool' }));
+  await page.keyboard.press('Enter');
+  await expect(name).toHaveValue('Keyboard tool');
+  await expect(page.getByTestId('tool-command')).toHaveValue('echo keys');
+
+  await tabTo(page, page.getByTestId('save-button'), true);
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+  const saved = readFileSync(workflow.path, 'utf-8');
+  expect(saved).toContain('tool_command="echo keys"');
+  expect(saved).toContain('timeout="20s"');
+  expect(saved).toContain('max_retries=3');
+
+  await page.getByRole('searchbox', { name: 'Search steps' }).focus();
+  await tabTo(page, page.getByRole('group', { name: 'Tool: Keyboard tool' }));
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.svelte-flow__node')).toHaveCount(2);
+  await page.getByRole('searchbox', { name: 'Search steps' }).focus();
+  await tabTo(page, page.getByTestId('save-button'), true);
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+  expect(readFileSync(workflow.path, 'utf-8')).not.toContain('Keyboard tool');
+});
+
 test('at phone width the page does not scroll sideways and the sheets open', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.reload();

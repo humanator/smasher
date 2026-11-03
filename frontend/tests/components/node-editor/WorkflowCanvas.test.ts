@@ -148,6 +148,46 @@ describe('built-in delete interaction', () => {
   });
 });
 
+// Svelte Flow selects a focused step or connection with Enter or Space, which
+// is no click; the inspector follows it so the keyboard can select (SC5).
+describe('keyboard selection', () => {
+  it('shows a step in the inspector when it is selected with Enter', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    await clickNodeByLabel('A');
+    expect(screen.getByTestId('node-inspector-label')).toHaveValue('A');
+
+    const nodeB = screen.getByText('B').closest('.svelte-flow__node') as HTMLElement;
+    nodeB.focus();
+    await fireEvent.keyDown(nodeB, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('node-inspector-label')).toHaveValue('B');
+    });
+  });
+
+  it('then deletes the step it selected, not the one selected before', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    await clickNodeByLabel('A');
+    const nodeB = screen.getByText('B').closest('.svelte-flow__node') as HTMLElement;
+    nodeB.focus();
+    await fireEvent.keyDown(nodeB, { key: ' ' });
+    await waitFor(() => {
+      expect(screen.getByTestId('node-inspector-label')).toHaveValue('B');
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Step' }));
+
+    expect(component.currentGraph().nodes.map((n) => n.id)).toEqual(['a']);
+  });
+});
+
 describe('reacting to a changed graph prop', () => {
   it('reflects nodes/edges added by re-assigning graph (what a future palette drag will do)', async () => {
     const { component, rerender } = render(WorkflowCanvas, {
