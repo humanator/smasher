@@ -332,7 +332,7 @@ Rules for every task:
   - Files: `EditorToolbarActions.svelte`, `WorkflowEditorPage.svelte`, test.
   - Depends on: T17. Scope: S.
 
-- [ ] **Task 19: Create mode**
+- [x] **Task 19: Create mode**
   - Description:
     - `NewWorkflowPage` is titled "New workflow" and its Back goes to Workflows.
     - Name and Folder move to a slim, restyled bar above the canvas.

@@ -41,7 +41,7 @@ test('create a workflow via real drag-and-drop, save, reload, edit, and re-save'
   try {
     await page.goto(`${baseURL || 'http://127.0.0.1:5173'}/workflows/new`);
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('Create New Workflow')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'New workflow' })).toBeVisible();
 
     // The create-mode name/target-dir fields only exist once the canvas has
     // mounted, and the <select>'s options only populate once

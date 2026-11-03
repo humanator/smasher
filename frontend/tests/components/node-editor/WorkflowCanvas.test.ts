@@ -228,6 +228,15 @@ describe('save action (edit mode -- workflowId set)', () => {
 describe('create mode (no workflowId)', () => {
   const emptyGraph: EditorGraph = { graph_attrs: {}, nodes: [], edges: [] };
 
+  it('has no Run before the first save, whatever the page passes', async () => {
+    render(CanvasHost, {
+      props: { graph: emptyGraph, availableTargetDirs: ['examples'], onSave: vi.fn(), onRun: vi.fn() },
+    });
+
+    await screen.findByTestId('save-button');
+    expect(screen.queryByRole('button', { name: 'Run' })).toBeNull();
+  });
+
   it('renders name and target-dir fields, defaulting the dir to the first available one', async () => {
     render(WorkflowCanvas, {
       props: { graph: emptyGraph, availableTargetDirs: ['examples', 'other'], onSave: vi.fn() },

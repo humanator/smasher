@@ -1,14 +1,18 @@
 <script lang="ts">
-  // ABOUTME: Create new workflow page - mounts canvas in create mode
+  // ABOUTME: Create new workflow page - mounts canvas in create mode, titled New workflow with Back to Workflows
   // ABOUTME: Fetches available target directories and wires onSave to createWorkflowGraph
 
   import { onMount } from 'svelte';
   import * as workflowsApi from '../../lib/api/workflows';
   import type { EditorGraph } from '../../lib/api/workflows';
   import WorkflowCanvas from '../node-editor/WorkflowCanvas.svelte';
+  import { usePageBack, usePageTitle } from '$lib/page-header.svelte';
 
   let availableTargetDirs: string[] = $state([]);
   let error: string | null = $state(null);
+
+  usePageTitle(() => 'New workflow');
+  usePageBack(() => ({ label: 'Workflows', href: '/' }));
 
   onMount(async () => {
     try {

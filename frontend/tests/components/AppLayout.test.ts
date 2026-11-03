@@ -115,13 +115,14 @@ describe('App page header on other routes', () => {
     visit('/');
   });
 
-  it('new-workflow page: back link to the catalog, title, and Save in the header', async () => {
+  it('new-workflow page: Back to Workflows, the New workflow title, and Save in the header', async () => {
     visit('/workflows/new');
     render(App);
     const header = screen.getByRole('banner');
-    const crumb = within(header).getByRole('link', { name: 'Back to Smasher Pipelines' });
+    expect(within(header).getByRole('heading', { level: 1, name: 'New workflow' })).toBeTruthy();
+    // The page sets Back once its lazily loaded chunk mounts.
+    const crumb = await within(header).findByRole('link', { name: 'Back to Workflows' }, { timeout: 5000 });
     expect(crumb.getAttribute('href')).toBe('/');
-    expect(within(header).getByRole('heading', { level: 1, name: 'Create New Workflow' })).toBeTruthy();
     await waitFor(
       () => {
         expect(within(header).getByTestId('save-button')).toBeTruthy();
@@ -136,7 +137,6 @@ describe('App page header on other routes', () => {
   it('every non-catalog route has a back link to the catalog and no breadcrumb', () => {
     // The workflow page names the catalog by its own title; the rest use the app's.
     const backLabels: Record<string, string> = {
-      '/workflows/new': 'Back to Smasher Pipelines',
       '/workflows/some-id': 'Back to Workflows',
       '/runs/some-run': 'Back to Smasher Pipelines',
     };
@@ -258,11 +258,11 @@ describe('App document title', () => {
     await waitFor(() => expect(document.title).toBe('Consensus Task — Smasher'), { timeout: 5000 });
   });
 
-  it('is New Workflow — Smasher on the new-workflow page', async () => {
+  it('is New workflow — Smasher on the new-workflow page', async () => {
     visit('/workflows/new');
     render(App);
 
-    await waitFor(() => expect(document.title).toBe('New Workflow — Smasher'));
+    await waitFor(() => expect(document.title).toBe('New workflow — Smasher'), { timeout: 5000 });
   });
 
   it('follows back navigation from a run page to the catalog', async () => {

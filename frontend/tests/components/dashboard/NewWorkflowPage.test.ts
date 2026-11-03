@@ -6,6 +6,8 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/svelte/svel
 import { existsSync, rmSync, readdirSync } from 'fs';
 import { join } from 'path';
 import NewWorkflowPage from '../../../src/components/dashboard/NewWorkflowPage.svelte';
+import NewWorkflowHost from './NewWorkflowHost.svelte';
+import { within } from '@testing-library/svelte/svelte5';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
 
@@ -36,6 +38,27 @@ describe('NewWorkflowPage', () => {
     // (covered in AppLayout.test.ts); the page itself no longer duplicates them.
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
     expect(screen.getByTestId('create-name-input')).toBeTruthy();
+  });
+
+  it('is titled New workflow, and Back goes to Workflows', () => {
+    render(NewWorkflowHost);
+    const header = screen.getByRole('banner');
+
+    expect(within(header).getByRole('heading', { level: 1, name: 'New workflow' })).toBeTruthy();
+    expect(within(header).getByRole('link', { name: 'Back to Workflows' }).getAttribute('href')).toBe('/');
+  });
+
+  it('puts Name and Folder in a bar above the canvas, and has no Run or Export until the first save', async () => {
+    render(NewWorkflowHost);
+    const header = screen.getByRole('banner');
+
+    const bar = screen.getByRole('group', { name: 'New workflow details' });
+    expect(within(bar).getByLabelText('Name')).toBe(screen.getByTestId('create-name-input'));
+    expect(within(bar).getByLabelText('Folder')).toBe(screen.getByTestId('create-target-dir-select'));
+    expect(bar.compareDocumentPosition(screen.getByRole('region', { name: 'Workflow canvas drop zone' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => expect(within(header).getByTestId('save-button')).toBeTruthy());
+    expect(within(header).queryByRole('button', { name: 'Run' })).toBeNull();
+    expect(within(header).queryByRole('button', { name: 'Export .dot file' })).toBeNull();
   });
 
   it('fetches available_target_dirs from API on mount', async () => {

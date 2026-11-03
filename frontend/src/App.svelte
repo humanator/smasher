@@ -25,7 +25,7 @@
     designPage
       ? 'Design system'
       : workflowPageType === 'new'
-      ? 'Create New Workflow'
+      ? (pageHeader.title ?? 'New workflow')
       : workflowPageType === 'edit' || workflowPageType === 'detail'
         ? (pageHeader.title ?? 'Workflow')
         : runId
@@ -37,7 +37,7 @@
     designPage
       ? 'Design system — Smasher'
       : workflowPageType === 'new'
-      ? 'New Workflow — Smasher'
+      ? `${pageHeader.title ?? 'New workflow'} — Smasher`
       : workflowPageType === 'edit' || workflowPageType === 'detail'
         ? `${pageHeader.title ?? 'Workflow'} — Smasher`
         : runId

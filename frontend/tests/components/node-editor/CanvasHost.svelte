@@ -12,6 +12,7 @@
 		availableTargetDirs,
 		onSave,
 		onExport,
+		onRun,
 		onCanvas,
 	}: ComponentProps<typeof WorkflowCanvas> & { onCanvas?: (canvas: ReturnType<typeof WorkflowCanvas>) => void } =
 		$props();
@@ -31,4 +32,4 @@
 	back={header.back}
 	actions={header.actions}
 />
-<WorkflowCanvas bind:this={canvas} {graph} {workflowId} {availableTargetDirs} {onSave} {onExport} />
+<WorkflowCanvas bind:this={canvas} {graph} {workflowId} {availableTargetDirs} {onSave} {onExport} {onRun} />

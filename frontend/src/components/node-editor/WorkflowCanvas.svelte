@@ -117,6 +117,8 @@
   const uid = $props.id();
 
   const isCreateMode = $derived(!workflowId);
+  // The create bar's accessible name; not on the board (proposed 2026-11-03).
+  const CREATE_BAR_LABEL = 'New workflow details';
   let createName = $state('');
   let createTargetDir = $state('');
 
@@ -705,7 +707,7 @@
     onFit={() => void flow?.fitView()}
     {onExport}
     onSave={() => void handleSave()}
-    onRun={onRun ? () => void handleRun() : undefined}
+    onRun={onRun && !isCreateMode ? () => void handleRun() : undefined}
     {saving}
     {saveDisabled}
   />
@@ -715,19 +717,25 @@
   <Palette selected={guideHandler} onSelect={selectGuide} />
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
-      <div class="flex gap-3 items-end px-3 py-2">
-        <div class="flex flex-col gap-1.5">
-          <Label for="{uid}-create-name">Name</Label>
+      <!-- D10: a new workflow's Name and Folder sit in a slim bar above the canvas. -->
+      <div
+        role="group"
+        aria-label={CREATE_BAR_LABEL}
+        class="flex flex-none flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border bg-background px-3 py-1.5"
+      >
+        <div class="flex items-center gap-2">
+          <Label for="{uid}-create-name" class="text-caption text-muted-foreground">Name</Label>
           <Input
             id="{uid}-create-name"
             type="text"
             data-testid="create-name-input"
             bind:value={createName}
             placeholder="my-pipeline"
+            class="w-56"
           />
         </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="{uid}-create-target-dir">Directory</Label>
+        <div class="flex items-center gap-2">
+          <Label for="{uid}-create-target-dir" class="text-caption text-muted-foreground">Folder</Label>
           <NativeSelect.Root
             id="{uid}-create-target-dir"
             data-testid="create-target-dir-select"

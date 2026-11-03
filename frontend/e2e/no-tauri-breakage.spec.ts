@@ -29,7 +29,7 @@ test('runs with zero Tauri-only code paths breaking in a plain browser', async (
   // forms -- the biggest surface Task 20's shim call-sites touch).
   await page.getByRole('link', { name: 'New workflow', exact: true }).click();
   await page.waitForURL(/\/workflows\/new/);
-  await expect(page.getByText('Create New Workflow')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'New workflow' })).toBeVisible();
   // Give the create-mode fields (populated from a real API fetch) time to
   // settle so any async Tauri-detection code in that path has run.
   await expect(page.getByTestId('create-name-input')).toBeVisible();
