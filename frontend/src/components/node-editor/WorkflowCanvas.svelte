@@ -829,6 +829,7 @@
         bind:edges
         fitView
         minZoom={0.1}
+        deleteKey={['Backspace', 'Delete']}
         {nodeTypes}
         {edgeTypes}
         connectionMode={ConnectionMode.Loose}

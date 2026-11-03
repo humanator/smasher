@@ -128,6 +128,24 @@ describe('built-in delete interaction', () => {
     // The edge referencing the deleted node goes with it.
     expect(component.currentGraph().edges).toHaveLength(0);
   });
+
+  it('removes a selected node when Delete is pressed, as well as Backspace (D3)', async () => {
+    const { component } = render(WorkflowCanvas, {
+      props: { graph: sampleGraph, onSave: vi.fn() },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    const nodeA = screen.getByText('A').closest('.svelte-flow__node') as HTMLElement;
+    await fireEvent.click(nodeA);
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await waitFor(() => {
+      expect(component.currentGraph().nodes.map((n) => n.id)).toEqual(['b']);
+    });
+  });
 });
 
 describe('reacting to a changed graph prop', () => {
