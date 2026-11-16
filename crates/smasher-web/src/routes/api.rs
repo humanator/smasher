@@ -78,6 +78,16 @@ pub struct CancelResponse {
     pub status: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DeleteRunsRequest {
+    pub run_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeleteRunsResponse {
+    pub deleted: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TokenResponse {
     pub input_tokens: u64,
@@ -135,6 +145,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/runs", post(submit_pipeline).get(list_runs))
+        .route("/api/runs/delete", post(delete_runs))
         .route("/api/runs/{id}", get(get_run))
         .route("/api/runs/{id}/events", get(events_stream))
         .route("/api/runs/{id}/cancel", post(cancel_run))
@@ -461,6 +472,69 @@ async fn cancel_run(
         success: true,
         status: "Aborted".into(),
     }))
+}
+
+/// Permanently deletes finished runs: each run's `{data_dir}/artifacts/<id>/`
+/// tree and its in-memory record. The whole batch is checked first (every id
+/// a safe path component, known, and not running), so a refused request
+/// deletes nothing.
+async fn delete_runs(
+    State(state): State<AppState>,
+    Json(req): Json<DeleteRunsRequest>,
+) -> Result<Json<DeleteRunsResponse>, WebError> {
+    if req.run_ids.is_empty() {
+        return Err(WebError::BadRequest(
+            "run_ids must name at least one run".into(),
+        ));
+    }
+    // A rehydrated record's id comes from its manifest, so never trust it as
+    // a path component; "." would name the artifacts dir itself.
+    if let Some(bad) = req
+        .run_ids
+        .iter()
+        .find(|id| !crate::candidates::valid_id(id) || id.as_str() == ".")
+    {
+        return Err(WebError::BadRequest(format!("invalid run id: {bad:?}")));
+    }
+
+    // Held across the checks and the removal so no run starts or resumes
+    // under an id between being checked and being deleted.
+    let mut runs = state.runs.write().await;
+    for id in &req.run_ids {
+        let record = runs
+            .get(id)
+            .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+        if record.status == RunStatus::Running {
+            return Err(WebError::Conflict(format!(
+                "run {id} is still running; cancel it before deleting"
+            )));
+        }
+    }
+
+    let artifacts_dir = std::path::Path::new(&state.data_dir).join("artifacts");
+    let mut deleted = Vec::with_capacity(req.run_ids.len());
+    for id in req.run_ids {
+        if deleted.contains(&id) {
+            continue;
+        }
+        let run_dir = artifacts_dir.join(&id);
+        let removed = tokio::task::spawn_blocking(move || std::fs::remove_dir_all(run_dir))
+            .await
+            .map_err(|e| WebError::Internal(format!("delete task failed: {e}")))?;
+        match removed {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                return Err(WebError::Internal(format!(
+                    "failed to delete run {id} (deleted so far: {deleted:?}): {e}"
+                )));
+            }
+        }
+        runs.remove(&id);
+        deleted.push(id);
+    }
+
+    Ok(Json(DeleteRunsResponse { deleted }))
 }
 
 async fn resume_run(
@@ -1396,5 +1470,165 @@ mod tests {
             parsed.get("available_target_dirs").unwrap(),
             &serde_json::json!(["/workflows", "/examples"])
         );
+    }
+
+    /// A state whose `data_dir` is `dir`, plus a finished or running record
+    /// for each `(id, status)` with a populated `{dir}/artifacts/<id>/` tree.
+    async fn delete_fixture(dir: &std::path::Path, runs: &[(&str, RunStatus)]) -> AppState {
+        let client = smasher_llm::client::Client::from_env();
+        let state = AppState::new(
+            client,
+            "test-model".into(),
+            None,
+            dir.display().to_string(),
+            vec![],
+        );
+        for (id, status) in runs {
+            let root = dir.join("artifacts").join(id);
+            std::fs::create_dir_all(root.join("events")).unwrap();
+            std::fs::write(root.join("events").join("events.jsonl"), "{}\n").unwrap();
+            insert_test_record(&state, id, status.clone()).await;
+        }
+        state
+    }
+
+    async fn post_delete(
+        state: AppState,
+        ids: serde_json::Value,
+    ) -> (StatusCode, serde_json::Value) {
+        let app = router().with_state(state);
+        let req = Request::builder()
+            .method("POST")
+            .uri("/api/runs/delete")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&serde_json::json!({ "run_ids": ids })).unwrap(),
+            ))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap())
+    }
+
+    #[tokio::test]
+    async fn delete_runs_removes_each_record_and_its_artifacts_tree() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = delete_fixture(
+            tmp.path(),
+            &[
+                ("run-del-a", RunStatus::Completed),
+                ("run-del-b", RunStatus::Failed),
+                ("run-keep", RunStatus::Aborted),
+            ],
+        )
+        .await;
+
+        let (status, body) =
+            post_delete(state.clone(), serde_json::json!(["run-del-a", "run-del-b"])).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body["deleted"],
+            serde_json::json!(["run-del-a", "run-del-b"])
+        );
+        assert!(!tmp.path().join("artifacts/run-del-a").exists());
+        assert!(!tmp.path().join("artifacts/run-del-b").exists());
+        assert!(tmp.path().join("artifacts/run-keep").exists());
+        let runs = state.runs.read().await;
+        assert!(!runs.contains_key("run-del-a"));
+        assert!(!runs.contains_key("run-del-b"));
+        assert!(runs.contains_key("run-keep"));
+    }
+
+    #[tokio::test]
+    async fn delete_runs_refuses_a_running_run_and_deletes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = delete_fixture(
+            tmp.path(),
+            &[
+                ("run-done", RunStatus::Completed),
+                ("run-live", RunStatus::Running),
+            ],
+        )
+        .await;
+
+        let (status, body) =
+            post_delete(state.clone(), serde_json::json!(["run-done", "run-live"])).await;
+
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert!(
+            body["error"].as_str().unwrap().contains("run-live"),
+            "error should name the running run: {body}"
+        );
+        assert!(tmp.path().join("artifacts/run-done").exists());
+        assert!(tmp.path().join("artifacts/run-live").exists());
+        let runs = state.runs.read().await;
+        assert!(runs.contains_key("run-done"));
+        assert!(runs.contains_key("run-live"));
+    }
+
+    #[tokio::test]
+    async fn delete_runs_unknown_id_returns_404_and_deletes_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = delete_fixture(tmp.path(), &[("run-real", RunStatus::Completed)]).await;
+
+        let (status, _) =
+            post_delete(state.clone(), serde_json::json!(["run-real", "run-ghost"])).await;
+
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert!(tmp.path().join("artifacts/run-real").exists());
+        assert!(state.runs.read().await.contains_key("run-real"));
+    }
+
+    #[tokio::test]
+    async fn delete_runs_rejects_an_empty_list() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = delete_fixture(tmp.path(), &[]).await;
+
+        let (status, _) = post_delete(state, serde_json::json!([])).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn delete_runs_rejects_ids_that_escape_the_artifacts_dir() {
+        // A rehydrated record's id comes from its manifest on disk, so even a
+        // known id can't be trusted as a path component.
+        let tmp = tempfile::tempdir().unwrap();
+        let victim = tmp.path().join("victim");
+        std::fs::create_dir_all(&victim).unwrap();
+        let state = delete_fixture(tmp.path(), &[("run-ok", RunStatus::Completed)]).await;
+        for id in ["../victim", ".", "..", "a/b", "a\\b", ""] {
+            insert_test_record(&state, id, RunStatus::Completed).await;
+        }
+
+        for id in ["../victim", ".", "..", "a/b", "a\\b", ""] {
+            let (status, _) = post_delete(state.clone(), serde_json::json!([id])).await;
+            assert_eq!(
+                status,
+                StatusCode::BAD_REQUEST,
+                "id {id:?} should be refused"
+            );
+        }
+
+        assert!(victim.exists());
+        assert!(tmp.path().join("artifacts/run-ok").exists());
+        assert!(state.runs.read().await.contains_key("../victim"));
+    }
+
+    #[tokio::test]
+    async fn delete_runs_removes_a_record_whose_artifacts_tree_is_already_gone() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = delete_fixture(tmp.path(), &[("run-orphan", RunStatus::Failed)]).await;
+        std::fs::remove_dir_all(tmp.path().join("artifacts/run-orphan")).unwrap();
+
+        let (status, body) = post_delete(state.clone(), serde_json::json!(["run-orphan"])).await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["deleted"], serde_json::json!(["run-orphan"]));
+        assert!(!state.runs.read().await.contains_key("run-orphan"));
     }
 }
