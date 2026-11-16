@@ -19,17 +19,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
       linter or open their pages. Decide whether to allow the linter command,
       or leave checking to the pipeline's `system_lint`/`render` nodes.
 
-## P2: Robustness
-
-43. **Fix the link button's dark-mode contrast at the source.** The Button
-    `link` variant (`frontend/src/lib/components/ui/button/button.svelte`) uses
-    `text-primary`, which is about 3:1 on dark surfaces. Screens have fixed it one
-    link at a time with `dark:text-primary-subtle-foreground` (7.89:1), but the
-    editor status bar's **Review** link (`node-editor/StatusBar.svelte`) still
-    misses it. Add that class to the variant itself so every link, including new
-    ones, passes 4.5:1, then drop the per-link copies. Cover it in
-    `tests/lib/tokens.test.ts`.
-
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
 10. **Support two gallery gates pending on one run at once.** Needs a mapping
