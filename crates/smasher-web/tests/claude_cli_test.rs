@@ -23,7 +23,9 @@ fn fake_claude(dir: &std::path::Path) -> std::path::PathBuf {
     let result = json!({"type": "result", "subtype": "success", "is_error": false,
         "result": "Wrote index.html", "total_cost_usd": 0.0125,
         "usage": {"input_tokens": 18, "output_tokens": 161,
-                  "cache_read_input_tokens": 31730, "cache_creation_input_tokens": 15363}});
+                  "cache_read_input_tokens": 31730, "cache_creation_input_tokens": 15363},
+        "permission_denials": [{"tool_name": "Bash", "tool_use_id": "t2",
+                                "tool_input": {"command": "curl -sI https://example.com"}}]});
     std::fs::write(
         dir.join("out.ndjson"),
         format!("{tool_use}\n{text}\n{result}\n"),
@@ -147,6 +149,18 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
         .map(|(_, v)| v.to_string())
         .expect("no agent_message event");
     assert!(message.contains("Wrote index.html"), "{message}");
+
+    // The result line's permission denials reach the run's event stream.
+    let denial = events
+        .iter()
+        .find(|(n, v)| n == "agent_permission_denied" && v["node_id"] == "build")
+        .map(|(_, v)| v.clone())
+        .expect("no agent_permission_denied event");
+    assert_eq!(denial["tool_name"], "Bash", "{denial}");
+    assert_eq!(
+        denial["input_preview"], "curl -sI https://example.com",
+        "{denial}"
+    );
 
     // The manager node ran through the CLI too, its events tagged with its id.
     assert!(

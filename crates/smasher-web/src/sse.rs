@@ -31,6 +31,7 @@ pub fn event_name(event: &PipelineEvent) -> &'static str {
         PipelineEvent::AgentMessage { .. } => "agent_message",
         PipelineEvent::AgentTurnStarted { .. } => "agent_turn_started",
         PipelineEvent::AgentTokenUsage { .. } => "agent_token_usage",
+        PipelineEvent::AgentPermissionDenied { .. } => "agent_permission_denied",
     }
 }
 
@@ -235,6 +236,16 @@ mod tests {
                     timestamp: ts,
                 },
                 "agent_token_usage",
+            ),
+            (
+                PipelineEvent::AgentPermissionDenied {
+                    node_id: "n".into(),
+                    tool_name: "Bash".into(),
+                    tool_call_id: "c".into(),
+                    input_preview: "curl".into(),
+                    timestamp: ts,
+                },
+                "agent_permission_denied",
             ),
         ];
 

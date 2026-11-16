@@ -326,6 +326,28 @@ impl CodergenBackend for ClaudeCliBackend {
                                     timestamp: chrono::Utc::now(),
                                 });
                             }
+                            // Tool calls `dontAsk` refused. The run still succeeds.
+                            let denials = obj["permission_denials"].as_array();
+                            if let Some(ref emitter) = emitter {
+                                for denial in denials.into_iter().flatten() {
+                                    let tool_name =
+                                        denial["tool_name"].as_str().unwrap_or("").to_string();
+                                    emitter.emit(PipelineEvent::AgentPermissionDenied {
+                                        node_id: node_id.clone(),
+                                        input_preview:
+                                            smasher_agent::session::tool_input_preview_from_value(
+                                                &tool_name,
+                                                &denial["tool_input"],
+                                            ),
+                                        tool_name,
+                                        tool_call_id: denial["tool_use_id"]
+                                            .as_str()
+                                            .unwrap_or("")
+                                            .to_string(),
+                                        timestamp: chrono::Utc::now(),
+                                    });
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -850,6 +872,81 @@ mod tests {
         assert_eq!(usage, vec![("node1".to_string(), 18, 161, 0.034722)]);
         assert_eq!(input_tokens.load(Ordering::Relaxed), 18);
         assert_eq!(output_tokens.load(Ordering::Relaxed), 161);
+    }
+
+    /// Shaped like a real `claude -p` result after a `dontAsk` denial: the run
+    /// succeeds and the refused call is listed in `permission_denials`.
+    #[tokio::test]
+    async fn claude_cli_backend_streaming_emits_permission_denials_from_the_result_line() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ndjson_file = tmp.path().join("output.ndjson");
+        std::fs::write(
+            &ndjson_file,
+            concat!(
+                "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"permission_denials\":[",
+                "{\"tool_name\":\"Bash\",\"tool_use_id\":\"toolu_1\",\"tool_input\":{\"command\":\"curl -sI https://example.com\"}},",
+                "{\"tool_name\":\"WebFetch\",\"tool_use_id\":\"toolu_2\",\"tool_input\":{\"url\":\"https://example.com\"}}",
+                "]}\n"
+            ),
+        )
+        .unwrap();
+        let script_path = tmp.path().join("claude");
+        std::fs::write(
+            &script_path,
+            format!("#!/bin/sh\ncat {}\n", ndjson_file.display()),
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let emitter = Arc::new(crate::events::PipelineEventEmitter::default());
+        let mut rx = emitter.subscribe();
+        let backend = ClaudeCliBackend::new(
+            tmp.path().display().to_string(),
+            std::time::Duration::from_secs(10),
+        )
+        .with_claude_path(script_path.display().to_string())
+        .with_streaming(true)
+        .with_emitter(Arc::clone(&emitter));
+
+        let ctx = crate::state::Context::new();
+        ctx.set("_current_node_id", serde_json::json!("build"));
+        let outcome = backend.generate("test", None, None, &ctx).await.unwrap();
+        drop(emitter);
+        assert!(outcome.is_success(), "{outcome:?}");
+
+        let mut denials = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            if let crate::events::PipelineEvent::AgentPermissionDenied {
+                node_id,
+                tool_name,
+                tool_call_id,
+                input_preview,
+                ..
+            } = event
+            {
+                denials.push((node_id, tool_name, tool_call_id, input_preview));
+            }
+        }
+        assert_eq!(
+            denials,
+            vec![
+                (
+                    "build".to_string(),
+                    "Bash".to_string(),
+                    "toolu_1".to_string(),
+                    "curl -sI https://example.com".to_string()
+                ),
+                (
+                    "build".to_string(),
+                    "WebFetch".to_string(),
+                    "toolu_2".to_string(),
+                    "https://example.com".to_string()
+                ),
+            ]
+        );
     }
 
     // ---- Backend flag tests ----

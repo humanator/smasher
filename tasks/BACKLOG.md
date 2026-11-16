@@ -18,7 +18,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     - Codergen agents are denied the shell, so they can't run the design-kit
       linter or open their pages. Decide whether to allow the linter command,
       or leave checking to the pipeline's `system_lint`/`render` nodes.
-    - Show `permission_denials` from the CLI's result event in the run view.
 ## P2: Robustness
 
 40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
