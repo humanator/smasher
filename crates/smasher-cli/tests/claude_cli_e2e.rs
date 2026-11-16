@@ -111,3 +111,26 @@ fn run_uses_the_claude_binary_named_by_smasher_claude_cli() {
         describe(&output)
     );
 }
+
+#[test]
+fn run_sends_manager_nodes_through_the_claude_cli() {
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path().canonicalize().unwrap();
+    let output = run_claude_cli(
+        &dir,
+        r#"digraph CliManager {
+            start [shape=circle];
+            plan [shape=house, task="Plan the candidate builds"];
+            done [shape=doublecircle];
+            start -> plan -> done;
+        }"#,
+    );
+
+    assert!(output.status.success(), "{}", describe(&output));
+    assert!(!dir.join("decoy-ran").exists(), "ran claude from PATH");
+    assert!(
+        prompts(&dir).contains("Task: Plan the candidate builds"),
+        "{}",
+        describe(&output)
+    );
+}

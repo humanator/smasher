@@ -1,5 +1,5 @@
-// ABOUTME: Boots the web server with only a fake `claude` CLI configured and runs a codergen
-// ABOUTME: pipeline through it, checking the CLI's NDJSON events and token usage reach the run.
+// ABOUTME: Boots the web server with only a fake `claude` CLI configured and runs codergen and
+// ABOUTME: manager nodes through it, checking the CLI's NDJSON events and token usage reach the run.
 
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
@@ -105,8 +105,9 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
     let dot = r#"digraph CliCodergen {
         start [shape=circle];
         build [shape=box, prompt="Write index.html"];
+        plan [shape=house, task="Plan the next step"];
         done [shape=doublecircle];
-        start -> build -> done;
+        start -> build -> plan -> done;
     }"#;
     let submit: Value = reqwest::Client::new()
         .post(format!("{base}/api/runs"))
@@ -147,11 +148,22 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
         .expect("no agent_message event");
     assert!(message.contains("Wrote index.html"), "{message}");
 
-    // The result line's usage reaches the run totals, cache tokens excluded.
-    assert_eq!(run["input_tokens"], 18, "{run}");
-    assert_eq!(run["output_tokens"], 161, "{run}");
+    // The manager node ran through the CLI too, its events tagged with its id.
+    assert!(
+        events
+            .iter()
+            .any(|(n, v)| n == "agent_message" && v["node_id"] == "plan"),
+        "no agent_message from the manager: {events:?}"
+    );
 
+    // Each call's result-line usage (codergen, then manager) reaches the run
+    // totals, cache tokens excluded.
+    assert_eq!(run["input_tokens"], 36, "{run}");
+    assert_eq!(run["output_tokens"], 322, "{run}");
+
+    // argv.txt holds the last call's arguments: the manager's.
     let argv = std::fs::read_to_string(dir.path().join("argv.txt")).unwrap();
+    assert!(argv.contains("Task: Plan the next step"), "argv: {argv}");
     assert!(argv.contains("dontAsk"), "argv: {argv}");
     assert!(argv.contains("claude-sonnet-5"), "argv: {argv}");
 }

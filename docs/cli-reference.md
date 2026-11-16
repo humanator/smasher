@@ -137,7 +137,9 @@ smasher run [OPTIONS] <PIPELINE>
 
 ### Codergen through `claude -p`
 
-With `--backend claude-cli`, each codergen node runs the local `claude` CLI: the binary
+With `--backend claude-cli`, each codergen and manager (`house`) node runs the local
+`claude` CLI (a manager node with `provider="<other>"` uses that provider's API agent
+instead): the binary
 `SMASHER_CLAUDE_CLI` names when it holds a path, otherwise the first `claude` found in
 `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `PATH`. The node's
 `model` is passed as `--model` when it's a Claude model (`claude-*`, `sonnet`, `opus`,

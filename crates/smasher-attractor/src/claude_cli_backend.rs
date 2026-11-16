@@ -1,4 +1,4 @@
-// ABOUTME: CodergenBackend that runs each codergen node through the local `claude` CLI.
+// ABOUTME: Codergen and manager backends that run nodes through the local `claude` CLI.
 // ABOUTME: Streams NDJSON events to the pipeline emitter and enforces a per-node timeout.
 
 use std::path::Path;
@@ -10,6 +10,7 @@ use smasher_llm::provider::claude_cli::process::{base_command, is_claude_model};
 
 use crate::events::{PipelineEvent, PipelineEventEmitter};
 use crate::handler::{CodergenBackend, HandlerError};
+use crate::manager_handler::ManagerBackend;
 use crate::state::{Context, Outcome};
 
 /// Tools a codergen run may use without asking: file tools, plus Bash limited to
@@ -502,6 +503,44 @@ impl ClaudeCliBackend {
                 self.max_consecutive_timeouts
             )))
         }
+    }
+}
+
+/// Manager (`house`) nodes under the claude-cli provider. A manager's task runs as
+/// one `claude -p` agent session through `cli`, like a codergen node, except nodes
+/// whose config names another provider (e.g. `provider="openai"`), which go to
+/// `fallback`, the API agent.
+pub struct ClaudeCliManagerBackend {
+    cli: Arc<dyn CodergenBackend>,
+    fallback: Arc<dyn ManagerBackend>,
+}
+
+impl ClaudeCliManagerBackend {
+    pub fn new(cli: Arc<dyn CodergenBackend>, fallback: Arc<dyn ManagerBackend>) -> Self {
+        Self { cli, fallback }
+    }
+}
+
+#[async_trait::async_trait]
+impl ManagerBackend for ClaudeCliManagerBackend {
+    async fn coordinate(
+        &self,
+        task: &str,
+        config: &serde_json::Value,
+        context: &Context,
+    ) -> Result<Outcome, HandlerError> {
+        let provider = config.get("provider").and_then(serde_json::Value::as_str);
+        if provider.is_some_and(|p| p != "claude-cli") {
+            return self.fallback.coordinate(task, config, context).await;
+        }
+        let model = config.get("model").and_then(serde_json::Value::as_str);
+        // The CLI backend adds the pipeline context itself.
+        let prompt = format!(
+            "You are an AI coordination agent executing a manager task in a pipeline. \
+             Analyze the task, consider the configuration, and produce a clear result.\n\n\
+             Task: {task}\nConfig: {config}"
+        );
+        self.cli.generate(&prompt, model, provider, context).await
     }
 }
 
@@ -1312,5 +1351,113 @@ mod tests {
             append_arg(&recorded_argv(tmp.path())).as_deref(),
             Some(smasher_agent::prompt::DESIGN_FACTORY_CONVENTIONS.trim())
         );
+    }
+
+    // ---- ClaudeCliManagerBackend tests ----
+
+    type Calls = Arc<std::sync::Mutex<Vec<(String, Option<String>, Option<String>)>>>;
+
+    /// Records each codergen call's prompt, model and provider.
+    struct RecordingCodergen(Calls);
+
+    #[async_trait::async_trait]
+    impl CodergenBackend for RecordingCodergen {
+        async fn generate(
+            &self,
+            prompt: &str,
+            model: Option<&str>,
+            provider: Option<&str>,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
+            self.0.lock().unwrap().push((
+                prompt.to_string(),
+                model.map(String::from),
+                provider.map(String::from),
+            ));
+            Ok(Outcome::success_with(
+                serde_json::json!({"response": "cli"}),
+            ))
+        }
+    }
+
+    /// Records each task it coordinates.
+    struct RecordingManager(Arc<std::sync::Mutex<Vec<String>>>);
+
+    #[async_trait::async_trait]
+    impl ManagerBackend for RecordingManager {
+        async fn coordinate(
+            &self,
+            task: &str,
+            _config: &serde_json::Value,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
+            self.0.lock().unwrap().push(task.to_string());
+            Ok(Outcome::success_with(
+                serde_json::json!({"response": "api"}),
+            ))
+        }
+    }
+
+    fn manager() -> (
+        ClaudeCliManagerBackend,
+        Calls,
+        Arc<std::sync::Mutex<Vec<String>>>,
+    ) {
+        let cli_calls = Calls::default();
+        let fallback_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let backend = ClaudeCliManagerBackend::new(
+            Arc::new(RecordingCodergen(Arc::clone(&cli_calls))),
+            Arc::new(RecordingManager(Arc::clone(&fallback_calls))),
+        );
+        (backend, cli_calls, fallback_calls)
+    }
+
+    #[tokio::test]
+    async fn manager_without_a_provider_runs_its_task_through_the_cli() {
+        let (backend, cli_calls, fallback_calls) = manager();
+        let config = serde_json::json!({"model": "claude-opus-5-5", "parallelism": 2});
+
+        let outcome = backend
+            .coordinate("Plan the build", &config, &Context::new())
+            .await
+            .unwrap();
+
+        assert!(outcome.is_success());
+        let calls = cli_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        let (prompt, model, provider) = &calls[0];
+        assert!(prompt.contains("Task: Plan the build"), "{prompt}");
+        assert!(prompt.contains("\"parallelism\":2"), "{prompt}");
+        assert_eq!(model.as_deref(), Some("claude-opus-5-5"));
+        assert_eq!(provider, &None);
+        assert!(fallback_calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn manager_naming_claude_cli_runs_through_the_cli() {
+        let (backend, cli_calls, fallback_calls) = manager();
+        let config = serde_json::json!({"provider": "claude-cli"});
+
+        backend
+            .coordinate("Plan", &config, &Context::new())
+            .await
+            .unwrap();
+
+        assert_eq!(cli_calls.lock().unwrap().len(), 1);
+        assert!(fallback_calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn manager_naming_another_provider_goes_to_the_fallback() {
+        let (backend, cli_calls, fallback_calls) = manager();
+        let config = serde_json::json!({"provider": "openai", "model": "gpt-5"});
+
+        backend
+            .coordinate("Plan", &config, &Context::new())
+            .await
+            .unwrap();
+
+        assert!(cli_calls.lock().unwrap().is_empty());
+        assert_eq!(*fallback_calls.lock().unwrap(), vec!["Plan"]);
     }
 }

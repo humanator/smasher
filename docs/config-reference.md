@@ -36,23 +36,19 @@ with `provider` and `model` in the run request.
 ## Claude CLI Provider
 
 Runs LLM work through the local Claude Code CLI (`claude -p`) with whatever account
-`claude` is logged into, so no provider API key is needed. Codergen nodes run as
-Claude Code agent sessions. Single-call work (`task_critic`, `synthesis`) runs as
-trimmed, tool-less `claude -p` calls.
+`claude` is logged into, so no provider API key is needed. Codergen and manager
+(`house`) nodes run as Claude Code agent sessions. A manager's prompt is its `task`
+and `config`. Single-call work (`task_critic`, `synthesis`) runs as trimmed,
+tool-less `claude -p` calls.
 
 Tool nodes need no provider at all: they run a built-in tool or a shell
 command directly (see the [DOT reference](dot-reference.md#tool-parallelogram)).
 
-**Known limitation:** manager (`house`) nodes fail under `claude-cli` with "the
-claude-cli provider answers single calls and can't run tools". They run an LLM
-agent session with tools, which this provider doesn't support yet. To run them,
-give the node `provider="<other>"` with that provider's key configured.
-
 | Variable | Description |
 |----------|-------------|
 | `SMASHER_CLAUDE_CLI` | Registers the `claude-cli` provider. `1` finds the binary (in `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `PATH`); any other value is the path to it. `smasher run --backend claude-cli` runs the same binary. |
-| `SMASHER_PROVIDER=claude-cli` | Makes it the default provider (or choose it in Settings). The web server then sends codergen nodes to `claude -p` too, except nodes with an explicit `provider="<other>"`, which use that provider's API agent. |
-| `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` | Comma-separated tools codergen runs may use, replacing the default `Read,Edit,Write,Glob,Grep` plus `Bash(ls:*)`, `Bash(mkdir:*)`, `Bash(cp:*)`, `Bash(mv:*)`, `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(grep:*)`, `Bash(sort:*)`. Anything not listed is denied without prompting. |
+| `SMASHER_PROVIDER=claude-cli` | Makes it the default provider (or choose it in Settings). The web server then sends codergen and manager nodes to `claude -p` too, except nodes with an explicit `provider="<other>"`, which use that provider's API agent. |
+| `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` | Comma-separated tools codergen and manager runs may use, replacing the default `Read,Edit,Write,Glob,Grep` plus `Bash(ls:*)`, `Bash(mkdir:*)`, `Bash(cp:*)`, `Bash(mv:*)`, `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(grep:*)`, `Bash(sort:*)`. Anything not listed is denied without prompting. |
 
 Every run passes `--strict-mcp-config`, `--setting-sources ""` and
 `--no-session-persistence`, so your MCP servers, settings and `~/.claude/CLAUDE.md`
