@@ -60,6 +60,38 @@ pub fn allowed_tools_from_env() -> Vec<String> {
     parse_allowed_tools(std::env::var(ALLOWED_TOOLS_ENV).ok().as_deref())
 }
 
+/// Env var holding the wall-clock limit, in whole seconds, for one node run
+/// through `claude -p` in the web server.
+pub const TIMEOUT_ENV: &str = "SMASHER_CLAUDE_CLI_TIMEOUT_SECS";
+
+/// Per-node limit when [`TIMEOUT_ENV`] is unset, matching `smasher run --agent-timeout`.
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// Parse a timeout in whole seconds. Unset or blank gives [`DEFAULT_TIMEOUT`];
+/// anything else that isn't a positive whole number is warned about and also
+/// gives the default.
+pub fn parse_timeout(value: Option<&str>) -> Duration {
+    let Some(value) = value.map(str::trim).filter(|v| !v.is_empty()) else {
+        return DEFAULT_TIMEOUT;
+    };
+    match value.parse::<u64>() {
+        Ok(secs) if secs > 0 => Duration::from_secs(secs),
+        _ => {
+            tracing::warn!(
+                value,
+                default_secs = DEFAULT_TIMEOUT.as_secs(),
+                "{TIMEOUT_ENV} is not a positive whole number of seconds; using the default"
+            );
+            DEFAULT_TIMEOUT
+        }
+    }
+}
+
+/// The timeout from [`TIMEOUT_ENV`], or the default.
+pub fn timeout_from_env() -> Duration {
+    parse_timeout(std::env::var(TIMEOUT_ENV).ok().as_deref())
+}
+
 /// How a codergen run's tool use is permitted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClaudeCliPermissions {
@@ -491,7 +523,8 @@ impl ClaudeCliBackend {
         if self.max_consecutive_timeouts > 0 && count >= self.max_consecutive_timeouts {
             Err(HandlerError::Other(format!(
                 "aborting: {} consecutive timeouts ({}s each). \
-                 Consider increasing --agent-timeout or simplifying node prompts.",
+                 Consider increasing --agent-timeout (smasher run) or \
+                 SMASHER_CLAUDE_CLI_TIMEOUT_SECS (web server), or simplifying node prompts.",
                 count,
                 self.timeout.as_secs()
             )))
@@ -1298,6 +1331,26 @@ mod tests {
     fn allowed_tools_unset_or_blank_uses_the_default() {
         assert_eq!(parse_allowed_tools(None), default_allowlist());
         assert_eq!(parse_allowed_tools(Some(" , ")), default_allowlist());
+    }
+
+    #[test]
+    fn timeout_unset_or_blank_uses_the_default() {
+        assert_eq!(DEFAULT_TIMEOUT, Duration::from_secs(600));
+        assert_eq!(parse_timeout(None), DEFAULT_TIMEOUT);
+        assert_eq!(parse_timeout(Some("  ")), DEFAULT_TIMEOUT);
+    }
+
+    #[test]
+    fn timeout_reads_whole_seconds() {
+        assert_eq!(parse_timeout(Some("1200")), Duration::from_secs(1200));
+        assert_eq!(parse_timeout(Some(" 90 ")), Duration::from_secs(90));
+    }
+
+    #[test]
+    fn invalid_timeout_falls_back_to_the_default() {
+        for value in ["abc", "0", "-5", "1.5", "10m"] {
+            assert_eq!(parse_timeout(Some(value)), DEFAULT_TIMEOUT, "{value:?}");
+        }
     }
 
     #[test]

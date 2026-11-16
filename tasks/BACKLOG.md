@@ -19,8 +19,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
       linter or open their pages. Decide whether to allow the linter command,
       or leave checking to the pipeline's `system_lint`/`render` nodes.
     - Show `permission_denials` from the CLI's result event in the run view.
-    - Make the claude-cli codergen timeout configurable (fixed at 600s in
-      `smasher-web/src/run_launch.rs`).
 ## P2: Robustness
 
 40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
-use std::time::Duration;
 
 use chrono::Utc;
 use tokio_util::sync::CancellationToken;
@@ -13,6 +12,7 @@ use tokio_util::sync::CancellationToken;
 use smasher_attractor::artifact::ArtifactStore;
 use smasher_attractor::claude_cli_backend::{
     ClaudeCliBackend, ClaudeCliManagerBackend, ClaudeCliPermissions, allowed_tools_from_env,
+    timeout_from_env,
 };
 use smasher_attractor::engine::{Engine, EngineConfig};
 use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
@@ -34,19 +34,16 @@ use crate::backend::{AgentCodergenBackend, ClaudeCliRouter, LlmManagerBackend};
 use crate::error::WebError;
 use crate::state::{AppState, RunRecord};
 
-/// Wall-clock limit for one codergen node run through `claude -p`, matching
-/// `smasher run --agent-timeout`'s default.
-const CLAUDE_CLI_NODE_TIMEOUT: Duration = Duration::from_secs(600);
-
 /// The `claude -p` codergen backend for a run: streams events to the run's
 /// emitter, uses the allowlist from `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` (or the
-/// default), and the binary `SMASHER_CLAUDE_CLI` resolves to.
+/// default), the per-node timeout from `SMASHER_CLAUDE_CLI_TIMEOUT_SECS` (or
+/// 600s), and the binary `SMASHER_CLAUDE_CLI` resolves to.
 fn claude_cli_backend(
     working_dir: &str,
     model: &str,
     emitter: Arc<PipelineEventEmitter>,
 ) -> ClaudeCliBackend {
-    let backend = ClaudeCliBackend::new(working_dir, CLAUDE_CLI_NODE_TIMEOUT)
+    let backend = ClaudeCliBackend::new(working_dir, timeout_from_env())
         .with_streaming(true)
         .with_emitter(emitter)
         .with_default_model(Some(model.to_string()))
