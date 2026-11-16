@@ -30,7 +30,7 @@
 		size = "default",
 		spacing = 0,
 		orientation = "horizontal",
-		variant = "default",
+		variant = "outline",
 		...restProps
 	}: ToggleGroupPrimitive.RootProps &
 		ToggleVariants & {
@@ -68,7 +68,7 @@ get along, so we shut typescript up by casting `value` to `never`.
 	data-spacing={spacing}
 	style={`--gap: ${spacing}`}
 	class={cn(
-		"data-[spacing=0]:data-[variant=outline]:rounded-3xl group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-vertical:flex-col data-vertical:items-stretch",
+		"group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] rounded-track p-0.5 data-[variant=default]:bg-secondary data-[variant=outline]:bg-control data-[variant=outline]:shadow-push data-vertical:flex-col data-vertical:items-stretch",
 		className
 	)}
 	{...restProps}

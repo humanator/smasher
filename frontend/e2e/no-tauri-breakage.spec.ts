@@ -23,13 +23,13 @@ test('runs with zero Tauri-only code paths breaking in a plain browser', async (
   await page.goto(base);
   await page.waitForLoadState('networkidle');
   expect(await page.evaluate(() => (window as unknown as { __TAURI__?: unknown }).__TAURI__)).toBeUndefined();
-  await expect(page.locator('h1', { hasText: 'Smasher Pipelines' })).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('h1', { hasText: 'Workflows' })).toBeVisible({ timeout: 10000 });
 
   // Catalog -> new-workflow page (mounts WorkflowCanvas, Palette, node-editor
   // forms -- the biggest surface Task 20's shim call-sites touch).
-  await page.getByRole('link', { name: 'New Workflow' }).click();
+  await page.getByRole('link', { name: 'New workflow', exact: true }).click();
   await page.waitForURL(/\/workflows\/new/);
-  await expect(page.getByText('Create New Workflow')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'New workflow' })).toBeVisible();
   // Give the create-mode fields (populated from a real API fetch) time to
   // settle so any async Tauri-detection code in that path has run.
   await expect(page.getByTestId('create-name-input')).toBeVisible();
@@ -38,8 +38,8 @@ test('runs with zero Tauri-only code paths breaking in a plain browser', async (
   // catalog's "paste DOT source" panel has been removed from the UI, and
   // every catalog workflow does real agentic work, so there's no UI path
   // left to launch an ad-hoc zero-LLM-call graph). Then navigate to its
-  // detail page so EventLog.svelte's completion-notification shim
-  // call-site (Task 20) actually executes -- a real browser has a real
+  // detail page so RunPage.svelte's run-notification shim
+  // call-site (useRunNotifications) actually executes -- a real browser has a real
   // Notification global, so showNotification's browser-fallback branch
   // runs for real here, not the jsdom "Notifications not supported"
   // warning path.
@@ -58,7 +58,8 @@ digraph NoTauriBreakageE2E {
   const { run_id: runId } = await submitResponse.json();
   await page.goto(`${base}/runs/${runId}`);
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('text=Pipeline completed')).toBeVisible({ timeout: 15000 });
+  await page.getByRole('tab', { name: 'Activity' }).click();
+  await expect(page.locator('.event-log').getByText('Run completed')).toBeVisible({ timeout: 15000 });
 
   await page.goto(base);
   await page.waitForLoadState('networkidle');

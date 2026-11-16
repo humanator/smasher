@@ -1,17 +1,18 @@
 <script lang="ts" module>
-	import { type VariantProps, tv } from "tailwind-variants";
+	import type { VariantProps } from "tailwind-variants";
+	import { tv } from "$lib/utils.js";
 
 	export const toggleVariants = tv({
-		base: "hover:text-foreground aria-pressed:bg-muted focus-visible:border-ring focus-visible:ring-ring/30 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive gap-1 rounded-3xl text-sm font-medium transition-colors [&_svg:not([class*='size-'])]:size-4 group/toggle inline-flex items-center justify-center whitespace-nowrap outline-none hover:bg-muted focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+		base: "hover:text-foreground aria-pressed:bg-secondary focus-visible:ring-ring aria-invalid:ring-invalid-ring aria-invalid:border-invalid gap-1 rounded-sm text-body leading-none font-normal text-foreground transition-colors [&_svg:not([class*='size-'])]:size-[13px] group/toggle inline-flex items-center justify-center whitespace-nowrap outline-none focus-visible:ring-3 disabled:pointer-events-none disabled:opacity-45 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 		variants: {
 			variant: {
 				default: "bg-transparent",
-				outline: "border-input hover:bg-muted border bg-transparent",
+				outline: "bg-transparent",
 			},
 			size: {
-				default: "h-9 min-w-9 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
-				sm: "h-8 min-w-8 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-				lg: "h-10 min-w-10 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+				default: "h-5 min-w-5 px-[11px]",
+				sm: "h-[18px] min-w-[18px] px-[11px] text-small",
+				lg: "h-6 min-w-6 px-[14px]",
 			},
 		},
 		defaultVariants: {

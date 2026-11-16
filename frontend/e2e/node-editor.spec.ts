@@ -41,7 +41,7 @@ test('create a workflow via real drag-and-drop, save, reload, edit, and re-save'
   try {
     await page.goto(`${baseURL || 'http://127.0.0.1:5173'}/workflows/new`);
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText('Create New Workflow')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'New workflow' })).toBeVisible();
 
     // The create-mode name/target-dir fields only exist once the canvas has
     // mounted, and the <select>'s options only populate once
@@ -121,13 +121,20 @@ test('a dropped node lands under the pointer after zooming and panning', async (
   await dragPaletteEntryOntoCanvas(page, 'Start');
   await expect(page.locator('.svelte-flow__node')).toHaveCount(1);
 
-  // That fit zooms to the maximum around one node, so zoom out once with
-  // the Controls' - button, then pan by dragging the empty pane. The
-  // viewport is then neither at zoom 1 nor at the origin.
-  await page.locator('.svelte-flow__controls-zoomout').click();
+  // That fit zooms to the maximum around one node, so zoom out with the
+  // toolbar's Zoom out, then pan by dragging the empty pane. The viewport is
+  // then neither at zoom 1 nor at the origin.
   const pane = await page.locator('.svelte-flow__pane').boundingBox();
   expect(pane).not.toBeNull();
   const start = { x: pane!.x + pane!.width / 2, y: pane!.y + pane!.height / 2 };
+  const viewport = page.locator('.svelte-flow__viewport');
+  const before = await viewport.getAttribute('style');
+  const zoom = page.getByRole('group', { name: 'Zoom' });
+  const level = await zoom.textContent();
+  await zoom.getByRole('button', { name: 'Zoom out' }).click();
+  await zoom.getByRole('button', { name: 'Zoom out' }).click();
+  await expect(viewport).not.toHaveAttribute('style', before!);
+  await expect(zoom).not.toHaveText(level!);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(start.x - 120, start.y - 80, { steps: 8 });
@@ -188,6 +195,35 @@ test('saving over a file changed on disk toasts the conflict, and Save anyway wr
   }
 });
 
+test('saving over a file changed on disk toasts the conflict, and Reload shows the version on disk', async ({
+  page,
+  baseURL,
+}) => {
+  const base = baseURL || 'http://127.0.0.1:5173';
+  const name = `_test_node_editor_reload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const dot = 'digraph { start [shape=Mdiamond, label="Start"]; done [shape=doublecircle, label="Done"]; start -> done; }';
+  const { id } = await (await page.request.post(`${base}/api/workflows/import`, { data: { name, dot } })).json();
+  const listed = await (await page.request.get(`${base}/api/workflows`)).json();
+  const path: string = listed.workflows.find((w: { id: string }) => w.id === id).path;
+
+  try {
+    await page.goto(`${base}/workflows/${id}/edit`);
+    await expect(page.locator('.svelte-flow__node')).toHaveCount(2, { timeout: 10000 });
+    await page.locator('.svelte-flow__node[data-id="done"]').click();
+    await page.getByTestId('node-inspector-label').fill('Done in editor');
+    writeFileSync(path, dot.replace('label="Done"', 'label="Done elsewhere"'));
+
+    await page.getByTestId('save-button').click();
+    const toast = page.locator('[data-sonner-toast]', { hasText: 'changed on disk' });
+    await toast.getByRole('button', { name: 'Reload' }).click();
+    await expect(toast).toHaveCount(0);
+    await expect(page.locator('.svelte-flow__node[data-id="done"]')).toContainText('Done elsewhere');
+    expect(readFileSync(path, 'utf-8')).toContain('Done elsewhere');
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
 test('the canvas fills the viewport below the header on the edit and new pages', async ({ page, baseURL }) => {
   const base = baseURL || 'http://127.0.0.1:5173';
   const name = `_test_node_editor_fill_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -207,10 +243,15 @@ test('the canvas fills the viewport below the header on the edit and new pages',
       const header = (await page.locator('header').first().boundingBox())!;
       const box = (await flow.boundingBox())!;
       const palette = (await page.getByTestId('palette-entry-Codergen').boundingBox())!;
-      // Right up to the right and bottom edges of the window, left up to the
-      // palette, and no page scroll.
-      expect(box.x + box.width, url).toBeGreaterThan(1600 - 2);
-      expect(box.y + box.height, url).toBeGreaterThan(1000 - 2);
+      const statusBar = (await page.locator('footer', { hasText: /steps · \d+ connections/ }).boundingBox())!;
+      const inspector = (await page.getByRole('complementary', { name: 'Inspector' }).boundingBox())!;
+      // Right up to the inspector (which is always present at this width and
+      // reaches the right edge of the window), down to the status bar (which
+      // sits on the bottom edge), left up to the palette, and no page scroll.
+      expect(Math.abs(box.x + box.width - inspector.x), url).toBeLessThan(2);
+      expect(inspector.x + inspector.width, url).toBeGreaterThan(1600 - 2);
+      expect(Math.abs(box.y + box.height - statusBar.y), url).toBeLessThan(2);
+      expect(statusBar.y + statusBar.height, url).toBeGreaterThan(1000 - 2);
       expect(box.x - (palette.x + palette.width), url).toBeLessThan(24);
       expect(box.y - (header.y + header.height), url).toBeLessThan(80);
       const scrolls = await page.evaluate(
@@ -226,8 +267,10 @@ test('the canvas fills the viewport below the header on the edit and new pages',
 test('a wide graph fits inside the canvas on first load', async ({ page, baseURL }) => {
   const base = baseURL || 'http://127.0.0.1:5173';
   // consensus_task.dot is wide enough that Svelte Flow's default minZoom of
-  // 0.5 stopped fitView short, leaving nodes off both edges.
-  await page.setViewportSize({ width: 1280, height: 800 });
+  // 0.5 stopped fitView short, leaving nodes off both edges. With the
+  // 360px inspector always beside the canvas, 1280 wide leaves the canvas
+  // narrower than this graph at the 0.1 minZoom, so the window is wider.
+  await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(`${base}/workflows/examples__consensus_task/edit`);
   const nodes = page.locator('.svelte-flow__node');
   await expect(nodes.first()).toBeVisible({ timeout: 10000 });

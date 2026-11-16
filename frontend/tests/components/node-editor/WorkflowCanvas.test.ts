@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import userEvent from '@testing-library/user-event';
 import WorkflowCanvas from '../../../src/components/node-editor/WorkflowCanvas.svelte';
+import CanvasHost from './CanvasHost.svelte';
 import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG } from '../../../src/components/node-editor/nodeConfig';
 import type { EditorGraph } from '../../../src/components/node-editor/types';
 
@@ -20,6 +22,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+async function clickNodeByLabel(label: string) {
+  const el = screen.getByText(label).closest('.svelte-flow__node') as HTMLElement;
+  await fireEvent.click(el);
+}
+
+// An edit that marks the graph unsaved: select the step and retype its name.
+async function renameNode(label: string, to: string) {
+  await clickNodeByLabel(label);
+  await fireEvent.input(screen.getByTestId('node-inspector-label'), { target: { value: to } });
+}
+
 describe('setting the graph prop', () => {
   it('renders the expected number of nodes and edges', async () => {
     const { component } = render(WorkflowCanvas, {
@@ -35,7 +48,7 @@ describe('setting the graph prop', () => {
     expect(component.currentGraph().edges).toHaveLength(1);
   });
 
-  it("renders each node's kind-colored background/border (nodeConfig.THEME_COLORS), not the library's uncolored default", async () => {
+  it("renders each node as a step card in its kind's colours, named by kind and step", async () => {
     const { container } = render(WorkflowCanvas, {
       props: { graph: sampleGraph, onSave: vi.fn() },
     });
@@ -44,11 +57,15 @@ describe('setting the graph prop', () => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
     });
 
-    // 'a' is a Start node (green theme), 'b' is Codergen (blue theme).
+    // 'a' is a Start node (a pill, edge group), 'b' is Codergen (a card, AI group).
     const nodeA = container.querySelector('.svelte-flow__node[data-id="a"]') as HTMLElement;
     const nodeB = container.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
-    expect(nodeA.style.backgroundColor).not.toBe('');
-    expect(nodeA.style.backgroundColor).not.toBe(nodeB.style.backgroundColor);
+    const pill = nodeA.querySelector('.wf-pill') as HTMLElement;
+    const card = nodeB.querySelector('.wf-card') as HTMLElement;
+    expect(pill.style.getPropertyValue('--tint')).toBe('var(--kind-edge-tint)');
+    expect(card.style.getPropertyValue('--tint')).toBe('var(--kind-ai-tint)');
+    expect(nodeA).toHaveAttribute('aria-label', 'Start: A');
+    expect(nodeB).toHaveAttribute('aria-label', 'AI Agent: B');
   });
 
   it('gives every node all 4 attachment points (top/bottom for long jumps, left/right for horizontal flow)', async () => {
@@ -111,6 +128,64 @@ describe('built-in delete interaction', () => {
     // The edge referencing the deleted node goes with it.
     expect(component.currentGraph().edges).toHaveLength(0);
   });
+
+  it('removes a selected node when Delete is pressed, as well as Backspace (D3)', async () => {
+    const { component } = render(WorkflowCanvas, {
+      props: { graph: sampleGraph, onSave: vi.fn() },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    const nodeA = screen.getByText('A').closest('.svelte-flow__node') as HTMLElement;
+    await fireEvent.click(nodeA);
+    await fireEvent.keyDown(document, { key: 'Delete' });
+
+    await waitFor(() => {
+      expect(component.currentGraph().nodes.map((n) => n.id)).toEqual(['b']);
+    });
+  });
+});
+
+// Svelte Flow selects a focused step or connection with Enter or Space, which
+// is no click; the inspector follows it so the keyboard can select (SC5).
+describe('keyboard selection', () => {
+  it('shows a step in the inspector when it is selected with Enter', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    await clickNodeByLabel('A');
+    expect(screen.getByTestId('node-inspector-label')).toHaveValue('A');
+
+    const nodeB = screen.getByText('B').closest('.svelte-flow__node') as HTMLElement;
+    nodeB.focus();
+    await fireEvent.keyDown(nodeB, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('node-inspector-label')).toHaveValue('B');
+    });
+  });
+
+  it('then deletes the step it selected, not the one selected before', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => {
+      expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
+    });
+
+    await clickNodeByLabel('A');
+    const nodeB = screen.getByText('B').closest('.svelte-flow__node') as HTMLElement;
+    nodeB.focus();
+    await fireEvent.keyDown(nodeB, { key: ' ' });
+    await waitFor(() => {
+      expect(screen.getByTestId('node-inspector-label')).toHaveValue('B');
+    });
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Step' }));
+
+    expect(component.currentGraph().nodes.map((n) => n.id)).toEqual(['a']);
+  });
 });
 
 describe('reacting to a changed graph prop', () => {
@@ -165,6 +240,7 @@ describe('save action (edit mode -- workflowId set)', () => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
     });
 
+    await renameNode('B', 'B');
     await fireEvent.click(screen.getByTestId('save-button'));
 
     await waitFor(() => {
@@ -183,6 +259,7 @@ describe('save action (edit mode -- workflowId set)', () => {
       expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2);
     });
 
+    await renameNode('B', 'B');
     await fireEvent.click(screen.getByTestId('save-button'));
 
     await waitFor(() => {
@@ -208,6 +285,15 @@ describe('save action (edit mode -- workflowId set)', () => {
 // saveGraph.
 describe('create mode (no workflowId)', () => {
   const emptyGraph: EditorGraph = { graph_attrs: {}, nodes: [], edges: [] };
+
+  it('has no Run before the first save, whatever the page passes', async () => {
+    render(CanvasHost, {
+      props: { graph: emptyGraph, availableTargetDirs: ['examples'], onSave: vi.fn(), onRun: vi.fn() },
+    });
+
+    await screen.findByTestId('save-button');
+    expect(screen.queryByRole('button', { name: 'Run' })).toBeNull();
+  });
 
   it('renders name and target-dir fields, defaulting the dir to the first available one', async () => {
     render(WorkflowCanvas, {
@@ -270,76 +356,100 @@ describe('create mode (no workflowId)', () => {
   });
 });
 
-// Task 6: node-kind visual registry + palette sidebar. Palette.svelte has
-// no @xyflow/svelte context-dependent bits of its own (the drop position
-// comes from FlowPositionBridge.svelte, inside <SvelteFlow>, not from
-// Palette), but it's tested here, through the real integration point,
-// rather than a throwaway Palette-only render harness.
-describe('palette', () => {
-  it('renders the 3 documented groups with their entries', async () => {
+// Task 9: the step library (Palette.svelte, tested on its own in
+// Palette.test.ts) drives the canvas's `guide` selection, and Task 16 the
+// Step guide's Add to Canvas.
+describe('step library selection', () => {
+  it('shows the Step guide for a step picked in the library, and presses it', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('palette-group-pipeline-steps')).toBeInTheDocument();
-    });
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
 
-    const pipelineSteps = within(screen.getByTestId('palette-group-pipeline-steps'));
-    expect(pipelineSteps.getByText('Codergen')).toBeInTheDocument();
-    expect(pipelineSteps.getByText('Tool')).toBeInTheDocument();
-    expect(pipelineSteps.getByText('Manager')).toBeInTheDocument();
-
-    const controlFlow = within(screen.getByTestId('palette-group-control-flow'));
-    expect(controlFlow.getByText('Human Gate')).toBeInTheDocument();
-    expect(controlFlow.getByText('Conditional')).toBeInTheDocument();
-    expect(controlFlow.getByText('Sub-Pipeline')).toBeInTheDocument();
-
-    const structural = within(screen.getByTestId('palette-group-structural'));
-    expect(structural.getByText('Start')).toBeInTheDocument();
-    expect(structural.getByText('Exit')).toBeInTheDocument();
-    expect(structural.getByText('Parallel')).toBeInTheDocument();
-    expect(structural.getByText('Fan-In')).toBeInTheDocument();
+    const guide = screen.getByTestId('step-guide');
+    expect(within(guide).getByText('Step guide')).toBeInTheDocument();
+    expect(within(guide).getByRole('heading', { name: 'Tool' })).toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('collapses and expands the Pipeline Steps group independently of Control Flow', async () => {
+  it('deselects the step when it is clicked again', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('palette-entry-Codergen')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('palette-entry-Interviewer')).toBeInTheDocument();
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
 
-    await fireEvent.click(screen.getByTestId('palette-group-toggle-pipeline-steps'));
-
-    expect(screen.queryByTestId('palette-entry-Codergen')).not.toBeInTheDocument();
-    // Control Flow wasn't touched -- stays expanded.
-    expect(screen.getByTestId('palette-entry-Interviewer')).toBeInTheDocument();
-
-    await fireEvent.click(screen.getByTestId('palette-group-toggle-pipeline-steps'));
-
-    expect(screen.getByTestId('palette-entry-Codergen')).toBeInTheDocument();
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('renders the structural group with no collapse toggle (always visible)', async () => {
+  it('deselects the step when something on the canvas is selected', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('palette-entry-Start')).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('palette-group-toggle-structural')).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+    await clickNodeByLabel('B');
+
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
+    expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('marks entries draggable and puts the NodeType on the drag payload via dragstart', async () => {
+  it('replaces a selected step on the canvas with the guide', async () => {
     render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await clickNodeByLabel('B');
 
-    const entry = await screen.findByTestId('palette-entry-Codergen');
-    expect(entry).toHaveAttribute('draggable', 'true');
+    await fireEvent.click(screen.getByTestId('palette-entry-Start'));
 
-    const setData = vi.fn();
-    await fireEvent.dragStart(entry, {
-      dataTransfer: { setData, effectAllowed: '' } as unknown as DataTransfer,
-    });
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('step-guide')).getByRole('heading', { name: 'Start' })).toBeInTheDocument();
+  });
 
-    expect(setData).toHaveBeenCalledWith(NODE_DRAG_DATA_TYPE, 'Codergen');
+  it('Add to Canvas adds the step with its kind\'s default attrs, selects it and lets go of the library pick', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Add to Canvas' }));
+
+    await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(3));
+    const created = component.currentGraph().nodes.find((n) => !['a', 'b'].includes(n.id))!;
+    expect(created.node_type).toBe('Tool');
+    expect(created.label).toBe('Tool');
+    const attrs = { ...created.attrs };
+    delete attrs.pos;
+    expect(attrs).toEqual(NODE_KIND_CONFIG.Tool.defaultAttrs);
+    expect(screen.getByTestId('node-inspector-title')).toHaveTextContent('Tool');
+    expect(screen.getByTestId('tool-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
+    expect(screen.getByTestId('palette-entry-Tool')).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(document.querySelector(`.svelte-flow__node[data-id="${created.id}"]`)).toHaveClass('selected'));
+  });
+
+  it('adds a step from the keyboard alone: pick it in the library, then Add to Canvas', async () => {
+    const user = userEvent.setup();
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    screen.getByTestId('palette-entry-Codergen').focus();
+    await user.keyboard('{Enter}');
+    screen.getByRole('button', { name: 'Add to Canvas' }).focus();
+    await user.keyboard(' ');
+
+    await waitFor(() => expect(component.currentGraph().nodes.filter((n) => n.node_type === 'Codergen')).toHaveLength(2));
+    expect(screen.getByTestId('codergen-form')).toBeInTheDocument();
+    expect(screen.getByTestId('node-inspector-label')).toHaveFocus();
+  });
+
+  it('clears the guide when the empty canvas is clicked', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await fireEvent.click(screen.getByTestId('palette-entry-Tool'));
+
+    await fireEvent.click(document.querySelector('.svelte-flow__pane') as HTMLElement);
+
+    expect(screen.queryByTestId('step-guide')).not.toBeInTheDocument();
   });
 });
 
@@ -349,7 +459,7 @@ describe('palette', () => {
 // by calling the underlying handler directly. jsdom can't do real viewport
 // maths either, so whether a drop lands under the pointer at any pan/zoom
 // is proven by e2e/node-editor.spec.ts; the one synthetic `drop` test
-// below only covers the wiring through FlowPositionBridge.svelte.
+// below only covers the wiring through FlowBridge.svelte.
 // Task 7: node-kind form components + the selected-node side panel that
 // swaps between them. `sampleGraph` above only has Start/Codergen; this
 // fixture adds one node per interesting kind so each form's testid can be
@@ -368,17 +478,23 @@ const multiKindGraph: EditorGraph = {
   edges: [],
 };
 
-async function clickNodeByLabel(label: string) {
-  const el = screen.getByText(label).closest('.svelte-flow__node') as HTMLElement;
-  await fireEvent.click(el);
-}
-
 describe('node inspector (Task 7 side panel)', () => {
   it('is absent until a node is selected', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
 
     await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
     expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('shows Nothing selected in the inspector until something is selected', async () => {
+    render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+
+    const inspector = screen.getByRole('complementary', { name: 'Inspector' });
+    expect(within(inspector).getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
+
+    await clickNodeByLabel('Generate');
+    expect(screen.queryByRole('heading', { name: 'Nothing selected' })).not.toBeInTheDocument();
   });
 
   it('shows CodergenForm for a Codergen node, pre-populated from its attrs', async () => {
@@ -392,9 +508,10 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.getByTestId('codergen-prompt')).toHaveValue('write code');
     expect(screen.getByTestId('codergen-model')).toHaveValue('gpt-5');
     expect(screen.getByTestId('node-inspector-label')).toHaveValue('Generate');
-    expect(screen.getByTestId('node-inspector-description')).toHaveTextContent(
-      'Runs an AI coding agent from a prompt to generate or modify code.',
-    );
+    expect(screen.getByTestId('node-inspector-title')).toHaveTextContent('Generate');
+    const inspector = within(screen.getByTestId('node-inspector'));
+    expect(inspector.getByText('AI Agent')).toBeInTheDocument();
+    expect(inspector.getByText('Also called “Codergen” in workflow files.')).toBeInTheDocument();
   });
 
   it('shows InterviewerForm for an Interviewer node', async () => {
@@ -437,17 +554,66 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(screen.getByTestId('sub-pipeline-path')).toHaveValue('sub.dot');
   });
 
-  it('shows StructuralForm (label-only) for a Start node', async () => {
+  it('shows FlowForm with the no-settings note, and no More settings, for a Start node', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
 
     await clickNodeByLabel('Begin');
 
-    expect(screen.getByTestId('structural-form')).toBeInTheDocument();
+    expect(screen.getByTestId('flow-form')).toHaveTextContent('This step has no settings beyond its name.');
     expect(screen.getByTestId('node-inspector-label')).toHaveValue('Begin');
+    expect(screen.queryByRole('button', { name: /More settings/ })).toBe(null);
   });
 
-  it('shows StructuralForm as a fallback for an unrecognized node_type string', async () => {
+  it('shows More settings after the kind\'s own fields for a step that can retry', async () => {
+    render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+
+    await clickNodeByLabel('Generate');
+
+    const more = screen.getByRole('button', { name: /More settings/ });
+    expect(more).toHaveTextContent('4 settings');
+    expect(screen.getByTestId('codergen-form').compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('keeps a legacy retries attr when Retries is edited and the workflow saved', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(WorkflowCanvas, {
+      props: {
+        graph: { ...sampleGraph, nodes: sampleGraph.nodes.map((n) => (n.id === 'b' ? { ...n, attrs: { ...n.attrs, retries: 3 } } : n)) },
+        workflowId: 'existing-workflow',
+        onSave,
+      },
+    });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await clickNodeByLabel('B');
+
+    await fireEvent.click(screen.getByRole('button', { name: /More settings/ }));
+    await fireEvent.input(screen.getByTestId('more-max_retries'), { target: { value: '2' } });
+    await fireEvent.click(screen.getByTestId('save-button'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const saved = (onSave.mock.calls[0][0] as EditorGraph).nodes.find((n) => n.id === 'b');
+    expect(saved?.attrs).toMatchObject({ retries: 3, max_retries: 2 });
+  });
+
+  it('writes a Split\'s settings to its attrs', async () => {
+    const { component } = render(WorkflowCanvas, {
+      props: {
+        graph: { graph_attrs: {}, nodes: [{ id: 'fan', node_type: 'Parallel', label: 'Fan out', attrs: {} }], edges: [] },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Fan out')).toBeInTheDocument());
+    await clickNodeByLabel('Fan out');
+
+    await fireEvent.input(screen.getByTestId('parallel-max-concurrency'), { target: { value: '4' } });
+    await fireEvent.click(screen.getByTestId('parallel-fail-fast'));
+
+    expect(component.currentGraph().nodes[0].attrs).toMatchObject({ max_concurrency: 4, fail_fast: true });
+  });
+
+  it('shows FlowForm as a fallback for an unrecognized node_type string', async () => {
     render(WorkflowCanvas, {
       props: {
         graph: {
@@ -462,7 +628,7 @@ describe('node inspector (Task 7 side panel)', () => {
 
     await clickNodeByLabel('Mystery');
 
-    expect(screen.getByTestId('structural-form')).toBeInTheDocument();
+    expect(screen.getByTestId('flow-form')).toBeInTheDocument();
   });
 
   it('closes when the pane (not a node) is clicked', async () => {
@@ -482,9 +648,23 @@ describe('node inspector (Task 7 side panel)', () => {
     await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
     await clickNodeByLabel('Generate');
 
-    await fireEvent.click(screen.getByLabelText('Close node inspector'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
 
     expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
+  });
+
+  it('Delete Step removes the step and its connections, and clears the selection', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    await clickNodeByLabel('B');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Step' }));
+
+    expect(component.currentGraph().nodes.map((n) => n.id)).toEqual(['a']);
+    expect(component.currentGraph().edges).toHaveLength(0);
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
   });
 
   it('editing a kind-specific field updates the node\'s attrs in live graph state immediately', async () => {
@@ -537,6 +717,36 @@ describe('node inspector (Task 7 side panel)', () => {
     expect(updated?.attrs?.question).toBe('ok?');
   });
 
+  it('shows a Required field\'s problem inline only while it fires, following live edits', async () => {
+    render(WorkflowCanvas, {
+      props: {
+        graph: {
+          graph_attrs: {},
+          nodes: [
+            { id: 'gen', node_type: 'Codergen', label: 'Generate', attrs: {} },
+            { id: 'run', node_type: 'Tool', label: 'Run', attrs: { tool_command: '' } },
+          ],
+          edges: [],
+        },
+        onSave: vi.fn(),
+      },
+    });
+    await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
+
+    // Instructions fall back to the step name, so the rule fires only once both are empty.
+    await clickNodeByLabel('Generate');
+    expect(screen.getByTestId('codergen-prompt')).not.toHaveAttribute('aria-invalid');
+    await fireEvent.input(screen.getByTestId('node-inspector-label'), { target: { value: '' } });
+    expect(screen.getByTestId('codergen-prompt')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Is missing instructions.')).toBeInTheDocument();
+
+    await clickNodeByLabel('Run');
+    expect(screen.getByText('Needs a command.')).toBeInTheDocument();
+    await fireEvent.input(screen.getByTestId('tool-command'), { target: { value: 'make' } });
+    expect(screen.queryByText('Needs a command.')).toBe(null);
+    expect(screen.getByTestId('tool-command')).not.toHaveAttribute('aria-invalid');
+  });
+
   it('switching selection to a different node swaps the form and shows that node\'s own attrs, not the previous selection\'s', async () => {
     render(WorkflowCanvas, { props: { graph: multiKindGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getByText('Generate')).toBeInTheDocument());
@@ -567,7 +777,7 @@ describe('node inspector (Task 7 side panel)', () => {
 });
 
 describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
-  it('creates a new node of the given NodeType at the given position, with the config default label', async () => {
+  it("creates a new node of the given NodeType at the given position, named after the kind with its default attrs", async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
 
@@ -581,8 +791,8 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
     const created = component.currentGraph().nodes.find((n) => !['a', 'b'].includes(n.id));
     expect(created).toBeDefined();
     expect(created?.node_type).toBe('Codergen');
-    expect(created?.label).toBe(NODE_KIND_CONFIG.Codergen.title);
-    expect(created?.attrs?.pos).toBe('321,87');
+    expect(created?.label).toBe('AI Agent');
+    expect(created?.attrs).toEqual({ ...NODE_KIND_CONFIG.Codergen.defaultAttrs, pos: '321,87' });
   });
 
   it('ignores an unrecognized node type instead of crashing or adding a node', async () => {
@@ -593,7 +803,7 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
     expect(component.currentGraph().nodes).toHaveLength(2);
   });
 
-  it('turns a drop event into a node via the flow-position bridge', async () => {
+  it('turns a drop event into a node via the flow bridge', async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(component.currentGraph().nodes).toHaveLength(2));
 
@@ -632,46 +842,28 @@ describe('dropping a palette entry onto the canvas (addNodeAtPosition)', () => {
 // "call the real handler directly instead of a synthetic DOM gesture jsdom
 // can't produce" precedent `addNodeAtPosition` already set for Task 4's
 // drag-and-drop.
-describe('connection handle polish (Task 8)', () => {
-  it('marks a node with at least one edge as wf-node-connected', async () => {
-    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
-    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
-
-    const nodeA = document.querySelector('.svelte-flow__node[data-id="a"]');
-    const nodeB = document.querySelector('.svelte-flow__node[data-id="b"]');
-    expect(nodeA?.className).toContain('wf-node-connected');
-    expect(nodeB?.className).toContain('wf-node-connected');
-  });
-
-  it('does not mark an unconnected node as wf-node-connected', async () => {
+// D4 replaced Task 8's "connected nodes keep their handles lit": every
+// node's handles are hidden at rest, whether it has edges or not, and
+// WorkflowNode.css reveals them on hover/focus/selection or while a
+// connection is being drawn (see WorkflowNode.test.ts).
+describe('connection handles (D4)', () => {
+  it('gives connected and unconnected nodes the same hidden-at-rest handles', async () => {
     render(WorkflowCanvas, {
       props: {
-        graph: {
-          graph_attrs: {},
-          nodes: [{ id: 'lonely', node_type: 'Start', label: 'Lonely', attrs: {} }],
-          edges: [],
-        },
+        graph: { ...sampleGraph, nodes: [...sampleGraph.nodes, { id: 'lonely', node_type: 'Exit', label: 'Lonely', attrs: {} }] },
         onSave: vi.fn(),
       },
     });
     await waitFor(() => expect(screen.getByText('Lonely')).toBeInTheDocument());
 
-    const node = document.querySelector('.svelte-flow__node[data-id="lonely"]');
-    expect(node?.className).not.toContain('wf-node-connected');
-  });
-
-  it('removes the wf-node-connected class once its only edge is deleted', async () => {
-    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
-    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
-
-    // The id convert.ts's toFlowEdges assigns (`${from}->${to}#${i}`).
-    component.edgeActions.onDeleteEdge('a->b#0');
-
-    await waitFor(() => {
-      expect(component.currentGraph().edges).toHaveLength(0);
-    });
-    const nodeA = document.querySelector('.svelte-flow__node[data-id="a"]');
-    expect(nodeA?.className).not.toContain('wf-node-connected');
+    for (const id of ['a', 'lonely']) {
+      const handles = document.querySelectorAll(`.svelte-flow__node[data-id="${id}"] .svelte-flow__handle`);
+      expect(handles).toHaveLength(4);
+      for (const handle of handles) {
+        expect(handle).toHaveClass('wf-handle');
+        expect(handle).not.toHaveClass('wf-handle-live');
+      }
+    }
   });
 });
 
@@ -686,7 +878,7 @@ describe('edge inspector (Task 8 side panel)', () => {
     const graph: EditorGraph = {
       ...sampleGraph,
       edges: [
-        { from: 'a', to: 'b', condition: 'ready', priority: 2, loop_restart: true, attrs: {} },
+        { from: 'a', to: 'b', label: 'go', condition: 'ready', priority: 2, loop_restart: true, attrs: {} },
       ],
     };
     const { component } = render(WorkflowCanvas, { props: { graph, onSave: vi.fn() } });
@@ -696,6 +888,7 @@ describe('edge inspector (Task 8 side panel)', () => {
 
     await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
     expect(screen.getByTestId('edge-form')).toBeInTheDocument();
+    expect(screen.getByTestId('edge-label')).toHaveValue('go');
     expect(screen.getByTestId('edge-condition')).toHaveValue('ready');
     expect(screen.getByTestId('edge-priority')).toHaveValue('2');
     expect(screen.getByTestId('edge-loop-restart')).toBeChecked();
@@ -715,6 +908,33 @@ describe('edge inspector (Task 8 side panel)', () => {
     expect(updated?.condition).toBe('x > 5');
     expect(updated?.priority).toBe(3);
     expect(updated?.loop_restart).toBe(true);
+  });
+
+  it('a label edit sets the connection\'s label, which its canvas pill shows, and clearing it removes the label', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-form')).toBeInTheDocument());
+
+    await fireEvent.input(screen.getByTestId('edge-label'), { target: { value: 'retry' } });
+    expect(component.currentGraph().edges[0].label).toBe('retry');
+    expect(screen.getByTestId('edge-inspector-title')).toHaveTextContent('A → B');
+
+    await fireEvent.input(screen.getByTestId('edge-label'), { target: { value: '' } });
+    expect(component.currentGraph().edges[0].label).toBeUndefined();
+  });
+
+  it('a bad priority shows the error and leaves the saved priority alone', async () => {
+    const graph: EditorGraph = { ...sampleGraph, edges: [{ from: 'a', to: 'b', priority: 2, loop_restart: false, attrs: {} }] };
+    const { component } = render(WorkflowCanvas, { props: { graph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-form')).toBeInTheDocument());
+
+    await fireEvent.input(screen.getByTestId('edge-priority'), { target: { value: 'x' } });
+
+    expect(screen.getByText('Priority must be a whole number, like 1 or 5.')).toBeInTheDocument();
+    expect(component.currentGraph().edges[0].priority).toBe(2);
   });
 
   it('selecting a node closes an open edge inspector, and vice versa', async () => {
@@ -754,13 +974,85 @@ describe('edge inspector (Task 8 side panel)', () => {
     component.selectEdge('a->b#0');
     await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
 
-    await fireEvent.click(screen.getByLabelText('Close edge inspector'));
+    await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
 
     expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
   });
+
+  it('titles the connection by the steps it joins', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+
+    await waitFor(() => expect(screen.getByTestId('edge-inspector-title')).toHaveTextContent('A → B'));
+    expect(within(screen.getByTestId('edge-inspector')).getByText('Connection')).toBeInTheDocument();
+  });
+
+  it('Delete Connection removes the connection and clears the selection', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    component.selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Connection' }));
+
+    expect(component.currentGraph().edges).toHaveLength(0);
+    expect(component.currentGraph().nodes).toHaveLength(2);
+    expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Nothing selected' })).toBeInTheDocument();
+  });
 });
 
-describe('edge deletion via edgeActions (Task 8 hover-revealed delete)', () => {
+describe('Branch rules', () => {
+  const branchGraph: EditorGraph = {
+    name: 'Branchy',
+    graph_attrs: {},
+    nodes: [
+      { id: 'start', node_type: 'Start', label: 'Begin', attrs: {} },
+      { id: 'br', node_type: 'Conditional', label: 'Good enough?', attrs: {} },
+      { id: 'ok', node_type: 'Exit', label: 'Ship it', attrs: {} },
+      { id: 'draft', node_type: 'Codergen', label: 'Draft', attrs: { prompt: 'p' } },
+    ],
+    edges: [
+      { from: 'start', to: 'br', loop_restart: false, attrs: {} },
+      { from: 'br', to: 'ok', label: 'yes', condition: 'outcome=success', loop_restart: false, attrs: {} },
+      { from: 'br', to: 'draft', loop_restart: true, attrs: {} },
+    ],
+  };
+
+  it('lists one rule per outgoing connection, named after its target, with no More settings', async () => {
+    render(WorkflowCanvas, { props: { graph: branchGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Good enough?')).toBeInTheDocument());
+
+    await clickNodeByLabel('Good enough?');
+
+    expect(screen.getByRole('textbox', { name: 'Go to “Ship it” when…' })).toHaveValue('outcome=success');
+    expect(screen.getByRole('textbox', { name: 'Go to “Draft” when…' })).toHaveAccessibleDescription(
+      'This path loops back and redoes the step. Leave blank to use the label as the rule.',
+    );
+    expect(screen.queryByRole('textbox', { name: /Begin/ })).toBe(null);
+    expect(screen.getByRole('button', { name: 'Rule syntax' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /More settings/ })).toBe(null);
+  });
+
+  it('edits the condition of the right connection only', async () => {
+    const { component } = render(WorkflowCanvas, { props: { graph: branchGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Good enough?')).toBeInTheDocument());
+    await clickNodeByLabel('Good enough?');
+
+    await fireEvent.input(screen.getByRole('textbox', { name: 'Go to “Draft” when…' }), { target: { value: 'outcome=fail' } });
+
+    const edges = component.currentGraph().edges;
+    expect(edges.find((e) => e.to === 'draft')?.condition).toBe('outcome=fail');
+    expect(edges.find((e) => e.to === 'ok')?.condition).toBe('outcome=success');
+    expect(edges.find((e) => e.to === 'br')?.condition).toBeUndefined();
+    expect(edges.find((e) => e.to === 'draft')?.loop_restart).toBe(true);
+  });
+});
+
+// The hover-revealed × is gone (D3); edgeActions.onDeleteEdge stays the one
+// path for deleting a connection, alongside Backspace (see WorkflowEdge.test.ts).
+describe('edge deletion via edgeActions', () => {
   it('removes the edge from graph state when onDeleteEdge is invoked', async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
@@ -785,13 +1077,453 @@ describe('edge deletion via edgeActions (Task 8 hover-revealed delete)', () => {
       expect(screen.queryByTestId('edge-inspector')).not.toBeInTheDocument();
     });
   });
+});
 
-  it('tracks hover state via edgeActions.hoveredEdgeId', async () => {
+describe('connection labels and legend (Task 7)', () => {
+  it('opens the edge inspector when a label pill reports a click (edgeActions.onSelectEdge)', async () => {
     const { component } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
     await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    const nodeA = screen.getByText('A').closest('.svelte-flow__node') as HTMLElement;
+    await fireEvent.click(nodeA);
 
-    expect(component.edgeActions.hoveredEdgeId).toBeNull();
-    component.edgeActions.hoveredEdgeId = 'a->b#0';
-    expect(component.edgeActions.hoveredEdgeId).toBe('a->b#0');
+    component.edgeActions.onSelectEdge('a->b#0');
+
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+  });
+
+  it('shows the legend on the canvas', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    const canvas = within(screen.getByRole('region', { name: 'Workflow canvas drop zone' }));
+    expect(canvas.getByText('Then run the next step')).toBeInTheDocument();
+    expect(canvas.getByText('Go back and redo (a loop)')).toBeInTheDocument();
+  });
+});
+
+// Task 8: canvas chrome and the status bar under it.
+describe('canvas chrome and status bar (Task 8)', () => {
+  const problemGraph: EditorGraph = {
+    name: 'Problems',
+    graph_attrs: {},
+    nodes: [
+      { id: 'start', node_type: 'Start', label: 'Begin', attrs: {} },
+      { id: 'check', node_type: 'Tool', label: 'Check', attrs: {} },
+      { id: 'end', node_type: 'Exit', label: 'Done', attrs: {} },
+    ],
+    edges: [
+      { from: 'start', to: 'check', loop_restart: false, attrs: {} },
+      { from: 'check', to: 'end', loop_restart: false, attrs: {} },
+    ],
+  };
+
+  it('draws a dot grid, a MiniMap and no xyflow Controls', async () => {
+    const { container } = render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    expect(container.querySelector('.svelte-flow__background pattern circle')).not.toBeNull();
+    expect(container.querySelector('.svelte-flow__minimap')).not.toBeNull();
+    expect(container.querySelector('.svelte-flow__controls')).toBeNull();
+  });
+
+  it('shows the counts and the problem in the status bar', async () => {
+    render(WorkflowCanvas, { props: { graph: problemGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+
+    expect(screen.getByText('3 steps · 2 connections')).toBeInTheDocument();
+    expect(screen.getByText('“Check” needs a tool chosen.')).toBeInTheDocument();
+  });
+
+  it('says No problems found once the problem is fixed', async () => {
+    render(WorkflowCanvas, { props: { graph: problemGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+    await clickNodeByLabel('Check');
+
+    await fireEvent.click(screen.getByTestId('tool-select-system_lint'));
+
+    await waitFor(() => expect(screen.getByText('No problems found')).toBeInTheDocument());
+  });
+
+  it('selects the first problem step when Review is pressed', async () => {
+    render(WorkflowCanvas, { props: { graph: problemGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getByText('Begin')).toBeInTheDocument());
+    expect(screen.queryByTestId('node-inspector')).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+
+    await waitFor(() => expect(screen.getByTestId('node-inspector')).toBeInTheDocument());
+    expect(screen.getByTestId('node-inspector-label')).toHaveValue('Check');
+    expect(document.querySelector('.svelte-flow__node[data-id="check"]')).toHaveClass('selected');
+  });
+
+  it('hides Review for a workflow-level problem', async () => {
+    render(WorkflowCanvas, { props: { graph: sampleGraph, onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+
+    expect(screen.getByText('This workflow has no Finish step.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull();
+  });
+});
+
+// Task 17: explicit Save with a save-state subtitle (D1), never autosave.
+describe('save state (Task 17)', () => {
+  const subtitle = () => screen.getByTestId('toolbar-subtitle');
+  const saveButton = () => screen.getByTestId('save-button');
+
+  async function renderHost(props: Record<string, unknown> = {}) {
+    let canvas!: ReturnType<typeof WorkflowCanvas>;
+    const result = render(CanvasHost, {
+      props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave: vi.fn(), onCanvas: (c: ReturnType<typeof WorkflowCanvas>) => (canvas = c), ...props },
+    });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+    return { ...result, canvas: () => canvas };
+  }
+
+  // Svelte Flow drags with d3-drag, which listens on the event's `view`.
+  // jsdom here refuses `view` in the MouseEvent constructor, so it is set
+  // on the event afterwards. jsdom gives the canvas no size, so every
+  // pointer looks close to its edge and the drag's auto-pan loop would keep
+  // running after the test: no animation frames during a drag.
+  function startDragging() {
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+  }
+
+  function mouse(target: EventTarget, type: string, x: number, y: number) {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y });
+    Object.defineProperty(event, 'view', { value: window });
+    target.dispatchEvent(event);
+  }
+
+  // Zoom and Fit run as d3 transitions on a timer. One still running when
+  // the test unmounts the canvas throws on its next tick, which stalls the
+  // shared timer for the tests after it, so these tests let them finish.
+  const viewportSettled = () => new Promise((resolve) => setTimeout(resolve, 100));
+
+  function beforeUnloadBlocked(): boolean {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  }
+
+  it('says nothing and disables Save on first load', async () => {
+    await renderHost();
+
+    expect(subtitle()).toHaveTextContent(/^$/);
+    expect(subtitle()).toHaveAttribute('aria-live', 'polite');
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('shows Unsaved changes with the warning dot after an edit, and enables Save', async () => {
+    await renderHost();
+
+    await renameNode('B', 'Draft');
+
+    expect(subtitle()).toHaveTextContent('Unsaved changes');
+    expect(subtitle().querySelector('.bg-warning')).not.toBeNull();
+    expect(saveButton()).not.toBeDisabled();
+  });
+
+  it('says Saving… while the save is in flight, then Saved just now with the success dot', async () => {
+    let finish!: () => void;
+    const onSave = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+    await renderHost({ onSave });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    expect(subtitle()).toHaveTextContent('Saving…');
+    expect(saveButton()).toHaveTextContent('Saving…');
+    finish();
+    await waitFor(() => expect(subtitle()).toHaveTextContent('Saved just now'));
+    expect(subtitle().querySelector('.bg-success')).not.toBeNull();
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('stays unsaved when the save fails', async () => {
+    await renderHost({ onSave: vi.fn().mockRejectedValue(new Error('workflow not found')) });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    await waitFor(() => expect(screen.getByTestId('save-error')).toBeInTheDocument());
+    expect(subtitle()).toHaveTextContent('Unsaved changes');
+    expect(saveButton()).not.toBeDisabled();
+  });
+
+  it('stays unsaved when the page reports the save did not happen (a conflict)', async () => {
+    await renderHost({ onSave: vi.fn().mockResolvedValue(false) });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^\s*Save\s*$/));
+    expect(subtitle()).toHaveTextContent('Unsaved changes');
+  });
+
+  it('is saved once the page says a later save worked (Save anyway)', async () => {
+    const { canvas } = await renderHost({ onSave: vi.fn().mockResolvedValue(false) });
+    await renameNode('B', 'Draft');
+    await fireEvent.click(saveButton());
+    await waitFor(() => expect(saveButton()).toHaveTextContent(/^\s*Save\s*$/));
+
+    canvas().markSaved();
+
+    await waitFor(() => expect(subtitle()).toHaveTextContent('Saved just now'));
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('is clean again after the graph is reloaded', async () => {
+    const { rerender } = await renderHost();
+    await renameNode('B', 'Draft');
+
+    await rerender({ graph: { ...sampleGraph } });
+
+    await waitFor(() => expect(saveButton()).toBeDisabled());
+    expect(subtitle()).toHaveTextContent(/^$/);
+  });
+
+  it('marks the graph unsaved when a step is added', async () => {
+    const { canvas } = await renderHost();
+
+    canvas().addNodeAtPosition('Tool', { x: 0, y: 0 });
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a step is deleted', async () => {
+    await renderHost();
+    await clickNodeByLabel('A');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete Step' }));
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a step is deleted with Backspace', async () => {
+    await renderHost();
+    await clickNodeByLabel('A');
+
+    await fireEvent.keyDown(document, { key: 'Backspace' });
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a connection is deleted', async () => {
+    const { canvas } = await renderHost();
+
+    canvas().edgeActions.onDeleteEdge('a->b#0');
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a connection setting changes', async () => {
+    const { canvas } = await renderHost();
+    canvas().selectEdge('a->b#0');
+    await waitFor(() => expect(screen.getByTestId('edge-inspector')).toBeInTheDocument());
+
+    await fireEvent.input(screen.getByTestId('edge-label'), { target: { value: 'next' } });
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('marks the graph unsaved when a step is dragged somewhere new', async () => {
+    await renderHost();
+    const node = document.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
+    startDragging();
+
+    mouse(node, 'mousedown', 10, 10);
+    mouse(window, 'mousemove', 30, 20);
+    mouse(window, 'mousemove', 60, 40);
+    mouse(window, 'mouseup', 60, 40);
+
+    await waitFor(() => expect(saveButton()).not.toBeDisabled());
+  });
+
+  it('stays clean when a step is clicked without moving', async () => {
+    await renderHost();
+    const node = document.querySelector('.svelte-flow__node[data-id="b"]') as HTMLElement;
+    startDragging();
+
+    mouse(node, 'mousedown', 10, 10);
+    mouse(window, 'mouseup', 10, 10);
+    await fireEvent.click(node);
+
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('stays clean when zooming and fitting', async () => {
+    await renderHost();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Fit' }));
+    await viewportSettled();
+
+    expect(saveButton()).toBeDisabled();
+    expect(subtitle()).toHaveTextContent(/^$/);
+  });
+
+  it('shows the zoom level in the toolbar and follows Zoom in', async () => {
+    await renderHost();
+    const level = () => within(screen.getByRole('group', { name: 'Zoom' })).getByText(/^\d+%$/).textContent;
+    const before = level();
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+
+    await waitFor(() => expect(level()).not.toBe(before));
+    await viewportSettled();
+  });
+
+  it('warns before leaving the page only while there are unsaved changes', async () => {
+    await renderHost();
+    expect(beforeUnloadBlocked()).toBe(false);
+
+    await renameNode('B', 'Draft');
+    expect(beforeUnloadBlocked()).toBe(true);
+  });
+
+  it('stops warning once the changes are saved', async () => {
+    await renderHost({ onSave: vi.fn().mockResolvedValue(undefined) });
+    await renameNode('B', 'Draft');
+
+    await fireEvent.click(saveButton());
+
+    await waitFor(() => expect(subtitle()).toHaveTextContent('Saved just now'));
+    expect(beforeUnloadBlocked()).toBe(false);
+  });
+});
+
+// Task 20 (D13): below 768px the step library and inspector are sheets
+// opened from the toolbar, and zoom collapses to Fit; from 768px to 1100px
+// the inspector sits beside the canvas but can be closed.
+describe('narrow widths (Task 20)', () => {
+  let restoreMatchMedia: (() => void) | undefined;
+
+  // Answers each `max-width: Npx` query for a window `width` wide; any
+  // other query (Svelte Flow's colour scheme) doesn't match.
+  function viewport(width: number) {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => {
+      const max = /max-width:\s*(\d+)px/.exec(query);
+      return {
+        matches: max ? width <= Number(max[1]) : false,
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      };
+    }) as typeof window.matchMedia;
+    restoreMatchMedia = () => (window.matchMedia = original);
+  }
+
+  afterEach(() => {
+    restoreMatchMedia?.();
+    restoreMatchMedia = undefined;
+  });
+
+  async function renderAt(width: number) {
+    viewport(width);
+    render(CanvasHost, { props: { graph: sampleGraph, workflowId: 'existing-workflow', onSave: vi.fn() } });
+    await waitFor(() => expect(screen.getAllByText(/^[AB]$/)).toHaveLength(2));
+  }
+
+  const toolbar = () => screen.getByRole('banner');
+
+  describe('on a phone (375px)', () => {
+    it('keeps the step library and inspector off the page, with Steps and Inspector in the toolbar', async () => {
+      await renderAt(375);
+
+      expect(screen.queryByTestId('palette')).toBeNull();
+      expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+      expect(within(toolbar()).getByRole('button', { name: 'Steps' })).toHaveAttribute('aria-expanded', 'false');
+      expect(within(toolbar()).getByRole('button', { name: 'Inspector' })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('collapses zoom to Fit', async () => {
+      await renderAt(375);
+
+      expect(within(toolbar()).queryByRole('group', { name: 'Zoom' })).toBeNull();
+      expect(within(toolbar()).getByRole('button', { name: 'Fit' })).toBeInTheDocument();
+    });
+
+    it('opens the step library in a sheet from Steps, and picking a step shows its guide in the Inspector sheet', async () => {
+      await renderAt(375);
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Steps' }));
+      const library = await screen.findByRole('dialog', { name: 'Step library' });
+      await fireEvent.click(within(library).getByTestId('palette-entry-Tool'));
+
+      const inspector = await screen.findByRole('dialog', { name: 'Inspector' });
+      expect(within(inspector).getByTestId('step-guide')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Step library' })).toBeNull());
+    });
+
+    it('opens the Inspector sheet when a step is selected', async () => {
+      await renderAt(375);
+
+      await clickNodeByLabel('B');
+
+      const inspector = await screen.findByRole('dialog', { name: 'Inspector' });
+      expect(within(inspector).getByTestId('node-inspector-label')).toHaveValue('B');
+    });
+
+    it('opens the Inspector sheet from the toolbar, and Close inspector closes it', async () => {
+      await renderAt(375);
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Inspector' }));
+      const inspector = await screen.findByRole('dialog', { name: 'Inspector' });
+      expect(within(inspector).getByTestId('nothing-selected')).toBeInTheDocument();
+
+      await clickNodeByLabel('B');
+      await fireEvent.click(within(screen.getByRole('dialog', { name: 'Inspector' })).getByRole('button', { name: 'Close inspector' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Inspector' })).toBeNull());
+    });
+  });
+
+  describe('on a tablet (900px)', () => {
+    it('shows the step library and inspector beside the canvas, with the zoom group', async () => {
+      await renderAt(900);
+
+      expect(screen.getByTestId('palette')).toBeInTheDocument();
+      expect(screen.getByRole('complementary', { name: 'Inspector' })).toBeInTheDocument();
+      expect(within(toolbar()).getByRole('group', { name: 'Zoom' })).toBeInTheDocument();
+      expect(within(toolbar()).queryByRole('button', { name: 'Steps' })).toBeNull();
+    });
+
+    it('closes the inspector with Close inspector, and brings it back from the toolbar or a selection', async () => {
+      await renderAt(900);
+      await clickNodeByLabel('B');
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
+      expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+      const toggle = within(toolbar()).getByRole('button', { name: 'Inspector' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+      await fireEvent.click(toggle);
+      expect(screen.getByTestId('nothing-selected')).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+      // Nothing selected has no header to close from, so the toolbar puts it away.
+      await fireEvent.click(toggle);
+      expect(screen.queryByRole('complementary', { name: 'Inspector' })).toBeNull();
+      await clickNodeByLabel('A');
+      expect(screen.getByTestId('node-inspector')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the inspector at 1100px and up, with no Steps or Inspector buttons', async () => {
+    await renderAt(1440);
+    await clickNodeByLabel('B');
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close inspector' }));
+
+    expect(screen.getByTestId('nothing-selected')).toBeInTheDocument();
+    expect(within(toolbar()).queryByRole('button', { name: 'Steps' })).toBeNull();
+    expect(within(toolbar()).queryByRole('button', { name: 'Inspector' })).toBeNull();
   });
 });

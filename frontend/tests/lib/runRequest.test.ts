@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildRunRequest, type RunFormValues } from '../../src/lib/runRequest';
 
-const SHAPE_ERROR = 'Expected {"node_id": {"model": "...", "provider": "..."}}';
+const SHAPE_ERROR = 'Expected {"step_id": {"model": "...", "provider": "..."}}';
 
 function values(overrides: Partial<RunFormValues> = {}): RunFormValues {
   return { model: '', variables: '', brief: '', nodeOverrides: '', ...overrides };
@@ -75,13 +75,13 @@ describe('buildRunRequest', () => {
 
     it('rejects a line without = with its 1-based line number', () => {
       expect(errors({ variables: 'a=1\ncolour blue' })).toEqual({
-        variables: 'Line 2: expected key=value',
+        variables: 'Line 2: write it as name=value',
       });
     });
 
     it('rejects a line with an empty key', () => {
       expect(errors({ variables: '\n\n  =x' })).toEqual({
-        variables: 'Line 3: expected key=value',
+        variables: 'Line 3: write it as name=value',
       });
     });
   });
@@ -118,7 +118,7 @@ describe('buildRunRequest', () => {
     });
 
     it('reports invalid JSON with the parser message', () => {
-      expect(errors({ nodeOverrides: '{nope' }).nodeOverrides).toMatch(/^Invalid JSON: .+/);
+      expect(errors({ nodeOverrides: '{nope' }).nodeOverrides).toMatch(/^That is not valid JSON yet \(.+\)$/);
     });
 
     it.each(['[]', '"x"', 'null', '{"a": "m"}', '{"a": {"model": 1}}', '{"a": {"provider": false}}'])(
@@ -131,7 +131,7 @@ describe('buildRunRequest', () => {
 
   it('returns both errors when both fields are bad', () => {
     expect(errors({ variables: 'oops', nodeOverrides: '[]' })).toEqual({
-      variables: 'Line 1: expected key=value',
+      variables: 'Line 1: write it as name=value',
       nodeOverrides: SHAPE_ERROR,
     });
   });

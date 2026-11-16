@@ -1,144 +1,175 @@
 <script lang="ts">
-  // ABOUTME: Workflow page at /workflows/{id}: name, source, Edit, Run Workflow, its featured run and history
-  // ABOUTME: Filters GET /api/workflows and GET /api/runs in the browser, as there are no per-id endpoints
+  // ABOUTME: Workflow page at /workflows/{id}: toolbar (back, Edit Workflow, Run), what it does, its active run and history
+  // ABOUTME: Reads workflows and runs from the shared library store; fetches only the workflow's graph, once
 
   import { onMount } from 'svelte';
-  import * as workflowsApi from '../../lib/api/workflows';
-  import type { WorkflowSummary } from '../../lib/api/workflows';
-  import * as runsApi from '../../lib/api/runs';
+  import FolderIcon from '@lucide/svelte/icons/folder';
+  import PlayIcon from '@lucide/svelte/icons/play';
+  import { toast } from 'svelte-sonner';
+  import { getWorkflowGraph, type EditorGraph } from '../../lib/api/workflows';
   import type { RunSummary } from '../../lib/api/runs';
-  import { pickFeaturedRun } from '../../lib/runStatus';
+  import type { WorkflowSummary } from '../../lib/api/workflows';
   import { Button } from '$lib/components/ui/button/index.js';
+  import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+  import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+  import { isTauri, revealInFinder } from '$lib/native';
+  import { errorMessage } from '$lib/notify';
   import { formatWorkflowName } from '$lib/utils';
-  import { usePageActions, usePageTitle } from '$lib/page-header.svelte';
-  import RunDialog from './RunDialog.svelte';
-  import RunMetaList from './RunMetaList.svelte';
+  import { describeLoops, orderSteps, stepLabel } from '$lib/workflowSteps';
+  import { usePageActions, usePageBack, usePageSubtitle, usePageTitle } from '$lib/page-header.svelte';
+  import { libraryStore } from '../../stores/library.svelte';
+  import ToolbarIconButton from '../shell/ToolbarIconButton.svelte';
+  import ActiveRunBanner from './ActiveRunBanner.svelte';
+  import LazyRunDialog from './LazyRunDialog.svelte';
   import RunTable from './RunTable.svelte';
-  import StatusBadge from './StatusBadge.svelte';
+  import StepList from './StepList.svelte';
 
-  let { workflowId }: { workflowId: string } = $props();
+  interface Library {
+    readonly workflows: WorkflowSummary[];
+    readonly runs: RunSummary[];
+    readonly loaded: boolean;
+    readonly error: string | null;
+    refresh(): Promise<void>;
+  }
 
-  let workflow: WorkflowSummary | null = $state(null);
-  let loading = $state(true);
-  let error: string | null = $state(null);
+  let { workflowId, library = libraryStore }: { workflowId: string; library?: Library } = $props();
+
   let runDialogOpen = $state(false);
+  // Finder exists only in the desktop app.
+  const native = isTauri();
 
-  const RUNS_POLL_INTERVAL_MS = 5000;
-
-  // This workflow's runs, newest first as the server lists them. The card
-  // and the history both come from this one list.
-  let runs: RunSummary[] = $state([]);
-  let runsLoaded = $state(false);
-  let runsError: string | null = $state(null);
-  const featured = $derived(pickFeaturedRun(runs));
-
-  async function refreshRuns() {
+  async function showInFinder(path: string) {
     try {
-      const response = await runsApi.listRuns();
-      runs = response.runs.filter((run) => run.workflow_id === workflowId);
-      runsError = null;
+      await revealInFinder(path);
     } catch (err) {
-      runsError = err instanceof Error ? err.message : 'Failed to load runs';
-    } finally {
-      runsLoaded = true;
+      toast.error(`Couldn't show the file in Finder. ${errorMessage(err, 'Something went wrong.')}`);
+    }
+  }
+
+  const workflow = $derived(library.workflows.find((w) => w.id === workflowId) ?? null);
+  // Newest first, as the server lists them. The banner and the history both come from this one list.
+  const runs = $derived(library.runs.filter((run) => run.workflow_id === workflowId));
+
+  let graph = $state<EditorGraph | null>(null);
+  let graphError = $state<string | null>(null);
+  const order = $derived(graph ? orderSteps(graph) : { steps: [], backEdges: [] });
+  const intro = $derived(graph ? describeLoops(graph, order) : '');
+  /** Step id → the name every section uses for it. */
+  const labels = $derived(new Map((graph?.nodes ?? []).map((n) => [n.id, stepLabel(n)])));
+
+  async function loadGraph() {
+    graphError = null;
+    try {
+      graph = (await getWorkflowGraph(workflowId)).graph;
+    } catch (err) {
+      graphError = errorMessage(err, 'The server could not read it.');
     }
   }
 
   onMount(() => {
-    (async () => {
-      try {
-        const { workflows } = await workflowsApi.listWorkflows();
-        workflow = workflows.find((w) => w.id === workflowId) ?? null;
-      } catch (err) {
-        error = err instanceof Error ? err.message : 'Failed to load workflow';
-      } finally {
-        loading = false;
-      }
-    })();
-
-    refreshRuns();
-    const pollHandle = setInterval(refreshRuns, RUNS_POLL_INTERVAL_MS);
-    return () => clearInterval(pollHandle);
+    void loadGraph();
   });
 
-  // App shows "Workflow" until this is known.
+  // App shows "Workflow" until the library has loaded.
   usePageTitle(() => {
-    if (loading || error) return null;
+    if (!library.loaded) return null;
     return workflow ? formatWorkflowName(workflow.name) : 'Workflow not found';
   });
-
-  // Edit + Run Workflow live in the page header when there is one.
+  usePageSubtitle(() => (workflow ? `\`${workflow.name}\` · ${workflow.source_dir}` : null));
+  usePageBack(() => ({ label: 'Workflows', href: '/' }));
   const actionsInHeader = usePageActions(workflowActions);
 </script>
 
 {#snippet workflowActions()}
   {#if workflow}
-    <div class="flex items-center gap-2">
-      <Button
-        href="/workflows/{encodeURIComponent(workflow.id)}/edit"
-        variant="secondary"
-        size="sm"
-      >
-        Edit
-      </Button>
-      <Button size="sm" onclick={() => (runDialogOpen = true)}>Run Workflow</Button>
-    </div>
+    {#if native}
+      <Tooltip.Provider>
+        <ToolbarIconButton label="Show in Finder" icon={FolderIcon} onclick={() => void showInFinder(workflow.path)} />
+      </Tooltip.Provider>
+    {/if}
+    <Button href="/workflows/{encodeURIComponent(workflow.id)}/edit" variant="outline">Edit Workflow</Button>
+    <Button onclick={() => (runDialogOpen = true)}>
+      <PlayIcon aria-hidden="true" />
+      Run
+    </Button>
   {/if}
 {/snippet}
 
-<div class="workflow-detail flex flex-col gap-6">
-  {#if loading}
-    <p class="text-muted-foreground">Loading workflow...</p>
-  {:else if error}
-    <p class="text-destructive" role="alert">Error: {error}</p>
-  {:else if !workflow}
-    <div class="flex flex-col items-start gap-2">
-      <p class="text-lg text-foreground">Workflow not found.</p>
-      <a href="/" class="text-primary hover:underline">← All workflows</a>
+{#if library.loaded && workflow}
+  <ActiveRunBanner {runs} {labels} />
+{/if}
+
+<div class="workflow-detail flex flex-col gap-6 px-4 pt-5 pb-8 sm:px-6">
+  {#if !library.loaded && library.error}
+    <div
+      role="alert"
+      class="flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive"
+    >
+      <span class="min-w-0 flex-1">Couldn't load your workflows. {library.error}</span>
+      <Button variant="outline" size="sm" onclick={() => void library.refresh()}>Try Again</Button>
+    </div>
+  {:else if library.loaded && !workflow}
+    <div class="flex flex-col items-start gap-3">
+      <p class="m-0 text-body text-foreground">We couldn't find that workflow. It may have been renamed or moved.</p>
+      <Button href="/" variant="outline">Back to Workflows</Button>
     </div>
   {:else}
-    <div class="flex flex-col gap-1 text-sm text-muted-foreground">
-      <p class="font-mono">{workflow.name}</p>
-      <p>Source: {workflow.source_dir}</p>
-    </div>
-
-    {#if !actionsInHeader}
-      {@render workflowActions()}
+    {#if workflow && !actionsInHeader}
+      <div class="flex items-center gap-2">{@render workflowActions()}</div>
     {/if}
 
-    {#if featured}
-      <section
-        aria-label={featured.heading}
-        class="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 text-card-foreground"
-      >
-        <h3 class="text-base font-semibold text-foreground">{featured.heading}</h3>
-        <div class="flex flex-wrap items-center gap-3">
-          <a href="/runs/{featured.run.id}" class="font-mono text-primary hover:underline">
-            {featured.run.id}
-          </a>
-          <StatusBadge status={featured.run.status} />
-        </div>
-        <p class="text-sm text-muted-foreground">
-          Started {new Date(featured.run.started_at).toLocaleString()}
+    <div class="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <StepList
+        steps={order.steps}
+        {intro}
+        loading={!graph && !graphError}
+        error={graphError}
+        editHref="/workflows/{encodeURIComponent(workflowId)}/edit"
+        onRetry={() => void loadGraph()}
+      />
+
+      <section aria-labelledby="history-heading" class="min-w-0">
+        <h2 id="history-heading" class="m-0 text-heading font-bold text-foreground">Run history</h2>
+        <p class="mt-0.5 mb-2.5 text-xs text-muted-foreground">
+          Every run of this workflow, newest first. Open one to see what happened step by step.
         </p>
-        <RunMetaList run={featured.run} />
-        {#if featured.moreRunning > 0}
-          <p class="text-sm text-muted-foreground">+{featured.moreRunning} more running</p>
+
+        {#if library.error}
+          <div
+            role="alert"
+            class="mb-2.5 flex items-center gap-3 rounded-lg border border-destructive-border bg-destructive-surface px-3 py-2.5 text-body text-destructive"
+          >
+            <span class="min-w-0 flex-1">Couldn't refresh this workflow's runs. {library.error}</span>
+            <Button variant="outline" size="sm" onclick={() => void library.refresh()}>Try Again</Button>
+          </div>
+        {/if}
+
+        {#if !library.loaded}
+          <div role="status" aria-label="Loading runs" class="overflow-hidden rounded-lg border border-border bg-card">
+            {#each [0, 1, 2] as i (i)}
+              <div class="flex min-h-[34px] items-center gap-3 px-3 py-1.5 {i % 2 === 1 ? 'bg-muted' : ''}" aria-hidden="true">
+                <Skeleton class="h-4 w-20 rounded-full" />
+                <Skeleton class="h-3.5 w-32 rounded" />
+                <Skeleton class="ml-auto h-3.5 w-16 rounded" />
+              </div>
+            {/each}
+          </div>
+        {:else if runs.length > 0}
+          <RunTable {runs} columns="workflow" {labels} />
+        {:else}
+          <div class="rounded-lg border border-border px-3 py-6 text-center">
+            <p class="m-0 text-body text-muted-foreground">This workflow hasn't run yet.</p>
+            <Button size="sm" class="mt-3" onclick={() => (runDialogOpen = true)}>
+              <PlayIcon aria-hidden="true" />
+              Run
+            </Button>
+          </div>
         {/if}
       </section>
+    </div>
+
+    {#if workflow}
+      <LazyRunDialog {workflow} bind:open={runDialogOpen} />
     {/if}
-
-    <section aria-label="Run History" class="flex flex-col gap-4">
-      <h3 class="text-base font-semibold text-foreground">Run History</h3>
-      {#if runsError}
-        <p class="text-destructive" role="alert">Error: {runsError}</p>
-      {:else if runs.length > 0}
-        <RunTable {runs} />
-      {:else if runsLoaded}
-        <p class="text-muted-foreground">No runs yet.</p>
-      {/if}
-    </section>
-
-    <RunDialog {workflow} bind:open={runDialogOpen} />
   {/if}
 </div>

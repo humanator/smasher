@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use axum::extract::{Path, State};
 use axum::routing::{get, post};
@@ -141,6 +142,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/runs/{id}/resume", post(resume_run))
         .route("/api/runs/{id}/tokens", get(get_tokens))
         .route("/api/runs/{id}/graph", get(render_graph))
+        .route("/api/runs/{id}/steps", get(run_steps))
         .route("/api/runs/{id}/candidates", get(list_candidates))
         .route("/api/runs/{id}/decisions", get(list_decisions))
         .route("/api/graph/nodes", post(list_graph_nodes))
@@ -457,18 +459,41 @@ async fn cancel_run(
     }
 
     record.cancellation.cancel();
-    Ok(Json(CancelResponse {
-        success: true,
-        status: "Aborted".into(),
-    }))
+    drop(runs);
+
+    // The run's own task records how it stopped once the engine notices the
+    // cancel, a few milliseconds later. Answer only then, so this reply and any
+    // read after it agree, instead of a read still seeing `Running`.
+    let deadline = tokio::time::Instant::now() + CANCEL_SETTLE_TIMEOUT;
+    loop {
+        let status = state.runs.read().await.get(&id).map(|r| r.status.clone());
+        match status {
+            Some(RunStatus::Running) if tokio::time::Instant::now() < deadline => {
+                tokio::time::sleep(CANCEL_SETTLE_POLL).await;
+            }
+            // Still running at the deadline: the cancel stands, and the status says
+            // so truthfully; the run aborts when the engine next checks.
+            Some(status) => {
+                return Ok(Json(CancelResponse {
+                    success: true,
+                    status: format!("{status:?}"),
+                }));
+            }
+            None => return Err(WebError::NotFound(format!("run {id}"))),
+        }
+    }
 }
+
+/// How long a cancel waits for the run to record that it stopped.
+const CANCEL_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
+const CANCEL_SETTLE_POLL: Duration = Duration::from_millis(5);
 
 async fn resume_run(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ResumeResponse>, WebError> {
     // Look up the existing run record to get its checkpoint and graph.
-    let (dot_source, graph, variables, checkpoint_json) = {
+    let (dot_source, graph, variables, checkpoint_json, workflow_id) = {
         let runs = state.runs.read().await;
         let record = runs
             .get(&id)
@@ -507,6 +532,7 @@ async fn resume_run(
             record.graph.clone(),
             record.variables.clone(),
             cp_json,
+            record.workflow_id.clone(),
         )
     };
 
@@ -531,8 +557,8 @@ async fn resume_run(
                 checkpoint,
                 checkpoint_dir: std::path::PathBuf::new(),
             }),
-            workflow_id: None,
-            use_checkpointing: false,
+            workflow_id,
+            use_checkpointing: true,
         },
     )
     .await?;
@@ -614,6 +640,70 @@ async fn render_graph(
         output.content,
     )
         .into_response())
+}
+
+#[derive(Debug, Serialize)]
+struct StepNode {
+    id: String,
+    node_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct StepEdge {
+    from: String,
+    to: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    priority: Option<i32>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    loop_restart: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct StepsResponse {
+    nodes: Vec<StepNode>,
+    edges: Vec<StepEdge>,
+}
+
+/// The run's graph as nodes and edges in the editor-graph shape. Live and
+/// rehydrated runs both carry their resolved graph on the record (rehydration
+/// rebuilds it from `graph.dot`), so one code path serves both.
+async fn run_steps(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<StepsResponse>, WebError> {
+    let runs = state.runs.read().await;
+    let record = runs
+        .get(&id)
+        .ok_or_else(|| WebError::NotFound(format!("run {id}")))?;
+
+    let nodes = record
+        .graph
+        .nodes
+        .iter()
+        .map(|node| StepNode {
+            id: node.id.clone(),
+            node_type: crate::routes::editor_api::node_type_to_str(&node.node_type).to_string(),
+            label: node.label.clone(),
+        })
+        .collect();
+    let edges = record
+        .graph
+        .edges
+        .iter()
+        .map(|edge| StepEdge {
+            from: edge.from.clone(),
+            to: edge.to.clone(),
+            label: edge.label.clone(),
+            priority: edge.priority,
+            loop_restart: edge.loop_restart,
+        })
+        .collect();
+
+    Ok(Json(StepsResponse { nodes, edges }))
 }
 
 async fn list_candidates(
@@ -1019,10 +1109,112 @@ mod tests {
         token
     }
 
+    async fn get_steps(app: Router, uri: &str) -> (StatusCode, serde_json::Value) {
+        let req = Request::builder().uri(uri).body(Body::empty()).unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (
+            status,
+            serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+        )
+    }
+
+    #[tokio::test]
+    async fn run_steps_lists_nodes_and_edges_of_a_live_run() {
+        let state = test_state();
+        let _token = insert_test_record(&state, "run-steps-1", RunStatus::Running).await;
+        let dot = r#"digraph {
+  start [shape=Mdiamond];
+  work [label="Do the work"];
+  exit [shape=Msquare];
+  start -> work;
+  work -> work [label="again", priority=2, loop_restart=true];
+  work -> exit;
+}"#;
+        state
+            .runs
+            .write()
+            .await
+            .get_mut("run-steps-1")
+            .unwrap()
+            .graph = graph::resolve(&parser::parse(dot).unwrap()).unwrap();
+        let (status, json) =
+            get_steps(router().with_state(state), "/api/runs/run-steps-1/steps").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            json["nodes"],
+            serde_json::json!([
+                {"id": "start", "node_type": "Start"},
+                {"id": "work", "node_type": "Codergen", "label": "Do the work"},
+                {"id": "exit", "node_type": "Exit"},
+            ])
+        );
+        assert_eq!(
+            json["edges"],
+            serde_json::json!([
+                {"from": "start", "to": "work"},
+                {"from": "work", "to": "work", "label": "again", "priority": 2, "loop_restart": true},
+                {"from": "work", "to": "exit"},
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn run_steps_for_an_unknown_run_is_not_found() {
+        let (status, _) =
+            get_steps(router().with_state(test_state()), "/api/runs/nope/steps").await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn run_steps_works_for_a_run_rehydrated_from_disk() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = AppState::new(
+            smasher_llm::client::Client::from_env(),
+            "test-model".into(),
+            None,
+            tmp.path().display().to_string(),
+            vec![],
+        );
+        let mut run_directory = smasher_attractor::run_dir::RunDirectory::create(
+            &tmp.path().join("artifacts"),
+            "run-old",
+            "g",
+            "digraph { a -> b [label=\"go\"] }",
+        )
+        .expect("run directory");
+        run_directory
+            .persist_run_metadata(None, Some("Completed".into()), 0, 0, None)
+            .unwrap();
+        std::fs::write(
+            tmp.path().join("artifacts/run-old/graph.dot"),
+            "digraph { a -> b [label=\"go\"] }",
+        )
+        .unwrap();
+        let rehydrated = crate::rehydrate::rehydrate_runs(&tmp.path().display().to_string()).await;
+        state.runs.write().await.extend(rehydrated);
+
+        let (status, json) = get_steps(router().with_state(state), "/api/runs/run-old/steps").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(json["nodes"].as_array().unwrap().len(), 2);
+        assert_eq!(json["edges"][0]["label"], "go");
+    }
+
     #[tokio::test]
     async fn cancel_running_run_returns_success() {
         let state = test_state();
-        let _token = insert_test_record(&state, "run-cancel-1", RunStatus::Running).await;
+        let token = insert_test_record(&state, "run-cancel-1", RunStatus::Running).await;
+        // Stand in for the run's task, which records Aborted once the engine sees the cancel.
+        let runs = state.runs.clone();
+        tokio::spawn(async move {
+            token.cancelled().await;
+            if let Some(record) = runs.write().await.get_mut("run-cancel-1") {
+                record.status = RunStatus::Aborted;
+            }
+        });
         let app = router().with_state(state);
         let req = Request::builder()
             .method("POST")

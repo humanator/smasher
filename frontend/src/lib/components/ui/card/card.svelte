@@ -1,3 +1,28 @@
+<script lang="ts" module>
+	import { tv } from "$lib/utils.js";
+
+	// Run.dc.html and Workflow.dc.html cards: 10px corners, 13px type. Default is the white
+	// candidate card; muted is the step list; success and destructive are the finished/failed heroes.
+	export const cardVariants = tv({
+		base: "text-card-foreground group/card flex flex-col gap-3 overflow-hidden rounded-xl py-(--card-spacing-y) text-body has-[>img:first-child]:pt-0",
+		variants: {
+			variant: {
+				default: "bg-card shadow-card",
+				muted: "bg-muted border border-border",
+				success: "bg-success-subtle border border-success-border",
+				destructive: "bg-destructive-surface border border-destructive-border",
+			},
+			size: {
+				default: "[--card-spacing:--spacing(5)] [--card-spacing-y:18px] py-[18px]",
+				sm: "[--card-spacing:--spacing(3)] [--card-spacing-y:--spacing(3)] py-3",
+			},
+		},
+		defaultVariants: { variant: "default", size: "default" },
+	});
+
+	export type CardVariant = "default" | "muted" | "success" | "destructive";
+</script>
+
 <script lang="ts">
 	import { cn, type WithElementRef } from "$lib/utils.js";
 	import type { HTMLAttributes } from "svelte/elements";
@@ -7,15 +32,20 @@
 		class: className,
 		children,
 		size = "default",
+		variant = "default",
 		...restProps
-	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & { size?: "default" | "sm" } = $props();
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {
+		size?: "default" | "sm";
+		variant?: CardVariant;
+	} = $props();
 </script>
 
 <div
 	bind:this={ref}
 	data-slot="card"
 	data-size={size}
-	class={cn("bg-card text-card-foreground ring-foreground/5 dark:ring-foreground/10 gap-(--card-spacing) overflow-hidden rounded-4xl py-(--card-spacing) text-sm shadow-md ring-1 [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-4xl *:[img:last-child]:rounded-b-4xl group/card flex flex-col", className)}
+	data-variant={variant}
+	class={cn(cardVariants({ variant, size }), className)}
 	{...restProps}
 >
 	{@render children?.()}

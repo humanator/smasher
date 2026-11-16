@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Tabs component</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4) !important}
+</style>
+</helmet>
+<div role="tablist" style="{{listStyle}}">
+  <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+    <button type="button" role="tab" aria-selected="{{t.active}}" onClick="{{t.onPress}}" style="{{t.style}}">{{t.label}}</button>
+  </sc-for>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"tabs":{"editor":"text","default":"Settings|Help"},"value":{"editor":"text","default":""},"variant":{"editor":"enum","default":"default","options":["default","line"]},"fullWidth":{"editor":"boolean","default":false},"onChange":{"editor":null},"$preview":{"width":260,"height":40}}'>
+// macOS segmented control (default) or a plain underlined tab row (line). Same API as the shadcn tabs it replaces.
+// `tabs` is pipe-separated. Give it onChange(label) to control it.
+class Component extends DCLogic {
+  state = { v: null };
+  renderVals() {
+    const p = this.props;
+    const names = String(p.tabs ?? 'Settings|Help').split('|').map((x) => x.trim()).filter(Boolean);
+    const controlled = typeof p.onChange === 'function';
+    const cur = controlled ? (p.value || names[0]) : (this.state.v ?? (p.value || names[0]));
+    const line = p.variant === 'line';
+    const fw = !!p.fullWidth;
+    return {
+      listStyle: 'box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;display:' + (fw ? 'flex' : 'inline-flex') + ';align-items:center;' + (line ? 'gap:18px;border-bottom:1px solid rgba(0,0,0,.1);' : 'gap:0;padding:2px;border-radius:7px;background:rgba(0,0,0,.06);') + (fw ? 'width:100%;' : ''),
+      tabs: names.map((n) => {
+        const on = n === cur;
+        return {
+          label: n, active: on,
+          onPress: () => { if (controlled) p.onChange(n); else this.setState({ v: n }); },
+          style: line
+            ? 'padding:6px 0;margin-bottom:-1px;background:transparent;border:0;border-bottom:2px solid ' + (on ? '#BE185D' : 'transparent') + ';font:inherit;font-size:13px;font-weight:' + (on ? 600 : 400) + ';cursor:default;color:' + (on ? '#1D1D1F' : '#6E6E73') + ';'
+            : 'flex:' + (fw ? 1 : 'none') + ';height:20px;padding:0 12px;border-radius:5px;border:0;font:inherit;font-size:13px;line-height:1;cursor:default;white-space:nowrap;color:#1D1D1F;' + (on ? 'background:#FFFFFF;font-weight:500;box-shadow:0 0 0 .5px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.14);' : 'background:transparent;font-weight:400;')
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

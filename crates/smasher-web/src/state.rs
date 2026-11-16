@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
 use smasher_attractor::graph::Graph;
 use smasher_attractor::http_interviewer::HttpInterviewer;
-use smasher_attractor::state::RunStatus;
+use smasher_attractor::state::{Checkpoint, RunStatus};
 
 /// Shared application state cloned into each axum handler.
 #[derive(Clone)]
@@ -151,6 +151,17 @@ pub struct RunSummary {
     /// gallery picks out of Answered Questions.
     #[serde(default)]
     pub gallery_gates: Vec<String>,
+    /// Questions the run is currently blocked on. Drives the SPA's "Needs you".
+    #[serde(default)]
+    pub pending_questions: u32,
+    /// When the oldest pending question was raised (RFC3339 UTC), or `None`
+    /// when nothing is waiting. Drives the SPA's needs-you banner.
+    #[serde(default)]
+    pub waiting_since: Option<String>,
+    /// Whether `POST /api/runs/{id}/resume` can pick this run up: it failed or
+    /// was aborted and left a readable checkpoint behind.
+    #[serde(default)]
+    pub resumable: bool,
 }
 
 impl RunRecord {
@@ -175,7 +186,36 @@ impl RunRecord {
             }),
             workflow_id: self.workflow_id.clone(),
             gallery_gates: self.gallery_gates(),
+            pending_questions: self.interviewer.queue().len() as u32,
+            waiting_since: self.waiting_since(),
+            resumable: self.resumable(),
         }
+    }
+
+    /// Failed or aborted, with a checkpoint on disk that parses.
+    fn resumable(&self) -> bool {
+        if !matches!(self.status, RunStatus::Failed | RunStatus::Aborted) {
+            return false;
+        }
+        self.run_working_dir
+            .as_ref()
+            .and_then(|dir| {
+                std::fs::read_to_string(
+                    std::path::Path::new(dir)
+                        .join("checkpoints")
+                        .join("checkpoint.json"),
+                )
+                .ok()
+            })
+            .is_some_and(|json| Checkpoint::from_json(&json).is_ok())
+    }
+
+    /// The oldest pending question's creation time on the wall clock. The queue
+    /// stores monotonic `Instant`s, so convert via the time elapsed since then.
+    fn waiting_since(&self) -> Option<String> {
+        let created_at = self.interviewer.queue().oldest_created_at()?;
+        let wall = std::time::SystemTime::now().checked_sub(created_at.elapsed())?;
+        Some(DateTime::<Utc>::from(wall).to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
     }
 
     fn gallery_gates(&self) -> Vec<String> {
@@ -234,6 +274,9 @@ mod tests {
             run_working_dir: None,
             workflow_id: None,
             gallery_gates: vec![],
+            pending_questions: 0,
+            waiting_since: None,
+            resumable: false,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["id"], "test-123");
@@ -255,6 +298,9 @@ mod tests {
             run_working_dir: None,
             workflow_id: None,
             gallery_gates: vec![],
+            pending_questions: 0,
+            waiting_since: None,
+            resumable: false,
         };
         let json = serde_json::to_value(&summary).unwrap();
         assert_eq!(json["error"], "node X failed");
@@ -292,6 +338,120 @@ mod tests {
     }
 
     #[test]
+    fn to_summary_reports_pending_questions_from_the_interviewer_queue() {
+        use smasher_attractor::http_interviewer::{PendingQuestion, QuestionKind};
+        let record = make_test_record(RunStatus::Running, None, None);
+        assert_eq!(record.to_summary().pending_questions, 0);
+
+        let id = record.interviewer.queue().push(PendingQuestion {
+            id: "q1".into(),
+            question: "Proceed?".into(),
+            choices: vec![],
+            kind: QuestionKind::Approval,
+            created_at: std::time::Instant::now(),
+            node_id: Some("gate".into()),
+            answer_tx: None,
+        });
+        assert_eq!(record.to_summary().pending_questions, 1);
+
+        record.interviewer.queue().take(&id);
+        assert_eq!(record.to_summary().pending_questions, 0);
+    }
+
+    fn pending(
+        id: &str,
+        created_at: std::time::Instant,
+    ) -> smasher_attractor::http_interviewer::PendingQuestion {
+        smasher_attractor::http_interviewer::PendingQuestion {
+            id: id.into(),
+            question: "Proceed?".into(),
+            choices: vec![],
+            kind: smasher_attractor::http_interviewer::QuestionKind::Approval,
+            created_at,
+            node_id: None,
+            answer_tx: None,
+        }
+    }
+
+    fn parse_rfc3339(s: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(s).unwrap().with_timezone(&Utc)
+    }
+
+    #[test]
+    fn waiting_since_is_none_without_pending_questions() {
+        let record = make_test_record(RunStatus::Running, None, None);
+        assert!(record.to_summary().waiting_since.is_none());
+    }
+
+    #[test]
+    fn waiting_since_reports_the_oldest_pending_question() {
+        use std::time::{Duration, Instant};
+        let record = make_test_record(RunStatus::Running, None, None);
+        let queue = record.interviewer.queue();
+        queue.push(pending("q-new", Instant::now() - Duration::from_secs(30)));
+        queue.push(pending("q-old", Instant::now() - Duration::from_secs(300)));
+
+        let since = record
+            .to_summary()
+            .waiting_since
+            .expect("waiting_since set");
+        let expected = Utc::now() - chrono::Duration::seconds(300);
+        let drift = (parse_rfc3339(&since) - expected).num_milliseconds().abs();
+        assert!(drift <= 1000, "waiting_since {since} drifted {drift} ms");
+
+        queue.take("q-new");
+        queue.take("q-old");
+        assert!(record.to_summary().waiting_since.is_none());
+    }
+
+    #[test]
+    fn waiting_since_serialises_as_rfc3339_utc() {
+        let record = make_test_record(RunStatus::Running, None, None);
+        record
+            .interviewer
+            .queue()
+            .push(pending("q1", std::time::Instant::now()));
+        let since = record.to_summary().waiting_since.unwrap();
+        assert!(since.ends_with('Z'), "expected UTC 'Z' suffix, got {since}");
+    }
+
+    #[test]
+    fn run_summary_without_waiting_since_deserializes_to_none() {
+        let json = serde_json::json!({
+            "id": "r1",
+            "status": "Running",
+            "started_at": "2025-01-01T00:00:00Z",
+            "completed_at": null,
+            "graph_name": null,
+            "error": null,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "run_working_dir": null,
+            "workflow_id": null,
+        });
+        let summary: RunSummary = serde_json::from_value(json).unwrap();
+        assert!(summary.waiting_since.is_none());
+    }
+
+    #[test]
+    fn run_summary_without_pending_questions_deserializes_to_zero() {
+        let json = serde_json::json!({
+            "id": "r1",
+            "status": "Running",
+            "started_at": "2025-01-01T00:00:00Z",
+            "completed_at": null,
+            "graph_name": null,
+            "error": null,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "run_working_dir": null,
+            "workflow_id": null,
+        });
+        let summary: RunSummary = serde_json::from_value(json).unwrap();
+        assert_eq!(summary.pending_questions, 0);
+    }
+
+    #[test]
     fn to_summary_exposes_relative_working_dir() {
         let record = make_test_record(
             RunStatus::Running,
@@ -300,6 +460,69 @@ mod tests {
         );
         let summary = record.to_summary();
         assert_eq!(summary.run_working_dir, Some("artifacts/abc-123".into()));
+    }
+
+    /// A run directory whose `checkpoints/checkpoint.json` holds `contents`.
+    fn run_dir_with_checkpoint(contents: &str) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("checkpoints")).unwrap();
+        std::fs::write(dir.path().join("checkpoints/checkpoint.json"), contents).unwrap();
+        dir
+    }
+
+    fn valid_checkpoint_json() -> String {
+        smasher_attractor::state::Checkpoint::new(
+            "p",
+            "a",
+            &smasher_attractor::state::Context::new(),
+        )
+        .to_json()
+        .unwrap()
+    }
+
+    fn resumable(status: RunStatus, dir: Option<&std::path::Path>) -> bool {
+        make_test_record(status, dir.map(|d| d.display().to_string()), None)
+            .to_summary()
+            .resumable
+    }
+
+    #[test]
+    fn to_summary_failed_and_aborted_runs_with_a_checkpoint_are_resumable() {
+        let dir = run_dir_with_checkpoint(&valid_checkpoint_json());
+        assert!(resumable(RunStatus::Failed, Some(dir.path())));
+        assert!(resumable(RunStatus::Aborted, Some(dir.path())));
+    }
+
+    #[test]
+    fn to_summary_failed_run_without_a_checkpoint_is_not_resumable() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(!resumable(RunStatus::Failed, Some(dir.path())));
+        assert!(!resumable(RunStatus::Failed, None));
+    }
+
+    #[test]
+    fn to_summary_failed_run_with_an_unparsable_checkpoint_is_not_resumable() {
+        let dir = run_dir_with_checkpoint("not json");
+        assert!(!resumable(RunStatus::Failed, Some(dir.path())));
+    }
+
+    #[test]
+    fn to_summary_completed_and_running_runs_are_not_resumable() {
+        let dir = run_dir_with_checkpoint(&valid_checkpoint_json());
+        assert!(!resumable(RunStatus::Completed, Some(dir.path())));
+        assert!(!resumable(RunStatus::Running, Some(dir.path())));
+    }
+
+    #[test]
+    fn run_summary_without_resumable_deserializes_as_false() {
+        let json = serde_json::json!({
+            "id": "old", "status": "Failed", "started_at": "2025-01-01T00:00:00Z",
+            "completed_at": null, "graph_name": null, "error": null,
+            "input_tokens": 0, "output_tokens": 0, "run_working_dir": null,
+            "workflow_id": null
+        });
+        let summary: RunSummary = serde_json::from_value(json).unwrap();
+        assert!(!summary.resumable);
     }
 
     #[test]

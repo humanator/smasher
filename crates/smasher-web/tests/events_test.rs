@@ -475,3 +475,55 @@ async fn test_events_jsonl_is_complete_once_run_reports_completed() {
         "events.jsonl should end in pipeline_completed:\n{contents}"
     );
 }
+
+/// Cancelling answers only once the run has stopped, so a read straight after
+/// it never sees a stale `Running`. Repeated because the old gap was a few
+/// milliseconds wide and only showed up most of the time.
+#[tokio::test]
+async fn test_cancel_answers_once_the_run_has_stopped() {
+    let (base_url, _server) = start_test_server().await;
+    let client = Client::new();
+
+    for _ in 0..5 {
+        let submitted: Value = client
+            .post(format!("{base_url}/api/runs"))
+            .json(&json!({ "dot_source": human_gate_workflow_dot(), "variables": {} }))
+            .send()
+            .await
+            .expect("failed to submit run")
+            .json()
+            .await
+            .expect("failed to parse submit response");
+        let run_id = submitted["run_id"].as_str().expect("run_id").to_string();
+        wait_for_question_id(&client, &base_url, &run_id).await;
+
+        let cancelled: Value = client
+            .post(format!("{base_url}/api/runs/{run_id}/cancel"))
+            .send()
+            .await
+            .expect("failed to cancel")
+            .json()
+            .await
+            .expect("failed to parse cancel response");
+        let run: Value = client
+            .get(format!("{base_url}/api/runs/{run_id}"))
+            .send()
+            .await
+            .expect("failed to get run")
+            .json()
+            .await
+            .expect("failed to parse run");
+
+        assert_eq!(cancelled["success"], true);
+        assert_eq!(cancelled["status"], "Aborted");
+        assert_eq!(
+            run["status"], "Aborted",
+            "a read right after cancel saw {}",
+            run["status"]
+        );
+        assert!(
+            !run["completed_at"].is_null(),
+            "an aborted run has a completion time"
+        );
+    }
+}

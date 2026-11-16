@@ -49,6 +49,30 @@ describe('ModelPicker', () => {
     expect(providerSelect().value).toBe('');
   });
 
+  it('labels its fields Provider and Model by default, with no hints', () => {
+    renderPicker({});
+    expect(screen.getByLabelText('Provider')).toBe(providerSelect());
+    expect(screen.getByLabelText('Model')).toBe(modelSelect());
+    expect(providerSelect()).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('takes other labels and a hint for each field', () => {
+    render(ModelPicker, {
+      props: {
+        idPrefix: 'mp',
+        models: [anthropic],
+        onChange: vi.fn(),
+        providerLabel: 'Default provider',
+        modelLabel: 'Default model',
+        providerHint: 'Which service to send requests to.',
+        modelHint: 'The model AI steps use.',
+        layout: 'rows',
+      },
+    });
+    expect(screen.getByLabelText('Default provider')).toHaveAccessibleDescription('Which service to send requests to.');
+    expect(screen.getByLabelText('Default model')).toHaveAccessibleDescription('The model AI steps use.');
+  });
+
   it('labels the blank provider option as asked', () => {
     renderPicker({ blankLabel: 'Choose a provider…' } as never);
 

@@ -1,35 +1,92 @@
-/* ABOUTME: Card styling for custom `workflow` nodes in the @xyflow/svelte canvas */
-/* ABOUTME: Global (unscoped) because SvelteFlow's NodeWrapper applies the class, not WorkflowNode */
+/* ABOUTME: Step card and pill styling for custom `workflow` nodes in the @xyflow/svelte canvas */
+/* ABOUTME: Global (unscoped) because SvelteFlow's NodeWrapper and Handle own these elements, not WorkflowNode */
 
-/* @xyflow/svelte/dist/style.css only styles the built-in
-   `.svelte-flow__node-default` (plus input/output/group) -- a custom
-   node's own `.svelte-flow__node-workflow` class gets none of that
-   padding/border-radius/width/text-align/border/background look, so it's
-   replicated here verbatim (same source values, style.css's own
-   `.svelte-flow__node-default` rule) rather than silently regressing to
-   an unstyled box now that per-kind coloring (nodeConfig.ts's
-   nodeStyleFor) depends on this node rendering as a card in the first
-   place. These rules must be global -- this class is applied by
-   SvelteFlow's own NodeWrapper, not WorkflowNode.svelte's template, so a
-   component-scoped <style> block has nothing to scope them to. */
+/* SvelteFlow's NodeWrapper gets the `.svelte-flow__node-workflow` class and
+   the selected/focus state; the visible card is WorkflowNode's own
+   .wf-card / .wf-pill inside it, so the wrapper itself draws nothing.
+   Sizes and colours follow Main.dc.html's node cards, using theme tokens. */
 .svelte-flow__node-workflow {
-  padding: 10px;
-  border-radius: var(--xy-node-border-radius, var(--xy-node-border-radius-default));
-  width: 150px;
-  font-size: 12px;
-  color: var(--xy-node-color, var(--xy-node-color-default));
-  text-align: center;
-  border: var(--xy-node-border, var(--xy-node-border-default));
-  background-color: var(--xy-node-background-color, var(--xy-node-background-color-default));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
 }
 
-.svelte-flow__node-workflow.selectable:hover {
-  box-shadow: var(--xy-node-boxshadow-hover, var(--xy-node-boxshadow-hover-default));
-}
-
-.svelte-flow__node-workflow.selectable.selected,
-.svelte-flow__node-workflow.selectable:focus,
-.svelte-flow__node-workflow.selectable:focus-visible {
+.svelte-flow__node-workflow:focus,
+.svelte-flow__node-workflow:focus-visible {
   outline: none;
-  border: var(--xy-node-border-selected, var(--xy-node-border-selected-default));
+}
+
+.wf-card,
+.wf-pill {
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  background: var(--card);
+  box-shadow: var(--elevation-card);
+}
+
+.wf-card {
+  width: 260px;
+  min-height: 96px;
+  padding: 12px 14px;
+  border-radius: var(--radius-xl);
+}
+
+.wf-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 160px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+}
+
+.wf-chip {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--tint);
+  color: var(--ink);
+}
+
+.wf-kind {
+  color: var(--ink);
+}
+
+/* Selected: a 2px accent border plus the board's accent halo. */
+.svelte-flow__node.selected .wf-card,
+.svelte-flow__node.selected .wf-pill {
+  border: 2px solid var(--primary);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent),
+    var(--elevation-card);
+}
+
+.svelte-flow__node-workflow:focus-visible .wf-card,
+.svelte-flow__node-workflow:focus-visible .wf-pill {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* D4: handles stay in the DOM (so they can still be dragged from) but are
+   invisible until the node is hovered, focused or selected, or a
+   connection drag is in progress anywhere (WorkflowNode adds
+   .wf-handle-live while useConnection() reports one). */
+.wf-handle {
+  opacity: 0;
+  background: var(--primary);
+  border-color: var(--card);
+  transition: opacity 0.15s ease;
+}
+
+.svelte-flow__node:hover .wf-handle,
+.svelte-flow__node:focus-within .wf-handle,
+.svelte-flow__node.selected .wf-handle,
+.wf-handle.wf-handle-live {
+  opacity: 1;
 }

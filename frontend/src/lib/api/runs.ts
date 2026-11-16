@@ -20,6 +20,9 @@ export interface RunSummary {
   run_working_dir: string | null;
   workflow_id: string | null;
   gallery_gates: string[];
+  pending_questions: number;
+  waiting_since: string | null;
+  resumable: boolean;
 }
 
 export interface ListRunsResponse {
@@ -48,6 +51,11 @@ export interface ResumeResponse {
   run_id: string;
   status: string;
   resumed_from_node: string;
+}
+
+export interface StepsResponse {
+  nodes: GraphNodeSummary[];
+  edges: StepEdge[];
 }
 
 export interface TokenResponse {
@@ -83,6 +91,14 @@ export interface GraphNodeSummary {
   id: string;
   node_type: string;
   label?: string;
+}
+
+export interface StepEdge {
+  from: string;
+  to: string;
+  label?: string;
+  priority?: number;
+  loop_restart?: boolean;
 }
 
 export interface GraphNodesResponse {
@@ -161,11 +177,17 @@ export async function cancelRun(id: string): Promise<CancelResponse> {
   return handleResponse<CancelResponse>(response);
 }
 
-export async function resumeRun(id: string): Promise<ResumeResponse> {
+// Resolves to the id of the new run the server starts from the checkpoint.
+export async function resumeRun(id: string): Promise<string> {
   const response = await fetch(getApiUrl(`/runs/${id}/resume`), {
     method: 'POST',
   });
-  return handleResponse<ResumeResponse>(response);
+  return (await handleResponse<ResumeResponse>(response)).run_id;
+}
+
+export async function getRunSteps(id: string): Promise<StepsResponse> {
+  const response = await fetch(getApiUrl(`/runs/${encodeURIComponent(id)}/steps`));
+  return handleResponse<StepsResponse>(response);
 }
 
 export async function getTokens(id: string): Promise<TokenResponse> {

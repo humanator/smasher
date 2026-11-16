@@ -1,15 +1,22 @@
-// ABOUTME: Tests for WorkflowDetailPage, the /workflows/{id} page
-// ABOUTME: Imports throwaway copies of the gate-only run_launch_check.dot through the real API
+// ABOUTME: Tests for WorkflowDetailPage, the /workflows/{id} page, rendered under the real toolbar
+// ABOUTME: Stand-in libraries for the frame's states; throwaway run_launch_check.dot imports for real runs
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { readFileSync, rmSync } from 'fs';
 import { join } from 'path';
-import { render, screen, fireEvent, within } from '@testing-library/svelte/svelte5';
-import WorkflowDetailPage from '../../../src/components/dashboard/WorkflowDetailPage.svelte';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/svelte/svelte5';
+import WorkflowDetailHost from './WorkflowDetailHost.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
 import * as workflowsApi from '../../../src/lib/api/workflows';
+import type { WorkflowSummary } from '../../../src/lib/api/workflows';
 import * as runsApi from '../../../src/lib/api/runs';
+import type { RunSummary } from '../../../src/lib/api/runs';
+import { isNeedsYou } from '../../../src/lib/runStatus';
+import { formatWorkflowName } from '../../../src/lib/utils';
+import { createLibraryStore } from '../../../src/stores/library.svelte';
 import { ANONYMOUS_GATE, submitGraph, cancelAll } from '../../fixtures/graphs';
+import { toast } from 'svelte-sonner';
+import { Toaster } from '../../../src/lib/components/ui/sonner/index.js';
 
 const runLaunchCheck = readFileSync(
   join(process.cwd(), '..', 'examples', 'run_launch_check.dot'),
@@ -23,7 +30,46 @@ async function importThrowaway(): Promise<{ id: string; name: string }> {
   return { id, name };
 }
 
+const WORKFLOW: WorkflowSummary = {
+  id: 'examples__design_concepts_review',
+  name: 'design_concepts_review.dot',
+  source_dir: 'workflows/design',
+  path: 'workflows/design/design_concepts_review.dot',
+};
+
+function fakeLibrary(state: {
+  workflows?: WorkflowSummary[];
+  runs?: RunSummary[];
+  loaded?: boolean;
+  error?: string | null;
+  refresh?: () => Promise<void>;
+}) {
+  const runs = state.runs ?? [];
+  return {
+    workflows: state.workflows ?? [WORKFLOW],
+    runs,
+    needsYou: runs.filter(isNeedsYou),
+    loaded: state.loaded ?? true,
+    error: state.error ?? null,
+    refresh: state.refresh ?? (async () => {}),
+  };
+}
+
+function toolbar() {
+  return screen.getByRole('banner');
+}
+
 let launched: string[] = [];
+let stores: { stop(): void }[] = [];
+
+// A real library store against the test backend, as AppShell starts it.
+async function realLibrary(pollMs = 5000) {
+  const library = createLibraryStore(pollMs);
+  library.start();
+  stores.push(library);
+  await waitFor(() => expect(library.loaded).toBe(true), { timeout: 5000 });
+  return library;
+}
 
 describe('WorkflowDetailPage', () => {
   beforeAll(() => {
@@ -31,6 +77,9 @@ describe('WorkflowDetailPage', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
+    stores.forEach((s) => s.stop());
+    stores = [];
     // bits-ui's scroll lock clears this on a timer after the open dialog
     // unmounts; reset it so the next test's clicks aren't blocked.
     document.body.style.pointerEvents = '';
@@ -43,52 +92,256 @@ describe('WorkflowDetailPage', () => {
     }
   });
 
-  it('shows the name, source, an Edit link and a Run Workflow button', async () => {
-    const { id, name } = await importThrowaway();
+  describe('toolbar', () => {
+    it('shows the title, the file name and folder, Back to Workflows, Edit Workflow and Run', () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
 
-    render(WorkflowDetailPage, { props: { workflowId: id } });
-
-    expect(await screen.findByText(`${name}.dot`, {}, { timeout: 5000 })).toBeTruthy();
-    expect(screen.getByText(/^Source: \//)).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Edit' })).toHaveAttribute(
-      'href',
-      `/workflows/${encodeURIComponent(id)}/edit`
-    );
-    expect(screen.getByRole('button', { name: 'Run Workflow' })).toBeTruthy();
-  });
-
-  it('opens the run dialog from Run Workflow, and Cancel launches nothing', async () => {
-    const { id } = await importThrowaway();
-    render(WorkflowDetailPage, { props: { workflowId: id } });
-
-    await fireEvent.click(await screen.findByRole('button', { name: 'Run Workflow' }, { timeout: 5000 }));
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('heading', { name: /^Run / })).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    const { runs } = await runsApi.listRuns();
-    expect(runs.filter((r) => r.workflow_id === id)).toEqual([]);
-  });
-
-  it('says so when no workflow has the id', async () => {
-    render(WorkflowDetailPage, { props: { workflowId: 'no-such-workflow' } });
-
-    expect(await screen.findByText('Workflow not found.', {}, { timeout: 5000 })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /all workflows/i })).toHaveAttribute('href', '/');
-  });
-
-  describe('runs', () => {
-    it('shows no card and "No runs yet." for a fresh workflow', async () => {
-      const { id } = await importThrowaway();
-
-      render(WorkflowDetailPage, { props: { workflowId: id } });
-
-      expect(await screen.findByText('No runs yet.', {}, { timeout: 5000 })).toBeTruthy();
-      expect(screen.queryByText('Active run')).toBeNull();
-      expect(screen.queryByText('Latest run')).toBeNull();
+      expect(within(toolbar()).getByRole('heading', { level: 1, name: 'Design Concepts Review' })).toBeTruthy();
+      expect(within(toolbar()).getByTestId('toolbar-subtitle').textContent).toBe(
+        'design_concepts_review.dot · workflows/design'
+      );
+      expect(within(toolbar()).getByTestId('toolbar-subtitle').querySelector('code')?.textContent).toBe(
+        'design_concepts_review.dot'
+      );
+      expect(within(toolbar()).getByRole('link', { name: 'Back to Workflows' })).toHaveAttribute('href', '/');
+      expect(within(toolbar()).getByRole('link', { name: 'Edit Workflow' })).toHaveAttribute(
+        'href',
+        `/workflows/${encodeURIComponent(WORKFLOW.id)}/edit`
+      );
+      expect(within(toolbar()).getByRole('button', { name: 'Run' })).toBeTruthy();
     });
 
-    it('features the newest running run, lists only its own runs, then shows the latest once done', async () => {
+    it('reads "Workflow" with no subtitle or actions while the library loads', () => {
+      render(WorkflowDetailHost, {
+        props: { workflowId: WORKFLOW.id, library: fakeLibrary({ workflows: [], loaded: false }) },
+      });
+
+      expect(within(toolbar()).getByRole('heading', { level: 1, name: 'Workflow' })).toBeTruthy();
+      expect(within(toolbar()).queryByTestId('toolbar-subtitle')).toBeNull();
+      expect(within(toolbar()).queryByRole('button', { name: 'Run' })).toBeNull();
+      expect(within(toolbar()).queryByRole('link', { name: 'Edit Workflow' })).toBeNull();
+      const history = screen.getByRole('region', { name: 'Run history' });
+      expect(within(history).getByRole('status', { name: 'Loading runs' })).toBeTruthy();
+    });
+
+    it('makes no workflow or run requests of its own', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const urls = fetchSpy.mock.calls.map(([input]) => String(input instanceof Request ? input.url : input));
+      expect(urls.filter((u) => /\/api\/(runs|workflows)$/.test(u))).toEqual([]);
+    });
+  });
+
+  describe('Show in Finder', () => {
+    afterEach(async () => {
+      delete window.__TAURI__;
+      toast.dismiss();
+      await waitFor(() => expect(document.querySelectorAll('[data-sonner-toast][data-removed="false"]')).toHaveLength(0));
+    });
+
+    it('is not offered in the browser', () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      expect(within(toolbar()).queryByRole('button', { name: 'Show in Finder' })).toBeNull();
+    });
+
+    it("reveals the workflow's file in the desktop app, before Edit Workflow", async () => {
+      const invoke = vi.fn(async () => undefined as never);
+      window.__TAURI__ = { core: { invoke } };
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      const button = within(toolbar()).getByRole('button', { name: 'Show in Finder' });
+      const edit = within(toolbar()).getByRole('link', { name: 'Edit Workflow' });
+      expect(button.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await fireEvent.click(button);
+
+      expect(invoke).toHaveBeenCalledWith('reveal_in_finder', { path: WORKFLOW.path });
+    });
+
+    it('says why when the file cannot be shown', async () => {
+      window.__TAURI__ = {
+        core: {
+          invoke: async () => {
+            throw new Error("That file isn't in a workflows folder.");
+          },
+        },
+      };
+      render(Toaster);
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Show in Finder' }));
+
+      expect(
+        await screen.findByText("Couldn't show the file in Finder. That file isn't in a workflows folder.")
+      ).toBeTruthy();
+    });
+  });
+
+  describe('not found and errors', () => {
+    it('says so when no workflow has the id, with only the back button in the toolbar', () => {
+      render(WorkflowDetailHost, { props: { workflowId: 'no-such-workflow', library: fakeLibrary({}) } });
+
+      expect(within(toolbar()).getByRole('heading', { level: 1, name: 'Workflow not found' })).toBeTruthy();
+      expect(screen.getByText("We couldn't find that workflow. It may have been renamed or moved.")).toBeTruthy();
+      const main = screen.getByText(/couldn't find that workflow/).closest('div')!;
+      expect(within(main).getByRole('link', { name: 'Back to Workflows' })).toHaveAttribute('href', '/');
+      expect(within(toolbar()).queryByRole('button', { name: 'Run' })).toBeNull();
+      expect(within(toolbar()).queryByRole('link', { name: 'Edit Workflow' })).toBeNull();
+      expect(within(toolbar()).queryByTestId('toolbar-subtitle')).toBeNull();
+    });
+
+    it('shows a failed library load with Try Again', async () => {
+      const refresh = vi.fn(async () => {});
+      render(WorkflowDetailHost, {
+        props: {
+          workflowId: WORKFLOW.id,
+          library: fakeLibrary({ workflows: [], loaded: false, error: 'Network down', refresh }),
+        },
+      });
+
+      const alert = screen.getByRole('alert');
+      expect(alert.textContent).toContain('Network down');
+      await fireEvent.click(within(alert).getByRole('button', { name: 'Try Again' }));
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('run history', () => {
+    function run(id: string, extra: Partial<RunSummary> = {}): RunSummary {
+      return {
+        id,
+        status: 'Completed',
+        started_at: '2026-10-16T02:31:00Z',
+        completed_at: '2026-10-16T02:38:00Z',
+        graph_name: 'design_concepts_review',
+        error: null,
+        input_tokens: 0,
+        output_tokens: 0,
+        run_working_dir: null,
+        workflow_id: WORKFLOW.id,
+        gallery_gates: [],
+        pending_questions: 0,
+        waiting_since: null,
+        resumable: false,
+        ...extra,
+      };
+    }
+
+    it('lists this workflow\'s runs under its heading and intro, with a failed run\'s reason', () => {
+      const runs = [
+        run('run-failed', { status: 'Failed', error: "retry exhausted for node 'lint': exit code 2" }),
+        run('run-done'),
+        run('run-other', { workflow_id: 'someone-else' }),
+      ];
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({ runs }) } });
+
+      const history = screen.getByRole('region', { name: 'Run history' });
+      expect(within(history).getByRole('heading', { level: 2, name: 'Run history' })).toBeTruthy();
+      expect(
+        within(history).getByText('Every run of this workflow, newest first. Open one to see what happened step by step.')
+      ).toBeTruthy();
+      expect(within(history).getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual([
+        'Status',
+        'Started',
+        'Run',
+        'Duration',
+      ]);
+      expect(within(history).getByRole('link', { name: 'run-failed lint: Exit code 2.' })).toBeTruthy();
+      expect(within(history).getByRole('link', { name: 'run-done' })).toBeTruthy();
+      expect(within(history).queryByRole('link', { name: /run-other/ })).toBeNull();
+    });
+
+    it('says a workflow has not run yet, with a Run button that opens the sheet', async () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      const history = screen.getByRole('region', { name: 'Run history' });
+      expect(within(history).getByText("This workflow hasn't run yet.")).toBeTruthy();
+      await fireEvent.click(within(history).getByRole('button', { name: 'Run' }));
+      expect(await screen.findByRole('dialog', {}, { timeout: 5000 })).toBeTruthy();
+    });
+
+    it('shows a failed refresh with Try Again, keeping the runs it has', async () => {
+      const refresh = vi.fn(async () => {});
+      render(WorkflowDetailHost, {
+        props: { workflowId: WORKFLOW.id, library: fakeLibrary({ runs: [run('run-done')], error: 'Network down', refresh }) },
+      });
+
+      const history = screen.getByRole('region', { name: 'Run history' });
+      const alert = within(history).getByRole('alert');
+      expect(alert.textContent).toContain('Network down');
+      expect(within(history).getByRole('link', { name: 'run-done' })).toBeTruthy();
+      await fireEvent.click(within(alert).getByRole('button', { name: 'Try Again' }));
+      expect(refresh).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('with the real backend', () => {
+    it('shows an imported workflow in the toolbar', async () => {
+      const { id, name } = await importThrowaway();
+      const library = await realLibrary();
+
+      render(WorkflowDetailHost, { props: { workflowId: id, library } });
+
+      expect(
+        within(toolbar()).getByRole('heading', { level: 1, name: formatWorkflowName(`${name}.dot`).trim() })
+      ).toBeTruthy();
+      expect(within(toolbar()).getByTestId('toolbar-subtitle').textContent).toMatch(
+        new RegExp(`^${name.replace(/\./g, '\\.')}\\.dot · /`)
+      );
+    });
+
+    it('lists what the workflow does, in running order with plain kinds', async () => {
+      const { id } = await importThrowaway();
+      const library = await realLibrary();
+
+      render(WorkflowDetailHost, { props: { workflowId: id, library } });
+
+      const steps = screen.getByRole('region', { name: 'What it does' });
+      const list = await within(steps).findByRole('list', {}, { timeout: 5000 });
+      expect(within(steps).getByText('The steps in order.')).toBeTruthy();
+      expect(within(list).getAllByRole('listitem').map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+        '1 Start Start',
+        '2 Brief: {{brief}} | Model: {{model}} | Colour: {{colour}} Ask a person',
+        '3 Exit Finish',
+      ]);
+    });
+
+    it("shows a failed graph read with Try Again", async () => {
+      render(WorkflowDetailHost, { props: { workflowId: WORKFLOW.id, library: fakeLibrary({}) } });
+
+      const steps = screen.getByRole('region', { name: 'What it does' });
+      const alert = await within(steps).findByRole('alert', {}, { timeout: 5000 });
+      expect(alert.textContent).toContain("Couldn't read this workflow's steps.");
+      expect(within(alert).getByRole('button', { name: 'Try Again' })).toBeTruthy();
+    });
+
+    it('opens the run dialog from Run, and Cancel launches nothing', async () => {
+      const { id } = await importThrowaway();
+      const library = await realLibrary();
+      render(WorkflowDetailHost, { props: { workflowId: id, library } });
+
+      await fireEvent.click(within(toolbar()).getByRole('button', { name: 'Run' }));
+      const dialog = await screen.findByRole('dialog', {}, { timeout: 5000 });
+      expect(within(dialog).getByRole('heading', { name: /^Run / })).toBeTruthy();
+      await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      const { runs } = await runsApi.listRuns();
+      expect(runs.filter((r) => r.workflow_id === id)).toEqual([]);
+    });
+
+    it("shows no banner and says a fresh workflow hasn't run yet", async () => {
+      const { id } = await importThrowaway();
+      const library = await realLibrary();
+
+      render(WorkflowDetailHost, { props: { workflowId: id, library } });
+
+      expect(await screen.findByText("This workflow hasn't run yet.", {}, { timeout: 5000 })).toBeTruthy();
+      expect(screen.queryByRole('region', { name: 'Active run' })).toBeNull();
+    });
+
+    it('features the newest running run, lists only its own runs, and drops the banner once done', async () => {
       const { id } = await importThrowaway();
       const older = (await runsApi.runWorkflow(id)).run_id;
       launched.push(older);
@@ -96,14 +349,21 @@ describe('WorkflowDetailPage', () => {
       launched.push(newer);
       // Another graph's run, which must never appear on this page.
       const other = await submitGraph(ANONYMOUS_GATE);
+      const library = await realLibrary(500);
 
-      render(WorkflowDetailPage, { props: { workflowId: id } });
+      render(WorkflowDetailHost, { props: { workflowId: id, library } });
 
-      const card = await screen.findByRole('region', { name: 'Active run' }, { timeout: 5000 });
-      expect(within(card).getByRole('link', { name: newer })).toHaveAttribute('href', `/runs/${newer}`);
-      expect(within(card).getByText('+1 more running')).toBeTruthy();
+      const banner = await screen.findByRole('region', { name: 'Active run' }, { timeout: 5000 });
+      expect(within(banner).getByRole('link', { name: newer })).toHaveAttribute('href', `/runs/${newer}`);
+      expect(within(banner).getByText('+ 1 more running')).toBeTruthy();
+      // Paused at names the gate step by its label from the graph.
+      await waitFor(
+        () => expect(within(banner).getByText(/^Brief: .* \| Colour: /, { selector: 'strong' })).toBeTruthy(),
+        { timeout: 5000 }
+      );
+      expect(within(banner).getByRole('link', { name: 'Answer' })).toHaveAttribute('href', `/runs/${newer}`);
 
-      const history = screen.getByRole('region', { name: 'Run History' });
+      const history = screen.getByRole('region', { name: 'Run history' });
       const rows = within(history).getAllByRole('row').slice(1);
       expect(rows).toHaveLength(2);
       expect(within(history).getByRole('link', { name: newer })).toBeTruthy();
@@ -113,10 +373,10 @@ describe('WorkflowDetailPage', () => {
       await runsApi.cancelRun(older);
       await runsApi.cancelRun(newer);
 
-      const latest = await screen.findByRole('region', { name: 'Latest run' }, { timeout: 8000 });
-      expect(within(latest).getByText('Completed')).toBeTruthy();
-      expect(within(latest).queryByText(/more running/)).toBeNull();
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Active run' })).toBeNull(), {
+        timeout: 8000,
+      });
+      expect(screen.queryByRole('region', { name: 'Latest run' })).toBeNull();
     }, 20000);
   });
 });
-

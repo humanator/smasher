@@ -2,7 +2,7 @@
 // ABOUTME: jsdom has no Tauri runtime, so window.__TAURI__.core.invoke stands in for smasher-desktop's key/CLI commands
 
 import { describe, it, expect, afterEach, beforeAll } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/svelte/svelte5';
+import { render, screen, waitFor, within } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import SettingsDialog from '../../../src/components/dashboard/SettingsDialog.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
@@ -55,11 +55,20 @@ const modelSelect = () => screen.getByTestId('settings-model') as HTMLSelectElem
 async function openDialog() {
   const user = userEvent.setup();
   render(SettingsDialog);
-  await user.click(screen.getByRole('button', { name: 'Settings' }));
+  await user.click(screen.getByRole('button', { name: 'AI model settings' }));
   await screen.findByTestId('settings-provider');
   // The test server always has the claude-cli provider.
   await waitFor(() => expect(providerSelect().querySelector('option[value="claude-cli"]')).toBeTruthy());
   return user;
+}
+
+async function showTab(user: ReturnType<typeof userEvent.setup>, name: 'Defaults' | 'Services' | 'Claude CLI') {
+  await user.click(screen.getByRole('tab', { name }));
+}
+
+async function expandProvider(user: ReturnType<typeof userEvent.setup>, label: string) {
+  const row = screen.getByRole('button', { name: new RegExp(`^${label}`) });
+  if (row.getAttribute('aria-expanded') !== 'true') await user.click(row);
 }
 
 async function pick(user: ReturnType<typeof userEvent.setup>, provider: string, model: string) {
@@ -101,12 +110,39 @@ describe('SettingsDialog', () => {
       expect(screen.getByTestId('settings-source').textContent).toMatch(/settings file/i);
     });
 
+    it('is one Settings window with no section tabs and no Keychain line', async () => {
+      await openDialog();
+
+      expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
+      expect(screen.queryByRole('tablist')).toBeNull();
+      expect(screen.queryByText(/Keychain/)).toBeNull();
+    });
+
+    it('labels the defaults as the design does, each with its hint', async () => {
+      await openDialog();
+
+      expect(screen.getByLabelText('Default provider')).toHaveAccessibleDescription(
+        'Which service to send requests to. Leave it on a provider and pick one of its models below.'
+      );
+      expect(screen.getByLabelText('Default model')).toHaveAccessibleDescription(
+        'The model AI steps use when neither the run nor the step asks for a specific one.'
+      );
+    });
+
+    it('closes from its close button', async () => {
+      const user = await openDialog();
+
+      await user.click(screen.getByRole('button', { name: 'Close settings' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    });
+
     it('says API keys come from the environment, and has no key or Claude CLI fields', async () => {
       await openDialog();
 
       expect(screen.getByText(/environment/i)).toBeTruthy();
       expect(screen.queryByLabelText('Anthropic API key')).toBeNull();
-      expect(screen.queryByLabelText('Claude CLI binary path')).toBeNull();
+      expect(screen.queryByLabelText('Where it is installed')).toBeNull();
     });
 
     it('saves a new provider and model on the server, with no restart prompt', async () => {
@@ -115,8 +151,8 @@ describe('SettingsDialog', () => {
       await pick(user, 'claude-cli', 'claude-fable');
       await user.click(screen.getByRole('button', { name: 'Save' }));
 
-      expect(await screen.findByRole('status')).toHaveTextContent(/Saved/);
-      expect(screen.queryByRole('button', { name: 'Restart now' })).toBeNull();
+      expect(await screen.findByRole('status')).toHaveTextContent('Saved. Changes apply to the next run.');
+      expect(screen.getByRole('dialog').textContent).not.toMatch(/restart/i);
       expect(await getSettings()).toEqual({
         provider: 'claude-cli',
         model: 'claude-fable',
@@ -152,12 +188,55 @@ describe('SettingsDialog', () => {
   });
 
   describe('in the desktop app', () => {
+    it('has Defaults, Services and Claude CLI tabs, titled by the one selected', async () => {
+      fakeDesktop();
+      const user = await openDialog();
+
+      const tablist = screen.getByRole('tablist', { name: 'Settings sections' });
+      expect(within(tablist).getAllByRole('tab').map((t) => t.textContent?.trim())).toEqual([
+        'Defaults',
+        'Services',
+        'Claude CLI',
+      ]);
+      expect(screen.getByRole('heading', { name: 'Defaults' })).toBeTruthy();
+      expect(screen.getByText('API keys are stored in your Mac’s Keychain.')).toBeTruthy();
+
+      await showTab(user, 'Services');
+      expect(screen.getByRole('heading', { name: 'Services' })).toBeTruthy();
+      expect(screen.getByTestId('settings-provider')).not.toBeVisible();
+      expect(screen.getByLabelText('Anthropic API key')).toBeVisible();
+    });
+
+    it('moves between tabs with the arrow keys', async () => {
+      fakeDesktop();
+      const user = await openDialog();
+
+      screen.getByRole('tab', { name: 'Defaults' }).focus();
+      await user.keyboard('{ArrowRight}');
+
+      expect(screen.getByRole('tab', { name: 'Services' })).toHaveFocus();
+    });
+
+    it('keeps an unsaved default across a trip to another tab', async () => {
+      fakeDesktop();
+      const user = await openDialog();
+
+      await pick(user, 'claude-cli', 'claude-opus');
+      await showTab(user, 'Services');
+      await showTab(user, 'Defaults');
+
+      expect(providerSelect().value).toBe('claude-cli');
+      expect(modelSelect().value).toBe('claude-opus');
+    });
+
     it('shows each provider\'s key and base URL fields and the Claude CLI section', async () => {
       fakeDesktop();
-      await openDialog();
+      const user = await openDialog();
+      await showTab(user, 'Services');
 
       expect(screen.getByText('/Users/test/Documents/smasher/settings.json')).toBeTruthy();
       for (const label of ['Anthropic', 'OpenAI', 'Gemini', 'Ollama']) {
+        await expandProvider(user, label);
         expect(screen.getByLabelText(`${label} API key`)).toBeTruthy();
         expect(screen.getByLabelText(`${label} base URL`)).toBeTruthy();
       }
@@ -166,22 +245,32 @@ describe('SettingsDialog', () => {
 
     it('shows which providers already have a key in the Keychain', async () => {
       fakeDesktop();
-      await openDialog();
+      const user = await openDialog();
+      await showTab(user, 'Services');
 
-      expect(screen.getByLabelText('Anthropic API key').getAttribute('placeholder')).toMatch(/Keychain/);
-      expect(screen.getByLabelText('OpenAI API key').getAttribute('placeholder')).toBe('Not set');
+      expect(screen.getByRole('button', { name: /^Anthropic/ })).toHaveTextContent('Key saved');
+      expect(screen.getByRole('button', { name: /^OpenAI/ })).toHaveTextContent('No key');
+      expect(screen.getByLabelText('Anthropic API key').getAttribute('placeholder')).toBe('Saved. Type to replace.');
+      expect(screen.getByLabelText('Anthropic API key')).toHaveAccessibleDescription(
+        'The secret that lets Smasher use your account with Anthropic. It is saved to the Keychain, never into a workflow.'
+      );
+      await expandProvider(user, 'OpenAI');
+      expect(screen.getByLabelText('OpenAI API key').getAttribute('placeholder')).toBe('Paste your API key');
     });
 
     it('saves keys and base URLs with no default model in the update, and no restart prompt', async () => {
       const calls = fakeDesktop();
       const user = await openDialog();
+      await showTab(user, 'Services');
 
+      await expandProvider(user, 'Ollama');
       await user.type(screen.getByLabelText('Ollama base URL'), 'http://localhost:11434');
+      await expandProvider(user, 'OpenAI');
       await user.type(screen.getByLabelText('OpenAI API key'), 'sk-new');
       await user.click(screen.getByRole('button', { name: 'Save' }));
 
-      expect(await screen.findByRole('status')).toHaveTextContent(/Saved/);
-      expect(screen.queryByText(/Restart/)).toBeNull();
+      expect(await screen.findByRole('status')).toHaveTextContent('Saved. Changes apply to the next run.');
+      expect(screen.getByRole('dialog').textContent).not.toMatch(/restart/i);
       const update = savedUpdate(calls);
       expect('default_model' in update).toBe(false);
       expect('default_provider' in update).toBe(false);
@@ -206,8 +295,11 @@ describe('SettingsDialog', () => {
     it('removes a stored key with an empty api_key', async () => {
       const calls = fakeDesktop();
       const user = await openDialog();
+      await showTab(user, 'Services');
 
       await user.click(screen.getByRole('button', { name: 'Remove Anthropic API key' }));
+      expect(screen.getByRole('button', { name: /^Anthropic/ })).toHaveTextContent('No key');
+      expect(screen.getByLabelText('Anthropic API key').getAttribute('placeholder')).toBe('Removed when you save');
       await user.click(screen.getByRole('button', { name: 'Save' }));
 
       await screen.findByRole('status');
@@ -240,27 +332,59 @@ describe('SettingsDialog', () => {
       const user = userEvent.setup();
       render(SettingsDialog);
 
-      await user.click(screen.getByRole('button', { name: 'Settings' }));
+      await user.click(screen.getByRole('button', { name: 'AI model settings' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent('not valid settings JSON');
     });
 
+    it('opens one provider at a time from its row, starting with the first', async () => {
+      fakeDesktop();
+      const user = await openDialog();
+      await showTab(user, 'Services');
+
+      expect(screen.getByRole('button', { name: /^Anthropic/ })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: /^OpenAI/ })).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByLabelText('OpenAI API key')).toBeNull();
+
+      await user.click(screen.getByRole('button', { name: /^Anthropic/ }));
+      expect(screen.queryByLabelText('Anthropic API key')).toBeNull();
+    });
+
+    it('explains the Ollama base URL, local copy included', async () => {
+      fakeDesktop();
+      const user = await openDialog();
+      await showTab(user, 'Services');
+      await expandProvider(user, 'Ollama');
+
+      expect(screen.getByLabelText('Ollama base URL')).toHaveAccessibleDescription(
+        /Only change this to point at a different server.*http:\/\/localhost:11434 to use a copy running on this Mac/
+      );
+    });
+
     it('shows Claude CLI with a path, the detected version and the allowlist, and no key field', async () => {
       fakeDesktop();
-      await openDialog();
+      const user = await openDialog();
+      await showTab(user, 'Claude CLI');
 
-      const path = screen.getByLabelText('Claude CLI binary path') as HTMLInputElement;
+      const path = screen.getByLabelText('Where it is installed') as HTMLInputElement;
       expect(path.value).toBe('');
       expect(path.getAttribute('placeholder')).toContain('/Users/test/.local/bin/claude');
+      expect(path).toHaveAccessibleDescription('Leave blank and Smasher will find it automatically.');
+      expect(
+        screen.getByText(
+          'Run every AI step through the claude command on this Mac, using the account it is signed in to. No API key needed.'
+        )
+      ).toBeTruthy();
       expect(await screen.findByText(/2\.1\.281 \(Claude Code\)/)).toBeTruthy();
-      const tools = screen.getByLabelText('Claude CLI allowed tools') as HTMLTextAreaElement;
+      const tools = screen.getByLabelText('Tools AI Agent steps may use') as HTMLTextAreaElement;
       expect(tools.value).toBe('Read\nWrite');
       expect(screen.queryByLabelText('Claude CLI API key')).toBeNull();
     });
 
     it('says when the Claude CLI is not found', async () => {
       fakeDesktop({ detect_claude_cli: () => ({ path: null, version: null }) });
-      await openDialog();
+      const user = await openDialog();
+      await showTab(user, 'Claude CLI');
 
       expect(await screen.findByText(/not found/i)).toBeTruthy();
     });
@@ -268,8 +392,9 @@ describe('SettingsDialog', () => {
     it('re-detects the Claude CLI at a typed path', async () => {
       const calls = fakeDesktop();
       const user = await openDialog();
+      await showTab(user, 'Claude CLI');
 
-      await user.type(screen.getByLabelText('Claude CLI binary path'), '/opt/claude');
+      await user.type(screen.getByLabelText('Where it is installed'), '/opt/claude');
       await user.click(screen.getByRole('button', { name: 'Detect Claude CLI' }));
 
       await waitFor(() =>
@@ -282,9 +407,10 @@ describe('SettingsDialog', () => {
     it('saves the Claude CLI path and allowlist', async () => {
       const calls = fakeDesktop();
       const user = await openDialog();
+      await showTab(user, 'Claude CLI');
 
-      await user.type(screen.getByLabelText('Claude CLI binary path'), '/opt/claude');
-      const tools = screen.getByLabelText('Claude CLI allowed tools');
+      await user.type(screen.getByLabelText('Where it is installed'), '/opt/claude');
+      const tools = screen.getByLabelText('Tools AI Agent steps may use');
       await user.clear(tools);
       await user.type(tools, 'Read{Enter}  {Enter}Bash(npm run build:*)');
       await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -298,10 +424,11 @@ describe('SettingsDialog', () => {
     it('resets the allowlist to the default', async () => {
       fakeDesktop();
       const user = await openDialog();
+      await showTab(user, 'Claude CLI');
 
-      await user.click(screen.getByRole('button', { name: 'Reset allowed tools to default' }));
+      await user.click(screen.getByRole('button', { name: 'Reset to Default' }));
 
-      const tools = screen.getByLabelText('Claude CLI allowed tools') as HTMLTextAreaElement;
+      const tools = screen.getByLabelText('Tools AI Agent steps may use') as HTMLTextAreaElement;
       expect(tools.value).toBe('Read\nEdit\nWrite');
     });
   });

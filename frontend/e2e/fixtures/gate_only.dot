@@ -1,0 +1,11 @@
+// ABOUTME: Gate-only fixture: start, one human gate, exit
+// ABOUTME: Runs park at the gate and never reach an LLM node, so tests can launch it for free
+
+digraph GateOnly {
+  Start [shape=Mdiamond, label="Start"];
+  Gate [shape=hexagon, label="Proceed with the gate-only fixture?", mode="freeform"];
+  Exit [shape=Msquare, label="Exit"];
+
+  Start -> Gate;
+  Gate -> Exit;
+}

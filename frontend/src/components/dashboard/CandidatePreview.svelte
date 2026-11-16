@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: A candidate's screenshot thumbnail, opening a lightbox with the live bundle at full size
-  // ABOUTME: Shared by CandidateCard and GalleryGate; the lightbox scales the capture viewport to fit
+  // ABOUTME: Used by the run page's Candidates; the lightbox scales the capture viewport to fit
 
   import type { CandidateResponse } from '../../lib/api/runs';
   import { fitScale, viewportOf } from '../../lib/previewScale';
@@ -41,8 +41,7 @@
 <button
   type="button"
   aria-label="Open preview of {candidate.candidate_id}"
-  class="candidate-thumbnail block w-full cursor-zoom-in overflow-hidden rounded bg-muted"
-  style="aspect-ratio: {viewport.width} / {viewport.height}"
+  class="candidate-thumbnail block h-32 w-full cursor-zoom-in overflow-hidden rounded-md border border-border bg-muted"
   onclick={openLightbox}
 >
   {#if thumbnailFailed}
@@ -60,9 +59,7 @@
 </button>
 
 <Dialog.Root bind:open>
-  <Dialog.Content
-    class="flex h-[calc(100vh-2rem)] flex-col gap-3 p-4 sm:max-w-[calc(100vw-2rem)]"
-  >
+  <Dialog.Content variant="fullscreen">
     <Dialog.Header class="flex-row items-center gap-2 pr-10">
       <Dialog.Title class="mr-auto font-mono">{candidate.candidate_id}</Dialog.Title>
       {#if candidate.bundle_url}

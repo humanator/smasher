@@ -7,6 +7,7 @@ use axum::{Json, Router};
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use smasher_attractor::events::{PipelineEvent, PipelineEventLog};
 use smasher_attractor::graph::{Graph, GraphNode, NodeAttrValue};
 use smasher_attractor::http_interviewer::AnswerQuestionResponse;
 
@@ -245,7 +246,7 @@ async fn submit_gallery_decision(
     // before the synchronous candidate scan below, rather than holding the
     // `runs` read lock (blocking every other handler that touches this map)
     // for the duration of a filesystem walk.
-    let interviewer = {
+    let (interviewer, gate_node, event_log) = {
         let runs = state.runs.read().await;
         let record = runs
             .get(&id)
@@ -259,26 +260,27 @@ async fn submit_gallery_decision(
         // in the graph" — a pipeline with more than one gallery gate (e.g. a
         // Discover gate and a separate Define gate) would otherwise only ever
         // let the first one's questions through this endpoint.
-        let belongs_to_gate = record
+        let gate_node = record
             .interviewer
             .list_questions()
             .questions
             .iter()
-            .any(|q| {
-                q.id == qid
-                    && q.node_id
-                        .as_deref()
-                        .is_some_and(|nid| find_gallery_gate_for_node(&record.graph, nid).is_some())
-            });
+            .find(|q| q.id == qid)
+            .and_then(|q| q.node_id.clone())
+            .filter(|nid| find_gallery_gate_for_node(&record.graph, nid).is_some());
 
-        if !belongs_to_gate {
+        let Some(gate_node) = gate_node else {
             return Ok(Json(AnswerQuestionResponse {
                 success: false,
                 error: Some(format!("question not found: {qid}")),
             }));
-        }
+        };
 
-        record.interviewer.clone()
+        (
+            record.interviewer.clone(),
+            gate_node,
+            record.event_log.clone(),
+        )
     };
 
     let decision = GateDecision {
@@ -293,7 +295,35 @@ async fn submit_gallery_decision(
             .await
             .map_err(|e| WebError::Internal(format!("candidate scan task panicked: {e}")))?;
     let canonical = validate_decision(&candidates, &decision).map_err(WebError::BadRequest)?;
-    Ok(Json(interviewer.answer_question(&qid, &canonical)))
+
+    // The decision history is read from the gate's NodeCompleted events, which the
+    // engine records a moment after the answer reaches it. Reply only once this
+    // answer's completion is there, so a read right after the reply lists it.
+    let completed_before = gate_completions(&event_log, &gate_node);
+    let response = interviewer.answer_question(&qid, &canonical);
+    if response.success {
+        let deadline = tokio::time::Instant::now() + DECISION_SETTLE_TIMEOUT;
+        while gate_completions(&event_log, &gate_node) <= completed_before
+            && tokio::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(DECISION_SETTLE_POLL).await;
+        }
+    }
+    Ok(Json(response))
+}
+
+/// How long a decision waits for the gate to record it before replying anyway.
+const DECISION_SETTLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const DECISION_SETTLE_POLL: std::time::Duration = std::time::Duration::from_millis(5);
+
+/// How many times `node_id` has completed so far. A gate can complete more than
+/// once in a run when an iterate decision loops back to it.
+fn gate_completions(event_log: &PipelineEventLog, node_id: &str) -> usize {
+    event_log
+        .events_for_node(node_id)
+        .iter()
+        .filter(|e| matches!(e, PipelineEvent::NodeCompleted { .. }))
+        .count()
 }
 
 #[cfg(test)]
@@ -618,6 +648,68 @@ mod tests {
             .unwrap()
     }
 
+    /// Stand in for the engine: once the gate's question is answered, record the
+    /// gate's completion in the run's event log after `delay`, as the real
+    /// InterviewerHandler does a moment after `ask` returns.
+    fn complete_gate_when_answered(
+        ask_handle: tokio::task::JoinHandle<
+            Result<String, smasher_attractor::interviewer::InterviewerError>,
+        >,
+        event_log: std::sync::Arc<smasher_attractor::events::PipelineEventLog>,
+        delay: std::time::Duration,
+    ) -> tokio::task::JoinHandle<String> {
+        tokio::spawn(async move {
+            let answer = ask_handle.await.unwrap().unwrap();
+            tokio::time::sleep(delay).await;
+            let data: serde_json::Value = serde_json::from_str(&answer).unwrap();
+            event_log.push(smasher_attractor::events::PipelineEvent::NodeCompleted {
+                node_id: "Gate1".into(),
+                outcome: smasher_attractor::state::Outcome::success_with(data),
+                duration_ms: 0,
+                timestamp: chrono::Utc::now(),
+            });
+            answer
+        })
+    }
+
+    #[tokio::test]
+    async fn decision_answers_once_the_gate_has_recorded_it() {
+        let run_id = "gallery-decision-recorded";
+        write_fixture_manifest(run_id, "candidate-a", false);
+
+        let state = test_state();
+        let interviewer = smasher_attractor::http_interviewer::HttpInterviewer::new();
+        insert_test_record_with(&state, run_id, interviewer.clone()).await;
+        let event_log = state.runs.read().await[run_id].event_log.clone();
+        let (ask_handle, qid) = spawn_pending_ask(interviewer).await;
+        let engine = complete_gate_when_answered(
+            ask_handle,
+            event_log.clone(),
+            std::time::Duration::from_millis(50),
+        );
+
+        let app = router().with_state(state.clone());
+        let req = post_json(
+            post_decision_uri(run_id, &qid),
+            serde_json::json!({"selected": [], "decision": "iterate"}),
+        );
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Read straight after the reply, as the run page does: the decision is there.
+        let graph = state.runs.read().await[run_id].graph.clone();
+        let decisions = crate::decision_history::gallery_decisions(&event_log.events(), &graph);
+        assert_eq!(
+            decisions.len(),
+            1,
+            "the decision was not recorded yet when the reply came"
+        );
+        assert_eq!(decisions[0].decision, "iterate");
+
+        engine.await.unwrap();
+        std::fs::remove_dir_all(std::path::Path::new("/tmp/artifacts").join(run_id)).ok();
+    }
+
     #[tokio::test]
     async fn decision_happy_path_unblocks_ask_with_canonical_json() {
         let run_id = "gallery-decision-happy";
@@ -627,7 +719,9 @@ mod tests {
         let state = test_state();
         let interviewer = smasher_attractor::http_interviewer::HttpInterviewer::new();
         insert_test_record_with(&state, run_id, interviewer.clone()).await;
+        let event_log = state.runs.read().await[run_id].event_log.clone();
         let (ask_handle, qid) = spawn_pending_ask(interviewer).await;
+        let engine = complete_gate_when_answered(ask_handle, event_log, std::time::Duration::ZERO);
 
         let app = router().with_state(state.clone());
         let req = post_json(
@@ -643,7 +737,7 @@ mod tests {
         let parsed: AnswerQuestionResponse = serde_json::from_slice(&body).unwrap();
         assert!(parsed.success);
 
-        let answer = ask_handle.await.unwrap().unwrap();
+        let answer = engine.await.unwrap();
         let answer_json: serde_json::Value = serde_json::from_str(&answer).unwrap();
         assert_eq!(
             answer_json,

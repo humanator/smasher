@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<title>Smasher run</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(190,24,93,.4);border-radius:6px}
+@keyframes wfspin{to{transform:rotate(360deg)}}
+@keyframes wfslide{0%{left:-35%}100%{left:100%}}
+</style>
+</helmet>
+<div style="position:relative;width:100%;min-width:1100px;height:900px;display:flex;background:#FFFFFF;color:#1D1D1F;font-size:13px;line-height:1.4;overflow:hidden">
+
+  <!-- Sidebar (source list) -->
+  <aside aria-label="Sidebar" style="width:220px;flex:none;display:flex;flex-direction:column;background:#EBEBEE;border-right:1px solid rgba(0,0,0,.08)">
+    <div aria-hidden="true" style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 20px">
+      <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+      <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)"></span>
+    </div>
+    <nav aria-label="Library" style="padding:0 10px">
+      <div style="padding:4px 8px 4px;font-size:11px;font-weight:600;color:#636368">Library</div>
+      <a href="Home.dc.html" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v12M18 9v12M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM18 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+        <span style="flex:1">Workflows</span><span style="font-size:12px;color:#636368">6</span>
+      </a>
+      <a href="Home.dc.html#runs" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2"/></svg>
+        <span style="flex:1">Recent runs</span><span style="font-size:12px;color:#636368">6</span>
+      </a>
+      <a href="Run.dc.html" style="display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+        <span style="flex:1">Needs you</span><span style="min-width:18px;height:16px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:#BE185D;color:#FFFFFF;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">1</span>
+      </a>
+    </nav>
+    <nav aria-label="Workflows" style="padding:14px 10px 0;flex:1;min-height:0;overflow:auto">
+      <div style="padding:4px 8px 4px;font-size:11px;font-weight:600;color:#636368">Workflows</div>
+      <sc-for list="{{sideWf}}" as="s" hint-placeholder-count="6">
+        <a href="Workflow.dc.html" aria-current="{{s.current}}" style="{{s.style}}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3v5h5"/></svg>
+          <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{s.title}}</span>
+          <span style="{{s.dot}}" aria-hidden="true"></span>
+        </a>
+      </sc-for>
+    </nav>
+    <div style="flex:none;padding:10px 18px 14px;font-size:11px;line-height:1.4;color:#636368">Smasher · 1 run needs your decision</div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <!-- Unified toolbar -->
+    <header style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.08)">
+      <dc-import name="Button" variant="ghost" size="icon" label="Back to Design concepts review" icon="back" href="Workflow.dc.html" hint-size="28px,28px"></dc-import>
+      <div style="flex:1;min-width:0;padding-left:4px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <h1 style="margin:0;font-size:15px;font-weight:700;line-height:1.2">Design concepts review</h1>
+          <dc-import name="Badge" variant="{{statusVariant}}" label="{{statusText}}" dot="{{statusDot}}" hint-size="70px,18px"></dc-import>
+        </div>
+        <div style="font-size:11px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace">run-7f3a9c</span> · {{elapsedText}}</div>
+      </div>
+      <sc-if value="{{isActive}}" hint-placeholder-val="{{ true }}">
+        <dc-import name="Button" variant="destructive" label="Abort Run" icon="stop" hint-size="92px,24px"></dc-import>
+      </sc-if>
+      <sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+        <dc-import name="Button" variant="outline" label="Run Again" icon="refresh" href="Home.dc.html" hint-size="92px,24px"></dc-import>
+      </sc-if>
+      <span aria-hidden="true" style="width:1px;height:18px;background:rgba(0,0,0,.12);margin:0 2px"></span>
+      <dc-import name="Button" variant="ghost" size="icon" label="Run information" icon="inspector" pressed="{{panelOpen}}" expanded="{{panelOpen}}" on-press="{{toggleSidebar}}" hint-size="28px,28px"></dc-import>
+    </header>
+
+    <div style="flex:1;min-height:0;display:flex">
+
+      <!-- Content -->
+      <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div style="flex:1;min-height:0;overflow:auto;padding:24px 28px 32px;display:flex;flex-direction:column;gap:20px">
+
+          <!-- Hero: waiting -->
+          <sc-if value="{{isWaiting}}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:#9D174D">Pick a favourite · Ask a person</div>
+              <h2 style="margin:2px 0 0;font-size:20px;font-weight:700;line-height:1.25">Which concept should we take forward?</h2>
+            </div>
+          </sc-if>
+
+          <!-- Hero: running -->
+          <sc-if value="{{isRunning}}" hint-placeholder-val="{{ false }}">
+            <section aria-live="polite" style="padding:18px 20px;border-radius:10px;background:#F7F7F9;border:1px solid rgba(0,0,0,.08)">
+              <div style="font-size:11px;font-weight:600;color:#6E6E73">Now running</div>
+              <h2 style="margin:2px 0 0;font-size:20px;font-weight:700;line-height:1.25">{{runningTitle}}</h2>
+              <p style="margin:6px 0 0;font-size:12.5px;line-height:1.45;color:#6E6E73">{{runningText}}</p>
+              <div style="position:relative;height:4px;margin-top:14px;border-radius:999px;background:rgba(0,0,0,.08);overflow:hidden"><span style="position:absolute;top:0;bottom:0;width:35%;border-radius:999px;background:#BE185D;animation:wfslide 1.6s linear infinite"></span></div>
+            </section>
+          </sc-if>
+
+          <!-- Hero: completed -->
+          <sc-if value="{{isCompleted}}" hint-placeholder-val="{{ false }}">
+            <section style="display:flex;gap:14px;align-items:flex-start;padding:18px 20px;border-radius:10px;background:#F2FAF4;border:1px solid rgba(40,200,64,.3)">
+              <span style="flex:none;width:32px;height:32px;border-radius:50%;background:#28C840;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg></span>
+              <div style="flex:1;min-width:0">
+                <h2 style="margin:0;font-size:20px;font-weight:700;line-height:1.25">Finished in 10 min 35 s</h2>
+                <p style="margin:4px 0 12px;font-size:12.5px;line-height:1.45;color:#3A3A3C">{{completedText}}</p>
+                <dc-import name="Button" variant="outline" label="Show Results in Finder" icon="folder" hint-size="170px,24px"></dc-import>
+              </div>
+            </section>
+          </sc-if>
+
+          <!-- Hero: failed -->
+          <sc-if value="{{isFailed}}" hint-placeholder-val="{{ false }}">
+            <section role="alert" style="display:flex;gap:14px;align-items:flex-start;padding:18px 20px;border-radius:10px;background:#FFF5F4;border:1px solid rgba(255,59,48,.28)">
+              <span style="flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5L23 21.5H1z" fill="#FF3B30" stroke="#FF3B30" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 9.5v5M12 17.8h.01" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+              <div style="flex:1;min-width:0">
+                <h2 style="margin:0;font-size:20px;font-weight:700;line-height:1.25">Check against design system couldn’t finish</h2>
+                <pre style="margin:10px 0 0;padding:8px 10px;border-radius:6px;background:#FFFFFF;border:1px solid rgba(0,0,0,.1);font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;color:#1D1D1F">candidate_dir “candidates/a” does not exist</pre>
+                <h3 style="margin:14px 0 4px;font-size:13px;font-weight:600">What you can try</h3>
+                <ul style="margin:0 0 14px;padding-left:18px;font-size:13px;line-height:1.55">
+                  <li>Open the step in the editor and check its tool settings point to a folder that exists.</li>
+                  <li>Check the step before it (Draft three concepts) actually created the files.</li>
+                </ul>
+                <div style="display:flex;gap:8px">
+                  <dc-import name="Button" variant="outline" label="Open in Editor" href="Main.dc.html" hint-size="110px,24px"></dc-import>
+                  <dc-import name="Button" variant="default" label="Run Again" icon="refresh" href="Home.dc.html" hint-size="92px,24px"></dc-import>
+                </div>
+              </div>
+            </section>
+          </sc-if>
+
+          <!-- Candidates -->
+          <sc-if value="{{showCands}}" hint-placeholder-val="{{ true }}">
+            <section aria-labelledby="cand-h">
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+                <h2 id="cand-h" style="margin:0;font-size:15px;font-weight:700">Candidates</h2>
+                <span style="font-size:12px;color:#6E6E73">{{candMeta}}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">
+                <sc-for list="{{cands}}" as="c" hint-placeholder-count="3">
+                  <article style="{{c.cardStyle}}">
+                    <sc-if value="{{c.failed}}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;justify-content:center;height:130px;border-radius:6px;background:#FFFFFF;border:1px dashed rgba(255,59,48,.4)">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2zM12 10v4M12 17.5h.01"/></svg>
+                      </div>
+                      <div style="margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600">{{c.id}}</div>
+                      <p style="margin:4px 0 0;font-size:12px;line-height:1.45;color:#C4170F">{{c.reason}}</p>
+                    </sc-if>
+                    <sc-if value="{{c.ok}}" hint-placeholder-val="{{ true }}">
+                      <div style="position:relative;height:130px;border-radius:6px;background:#F2F2F4;border:1px solid rgba(0,0,0,.08);overflow:hidden" role="img" aria-label="{{c.alt}}">
+                        <sc-for list="{{c.blocks}}" as="b" hint-placeholder-count="5"><span style="{{b.style}}"></span></sc-for>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                        <span style="flex:1;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600">{{c.id}}</span>
+                        <sc-if value="{{c.chosen}}" hint-placeholder-val="{{ false }}"><dc-import name="Badge" variant="secondary" label="Chosen" dot="#28C840" hint-size="64px,18px"></dc-import></sc-if>
+                        <sc-if value="{{c.selectable}}" hint-placeholder-val="{{ true }}">
+                          <dc-import name="Button" variant="{{c.selVariant}}" size="sm" label="{{c.btnText}}" icon="{{c.selIcon}}" pressed="{{c.on}}" on-press="{{c.onToggle}}" hint-size="80px,22px"></dc-import>
+                        </sc-if>
+                      </div>
+                      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+                        <sc-for list="{{c.score}}" as="s" hint-placeholder-count="3">
+                          <div>
+                            <span title="{{s.tech}}" style="display:inline-flex"><dc-import name="Badge" variant="secondary" label="{{s.text}}" dot="{{s.dot}}" hint-size="170px,18px"></dc-import></span>
+                          </div>
+                        </sc-for>
+                      </div>
+                      <sc-if value="{{c.selectable}}" hint-placeholder-val="{{ true }}">
+                        <div style="margin-top:10px">
+                          <dc-import name="Button" variant="link" size="xs" label="{{c.noteLabel}}" expanded="{{c.noteOpen}}" on-press="{{c.onNote}}" hint-size="80px,18px"></dc-import>
+                        </div>
+                        <sc-if value="{{c.noteOpen}}" hint-placeholder-val="{{ false }}">
+                          <div style="margin-top:6px"><dc-import name="Textarea" label="Note for {{c.id}}" hide-label="{{ true }}" rows="{{ 2 }}" value="{{c.note}}" on-input="{{c.onNoteInput}}" placeholder="Notes to steer the next round (optional)" hint-size="100%,60px"></dc-import></div>
+                        </sc-if>
+                      </sc-if>
+                      <sc-if value="{{c.hasSavedNote}}" hint-placeholder-val="{{ false }}"><p style="margin:10px 0 0;font-size:12px;line-height:1.45;color:#6E6E73">Your note: {{c.savedNote}}</p></sc-if>
+                    </sc-if>
+                  </article>
+                </sc-for>
+              </div>
+            </section>
+          </sc-if>
+
+          <!-- Decision history -->
+          <sc-if value="{{hasDecisions}}" hint-placeholder-val="{{ false }}">
+            <section aria-labelledby="dec-h">
+              <h2 id="dec-h" style="margin:0 0 10px;font-size:15px;font-weight:700">Your decisions</h2>
+              <sc-for list="{{decisions}}" as="d" hint-placeholder-count="1">
+                <div style="padding:12px 14px;border-radius:8px;background:#F7F7F9;border:1px solid rgba(0,0,0,.08)">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:13px;font-weight:600">Pick a favourite</span>
+                    <dc-import name="Badge" variant="secondary" label="{{d.decision}}" hint-size="60px,18px"></dc-import>
+                    <span style="margin-left:auto;font-size:11px;color:#6E6E73">{{d.when}}</span>
+                  </div>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                    <sc-for list="{{d.selected}}" as="s" hint-placeholder-count="1"><dc-import name="Badge" variant="outline" label="{{s.id}}" dot="#28C840" hint-size="90px,18px"></dc-import></sc-for>
+                    <sc-if value="{{d.none}}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:#6E6E73">Nothing selected</span></sc-if>
+                  </div>
+                  <sc-for list="{{d.notes}}" as="n" hint-placeholder-count="1"><p style="margin:8px 0 0;font-size:12px;color:#6E6E73"><span style="font-family:ui-monospace,Menlo,monospace;font-weight:600">{{n.id}}:</span> {{n.text}}</p></sc-for>
+                </div>
+              </sc-for>
+            </section>
+          </sc-if>
+        </div>
+
+        <!-- Decision bar (bottom bar) -->
+        <sc-if value="{{isWaiting}}" hint-placeholder-val="{{ true }}">
+          <section aria-label="Decision" style="flex:none;display:flex;align-items:center;gap:12px;padding:12px 20px 12px 28px;background:#F7F7F9;border-top:1px solid rgba(0,0,0,.1)">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:13px;font-weight:600">What should happen next?</span>
+                <dc-import name="Tooltip" trigger="" side="top" text="Try again with my notes: sends this round back and makes new candidates using your notes. With nothing selected, every candidate is rejected. Approve selected: carries the selected candidates forward and the workflow finishes." hint-size="20px,20px"></dc-import>
+              </div>
+              <div style="font-size:12px;color:#6E6E73">{{selectedText}}</div>
+            </div>
+            <dc-import name="Button" variant="outline" size="lg" label="Try Again with My Notes" on-press="{{onIterate}}" hint-size="180px,28px"></dc-import>
+            <dc-import name="Button" variant="default" size="lg" label="Approve Selected" icon="check" disabled="{{approveOff}}" on-press="{{onApprove}}" hint-size="150px,28px"></dc-import>
+          </section>
+        </sc-if>
+      </main>
+
+      <!-- Inspector -->
+      <sc-if value="{{panelOpen}}" hint-placeholder-val="{{ true }}">
+        <aside aria-label="Run information" style="width:300px;flex:none;display:flex;flex-direction:column;background:#F7F7F9;border-left:1px solid rgba(0,0,0,.08)">
+          <div style="padding:12px 14px 10px"><dc-import name="Tabs" tabs="Progress|Activity|Details" value="{{tabValue}}" on-change="{{onTab}}" full-width="{{ true }}" hint-size="272px,24px"></dc-import></div>
+          <div style="flex:1;min-height:0;overflow:auto;padding:4px 14px 16px;display:flex;flex-direction:column;gap:12px">
+
+            <sc-if value="{{showProgress}}" hint-placeholder-val="{{ true }}">
+              <section aria-labelledby="prog-h">
+                <div style="display:flex;align-items:baseline">
+                  <h2 id="prog-h" style="margin:0;font-size:11px;font-weight:600;color:#6E6E73">Progress</h2>
+                  <span style="margin-left:auto;font-size:11px;color:#6E6E73">{{progressText}}</span>
+                </div>
+                <ol style="margin:8px 0 0;padding:4px 0;list-style:none;background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:8px">
+                  <sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+                    <li style="display:flex;gap:10px;align-items:flex-start;padding:6px 10px">
+                      <span style="{{s.dot}}" aria-hidden="true">{{s.glyph}}</span>
+                      <span style="min-width:0">
+                        <span style="{{s.labelStyle}}">{{s.label}}</span>
+                        <span style="{{s.metaStyle}}">{{s.meta}}</span>
+                      </span>
+                    </li>
+                  </sc-for>
+                </ol>
+              </section>
+            </sc-if>
+
+            <sc-if value="{{showActivity}}" hint-placeholder-val="{{ false }}">
+              <section aria-labelledby="act-h">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <h2 id="act-h" style="margin:0;font-size:11px;font-weight:600;color:#6E6E73">Activity</h2>
+                  <div style="margin-left:auto"><dc-import name="ToggleGroup" variant="default" options="Key moments|Everything" size="sm" value="{{logValue}}" on-change="{{onLog}}" hint-size="170px,22px"></dc-import></div>
+                </div>
+                <p style="margin:6px 0 10px;font-size:11.5px;line-height:1.45;color:#6E6E73">{{activityHelp}}</p>
+                <div style="display:flex;flex-direction:column;background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:8px;padding:4px 0">
+                  <sc-for list="{{events}}" as="e" hint-placeholder-count="8">
+                    <div style="{{e.style}}">
+                      <span style="flex:none;width:52px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:#6E6E73;font-variant-numeric:tabular-nums">{{e.t}}</span>
+                      <span style="{{e.dotStyle}}" aria-hidden="true"></span>
+                      <span style="min-width:0">
+                        <span style="{{e.labelStyle}}">{{e.label}}</span>
+                        <span style="{{e.detailStyle}}">{{e.detail}}</span>
+                      </span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-if>
+
+            <sc-if value="{{showDetails}}" hint-placeholder-val="{{ false }}">
+              <section aria-labelledby="det-h">
+                <h2 id="det-h" style="margin:0 0 8px;font-size:11px;font-weight:600;color:#6E6E73">Run details</h2>
+                <dl style="margin:0;background:#FFFFFF;border:1px solid rgba(0,0,0,.08);border-radius:8px;overflow:hidden">
+                  <sc-for list="{{stats}}" as="s" hint-placeholder-count="5">
+                    <div style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,.06)">
+                      <dt style="font-size:11px;color:#6E6E73">{{s.label}}</dt>
+                      <dd style="margin:1px 0 0;font-size:13px;font-weight:500;overflow-wrap:anywhere;font-variant-numeric:tabular-nums">{{s.value}}</dd>
+                      <dd style="margin:1px 0 0;font-size:11px;color:#6E6E73">{{s.sub}}</dd>
+                    </div>
+                  </sc-for>
+                </dl>
+              </section>
+            </sc-if>
+          </div>
+        </aside>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props='{"scenario":{"editor":"enum","default":"failed","options":["waiting","running","completed","failed"],"section":"Demo"},"$preview":{"width":1440,"height":900}}'>
+const PINK = '#BE185D';
+// [dot colour, label text colour] — macOS system colours, text shades darkened for contrast
+const TONE = {
+  blue: ['#007AFF', '#0060DF'], green: ['#28C840', '#248A3D'], red: ['#FF3B30', '#C4170F'],
+  amber: ['#FF9500', '#B25000'], purple: ['#BE185D', '#9D174D'], muted: ['#AEAEB2', '#6E6E73']
+};
+const E = (t, lvl, tone, label, detail, o) => Object.assign({ t, lvl, tone, label, detail, agent: false, italic: false, tinted: false }, o || {});
+const BASE_EVENTS = [
+  E('10:42:05', 'key', 'blue', 'Run started', 'Design concepts review'),
+  E('10:42:05', 'key', 'amber', 'Step started', 'Draft three concepts'),
+  E('10:42:31', 'all', 'purple', 'Tool call', 'Draft three concepts · read_file brief.md', { agent: true }),
+  E('10:42:58', 'all', 'blue', 'Agent', 'Draft three concepts · I’ll sketch three directions: a guided wizard, a single scrolling page and a split view.', { agent: true, italic: true }),
+  E('10:43:11', 'all', 'muted', 'Tokens', 'Draft three concepts · 19,310 in · 5,204 out', { agent: true }),
+  E('10:43:11', 'key', 'green', 'Step finished', 'Draft three concepts · 1m 6s'),
+  E('10:43:11', 'key', 'amber', 'Step started', 'Check against design system'),
+  E('10:43:15', 'key', 'green', 'Step finished', 'Check against design system · 3.8s'),
+  E('10:43:15', 'key', 'amber', 'Step started', 'Usability critique'),
+  E('10:43:54', 'all', 'muted', 'Tokens', 'Usability critique · 8,774 in · 1,021 out', { agent: true }),
+  E('10:43:54', 'key', 'green', 'Step finished', 'Usability critique · 38.6s'),
+  E('10:43:54', 'key', 'green', 'Step finished', 'Did the checks pass? · 0.1s · took “No, try again”'),
+  E('10:43:54', 'key', 'amber', 'Went back (loop 1)', 'Did the checks pass? → Draft three concepts'),
+  E('10:43:54', 'key', 'amber', 'Step started', 'Draft three concepts'),
+  E('10:44:40', 'all', 'purple', 'Tool call', 'Draft three concepts · edit_file candidates/b/index.html', { agent: true }),
+  E('10:45:29', 'all', 'muted', 'Tokens', 'Draft three concepts · 21,880 in · 6,942 out', { agent: true }),
+  E('10:45:29', 'key', 'green', 'Step finished', 'Draft three concepts · 1m 35s'),
+  E('10:45:29', 'key', 'amber', 'Step started', 'Check against design system'),
+  E('10:45:33', 'key', 'green', 'Step finished', 'Check against design system · 4.1s'),
+  E('10:45:33', 'key', 'amber', 'Step started', 'Usability critique')
+];
+const WAIT_TAIL = [
+  E('10:46:11', 'all', 'muted', 'Tokens', 'Usability critique · 9,412 in · 1,106 out', { agent: true }),
+  E('10:46:11', 'key', 'green', 'Step finished', 'Usability critique · 38.2s'),
+  E('10:46:11', 'key', 'green', 'Step finished', 'Did the checks pass? · 0.1s · took “Yes, continue”'),
+  E('10:46:12', 'key', 'amber', 'Step started', 'Pick a favourite'),
+  E('10:46:12', 'key', 'purple', 'Waiting for you', 'Pick a favourite · Which concept should we take forward?', { tinted: true })
+];
+const FAIL_EVENTS = BASE_EVENTS.slice(0, 7).concat([
+  E('10:43:11', 'key', 'red', 'Step failed', 'Check against design system · 0.2s · candidate_dir “candidates/a” does not exist', { tinted: true }),
+  E('10:43:11', 'key', 'red', 'Run failed', 'Stopped at Check against design system · 1m 6s', { tinted: true })
+]);
+
+const STEP_DEFS = [['Start', 'Start'], ['Draft three concepts', 'AI Agent'], ['Check against design system', 'Tool'], ['Usability critique', 'Tool'], ['Did the checks pass?', 'Branch'], ['Pick a favourite', 'Ask a person'], ['Done', 'Finish']];
+const STEP_STATES = {
+  waiting: [['done', '0.0s'], ['done', 'Ran twice · 2m 41s'], ['done', 'Ran twice · 7.9s'], ['done', 'Ran twice · 1m 17s'], ['done', 'Ran twice · went back once'], ['waiting', 'Waiting for you'], ['pending', '']],
+  running: [['done', '0.0s'], ['done', 'Ran twice · 2m 41s'], ['done', 'Ran twice · 7.9s'], ['running', 'Second run in progress'], ['pending', ''], ['pending', ''], ['pending', '']],
+  completed: [['done', '0.0s'], ['done', 'Ran twice · 2m 41s'], ['done', 'Ran twice · 7.9s'], ['done', 'Ran twice · 1m 17s'], ['done', 'Ran twice · went back once'], ['done', 'Answered · 6m 28s'], ['done', '0.0s']],
+  failed: [['done', '0.0s'], ['done', '1m 6s'], ['failed', 'Stopped with an error'], ['pending', ''], ['pending', ''], ['pending', ''], ['pending', '']],
+  iterating: [['done', '0.0s'], ['running', 'Round 3 · just started'], ['pending', ''], ['pending', ''], ['pending', ''], ['pending', 'Answered · sent back'], ['pending', '']]
+};
+const CANDS = [
+  { id: 'concept-a', variant: 'wizard', failed: false,
+    score: [['Design-system check', 'lint', 'Passed', 'green', ''], ['Usability', 'critic', 'No friction found', 'green', ''], ['Recommendation', 'synthesis', 'Advance', 'blue', 'Clearest path to checkout with the fewest steps.']] },
+  { id: 'concept-b', variant: 'scroll', failed: false,
+    score: [['Design-system check', 'lint', 'Passed', 'green', ''], ['Usability', 'critic', '1 friction point', 'amber', 'The main button is easy to miss on small screens.'], ['Recommendation', 'synthesis', 'Iterate', 'amber', 'Strong layout; the call to action needs more weight.']] },
+  { id: 'concept-c', variant: 'split', failed: true, reason: 'Couldn’t be rendered: the page didn’t finish loading within 30 seconds.' }
+];
+const BLOCKS = {
+  wizard: [[10, 10, 80, 10, '#D1D1D6'], [10, 30, 50, 8, '#E5E5EA'], [10, 44, 80, 30, '#FFFFFF'], [10, 82, 36, 12, PINK], [54, 82, 36, 12, '#E5E5EA']],
+  scroll: [[0, 0, 100, 14, '#D1D1D6'], [10, 22, 80, 26, '#FFFFFF'], [10, 54, 80, 8, '#E5E5EA'], [10, 68, 80, 8, '#E5E5EA'], [10, 82, 24, 10, '#F5C2D7']],
+  split: [[5, 8, 42, 84, '#FFFFFF'], [53, 8, 42, 40, '#E5E5EA'], [53, 54, 42, 38, '#D1D1D6']]
+};
+const SCORE_DOT = { green: '#28C840', blue: '#007AFF', amber: '#FF9500' };
+const SIDE = [['Design concepts review', '#BE185D'], ['Product design factory', '#007AFF'], ['Gallery gate showcase', ''], ['Consensus task', ''], ['Human gate showcase', ''], ['Megaplan', '']];
+
+class Component extends DCLogic {
+  state = { phase: '', picked: {}, notes: {}, noteOpen: {}, decision: null, logMode: 'key', panel: 'progress' };
+
+  renderVals() {
+    const st = this.state;
+    const phase = st.phase || this.props.scenario || 'waiting';
+    const pickedIds = CANDS.filter((c) => st.picked[c.id]).map((c) => c.id);
+    const dec = st.decision;
+
+    /* ----- events (chronological, then reversed for display) ----- */
+    let evs;
+    if (phase === 'failed') evs = FAIL_EVENTS;
+    else if (phase === 'running') evs = BASE_EVENTS;
+    else {
+      evs = BASE_EVENTS.concat(WAIT_TAIL);
+      if (phase === 'completed') {
+        const sel = dec ? dec.selected : ['concept-a'];
+        evs = evs.concat([
+          E('10:52:40', 'key', 'purple', 'Answer received', 'Pick a favourite · approve · ' + (sel.length ? sel.join(', ') : 'nothing selected')),
+          E('10:52:40', 'key', 'green', 'Step finished', 'Pick a favourite · 6m 28s'),
+          E('10:52:40', 'key', 'amber', 'Step started', 'Done'),
+          E('10:52:40', 'key', 'green', 'Step finished', 'Done · 0.0s'),
+          E('10:52:40', 'key', 'green', 'Run completed', '7 steps · 10m 35s')
+        ]);
+      }
+      if (phase === 'iterating') {
+        evs = evs.concat([
+          E('10:52:41', 'key', 'purple', 'Answer received', 'Pick a favourite · iterate · ' + (pickedIds.length ? pickedIds.join(', ') : 'all rejected')),
+          E('10:52:41', 'key', 'amber', 'Went back (loop 2)', 'Pick a favourite → Draft three concepts'),
+          E('10:52:41', 'key', 'amber', 'Step started', 'Draft three concepts')
+        ]);
+      }
+    }
+    const allMode = st.logMode === 'all';
+    const events = evs.filter((e) => allMode || e.lvl === 'key').slice().reverse().map((e) => {
+      const tc = TONE[e.tone];
+      return { t: e.t, label: e.label, detail: e.detail,
+        style: 'display:flex;gap:8px;align-items:baseline;padding:5px 10px;' + (e.tinted ? 'background:' + (e.tone === 'red' ? '#FFF1F0' : '#FCEEF4') + ';' : '') + (e.agent ? 'padding-left:22px;' : ''),
+        dotStyle: 'flex:none;width:7px;height:7px;border-radius:50%;transform:translateY(-1px);background:' + tc[0],
+        labelStyle: 'display:block;font-size:11px;font-weight:600;color:' + tc[1],
+        detailStyle: 'display:block;font-size:12px;line-height:1.4;color:#1D1D1F;overflow-wrap:anywhere' + (e.italic ? ';font-style:italic' : '') };
+    });
+
+    /* ----- steps ----- */
+    const stepStates = STEP_STATES[phase];
+    const DOT = 'flex:none;width:18px;height:18px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#FFFFFF;margin-top:1px;';
+    const steps = STEP_DEFS.map((d, i) => {
+      const s = stepStates[i][0];
+      let dot = DOT + 'border:1.5px solid rgba(0,0,0,.2);background:#FFFFFF'; let glyph = '';
+      if (s === 'done') { dot = DOT + 'background:#28C840'; glyph = '✓'; }
+      if (s === 'failed') { dot = DOT + 'background:#FF3B30'; glyph = '✕'; }
+      if (s === 'waiting') { dot = DOT + 'background:' + PINK; glyph = '?'; }
+      if (s === 'running') { dot = DOT + 'border:2px solid rgba(0,0,0,.1);border-top-color:' + PINK + ';background:#FFFFFF;animation:wfspin 0.9s linear infinite'; }
+      const active = s !== 'pending';
+      return { label: d[0], dot, glyph,
+        labelStyle: 'display:block;font-size:13px;font-weight:' + (active ? 500 : 400) + ';color:' + (active ? '#1D1D1F' : '#6E6E73'),
+        meta: (d[1] + (stepStates[i][1] ? ' · ' + stepStates[i][1] : '')),
+        metaStyle: 'display:block;font-size:11px;color:' + (s === 'failed' ? '#C4170F' : (s === 'waiting' ? '#9D174D' : '#6E6E73')) };
+    });
+    const doneCount = stepStates.filter((s) => s[0] === 'done').length;
+
+    /* ----- candidates ----- */
+    const interactive = phase === 'waiting';
+    const chosenIds = phase === 'completed' ? (dec ? dec.selected : ['concept-a']) : [];
+    const CARD = 'padding:12px;border-radius:10px;background:#FFFFFF;';
+    const cands = CANDS.map((c) => {
+      if (c.failed) return { id: c.id, failed: true, ok: false, reason: c.reason, cardStyle: 'padding:12px;border-radius:10px;background:#FFF5F4;border:1px solid rgba(255,59,48,.25)' };
+      const on = !!st.picked[c.id]; const open = !!st.noteOpen[c.id]; const saved = (dec && dec.notes[c.id]) || '';
+      const chosen = chosenIds.indexOf(c.id) >= 0;
+      const ring = chosen ? '0 0 0 2px #28C840' : (on ? '0 0 0 2px ' + PINK : '0 0 0 1px rgba(0,0,0,.1)');
+      return { id: c.id, failed: false, ok: true, alt: 'Simplified layout sketch of ' + c.id,
+        cardStyle: CARD + 'box-shadow:' + ring + ',0 1px 3px rgba(0,0,0,.06)',
+        blocks: BLOCKS[c.variant].map((b) => ({ style: 'position:absolute;border-radius:4px;left:' + b[0] + '%;top:' + b[1] + '%;width:' + b[2] + '%;height:' + b[3] + '%;background:' + b[4] + ';border:1px solid rgba(0,0,0,.1);box-sizing:border-box' })),
+        selectable: interactive, chosen, on,
+        onToggle: () => this.setState({ picked: { ...this.state.picked, [c.id]: !this.state.picked[c.id] } }),
+        btnText: on ? 'Selected' : 'Select', selVariant: on ? 'default' : 'outline', selIcon: on ? 'check' : 'none',
+        score: c.score.map((s) => ({ text: s[0] + ': ' + s[2], dot: SCORE_DOT[s[3]], tech: 'Shown as “' + s[1] + '” in the workflow engine', hasNote: !!s[4], note: s[4] })),
+        noteOpen: open, note: st.notes[c.id] || '',
+        noteLabel: open ? 'Hide Note' : (st.notes[c.id] ? 'Edit Note' : 'Add a Note…'),
+        onNote: () => this.setState({ noteOpen: { ...this.state.noteOpen, [c.id]: !this.state.noteOpen[c.id] } }),
+        onNoteInput: (v) => this.setState({ notes: { ...this.state.notes, [c.id]: v } }),
+        hasSavedNote: !interactive && !!saved, savedNote: saved };
+    });
+
+    /* ----- decisions ----- */
+    const decisions = dec ? [{ decision: dec.edge, when: 'Today, 10:52 am',
+      selected: dec.selected.map((id) => ({ id })), none: dec.selected.length === 0,
+      notes: Object.keys(dec.notes).map((id) => ({ id, text: dec.notes[id] })) }] : [];
+
+    const decide = (edge) => () => {
+      const s = this.state;
+      const notes = {}; Object.keys(s.notes).forEach((k) => { if (s.notes[k] && s.notes[k].trim()) notes[k] = s.notes[k].trim(); });
+      this.setState({ decision: { edge, selected: CANDS.filter((c) => s.picked[c.id]).map((c) => c.id), notes }, phase: edge === 'approve' ? 'completed' : 'iterating' });
+    };
+
+    const isRunning = phase === 'running' || phase === 'iterating';
+    const status = { waiting: ['Needs you', 'default', ''], running: ['Running', 'secondary', '#007AFF'], iterating: ['Running', 'secondary', '#007AFF'], completed: ['Completed', 'secondary', '#28C840'], failed: ['Failed', 'destructive', ''] }[phase];
+    const tokens = { waiting: [59376, 14273], running: [49964, 13167], iterating: [59376, 14273], completed: [59376, 14273], failed: [19310, 5204] }[phase];
+    const elapsed = { waiting: '10 min so far', running: '3 min 45 s so far', iterating: '10 min 41 s so far', completed: '10 min 35 s', failed: '1 min 6 s' }[phase];
+    const fmt = (n) => n.toLocaleString('en-AU');
+
+    return {
+      sideWf: SIDE.map((s, i) => ({ title: s[0], current: i === 0 ? 'page' : undefined,
+        style: 'display:flex;align-items:center;gap:8px;height:28px;padding:0 8px;border-radius:6px;background:' + (i === 0 ? 'rgba(0,0,0,.09)' : 'transparent'),
+        dot: 'flex:none;width:7px;height:7px;border-radius:50%;background:' + (s[1] || 'transparent') })),
+      statusText: status[0], statusVariant: status[1], statusDot: status[2],
+      isActive: phase !== 'completed' && phase !== 'failed', isDone: phase === 'completed' || phase === 'failed',
+      isWaiting: phase === 'waiting', isRunning, isCompleted: phase === 'completed', isFailed: phase === 'failed',
+      runningTitle: phase === 'iterating' ? 'Making new candidates from your notes' : 'Usability critique',
+      runningText: phase === 'iterating' ? 'Your decision was recorded. The workflow has gone back to Draft three concepts for another round.' : 'This step makes one AI call that reviews the candidates as a usability critic. It usually takes under a minute.',
+      completedText: dec ? ('You approved ' + (dec.selected.length ? dec.selected.join(', ') : 'nothing') + '. The workflow then ran to the end.') : 'You approved concept-a. The workflow then ran to the end.',
+      elapsedText: 'Started today, 10:42 am · ' + elapsed,
+      stats: [
+        { label: 'Started', value: 'Today, 10:42 am', sub: elapsed },
+        { label: 'Input tokens', value: fmt(tokens[0]), sub: 'Text sent to the AI' },
+        { label: 'Output tokens', value: fmt(tokens[1]), sub: 'Text the AI wrote back' },
+        { label: 'Total tokens', value: fmt(tokens[0] + tokens[1]), sub: 'Input and output together' },
+        { label: 'Working folder', value: 'runs/run-7f3a9c', sub: 'Where this run saves its files' }
+      ],
+      panelOpen: !!st.panel,
+      toggleSidebar: () => this.setState({ panel: this.state.panel ? '' : 'progress' }),
+      tabValue: st.panel ? st.panel.charAt(0).toUpperCase() + st.panel.slice(1) : 'Progress',
+      onTab: (v) => this.setState({ panel: String(v).toLowerCase() }),
+      logValue: allMode ? 'Everything' : 'Key moments', onLog: (v) => this.setState({ logMode: v === 'Everything' ? 'all' : 'key' }),
+      showDetails: st.panel === 'details', showProgress: st.panel === 'progress', showActivity: st.panel === 'activity',
+      showCands: phase === 'waiting' || phase === 'completed' || phase === 'iterating', cands,
+      candMeta: 'Expected 3, found 3 · 1 could not be rendered',
+      selectedText: pickedIds.length ? (pickedIds.length + ' selected: ' + pickedIds.join(', ')) : 'Nothing selected yet. Select the candidates you want to keep.',
+      onApprove: decide('approve'), onIterate: decide('iterate'), approveOff: pickedIds.length === 0,
+      hasDecisions: decisions.length > 0, decisions,
+      steps, progressText: doneCount + ' of 7 done',
+      events,
+      activityHelp: allMode ? 'Everything, including each tool the AI used, what it said, token counts and indented detail.' : 'Only the moments that matter: steps starting and finishing, loops, and anything that needs you. Switch to Everything for the full detail.'
+    };
+  }
+}
+</script>
+</body>
+</html>

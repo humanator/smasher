@@ -1,4 +1,4 @@
-// ABOUTME: Run-launch E2E: fill the catalog's run dialog in a real browser and land on the new run
+// ABOUTME: Run-launch E2E: fill the dashboard's Run sheet in a real browser and land on the new run
 // ABOUTME: Launches only the gate-only run_launch_check fixture, so it spends no LLM tokens
 
 import { test, expect, type Page } from '@playwright/test';
@@ -6,8 +6,9 @@ import { test, expect, type Page } from '@playwright/test';
 async function openRunLaunchCheckDialog(page: Page) {
   await page.goto('/');
   const row = page.getByRole('row').filter({ hasText: 'run_launch_check.dot' });
-  await row.getByRole('button', { name: 'Run Workflow' }).click();
-  await expect(page.getByRole('heading', { name: 'Run Run Launch Check' })).toBeVisible();
+  await row.getByRole('button', { name: 'Run…' }).click();
+  // The Run sheet loads as its own chunk on first open; a cold dev server compiles it on demand.
+  await expect(page.getByRole('heading', { name: 'Run “Run Launch Check”' })).toBeVisible({ timeout: 15000 });
 }
 
 test('launches the typed brief, model and variable, then shows them on the run page', async ({
@@ -19,9 +20,9 @@ test('launches the typed brief, model and variable, then shows them on the run p
 
     await page.getByLabel('Brief').fill('e2e brief');
     await page.getByLabel('Provider').selectOption('claude-cli');
-    await page.getByLabel('Model').selectOption('claude-opus');
-    await page.getByLabel('Variables').fill('colour=blue');
-    await page.getByRole('button', { name: 'Run', exact: true }).click();
+    await page.getByLabel('Model', { exact: true }).selectOption('claude-opus');
+    await page.getByLabel('Extra values').fill('colour=blue');
+    await page.getByRole('button', { name: 'Start Run' }).click();
 
     await page.waitForURL(/\/runs\/[a-zA-Z0-9-]+$/);
     runId = new URL(page.url()).pathname.split('/')[2];
@@ -38,14 +39,15 @@ test('launches the typed brief, model and variable, then shows them on the run p
   }
 });
 
-test('shows a wrong-shape Node Overrides error inline and stays on the catalog', async ({ page }) => {
+test('shows a wrong-shape Step overrides error inline and stays on the dashboard', async ({ page }) => {
   await openRunLaunchCheckDialog(page);
 
-  await page.getByLabel('Node Overrides (JSON)').fill('{"a": "m"}');
-  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await page.getByRole('button', { name: 'Advanced: change the model for individual steps' }).click();
+  await page.getByLabel('Step overrides (JSON)').fill('{"a": "m"}');
+  await page.getByRole('button', { name: 'Start Run' }).click();
 
   await expect(
-    page.getByText('Expected {"node_id": {"model": "...", "provider": "..."}}')
+    page.getByText('Expected {"step_id": {"model": "...", "provider": "..."}}')
   ).toBeVisible();
   expect(new URL(page.url()).pathname).toBe('/');
 });

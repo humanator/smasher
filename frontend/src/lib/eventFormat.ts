@@ -1,9 +1,12 @@
-// ABOUTME: Turns each of the 17 pipeline event kinds into one event-log line
-// ABOUTME: Pure formatting only: icon, label, detail and a tone name, no styling classes
+// ABOUTME: Turns each of the 17 pipeline event kinds into one plain-worded event-log line
+// ABOUTME: Pure formatting only: icon, label, detail, tone and key/all level, no styling classes
 
 import type { PipelineEvent } from './api/events';
+import { stepKind } from './stepKinds';
 
 export type EventTone = 'blue' | 'green' | 'red' | 'amber' | 'purple' | 'muted';
+
+export type EventLevel = 'key' | 'all';
 
 export interface EventLine {
   icon: string;
@@ -17,6 +20,8 @@ export interface EventLine {
   /** Lines that need attention get a tinted background. */
   tinted: boolean;
   italic: boolean;
+  /** 'key' lines show under Key moments; 'all' lines only under Everything. */
+  level: EventLevel;
 }
 
 // Nms under 1s, N.Ns under 60s, then Nm Ns, as the old dashboard showed them.
@@ -26,30 +31,36 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
 }
 
+/** Step names by node id, e.g. from the run's steps; an id missing from it shows as itself. */
+export type StepLabels = ReadonlyMap<string, string>;
+
 function join(...parts: (string | undefined)[]): string {
   return parts.filter((p) => p !== undefined && p !== '').join(' · ');
 }
 
-export function formatEvent(event: PipelineEvent): EventLine {
-  const base = { agent: false, faded: false, tinted: false, italic: false };
-  const agent = { ...base, agent: true };
+export function formatEvent(event: PipelineEvent, labels?: StepLabels): EventLine {
+  const name = (id: string) => labels?.get(id) ?? id;
+  const base = { agent: false, faded: false, tinted: false, italic: false, level: 'key' as EventLevel };
+  const agent = { ...base, agent: true, level: 'all' as EventLevel };
+  const quiet = { ...base, faded: true, level: 'all' as EventLevel };
 
   switch (event.kind) {
     case 'pipeline_started':
-      return { ...base, icon: '⚡', label: 'Pipeline started', detail: event.graph_name, tone: 'blue' };
+      return { ...base, icon: '⚡', label: 'Run started', detail: event.graph_name, tone: 'blue' };
     case 'pipeline_completed':
       return {
         ...base,
         icon: '✓',
-        label: 'Pipeline completed',
-        detail: join(`${event.total_nodes} nodes`, formatDuration(event.duration_ms)),
+        label: 'Run completed',
+        detail: join(`${event.total_nodes} steps`, formatDuration(event.duration_ms)),
         tone: 'green',
       };
     case 'pipeline_aborted':
       return {
         ...base,
         icon: '✕',
-        label: 'Pipeline aborted',
+        // The engine reports a stop by the person as "cancelled"; anything else is a failure.
+        label: event.reason === 'cancelled' ? 'Run stopped' : 'Run failed',
         detail: event.reason,
         tone: 'red',
         tinted: true,
@@ -58,53 +69,52 @@ export function formatEvent(event: PipelineEvent): EventLine {
       return {
         ...base,
         icon: '▶',
-        label: 'Node started',
-        detail: `${event.node_id} (${event.node_type})`,
+        label: 'Step started',
+        detail: join(name(event.node_id), stepKind(event.node_type).plain),
         tone: 'amber',
       };
     case 'node_completed':
       return {
         ...base,
         icon: '✓',
-        label: 'Node completed',
-        detail: join(event.node_id, formatDuration(event.duration_ms)),
+        label: 'Step finished',
+        detail: join(name(event.node_id), formatDuration(event.duration_ms)),
         tone: 'green',
       };
     case 'node_failed':
       return {
         ...base,
         icon: '✕',
-        label: 'Node failed',
-        detail: join(event.node_id, formatDuration(event.duration_ms), event.error),
+        label: 'Step failed',
+        detail: join(name(event.node_id), formatDuration(event.duration_ms), event.error),
         tone: 'red',
       };
     case 'edge_traversed':
       return {
-        ...base,
+        ...quiet,
         icon: '→',
-        label: 'Edge',
-        detail: `${event.from} → ${event.to}${event.label ? ` [${event.label}]` : ''}`,
+        label: 'Moved on',
+        detail: `${name(event.from)} → ${name(event.to)}${event.label ? ` [${event.label}]` : ''}`,
         tone: 'muted',
-        faded: true,
       };
     case 'loop_restarted':
       return {
         ...base,
         icon: '↻',
-        label: `Loop #${event.restart_count}`,
-        detail: `${event.from} → ${event.to}`,
+        label: `Went back (loop ${event.restart_count})`,
+        detail: `${name(event.from)} → ${name(event.to)}`,
         tone: 'amber',
       };
     case 'context_updated':
-      return { ...base, icon: '⟳', label: 'Context updated', detail: event.key, tone: 'muted', faded: true };
+      return { ...quiet, icon: '⟳', label: 'Context updated', detail: event.key, tone: 'muted' };
     case 'checkpoint_created':
-      return { ...base, icon: '◆', label: 'Checkpoint', detail: event.node_id, tone: 'muted', faded: true };
+      return { ...quiet, icon: '◆', label: 'Progress saved', detail: name(event.node_id), tone: 'muted' };
     case 'human_prompt_issued':
       return {
         ...base,
         icon: '?',
-        label: 'Awaiting input',
-        detail: join(event.node_id, event.question),
+        label: 'Waiting for you',
+        detail: join(name(event.node_id), event.question),
         tone: 'purple',
         tinted: true,
       };
@@ -112,8 +122,8 @@ export function formatEvent(event: PipelineEvent): EventLine {
       return {
         ...base,
         icon: '✎',
-        label: 'Input received',
-        detail: join(event.node_id, event.response),
+        label: 'Answer received',
+        detail: join(name(event.node_id), event.response),
         tone: 'purple',
       };
     case 'agent_tool_call_started':
@@ -121,16 +131,16 @@ export function formatEvent(event: PipelineEvent): EventLine {
         ...agent,
         icon: '🔧',
         label: 'Tool call',
-        detail: join(event.node_id, event.tool_name),
+        detail: join(name(event.node_id), event.tool_name),
         tone: 'purple',
       };
     case 'agent_tool_call_completed':
       return {
         ...agent,
         icon: event.is_error ? '✕' : '✓',
-        label: 'Tool done',
+        label: 'Tool call',
         detail: join(
-          event.node_id,
+          name(event.node_id),
           event.tool_name,
           formatDuration(event.duration_ms),
           event.result_preview
@@ -142,7 +152,7 @@ export function formatEvent(event: PipelineEvent): EventLine {
         ...agent,
         icon: '💬',
         label: 'Agent',
-        detail: join(event.node_id, event.text),
+        detail: join(name(event.node_id), event.text),
         tone: 'blue',
         italic: true,
       };
@@ -151,7 +161,7 @@ export function formatEvent(event: PipelineEvent): EventLine {
         ...agent,
         icon: '↻',
         label: `Turn ${event.turn_number}`,
-        detail: event.node_id,
+        detail: name(event.node_id),
         tone: 'muted',
         faded: true,
       };
@@ -161,7 +171,7 @@ export function formatEvent(event: PipelineEvent): EventLine {
         icon: '⊛',
         label: 'Tokens',
         detail: join(
-          event.node_id,
+          name(event.node_id),
           `in:${event.input_tokens} out:${event.output_tokens}`,
           event.cost_usd ? `$${event.cost_usd.toFixed(4)}` : undefined
         ),

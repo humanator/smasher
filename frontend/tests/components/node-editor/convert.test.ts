@@ -66,11 +66,11 @@ describe('toFlowNodes', () => {
     expect(byId.exit.x).toBeGreaterThan(byId.start.x);
   });
 
-  it('gives every node a kind-colored inline style (nodeConfig.THEME_COLORS)', () => {
+  it('leaves inline style unset, since the step card draws its own kind colours from tokens', () => {
     const nodes: EditorNode[] = [{ id: 'a', node_type: 'Codergen', label: 'A', attrs: {} }];
     const flow = toFlowNodes(nodes);
-    expect(flow[0].style).toContain('#e0edff');
-    expect(flow[0].style).toContain('#3b82f6');
+    expect(flow[0].style).toBeUndefined();
+    expect(flow[0].type).toBe('workflow');
   });
 
   it('leaves style undefined for an unknown/future node_type rather than crashing', () => {
@@ -181,5 +181,22 @@ describe('toEditorGraph', () => {
       priority: 1,
       loop_restart: false,
     });
+  });
+
+  it('round-trips an Ask a person step\'s dotted human.* attrs and its answer attrs unchanged', () => {
+    const attrs = {
+      question: 'Ship it?',
+      gallery: true,
+      candidate_count: '3',
+      'human.timeout_secs': 3600,
+      'human.default_choice': 'approve',
+    };
+    const nodes: EditorNode[] = [{ id: 'ask', node_type: 'Interviewer', label: 'Ask', attrs }];
+
+    const result = toEditorGraph('G', {}, toFlowNodes(nodes), toFlowEdges([]));
+
+    const { pos, ...rest } = result.nodes[0].attrs!;
+    expect(typeof pos).toBe('string');
+    expect(rest).toEqual(attrs);
   });
 });

@@ -1,10 +1,28 @@
 // ABOUTME: Tests for the native shim module
 // ABOUTME: Tests browser fallback behavior (Tauri doesn't exist in test environment)
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as native from '../../../src/lib/native/index';
 
 describe('native shim', () => {
+  describe('markNativeWindow', () => {
+    afterEach(() => {
+      delete window.__TAURI__;
+      delete document.documentElement.dataset.native;
+    });
+
+    it('leaves <html> unmarked in a plain browser', () => {
+      native.markNativeWindow();
+      expect(document.documentElement.hasAttribute('data-native')).toBe(false);
+    });
+
+    it('sets data-native on <html> inside the desktop app', () => {
+      window.__TAURI__ = { core: { invoke: async () => undefined as never } };
+      native.markNativeWindow();
+      expect(document.documentElement.hasAttribute('data-native')).toBe(true);
+    });
+  });
+
   describe('isTauri', () => {
     it('should return false when window.__TAURI__ is not present', () => {
       expect(native.isTauri()).toBe(false);
@@ -71,6 +89,46 @@ describe('native shim', () => {
       expect(warn).toHaveBeenCalledWith('Notifications not supported');
 
       warn.mockRestore();
+    });
+  });
+
+  describe('revealInFinder', () => {
+    afterEach(() => {
+      delete window.__TAURI__;
+    });
+
+    it('refuses outside the desktop app', async () => {
+      await expect(native.revealInFinder('/w/review.dot')).rejects.toThrow('Show in Finder is only available in the desktop app');
+    });
+
+    it("invokes the desktop app's reveal_in_finder command with the path", async () => {
+      const invoke = vi.fn(async () => undefined as never);
+      window.__TAURI__ = { core: { invoke } };
+
+      await native.revealInFinder('/w/review.dot');
+
+      expect(invoke).toHaveBeenCalledWith('reveal_in_finder', { path: '/w/review.dot' });
+    });
+  });
+
+  describe('revealRunFolder', () => {
+    afterEach(() => {
+      delete window.__TAURI__;
+    });
+
+    it('refuses outside the desktop app', async () => {
+      await expect(native.revealRunFolder('/data/artifacts/run-1')).rejects.toThrow(
+        'Show in Finder is only available in the desktop app'
+      );
+    });
+
+    it("invokes the desktop app's reveal_run_folder command with the path", async () => {
+      const invoke = vi.fn(async () => undefined as never);
+      window.__TAURI__ = { core: { invoke } };
+
+      await native.revealRunFolder('/data/artifacts/run-1');
+
+      expect(invoke).toHaveBeenCalledWith('reveal_run_folder', { path: '/data/artifacts/run-1' });
     });
   });
 });

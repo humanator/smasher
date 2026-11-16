@@ -1,10 +1,11 @@
 <script lang="ts">
-  // ABOUTME: Codergen node-kind side-panel form component
-  // ABOUTME: Edits prompt, provider and model attributes
+  // ABOUTME: Codergen (AI Agent) node-kind side-panel form component
+  // ABOUTME: Edits Instructions (prompt) and the Model (provider and model), with copy from stepFields
 
   import { untrack } from 'svelte';
-  import { Label } from '$lib/components/ui/label/index.js';
-  import { Textarea } from '$lib/components/ui/textarea/index.js';
+  import { stepFields, type FieldSpec } from '$lib/stepFields';
+  import { fieldProblem } from '$lib/workflowProblems';
+  import Field from '../inspector/Field.svelte';
   import type { NodeFormProps } from '../types';
   import ModelPicker from './ModelPicker.svelte';
 
@@ -17,38 +18,33 @@
   // optional override, and `provider` picks which LLM provider serves it;
   // both are edited by the shared ModelPicker. `backend` is also read by the
   // real handler but stays a power-user override outside this form.
-  let { attrs, onChange }: NodeFormProps = $props();
-  const uid = $props.id();
+  let { attrs, onChange, problems = [] }: NodeFormProps = $props();
+
+  const fields = stepFields('Codergen');
+  const spec = (attr: string): FieldSpec => fields.find((f) => f.attr === attr)!;
 
   // `attrs` seeds local field state exactly once per mount -- the parent
-  // (WorkflowCanvasInner) remounts this component via {#key node.id} on
-  // every selection change, so "only captures the initial value" is the
-  // intended behavior here, not a bug; `untrack` says so explicitly rather
-  // than leaving the compiler's state_referenced_locally warning unexplained.
+  // remounts this component via {#key} on every selection change, so "only
+  // captures the initial value" is the intended behavior here, not a bug;
+  // `untrack` says so explicitly rather than leaving the compiler's
+  // state_referenced_locally warning unexplained.
   let prompt = $state(untrack(() => (typeof attrs.prompt === 'string' ? attrs.prompt : '')));
-
-  function handlePromptInput(event: Event) {
-    prompt = (event.target as HTMLTextAreaElement).value;
-    onChange({ attrs: { prompt: prompt || undefined } });
-  }
 </script>
 
-<div class="flex flex-col gap-3" data-testid="codergen-form">
-  <div class="flex flex-col gap-1.5">
-    <Label for="{uid}-prompt">Prompt</Label>
-    <Textarea
-      id="{uid}-prompt"
-      class="font-mono text-xs"
-      data-testid="codergen-prompt"
-      rows={4}
-      value={prompt}
-      oninput={handlePromptInput}
-    />
-  </div>
-  <ModelPicker
-    idPrefix="codergen"
-    provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
-    model={typeof attrs.model === 'string' ? attrs.model : undefined}
-    onChange={(patch) => onChange({ attrs: patch })}
+<div class="flex flex-col gap-5" data-testid="codergen-form">
+  <Field
+    spec={spec('prompt')}
+    bind:value={prompt}
+    testId="codergen-prompt"
+    error={fieldProblem('Codergen', 'prompt', problems)}
+    oninput={(v) => onChange({ attrs: { prompt: v || undefined } })}
   />
+  <Field spec={spec('model')}>
+    <ModelPicker
+      idPrefix="codergen"
+      provider={typeof attrs.provider === 'string' ? attrs.provider : undefined}
+      model={typeof attrs.model === 'string' ? attrs.model : undefined}
+      onChange={(patch) => onChange({ attrs: patch })}
+    />
+  </Field>
 </div>

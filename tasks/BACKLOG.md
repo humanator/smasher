@@ -42,6 +42,14 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     `prune_artifacts` does, and the in-memory record. Refuse runs that are
     still running. Deleting is permanent, since the desktop app keeps runs in
     `~/Documents/smasher`.
+43. **Fix the link button's dark-mode contrast at the source.** The Button
+    `link` variant (`frontend/src/lib/components/ui/button/button.svelte`) uses
+    `text-primary`, which is about 3:1 on dark surfaces. Screens have fixed it one
+    link at a time with `dark:text-primary-subtle-foreground` (7.89:1), but the
+    editor status bar's **Review** link (`node-editor/StatusBar.svelte`) still
+    misses it. Add that class to the variant itself so every link, including new
+    ones, passes 4.5:1, then drop the per-link copies. Cover it in
+    `tests/lib/tokens.test.ts`.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
@@ -59,6 +67,21 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     `.ai/attractor-runs/...` layout and shell variables. Rewrite their tool
     commands against smasher's (`SMASHER_RUN_DIR`, `nodes/<id>/`,
     `SMASHER_CTX_<KEY>`).
+41. **Let the editor fill in paths for the user.** A Tool node's `args` and
+    `tool_command` are free text, so a user building a workflow in the app has to
+    know that relative paths resolve against the run's own folder and write
+    absolute paths for anything else (found in the run UAT: BUG-2, where
+    `gallery_gate_showcase.dot` hard-codes a repo-relative `candidate_dir` that
+    can't resolve from a run). Add a placeholder, for example a "candidate
+    directory" token the node forms offer wherever a directory path is wanted,
+    that the engine resolves at run time. Spec it first: which nodes and fields
+    take it, what it resolves to, and how it's shown in the DOT.
+42. **Decide whether Settings offers "Infer from model name" and "Claude CLI"
+    as default providers.** The Home design shows both in the Default provider
+    list, but `PUT /api/settings` needs an explicit provider and the Claude CLI
+    is set up separately, so the dashboard kept today's list (open question 1
+    in [`archive/SPEC-dashboard.md`](archive/SPEC-dashboard.md)). Inferring needs
+    backend work, so decide first, then spec it.
 
 ## P4: Distribution and remote access
 

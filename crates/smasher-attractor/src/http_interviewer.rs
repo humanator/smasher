@@ -128,6 +128,12 @@ impl QuestionQueue {
         }
     }
 
+    /// When the longest-waiting question was enqueued, or `None` if the queue is empty.
+    pub fn oldest_created_at(&self) -> Option<Instant> {
+        let queue = self.inner.lock().expect("question queue lock poisoned");
+        queue.iter().map(|pq| pq.created_at).min()
+    }
+
     /// Return the number of pending questions.
     pub fn len(&self) -> usize {
         let queue = self.inner.lock().expect("question queue lock poisoned");
@@ -551,6 +557,31 @@ mod tests {
         let summaries = queue.list();
         let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
         assert_eq!(ids, vec!["q1", "q3"]);
+    }
+
+    #[test]
+    fn queue_oldest_created_at_is_none_when_empty() {
+        assert!(QuestionQueue::new().oldest_created_at().is_none());
+    }
+
+    #[test]
+    fn queue_oldest_created_at_picks_the_earliest_question() {
+        let queue = QuestionQueue::new();
+        let older = Instant::now() - std::time::Duration::from_secs(60);
+        let newer = Instant::now();
+        // Push the newer one first so queue order can't stand in for age.
+        for (id, created_at) in [("q-new", newer), ("q-old", older)] {
+            queue.push(PendingQuestion {
+                id: id.into(),
+                question: "?".into(),
+                choices: vec![],
+                kind: QuestionKind::Approval,
+                node_id: None,
+                created_at,
+                answer_tx: None,
+            });
+        }
+        assert_eq!(queue.oldest_created_at(), Some(older));
     }
 
     #[test]

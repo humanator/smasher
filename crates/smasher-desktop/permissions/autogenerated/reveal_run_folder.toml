@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-reveal-run-folder"
+description = "Enables the reveal_run_folder command without any pre-configured scope."
+commands.allow = ["reveal_run_folder"]
+
+[[permission]]
+identifier = "deny-reveal-run-folder"
+description = "Denies the reveal_run_folder command without any pre-configured scope."
+commands.deny = ["reveal_run_folder"]

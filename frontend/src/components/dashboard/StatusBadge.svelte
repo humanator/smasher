@@ -1,30 +1,13 @@
 <script lang="ts">
-  // ABOUTME: Presentational status pill for a run's lifecycle state
-  // ABOUTME: Color-codes Running/Completed/Failed/Aborted per the backend's RunStatus values
+  // ABOUTME: Status pill for a run or workflow: Running, Completed, Failed, Aborted, Needs you, No runs yet
+  // ABOUTME: Renders the shared statusBadge mapping; the status is always text, the dot is decorative
 
   import { Badge } from '$lib/components/ui/badge/index.js';
-  import { cn } from '$lib/utils';
+  import { statusBadge } from '$lib/runStatus';
 
   let { status }: { status: string } = $props();
 
-  // Status colors carry semantic meaning, so they stay as explicit hues
-  // rather than theme tokens.
-  const STATUS_CLASSES: Record<string, string> = {
-    running: 'bg-blue-100 text-blue-700',
-    completed: 'bg-green-100 text-green-700',
-    failed: 'bg-red-100 text-red-700',
-    aborted: 'bg-muted text-muted-foreground',
-    cancelled: 'bg-muted text-muted-foreground',
-  };
+  const badge = $derived(statusBadge(status));
 </script>
 
-<Badge
-  variant="secondary"
-  class={cn(
-    'status status-' + status.toLowerCase(),
-    'rounded font-semibold uppercase',
-    STATUS_CLASSES[status.toLowerCase()]
-  )}
->
-  {status}
-</Badge>
+<Badge variant={badge.variant} dot={badge.dot} class="status">{badge.label}</Badge>

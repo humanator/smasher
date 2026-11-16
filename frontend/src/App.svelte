@@ -1,53 +1,47 @@
 <script lang="ts">
   // ABOUTME: Root app shell - routes to components based on URL path
-  // ABOUTME: Minimal manual routing: catalog at /, run detail at /runs/{id}, workflow pages at /workflows/*
+  // ABOUTME: Minimal manual routing: dashboard at /, run detail at /runs/{id}, workflow pages at /workflows/*
 
   import './app.css';
   import { onMount } from 'svelte';
-  import WorkflowCatalog from './components/dashboard/WorkflowCatalog.svelte';
-  import RunList from './components/dashboard/RunList.svelte';
-  import RunDetail from './components/dashboard/RunDetail.svelte';
-  import EventLog from './components/dashboard/EventLog.svelte';
-  import QuestionCard from './components/dashboard/QuestionCard.svelte';
-  import CandidateGallery from './components/dashboard/CandidateGallery.svelte';
-  import GalleryGate from './components/dashboard/GalleryGate.svelte';
-  import DecisionHistory from './components/dashboard/DecisionHistory.svelte';
+  import DashboardPage from './components/dashboard/DashboardPage.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
-  import PageHeader from './components/dashboard/PageHeader.svelte';
-  import SettingsDialog from './components/dashboard/SettingsDialog.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
+  import AppShell from './components/shell/AppShell.svelte';
+  import LazySettingsDialog from './components/dashboard/LazySettingsDialog.svelte';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
+  import { ModeWatcher } from 'mode-watcher';
   import { providePageHeader } from '$lib/page-header.svelte';
 
   let runId = $state<string | null>(null);
+  let designPage = $state(false);
   let workflowPageType = $state<'new' | 'edit' | 'detail' | null>(null);
   let workflowId = $state<string | null>(null);
 
   // Pages below register their own controls (Save, Abort) into this header.
   const pageHeader = providePageHeader();
-  const catalogCrumbs = [{ label: 'Smasher Pipelines', href: '/' }];
-  const isCatalog = $derived(!runId && !workflowPageType);
+  const catalogBack = { label: 'Smasher Pipelines', href: '/' };
+  const isCatalog = $derived(!runId && !workflowPageType && !designPage);
   const pageTitle = $derived(
-    workflowPageType === 'new'
-      ? 'Create New Workflow'
-      : workflowPageType === 'edit'
-        ? 'Edit Workflow'
-        : workflowPageType === 'detail'
-          ? (pageHeader.title ?? 'Workflow')
-          : runId
-          ? `Run ${runId}`
-          : 'Smasher Pipelines'
+    designPage
+      ? 'Design system'
+      : workflowPageType === 'new'
+      ? (pageHeader.title ?? 'New workflow')
+      : workflowPageType === 'edit' || workflowPageType === 'detail'
+        ? (pageHeader.title ?? 'Workflow')
+        : runId
+          ? (pageHeader.title ?? 'Run')
+          : 'Workflows'
   );
   // The tab title puts the page first so truncated tabs stay readable.
   const documentTitle = $derived(
-    workflowPageType === 'new'
-      ? 'New Workflow — Smasher'
-      : workflowPageType === 'edit'
-        ? 'Edit Workflow — Smasher'
-        : workflowPageType === 'detail'
-          ? `${pageHeader.title ?? 'Workflow'} — Smasher`
-          : runId
-          ? `Run ${runId} — Smasher`
+    designPage
+      ? 'Design system — Smasher'
+      : workflowPageType === 'new'
+      ? `${pageHeader.title ?? 'New workflow'} — Smasher`
+      : workflowPageType === 'edit' || workflowPageType === 'detail'
+        ? `${pageHeader.title ?? 'Workflow'} — Smasher`
+        : runId
+          ? `${pageHeader.title ?? 'Run'} — Smasher`
           : 'Smasher'
   );
 
@@ -69,6 +63,14 @@
 
   function updatePath() {
     const path = window.location.pathname;
+
+    designPage = path === '/design';
+    if (designPage) {
+      runId = null;
+      workflowPageType = null;
+      workflowId = null;
+      return;
+    }
 
     // Extract run ID if path is /runs/{id} -- "new" is excluded since it's
     // not a real run id (the catalog's "Run Workflow" used to link to
@@ -131,99 +133,70 @@
   }
 </script>
 
-{#snippet newWorkflowAction()}
-  <Button href="/workflows/new">New Workflow</Button>
-{/snippet}
-
 {#snippet headerActions()}
-  {#if isCatalog}
-    {@render newWorkflowAction()}
-  {:else}
-    {@render pageHeader.actions?.()}
+  {@render pageHeader.actions?.()}
+  <!-- The dashboard places its own settings button, between Import and New workflow. -->
+  {#if !isCatalog}
+    <LazySettingsDialog />
   {/if}
-  <SettingsDialog />
 {/snippet}
 
-<div class="min-h-screen bg-muted/40 text-foreground">
-  <PageHeader
-    title={pageTitle}
-    crumbs={isCatalog ? [] : catalogCrumbs}
-    actions={headerActions}
-  />
+<AppShell
+  title={pageTitle}
+  subtitle={pageHeader.subtitle}
+  subtitleDot={pageHeader.subtitleDot}
+  subtitleLive={pageHeader.subtitleLive}
+  back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
+  actions={headerActions}
+  titleAccessory={pageHeader.titleAccessory}
+  currentWorkflowId={workflowPageType === 'detail' || workflowPageType === 'edit' ? workflowId : null}
+  sidebarCollapsed={workflowPageType === 'edit' || workflowPageType === 'new'}
+>
+  <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
+       so they load as their own chunk on demand; bundling them kept the
+       entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
+  {#if designPage}
+    {#await import('./components/design/PrimitivesGallery.svelte') then { default: PrimitivesGallery }}
+      <PrimitivesGallery />
+    {:catch}
+      <p class="p-8 text-destructive">Couldn't load the design system page. Reload to try again.</p>
+    {/await}
+  {:else if workflowPageType === 'new'}
+    <!-- New Workflow Page: the canvas fills everything below the 52px toolbar -->
+    <div class="h-[calc(100dvh-52px)]">
+      {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}
+        <NewWorkflowPage />
+      {:catch}
+        <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
+      {/await}
+    </div>
+  {:else if workflowPageType === 'edit' && workflowId}
+    <!-- Edit Workflow Page: the canvas fills everything below the 52px toolbar -->
+    <div class="h-[calc(100dvh-52px)]">
+      {#await import('./components/dashboard/WorkflowEditorPage.svelte') then { default: WorkflowEditorPage }}
+        <WorkflowEditorPage {workflowId} />
+      {:catch}
+        <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
+      {/await}
+    </div>
+  {:else if workflowPageType === 'detail' && workflowId}
+    {#key workflowId}
+      <WorkflowDetailPage {workflowId} />
+    {/key}
+  {:else if runId}
+    {#key runId}
+      {#await import('./components/run/RunPage.svelte') then { default: RunPage }}
+        <RunPage {runId} />
+      {:catch}
+        <p class="p-8 text-destructive">Couldn't load the run page. Reload the page to try again.</p>
+      {/await}
+    {/key}
+  {:else}
+    <DashboardPage />
+  {/if}
+</AppShell>
 
-  <main>
-    <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
-         so they load as their own chunk on demand; bundling them kept the
-         entry chunk over Vite's 500 kB limit (see scripts/check-bundle-size.mjs). -->
-    {#if workflowPageType === 'new'}
-      <!-- New Workflow Page: the canvas fills everything below the 3.5rem header -->
-      <div class="h-[calc(100dvh-3.5rem)]">
-        {#await import('./components/dashboard/NewWorkflowPage.svelte') then { default: NewWorkflowPage }}
-          <NewWorkflowPage />
-        {:catch}
-          <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
-        {/await}
-      </div>
-    {:else if workflowPageType === 'edit' && workflowId}
-      <!-- Edit Workflow Page: the canvas fills everything below the 3.5rem header -->
-      <div class="h-[calc(100dvh-3.5rem)]">
-        {#await import('./components/dashboard/WorkflowEditorPage.svelte') then { default: WorkflowEditorPage }}
-          <WorkflowEditorPage {workflowId} />
-        {:catch}
-          <p class="p-8 text-destructive">Couldn't load the workflow editor. Reload the page to try again.</p>
-        {/await}
-      </div>
-    {:else if workflowPageType === 'detail' && workflowId}
-      <div class="max-w-6xl mx-auto p-8">
-        {#key workflowId}
-          <WorkflowDetailPage {workflowId} />
-        {/key}
-      </div>
-    {:else if runId}
-      <!-- Run Detail View: EventLog + QuestionCard -->
-      <div class="max-w-6xl mx-auto p-8">
-        <div class="mb-8">
-          <RunDetail {runId} />
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <!-- Event Log on the left -->
-          <div>
-            <h2 class="text-xl font-semibold mb-4">Events</h2>
-            <EventLog {runId} />
-          </div>
-
-          <!-- Questions on the right -->
-          <div>
-            <h2 class="text-xl font-semibold mb-4">Questions</h2>
-            <QuestionCard {runId} />
-          </div>
-        </div>
-
-        <div class="mt-8">
-          <GalleryGate {runId} />
-        </div>
-
-        <div class="mt-8">
-          <h2 class="text-xl font-semibold mb-4">Candidates</h2>
-          <CandidateGallery {runId} />
-        </div>
-
-        <div class="mt-8">
-          <h2 class="text-xl font-semibold mb-4">Decision History</h2>
-          <DecisionHistory {runId} />
-        </div>
-      </div>
-    {:else}
-      <!-- Catalog View: Workflows and Runs stacked in the main column -->
-      <div class="mx-auto max-w-6xl px-4 sm:px-8">
-        <WorkflowCatalog />
-        <RunList />
-      </div>
-    {/if}
-  </main>
-</div>
-
+<ModeWatcher defaultMode="system" />
 <Toaster />
 
 <style>

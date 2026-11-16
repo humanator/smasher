@@ -4,20 +4,21 @@
 
   import {
     Background,
+    BackgroundVariant,
     ConnectionMode,
-    Controls,
     MarkerType,
     MiniMap,
     SvelteFlow,
     type Edge as FlowEdge,
     type Node as FlowNode,
-    type XYPosition,
   } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
-  import { setContext, untrack, type Component, type Snippet } from 'svelte';
+  import { setContext, tick, untrack, type Component } from 'svelte';
   import Palette from './Palette.svelte';
-  import FlowPositionBridge from './FlowPositionBridge.svelte';
-  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, nodeStyleFor, type NodeKindConfig } from './nodeConfig';
+  import FlowBridge, { type FlowApi } from './FlowBridge.svelte';
+  import StatusBar from './StatusBar.svelte';
+  import EditorToolbarActions from './EditorToolbarActions.svelte';
+  import { NODE_DRAG_DATA_TYPE, NODE_KIND_CONFIG, type NodeKindConfig } from './nodeConfig';
   import {
     DEFAULT_RANKDIR,
     toEditorGraph,
@@ -27,22 +28,34 @@
     type WorkflowNodeData,
   } from './convert';
   import type { AttrValue, EdgeFormChange, EditorGraph, NodeFormChange, NodeFormProps } from './types';
-  import { EDGE_ACTIONS_CONTEXT_KEY, type WorkflowEdgeActions } from './edgeContext';
+  import { EDGE_ACTIONS_CONTEXT_KEY, connectionName, type WorkflowEdgeActions } from './edgeContext';
   import { FLOW_DIRECTION_CONTEXT_KEY, type FlowDirection } from './flowDirectionContext';
+  import { NODE_STATE_CONTEXT_KEY, type WorkflowNodeState } from './nodeContext';
   import WorkflowEdge from './WorkflowEdge.svelte';
+  import Legend from './Legend.svelte';
   import WorkflowNode from './WorkflowNode.svelte';
   import EdgeForm from './EdgeForm.svelte';
+  import Inspector, { type InspectorView } from './inspector/Inspector.svelte';
+  import Field from './inspector/Field.svelte';
   import CodergenForm from './nodeForms/CodergenForm.svelte';
   import InterviewerForm from './nodeForms/InterviewerForm.svelte';
   import ToolForm from './nodeForms/ToolForm.svelte';
   import ManagerForm from './nodeForms/ManagerForm.svelte';
   import SubPipelineForm from './nodeForms/SubPipelineForm.svelte';
-  import StructuralForm from './nodeForms/StructuralForm.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { usePageActions } from '$lib/page-header.svelte';
+  import FlowForm from './nodeForms/FlowForm.svelte';
+  import RetrySettings from './inspector/RetrySettings.svelte';
+  import BranchRules, { type BranchPath } from './inspector/BranchRules.svelte';
+  import { usePageActions, usePageSubtitle } from '$lib/page-header.svelte';
+  import { useNow } from '$lib/hooks/useNow.svelte';
+  import { formatSavedAgo } from '$lib/timeFormat';
   import { Input } from '$lib/components/ui/input/index.js';
   import { Label } from '$lib/components/ui/label/index.js';
   import * as NativeSelect from '$lib/components/ui/native-select/index.js';
+  import * as Sheet from '$lib/components/ui/sheet/index.js';
+  import { IsMobile } from '$lib/hooks/is-mobile.svelte';
+  import { stepFields } from '$lib/stepFields';
+  import { stepKind } from '$lib/stepKinds';
+  import { workflowProblems, type Problem } from '$lib/workflowProblems';
 
   // Task 8: WorkflowEdge.svelte is the only edge type this canvas renders
   // (loaded edges via convert.ts's toFlowEdges, freshly hand-drawn ones via
@@ -51,17 +64,17 @@
   const edgeTypes = { workflow: WorkflowEdge };
 
   // WorkflowNode.svelte replaces the library's built-in "default" node type
-  // -- same look, plus left/right handles alongside top/bottom (see its own
-  // comment for why).
+  // with the step card (chip, kind, name, summary, Needs attention), plus
+  // left/right handles alongside top/bottom (see its own comment for why).
   const nodeTypes = { workflow: WorkflowNode };
 
   // Task 7: one form component per NodeType, rendered in a selected-node
   // side panel. Start/Exit/Parallel/FanIn/Conditional (no kind-specific
-  // attrs per grounding) *and* any unrecognized/future node_type string
-  // (same "don't crash on unknown kind" convention Task 4/6 already
-  // established for canvas rendering/the palette) fall back to
-  // StructuralForm via the `default` arm below.
-  function formComponentFor(nodeType: string): Component<NodeFormProps> {
+  // attrs per grounding, except Split's two) *and* any unrecognized/future
+  // node_type string (same "don't crash on unknown kind" convention Task 4/6
+  // already established for canvas rendering/the palette) fall back to
+  // FlowForm, which also needs the kind, via the `null` arm below.
+  function formComponentFor(nodeType: string): Component<NodeFormProps> | null {
     switch (nodeType) {
       case 'Codergen':
         return CodergenForm;
@@ -74,7 +87,7 @@
       case 'SubPipeline':
         return SubPipelineForm;
       default:
-        return StructuralForm;
+        return null;
     }
   }
 
@@ -90,19 +103,24 @@
   // host shell can call `createGraph` (POST, a new file) rather than
   // `saveGraph` (PUT, an existing one).
   //
-  // `extraActions` (e.g. the edit page's Export .dot) render next to Save,
-  // in the page header when there is one.
-  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, extraActions }: {
+  // `onExport` (the edit page's Export .dot file) and `onRun` (its Run
+  // dialog) sit in the toolbar next to Save, in the page header when there
+  // is one. `onSave` resolving to `false` means nothing was written (the
+  // edit page's conflict toast), so the changes stay unsaved.
+  let { graph = undefined, workflowId = undefined, availableTargetDirs = [], onSave, onExport = undefined, onRun = undefined }: {
     graph?: EditorGraph;
     workflowId?: string;
     availableTargetDirs?: string[];
-    onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | Promise<void>;
-    extraActions?: Snippet;
+    onSave: (graph: EditorGraph, meta?: { name: string; targetDir: string }) => void | boolean | Promise<void | boolean>;
+    onExport?: () => void;
+    onRun?: () => void;
   } = $props();
 
   const uid = $props.id();
 
   const isCreateMode = $derived(!workflowId);
+  // The create bar's accessible name; not on the board (proposed 2026-11-03).
+  const CREATE_BAR_LABEL = 'New workflow details';
   let createName = $state('');
   let createTargetDir = $state('');
 
@@ -128,6 +146,18 @@
   const flowDirection: FlowDirection = $state({ rankdir: DEFAULT_RANKDIR });
   setContext(FLOW_DIRECTION_CONTEXT_KEY, flowDirection);
 
+  // Unsaved changes (D1): every edit bumps `revision`, and a save records
+  // the revision it wrote, so an edit made while a save is in flight stays
+  // unsaved. Loading (or reloading) a graph is a clean start.
+  let revision = $state(0);
+  let savedRevision = $state(0);
+  let savedAt = $state<Date | null>(null);
+  const dirty = $derived(revision !== savedRevision);
+
+  function markDirty() {
+    revision += 1;
+  }
+
   $effect(() => {
     if (graph) {
       nodes = toFlowNodes(graph.nodes, graph.edges, graph.graph_attrs);
@@ -135,6 +165,7 @@
       graphName = graph.name ?? null;
       graphAttrs = (graph.graph_attrs ?? {}) as Record<string, AttrValue>;
       flowDirection.rankdir = typeof (graph.graph_attrs?.rankdir) === 'string' ? (graph.graph_attrs.rankdir) : DEFAULT_RANKDIR;
+      untrack(() => (savedRevision = revision));
     }
   });
 
@@ -146,8 +177,8 @@
   // The drop point is converted to flow coordinates (pan and zoom applied)
   // with useSvelteFlow()'s screenToFlowPosition. That hook only works in a
   // descendant of <SvelteFlow>, and this component's own <script> runs
-  // outside that context, so FlowPositionBridge.svelte (rendered inside
-  // <SvelteFlow> below) hands the function back up via `toFlowPosition`.
+  // outside that context, so FlowBridge.svelte (rendered inside <SvelteFlow>
+  // below) hands it -- with the other viewport helpers -- back up via `flow`.
   let nodeIdCounter = 0;
 
   function nextNodeId(nodeType: string): string {
@@ -170,10 +201,10 @@
       id: nextNodeId(nodeType),
       type: 'workflow',
       position,
-      style: nodeStyleFor(nodeType),
-      data: { label: config.title, nodeType, attrs: {} },
+      data: { label: stepKind(nodeType).plain, nodeType, attrs: { ...config.defaultAttrs } },
     };
     nodes = [...nodes, newNode];
+    markDirty();
     return newNode.id;
   }
 
@@ -187,24 +218,63 @@
   // time) so the panel keeps reflecting the node's current attrs/label as
   // they're edited, and gracefully disappears if the node is deleted out
   // from under it (Backspace) instead of pointing at a stale id.
-  let selectedNodeId = $state<string | null>(null);
+  //
+  // Task 8 added the same for edges, and Task 9 the step library's guide:
+  // one inspector slot, so the selection is a single value -- selecting one
+  // thing replaces whatever was selected before.
+  type Selection =
+    | { kind: 'none' }
+    | { kind: 'node'; id: string }
+    | { kind: 'edge'; id: string }
+    | { kind: 'guide'; handler: string };
+  let selection = $state<Selection>({ kind: 'none' });
+  const selectedNodeId = $derived(selection.kind === 'node' ? selection.id : null);
+  const selectedEdgeId = $derived(selection.kind === 'edge' ? selection.id : null);
   const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
-
-  // Task 8: the same pattern, for edges -- one inspector panel slot shared
-  // between a selected node and a selected edge (never both at once:
-  // selecting either clears the other, matching this canvas having a single
-  // side panel, not two independent ones).
-  let selectedEdgeId = $state<string | null>(null);
   const selectedEdge = $derived(edges.find((e) => e.id === selectedEdgeId) ?? null);
+  const guideHandler = $derived(selection.kind === 'guide' ? selection.handler : null);
 
   function handleNodeClick({ node }: { node: FlowNode<WorkflowNodeData> }) {
-    selectedNodeId = node.id;
-    selectedEdgeId = null;
+    selection = { kind: 'node', id: node.id };
   }
 
   function handleEdgeClick({ edge }: { edge: FlowEdge<WorkflowEdgeData> }) {
-    selectedEdgeId = edge.id;
-    selectedNodeId = null;
+    selection = { kind: 'edge', id: edge.id };
+  }
+
+  // Enter or Space on a focused step or connection selects it in Svelte Flow
+  // with no click, so the inspector follows that key too (SC5). Svelte Flow
+  // ignores the keys inside form controls, and so does this.
+  function handleCanvasKeyDown(event: KeyboardEvent) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target as HTMLElement;
+    if (target.closest('input, textarea, select, button')) return;
+    const node = target.closest<HTMLElement>('.svelte-flow__node');
+    const edge = target.closest<SVGElement>('.svelte-flow__edge');
+    const id = (node ?? edge)?.dataset.id;
+    if (!id) return;
+    if (node && nodes.some((n) => n.id === id)) selection = { kind: 'node', id };
+    else if (edge && edges.some((e) => e.id === id)) selection = { kind: 'edge', id };
+  }
+
+  // Delegated from the canvas region, whose focusable children are the steps and connections.
+  $effect(() => {
+    const region = canvasRegion;
+    if (!region) return;
+    region.addEventListener('keydown', handleCanvasKeyDown);
+    return () => region.removeEventListener('keydown', handleCanvasKeyDown);
+  });
+
+  // A step picked in the library (or unpicked: null). Whatever was selected
+  // on the canvas is let go, in Svelte Flow too, so no card stays ringed.
+  function selectGuide(handler: string | null) {
+    if (handler === null) {
+      selection = { kind: 'none' };
+      return;
+    }
+    nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+    edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+    selection = { kind: 'guide', handler };
   }
 
   // jsdom never renders a `.svelte-flow__edge` DOM element at all (it
@@ -223,60 +293,135 @@
   }
 
   function handlePaneClick() {
-    selectedNodeId = null;
-    selectedEdgeId = null;
+    selection = { kind: 'none' };
   }
 
-  // Task 8: hover state + the delete callback WorkflowEdge.svelte reads via
-  // Svelte context (see edgeContext.ts's own comment on why context, not a
-  // prop, is needed here). A single reactive ($state) object set once via
-  // setContext -- every WorkflowEdge instance reads the same live object.
-  // Exported for the same jsdom-can't-render-edges reason as selectEdge
-  // above: WorkflowEdge.svelte (the real consumer, via Svelte context --
-  // see edgeContext.ts) can't be driven by a real pointer-hover/click DOM
-  // event in a test, so tests call `.onDeleteEdge(...)`/set
-  // `.hoveredEdgeId` on this same live object directly instead of
-  // duplicating its logic in a separate test-only helper.
-  export const edgeActions: WorkflowEdgeActions = $state({
-    hoveredEdgeId: null,
-    onDeleteEdge: (edgeId: string) => {
-      edges = edges.filter((e) => e.id !== edgeId);
-      if (selectedEdgeId === edgeId) selectedEdgeId = null;
-    },
-  });
-  setContext(EDGE_ACTIONS_CONTEXT_KEY, edgeActions);
-
-  function handleEdgePointerEnter({ edge }: { edge: FlowEdge<WorkflowEdgeData> }) {
-    edgeActions.hoveredEdgeId = edge.id;
+  // Close inspector: let go of the selection, in Svelte Flow too. Below
+  // 1100px it also puts the inspector away.
+  function clearSelection() {
+    nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+    edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+    selection = { kind: 'none' };
+    inspectorOpen = false;
   }
 
-  function handleEdgePointerLeave() {
-    edgeActions.hoveredEdgeId = null;
-  }
-
-  // Task 8 (connection handle polish): handles are hidden by default and
-  // revealed on node hover via CSS alone (see the :global rules below), but
-  // "turn an accent color once connected" needs to know *which* nodes have
-  // at least one edge -- not expressible in CSS since a node's handle
-  // elements and the edges attached to it aren't DOM siblings/ancestors of
-  // each other. Recomputed only from `edges` (untracked read of `nodes`, so
-  // this doesn't re-run -- and fight the drag/selection updates `bind:nodes`
-  // applies -- every time `nodes` itself changes for unrelated reasons, e.g.
-  // a drag repositioning a node).
-  const connectedNodeIds = $derived(new Set(edges.flatMap((e) => [e.source, e.target])));
+  // D13: below 768px the step library and the inspector are sheets opened
+  // from the toolbar, and zoom collapses to Fit. From 768px to 1100px the
+  // inspector sits beside the canvas but can be put away. Selecting
+  // anything (a step picked in the library included) shows it again.
+  const phone = new IsMobile();
+  const narrow = new IsMobile(1100);
+  let stepsOpen = $state(false);
+  // Beside the canvas it starts out shown; a phone's sheet starts closed.
+  let inspectorOpen = $state(!phone.current);
+  const inspectorShown = $derived(!narrow.current || inspectorOpen);
 
   $effect(() => {
-    const connected = connectedNodeIds;
-    const current = untrack(() => nodes);
-    const next = current.map((n) => {
-      const base = typeof n.class === 'string' ? n.class.replace(/\bwf-node-connected\b/g, '').trim() : '';
-      const withFlag = connected.has(n.id) ? (base ? `${base} wf-node-connected` : 'wf-node-connected') : base;
-      if ((n.class ?? '') === withFlag) return n;
-      return { ...n, class: withFlag || undefined };
+    if (selection.kind === 'none') return;
+    untrack(() => {
+      inspectorOpen = true;
+      if (selection.kind === 'guide') stepsOpen = false;
     });
-    if (next.some((n, i) => n !== current[i])) {
-      nodes = next;
+  });
+
+  // The inspector's Delete Step / Delete Connection (D3). A step takes its
+  // connections with it, as Backspace does.
+  export function deleteSelection() {
+    if (selection.kind === 'node') {
+      const id = selection.id;
+      nodes = nodes.filter((n) => n.id !== id);
+      edges = edges.filter((e) => e.source !== id && e.target !== id);
+    } else if (selection.kind === 'edge') {
+      const id = selection.id;
+      edges = edges.filter((e) => e.id !== id);
     }
+    if (selection.kind === 'node' || selection.kind === 'edge') markDirty();
+    selection = { kind: 'none' };
+  }
+
+  // Task 8: the select and delete callbacks WorkflowEdge.svelte reads via
+  // Svelte context (see edgeContext.ts's own comment on why context, not a
+  // prop, is needed here). A label pill click selects its connection in
+  // Svelte Flow itself but isn't an edge click, so it reports here too.
+  // Exported for the same jsdom-can't-render-edges reason as selectEdge
+  // above: tests call `.onDeleteEdge(...)`/`.onSelectEdge(...)` on this
+  // same object directly instead of duplicating its logic in a test helper.
+  export const edgeActions: WorkflowEdgeActions = {
+    onSelectEdge: (edgeId: string) => selectEdge(edgeId),
+    onDeleteEdge: (edgeId: string) => {
+      edges = edges.filter((e) => e.id !== edgeId);
+      markDirty();
+      if (selectedEdgeId === edgeId) selection = { kind: 'none' };
+    },
+  };
+  setContext(EDGE_ACTIONS_CONTEXT_KEY, edgeActions);
+
+  // Advice for the step cards (and, later, the status bar): recomputed on
+  // every graph change, never blocking Save (spec R6).
+  const problems = $derived(workflowProblems(nodes, edges));
+  const problemsByNode = $derived.by(() => {
+    const byNode = new Map<string, string[]>();
+    for (const p of problems) {
+      if (p.nodeId) byNode.set(p.nodeId, [...(byNode.get(p.nodeId) ?? []), p.message]);
+    }
+    return byNode;
+  });
+  const outgoingByNode = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const e of edges) counts.set(e.source, (counts.get(e.source) ?? 0) + 1);
+    return counts;
+  });
+  const nodeState: WorkflowNodeState = {
+    get problemsByNode() {
+      return problemsByNode;
+    },
+    get outgoingByNode() {
+      return outgoingByNode;
+    },
+  };
+  setContext(NODE_STATE_CONTEXT_KEY, nodeState);
+
+  // A card's accessible name is "{kind}: {name}", plus ", needs attention"
+  // when it has a problem. SvelteFlow's NodeWrapper (the focusable element)
+  // reads it from the node's `ariaLabel`, so it is kept in step here; the
+  // write only happens when a name actually changed, so this settles after
+  // one pass instead of fighting the drag updates `bind:nodes` applies.
+  function nodeAriaLabel(n: FlowNode<WorkflowNodeData>): string {
+    const name = `${stepKind(n.data.nodeType).plain}: ${n.data.label}`;
+    return problemsByNode.has(n.id) ? `${name}, needs attention` : name;
+  }
+
+  $effect(() => {
+    const next = nodes.map((n) => {
+      const ariaLabel = nodeAriaLabel(n);
+      return n.ariaLabel === ariaLabel ? n : { ...n, ariaLabel };
+    });
+    if (next.some((n, i) => n !== nodes[i])) nodes = next;
+  });
+
+  // The same for connections: "Connection from {a} to {b}[, labelled {label}]".
+  const labelById = $derived(new Map(nodes.map((n) => [n.id, n.data.label])));
+
+  // A selection whose node or edge has gone (Backspace) shows Nothing selected.
+  const inspectorView: InspectorView = $derived.by(() => {
+    if (selectedNode) return { kind: 'node', handler: selectedNode.data.nodeType, title: selectedNode.data.label };
+    if (selectedEdge) {
+      const from = labelById.get(selectedEdge.source) ?? selectedEdge.source;
+      const to = labelById.get(selectedEdge.target) ?? selectedEdge.target;
+      return { kind: 'edge', title: `${from} → ${to}` };
+    }
+    if (guideHandler) return { kind: 'guide', handler: guideHandler };
+    return { kind: 'none' };
+  });
+  const inspectorKey = $derived(inspectorView.kind === 'none' ? 'none' : `${selection.kind}:${'id' in selection ? selection.id : guideHandler}`);
+
+  $effect(() => {
+    const next = edges.map((e) => {
+      const label = typeof e.label === 'string' ? e.label : undefined;
+      const ariaLabel = connectionName(labelById.get(e.source) ?? e.source, labelById.get(e.target) ?? e.target, label);
+      return e.ariaLabel === ariaLabel ? e : { ...e, ariaLabel };
+    });
+    if (next.some((e, i) => e !== edges[i])) edges = next;
   });
 
   // Applies an EdgeForm.svelte onChange patch to the selected edge's live
@@ -285,10 +430,12 @@
   // fields (not a generic attrs bag -- see types.ts's EdgeFormChange
   // comment), so each is applied only when the patch actually mentions it.
   function applyEdgeFormChange(edgeId: string, patch: EdgeFormChange) {
+    markDirty();
     edges = edges.map((e) => {
       if (e.id !== edgeId) return e;
       return {
         ...e,
+        label: patch.label !== undefined ? (patch.label ?? undefined) : e.label,
         data: {
           condition: patch.condition !== undefined ? patch.condition : (e.data?.condition ?? null),
           priority: patch.priority !== undefined ? patch.priority : (e.data?.priority ?? null),
@@ -297,6 +444,19 @@
         },
       };
     });
+  }
+
+  // A Branch's settings edit its outgoing connections' conditions (BranchRules).
+  function branchPaths(nodeId: string): BranchPath[] {
+    return edges
+      .filter((e) => e.source === nodeId)
+      .map((e) => ({
+        id: e.id,
+        target: labelById.get(e.target) ?? e.target,
+        label: typeof e.label === 'string' ? e.label : '',
+        loop: e.data?.loopRestart === true,
+        condition: e.data?.condition,
+      }));
   }
 
   // Applies a nodeForms/*.svelte onChange patch to the selected node's live
@@ -308,6 +468,7 @@
   // patch -- see the shared Label field below -- but this function accepts
   // both so one code path handles either kind of edit.
   function applyNodeFormChange(nodeId: string, patch: NodeFormChange) {
+    markDirty();
     nodes = nodes.map((n) => {
       if (n.id !== nodeId) return n;
       const nextAttrs = { ...n.data.attrs };
@@ -331,7 +492,32 @@
     });
   }
 
-  let toFlowPosition: ((screen: XYPosition) => XYPosition) | undefined;
+  // useSvelteFlow()'s helpers, handed up by FlowBridge (see addNodeAtPosition's
+  // comment). Its onZoom level is for the toolbar's zoom group.
+  let flow: FlowApi | undefined;
+  let zoom = $state(1);
+
+  // Backspace/Delete and drawn connections change the graph inside Svelte
+  // Flow, so they are counted here. A drag counts only when it ends with a
+  // step somewhere new, because `pos` is saved; a click is not a move.
+  function handleFlowDelete({ nodes: gone, edges: goneEdges }: { nodes: FlowNode[]; edges: FlowEdge[] }) {
+    if (gone.length > 0 || goneEdges.length > 0) markDirty();
+  }
+
+  let dragStart = new Map<string, { x: number; y: number }>();
+
+  function handleNodeDragStart({ nodes: dragged }: { nodes: FlowNode[] }) {
+    dragStart = new Map(dragged.map((n) => [n.id, { ...n.position }]));
+  }
+
+  function handleNodeDragStop({ nodes: dragged }: { nodes: FlowNode[] }) {
+    const moved = dragged.some((n) => {
+      const start = dragStart.get(n.id);
+      return !start || start.x !== n.position.x || start.y !== n.position.y;
+    });
+    dragStart = new Map();
+    if (moved) markDirty();
+  }
 
   // A node's size is only known once Svelte Flow has rendered and measured
   // it, so a dropped node is placed with its top-left at the drop point and
@@ -354,12 +540,38 @@
       n.id === node.id
         ? {
             ...n,
-            style: nodeStyleFor(n.data.nodeType),
+            style: undefined,
             position: { x: n.position.x - width / 2, y: n.position.y - height / 2 },
           }
         : n
     );
   });
+
+  // The Step guide's Add to Canvas (D6), the keyboard path for adding a
+  // step: it goes in the middle of the visible canvas, centred the same way
+  // a dropped step is, and is selected so its settings open straight away.
+  let canvasRegion: HTMLElement | undefined;
+  let focusStepName = false;
+
+  function addStepAtCentre(nodeType: string) {
+    if (!flow || !canvasRegion) return;
+    const rect = canvasRegion.getBoundingClientRect();
+    const centre = flow.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    const id = addNodeAtPosition(nodeType, centre);
+    if (!id) return;
+    nodes = nodes.map((n) => (n.id === id ? { ...n, style: 'visibility: hidden;' } : n));
+    nodeToCentre = id;
+    focusStepName = true;
+    selectNode(id);
+  }
+
+  // The button that was pressed has gone with the guide, so focus moves to
+  // the new step's name, the first thing a keyboard user will want to change.
+  function focusOnMount(settings: HTMLElement) {
+    if (!focusStepName) return;
+    focusStepName = false;
+    void tick().then(() => settings.querySelector('input')?.focus());
+  }
 
   function handleDragOver(event: DragEvent) {
     event.preventDefault();
@@ -369,18 +581,55 @@
   function handleDrop(event: DragEvent) {
     event.preventDefault();
     const nodeType = event.dataTransfer?.getData(NODE_DRAG_DATA_TYPE);
-    if (!nodeType || !toFlowPosition) return;
-    const id = addNodeAtPosition(nodeType, toFlowPosition({ x: event.clientX, y: event.clientY }));
+    if (!nodeType || !flow) return;
+    const id = addNodeAtPosition(nodeType, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }));
     if (!id) return;
-    nodes = nodes.map((n) => (n.id === id ? { ...n, style: `${n.style ?? ''} visibility: hidden;` } : n));
+    nodes = nodes.map((n) => (n.id === id ? { ...n, style: 'visibility: hidden;' } : n));
     nodeToCentre = id;
+  }
+
+  // Review in the status bar: select the problem's step or connection, in
+  // Svelte Flow too (so its ring shows), and pan to it at the current zoom.
+  function selectNode(nodeId: string) {
+    nodes = nodes.map((n) => (!!n.selected === (n.id === nodeId) ? n : { ...n, selected: n.id === nodeId }));
+    edges = edges.map((e) => (e.selected ? { ...e, selected: false } : e));
+    selection = { kind: 'node', id: nodeId };
+  }
+
+  function centreOf(nodeId: string): { x: number; y: number } | null {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    return {
+      x: node.position.x + (node.measured?.width ?? 0) / 2,
+      y: node.position.y + (node.measured?.height ?? 0) / 2,
+    };
+  }
+
+  function reviewProblem(problem: Problem) {
+    let centre: { x: number; y: number } | null = null;
+    if (problem.nodeId) {
+      selectNode(problem.nodeId);
+      centre = centreOf(problem.nodeId);
+    } else if (problem.edgeId) {
+      const edge = edges.find((e) => e.id === problem.edgeId);
+      if (!edge) return;
+      nodes = nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+      edges = edges.map((e) => (!!e.selected === (e.id === edge.id) ? e : { ...e, selected: e.id === edge.id }));
+      selectEdge(edge.id);
+      const a = centreOf(edge.source);
+      const b = centreOf(edge.target);
+      if (a && b) centre = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+    if (centre && flow) void flow.setCenter(centre.x, centre.y, { zoom: flow.getZoom(), duration: 200 });
   }
 
   let saving = $state(false);
   let saveError = $state<string | null>(null);
 
-  async function handleSave() {
+  /** Resolves true when the graph was written. */
+  async function handleSave(): Promise<boolean> {
     saveError = null;
+    const writing = revision;
     let meta: { name: string; targetDir: string } | undefined;
     if (isCreateMode) {
       const name = createName.trim();
@@ -389,57 +638,195 @@
         // blank-name rejection is the real enforcement, same discipline
         // create_workflow already applies.
         saveError = 'workflow name must not be blank';
-        return;
+        return false;
       }
       if (!createTargetDir) {
         saveError = 'choose a target directory';
-        return;
+        return false;
       }
       meta = { name, targetDir: createTargetDir };
     }
     saving = true;
     try {
-      await onSave(currentGraph(), meta);
+      if ((await onSave(currentGraph(), meta)) === false) return false;
+      recordSave(writing);
+      return true;
     } catch (err) {
       saveError = err instanceof Error ? err.message : String(err);
+      return false;
     } finally {
       saving = false;
     }
   }
 
-  const saveDisabled = $derived(saving || (isCreateMode && !createName.trim()));
+  // Run (D11) runs what is on the canvas: unsaved changes are saved first,
+  // and the dialog opens only if that worked.
+  async function handleRun() {
+    if (dirty && !(await handleSave())) return;
+    onRun?.();
+  }
+
+  function recordSave(writtenRevision: number) {
+    savedRevision = writtenRevision;
+    savedAt = new Date();
+  }
+
+  /** The page saved the graph itself (the conflict toast's Save anyway). */
+  export function markSaved() {
+    recordSave(revision);
+  }
+
+  // A new workflow has no file to compare with, so only its name gates Save.
+  const saveDisabled = $derived(saving || (isCreateMode ? !createName.trim() : !dirty));
+
+  // The save state under the title (D1). "Saved …" only ever follows a save
+  // made here, so nothing is claimed on load.
+  const now = useNow();
+  usePageSubtitle(
+    () => {
+      if (saving) return 'Saving…';
+      if (dirty) return 'Unsaved changes';
+      return savedAt ? `Saved ${formatSavedAgo(savedAt.toISOString(), now.current)}` : null;
+    },
+    { dot: () => (saving ? null : dirty ? 'warning' : savedAt ? 'success' : null), live: true }
+  );
+
+  // Leaving the page (any link: the router loads each page afresh) asks first.
+  $effect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  });
 
   // Save lives in the page header when there is one.
   const saveInHeader = usePageActions(saveAction);
-
-  // Shared by the node and edge inspector <aside>s (one side-panel slot).
-  const inspectorClass = 'w-[260px] flex-[0_0_260px] overflow-y-auto border-l border-border p-2.5 box-border';
 </script>
 
+{#snippet inspectorSettings()}
+  {#if selectedNode}
+    {@const node = selectedNode}
+    {@const FormComponent = formComponentFor(node.data.nodeType)}
+    <div class="flex flex-col gap-5" use:focusOnMount>
+      <Field
+        spec={stepFields(node.data.nodeType)[0]}
+        value={node.data.label}
+        testId="node-inspector-label"
+        oninput={(label) => applyNodeFormChange(node.id, { label })}
+      />
+      {#if node.data.nodeType === 'Conditional'}
+        <BranchRules
+          paths={branchPaths(node.id)}
+          onChange={(edgeId, condition) => applyEdgeFormChange(edgeId, { condition })}
+        />
+      {:else if FormComponent}
+        <FormComponent
+          attrs={node.data.attrs}
+          problems={problemsByNode.get(node.id) ?? []}
+          onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)}
+        />
+      {:else}
+        <FlowForm handler={node.data.nodeType} attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
+      {/if}
+      <RetrySettings handler={node.data.nodeType} attrs={node.data.attrs} onChange={(patch) => applyNodeFormChange(node.id, patch)} />
+    </div>
+  {:else if selectedEdge}
+    {@const edge = selectedEdge}
+    <EdgeForm
+      label={typeof edge.label === 'string' ? edge.label : null}
+      condition={edge.data?.condition ?? null}
+      priority={edge.data?.priority ?? null}
+      loopRestart={edge.data?.loopRestart ?? false}
+      onChange={(patch) => applyEdgeFormChange(edge.id, patch)}
+    />
+  {/if}
+{/snippet}
+
 {#snippet saveAction()}
-  {@render extraActions?.()}
-  <Button onclick={handleSave} disabled={saveDisabled} data-testid="save-button">
-    {saving ? 'Saving…' : 'Save'}
-  </Button>
+  <EditorToolbarActions
+    {zoom}
+    onZoomIn={() => void flow?.zoomIn()}
+    onZoomOut={() => void flow?.zoomOut()}
+    onFit={() => void flow?.fitView()}
+    {onExport}
+    onSave={() => void handleSave()}
+    onRun={onRun && !isCreateMode ? () => void handleRun() : undefined}
+    {saving}
+    {saveDisabled}
+    compact={phone.current}
+    onSteps={phone.current ? () => (stepsOpen = !stepsOpen) : undefined}
+    {stepsOpen}
+    onInspector={narrow.current ? () => (inspectorOpen = !inspectorOpen) : undefined}
+    {inspectorOpen}
+  />
+{/snippet}
+
+<!-- Remount on selection change: each form seeds its local field state
+     from `attrs` only once per mount (documented in each form's own
+     comment), and the inspector's tab goes back to Settings. -->
+{#snippet inspectorPanel(className?: string)}
+  {#key inspectorKey}
+    <Inspector
+      view={inspectorView}
+      onClose={clearSelection}
+      onDelete={deleteSelection}
+      onAdd={addStepAtCentre}
+      settings={inspectorSettings}
+      class={className}
+    />
+  {/key}
 {/snippet}
 
 <div class="w-full h-full flex-1 min-h-[480px] flex flex-row">
-  <Palette />
+  {#if phone.current}
+    <Sheet.Root bind:open={stepsOpen}>
+      <!-- A step picked here opens its guide in the Inspector sheet, which takes focus; don't hand it back to Steps. -->
+      <Sheet.Content
+        side="left"
+        showCloseButton={false}
+        aria-label="Step library"
+        class="w-[280px] gap-0 p-0"
+        onCloseAutoFocus={(event) => {
+          if (inspectorOpen) event.preventDefault();
+        }}
+      >
+        <Sheet.Title class="sr-only">Step library</Sheet.Title>
+        <Palette selected={guideHandler} onSelect={selectGuide} class="w-full flex-1 border-r-0" />
+      </Sheet.Content>
+    </Sheet.Root>
+    <Sheet.Root bind:open={inspectorOpen}>
+      <Sheet.Content side="right" showCloseButton={false} aria-label="Inspector" class="w-full gap-0 p-0 data-[side=right]:max-w-[360px]">
+        <Sheet.Title class="sr-only">Inspector</Sheet.Title>
+        {@render inspectorPanel('w-full flex-1 border-l-0')}
+      </Sheet.Content>
+    </Sheet.Root>
+  {:else}
+    <Palette selected={guideHandler} onSelect={selectGuide} />
+  {/if}
   <div class="flex-1 min-w-0 flex flex-col">
     {#if isCreateMode}
-      <div class="flex gap-3 items-end px-3 py-2">
-        <div class="flex flex-col gap-1.5">
-          <Label for="{uid}-create-name">Name</Label>
+      <!-- D10: a new workflow's Name and Folder sit in a slim bar above the canvas. -->
+      <div
+        role="group"
+        aria-label={CREATE_BAR_LABEL}
+        class="flex flex-none flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-border bg-background px-3 py-1.5"
+      >
+        <div class="flex items-center gap-2">
+          <Label for="{uid}-create-name" class="text-caption text-muted-foreground">Name</Label>
           <Input
             id="{uid}-create-name"
             type="text"
             data-testid="create-name-input"
             bind:value={createName}
             placeholder="my-pipeline"
+            class="w-56"
           />
         </div>
-        <div class="flex flex-col gap-1.5">
-          <Label for="{uid}-create-target-dir">Directory</Label>
+        <div class="flex items-center gap-2">
+          <Label for="{uid}-create-target-dir" class="text-caption text-muted-foreground">Folder</Label>
           <NativeSelect.Root
             id="{uid}-create-target-dir"
             data-testid="create-target-dir-select"
@@ -454,6 +841,7 @@
     {/if}
     <div
       class="flex-1 relative"
+      bind:this={canvasRegion}
       role="region"
       aria-label="Workflow canvas drop zone"
       ondragover={handleDragOver}
@@ -464,6 +852,7 @@
         bind:edges
         fitView
         minZoom={0.1}
+        deleteKey={['Backspace', 'Delete']}
         {nodeTypes}
         {edgeTypes}
         connectionMode={ConnectionMode.Loose}
@@ -471,15 +860,25 @@
         onnodeclick={handleNodeClick}
         onpaneclick={handlePaneClick}
         onedgeclick={handleEdgeClick}
-        onedgepointerenter={handleEdgePointerEnter}
-        onedgepointerleave={handleEdgePointerLeave}
+        ondelete={handleFlowDelete}
+        onconnect={markDirty}
+        onnodedragstart={handleNodeDragStart}
+        onnodedragstop={handleNodeDragStop}
       >
-        <FlowPositionBridge onReady={(fn) => (toFlowPosition = fn)} />
-        <Background />
-        <Controls />
-        <MiniMap />
+        <FlowBridge onReady={(api) => (flow = api)} onZoom={(level) => (zoom = level)} />
+        <Background variant={BackgroundVariant.Dots} gap={20} bgColor="var(--muted)" patternColor="var(--divider)" />
+        <MiniMap
+          class="overflow-hidden rounded-lg shadow-tooltip"
+          bgColor="var(--card)"
+          maskColor="var(--scrim-faint)"
+          nodeColor={(n) => stepKind(String(n.data.nodeType)).tint}
+          nodeStrokeColor={(n) => stepKind(String(n.data.nodeType)).ink}
+          nodeStrokeWidth={1}
+        />
       </SvelteFlow>
+      <Legend />
     </div>
+    <StatusBar stepCount={nodes.length} connectionCount={edges.length} {problems} onReview={reviewProblem} />
     {#if !saveInHeader}
       {@render saveAction()}
     {/if}
@@ -487,112 +886,14 @@
       <p role="alert" data-testid="save-error" class="text-destructive text-sm px-3 py-2">{saveError}</p>
     {/if}
   </div>
-  {#if selectedNode}
-    {@const node = selectedNode}
-    {@const FormComponent = formComponentFor(node.data.nodeType)}
-    <aside class={inspectorClass} data-testid="node-inspector">
-      <div class="flex items-center justify-between mb-2.5">
-        <span class="font-semibold text-sm text-foreground" data-testid="node-inspector-title">
-          {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.title ?? node.data.nodeType}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          class="text-base text-muted-foreground"
-          onclick={() => (selectedNodeId = null)}
-          aria-label="Close node inspector"
-        >
-          ×
-        </Button>
-      </div>
-      <p class="mb-2.5 text-xs leading-snug text-muted-foreground" data-testid="node-inspector-description">
-        {(NODE_KIND_CONFIG as Record<string, NodeKindConfig>)[node.data.nodeType]?.description ?? ''}
-      </p>
-      <!-- Remount on selection change: each nodeForms/*.svelte component
-           seeds its local field state from `attrs` only once per mount
-           (documented in each form's own comment) -- {#key} forces a fresh
-           instance instead of letting a prop update slip past that
-           intentional one-time read when the user selects a different node. -->
-      {#key node.id}
-        <div class="mb-2.5 flex flex-col gap-1.5">
-          <Label for="{uid}-node-label">Label</Label>
-          <Input
-            id="{uid}-node-label"
-            type="text"
-            data-testid="node-inspector-label"
-            value={node.data.label}
-            oninput={(event) =>
-              applyNodeFormChange(node.id, { label: (event.target as HTMLInputElement).value })}
-          />
-        </div>
-        <FormComponent attrs={node.data.attrs} onChange={(patch: NodeFormChange) => applyNodeFormChange(node.id, patch)} />
-      {/key}
-    </aside>
-  {:else if selectedEdge}
-    {@const edge = selectedEdge}
-    <aside class={inspectorClass} data-testid="edge-inspector">
-      <div class="flex items-center justify-between mb-2.5">
-        <span class="font-semibold text-sm text-foreground" data-testid="edge-inspector-title">Edge</span>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          class="text-base text-muted-foreground"
-          onclick={() => (selectedEdgeId = null)}
-          aria-label="Close edge inspector"
-        >
-          ×
-        </Button>
-      </div>
-      <!-- Remount on selection change, same reasoning as the node
-           inspector's own {#key} above -- EdgeForm.svelte seeds its local
-           field state from condition/priority/loopRestart only once per
-           mount. -->
-      {#key edge.id}
-        <EdgeForm
-          condition={edge.data?.condition ?? null}
-          priority={edge.data?.priority ?? null}
-          loopRestart={edge.data?.loopRestart ?? false}
-          onChange={(patch) => applyEdgeFormChange(edge.id, patch)}
-        />
-      {/key}
-    </aside>
+  {#if !phone.current && inspectorShown}
+    {@render inspectorPanel()}
   {/if}
 </div>
 
 <style>
-  /* Connection handles dim (not fully hidden -- an earlier revision hid
-     them at opacity 0 until hover, which made it impossible to discover
-     where a connection could even be dragged from) until the owning node
-     is hovered, brightened to full opacity with a plain opacity
-     transition; a node that has at least one edge (wf-node-connected,
-     computed in this file's `connectedNodeIds` $effect above) keeps its
-     handles visibly accent-colored even without hovering, so a "wired up"
-     node reads as such at a glance instead of needing a hover to confirm.
-     :global() is required here -- these elements are rendered by @xyflow/
-     svelte's own child components (DefaultNode/Handle.svelte), not by this
-     component's own template, so Svelte's default per-component style
-     scoping never reaches them. */
-  :global(.svelte-flow__handle) {
-    opacity: 0.45;
-    transition:
-      opacity 0.15s ease,
-      background-color 0.15s ease,
-      border-color 0.15s ease;
-  }
-
-  :global(.svelte-flow__node:hover .svelte-flow__handle),
-  :global(.svelte-flow__node.selected .svelte-flow__handle) {
-    opacity: 1;
-  }
-
-  :global(.svelte-flow__node.wf-node-connected .svelte-flow__handle) {
-    opacity: 1;
-    background-color: #3b82f6;
-    border-color: #3b82f6;
-  }
-
   /* Edge lines default to Svelte Flow's own pale-gray 1px stroke
-     (--xy-edge-stroke-default: #b1b1b7), which is nearly invisible against
+     (--xy-edge-stroke-default, a pale grey), which is nearly invisible against
      this app's light canvas background -- a loaded graph with every node
      genuinely connected read as a disconnected grid of boxes because the
      lines joining them couldn't be seen. Overriding the library's own
@@ -600,9 +901,11 @@
      hover/selected states, arrowheads, etc. all still driven by the one
      source of truth. */
   :global(.svelte-flow) {
-    --xy-edge-stroke-default: #64748b;
+    /* Theme tokens so edges follow dark mode. The board draws its lighter neutral grey, which is
+       under 3:1 against the canvas, so edges keep the darker muted grey. */
+    --xy-edge-stroke-default: var(--muted-foreground);
     --xy-edge-stroke-width-default: 2;
-    --xy-edge-stroke-selected-default: #3b82f6;
+    --xy-edge-stroke-selected-default: var(--primary);
   }
 
   /* @xyflow/svelte 1.6.6's own base.css gives `.svelte-flow__viewport` and

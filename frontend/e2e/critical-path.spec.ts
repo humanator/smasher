@@ -23,16 +23,16 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   // Wait for page load
   await page.waitForLoadState('networkidle');
 
-  // Wait for the app to render - look for the catalog heading
-  await expect(page.locator('h1', { hasText: 'Smasher Pipelines' })).toBeVisible({ timeout: 10000 });
+  // Wait for the app to render - look for the dashboard heading
+  await expect(page.locator('h1', { hasText: 'Workflows' })).toBeVisible({ timeout: 10000 });
 
   // Launch examples/human_gate_showcase.dot -- already on disk and listed
   // in the catalog (SMASHER_WORKFLOWS_DIR=examples) -- via its "Run
   // Workflow" button. The catalog is the only submission path now that
   // the free-form "paste DOT source" panel has been removed from the UI.
-  const row = page.locator('tr', { hasText: 'Human Gate Showcase' });
+  const row = page.getByRole('row').filter({ hasText: 'Human Gate Showcase' });
   await expect(row).toBeVisible({ timeout: 10000 });
-  await row.getByRole('button', { name: 'Run Workflow' }).click();
+  await row.getByRole('button', { name: 'Run…' }).click();
 
   // After submission, the page should navigate to /runs/{id}
   await page.waitForURL(/\/runs\/[a-z0-9-]+/);
@@ -40,13 +40,13 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   const runId = page.url().split('/runs/')[1];
   expect(runId).toBeTruthy();
 
-  // The EventLog component's heading should be visible (scope to the events panel
-  // specifically -- "Events" also appears as the page's own section heading).
-  const eventLogHeading = page.locator('.event-log h3', { hasText: 'Events' });
-  await expect(eventLogHeading).toBeVisible({ timeout: 10000 });
+  // The run panel's Activity tab holds the event log.
+  await page.getByRole('tab', { name: 'Activity' }).click();
+  const eventLog = page.locator('.event-log');
+  await expect(eventLog).toBeVisible({ timeout: 10000 });
 
-  // Wait for pipeline_started event to appear in EventLog (Task 6b replay)
-  await expect(page.locator('text=Pipeline started')).toBeVisible({ timeout: 15000 });
+  // Wait for pipeline_started event to appear in the log (Task 6b replay)
+  await expect(eventLog.getByText('Run started')).toBeVisible({ timeout: 15000 });
 
   // human_gate_showcase.dot has 5 chained gates. The backend's HttpInterviewer
   // currently reports every gate as kind "free_form" regardless of the DOT's
@@ -75,7 +75,7 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
       continue;
     }
 
-    const completionEvent = page.locator('text=Pipeline completed');
+    const completionEvent = eventLog.getByText('Run completed');
     if (await completionEvent.isVisible().catch(() => false)) {
       break;
     }
@@ -85,11 +85,11 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
 
   expect(gatesAnswered).toBeGreaterThan(0);
 
-  // Verify the pipeline completed - should see completion event in EventLog
-  await expect(page.locator('text=Pipeline completed')).toBeVisible({ timeout: 540000 });
+  // Verify the pipeline completed - should see completion event in the Activity log
+  await expect(eventLog.getByText('Run completed')).toBeVisible({ timeout: 540000 });
 
   // Verify the run's authoritative final status via the real API, not by
-  // text-matching the page: the EventLog legitimately renders historical
+  // text-matching the page: the Activity log legitimately renders historical
   // "node_failed" entries as part of normal operation (a node can fail and
   // the graph can still route around it), so scanning the whole page for
   // /error|failed/i would false-positive on that real, correct log content.
@@ -97,7 +97,7 @@ test('submit pipeline, stream events, answer 5 human gates, observe completion',
   const runStatus = (await runResponse.json()).status;
   expect(runStatus).toBe('Completed');
 
-  // The WorkflowCatalog component renders its own errors with
+  // The dashboard renders its own errors with
   // role="alert" -- confirm none of those are present.
   await expect(page.locator('[role="alert"]')).toHaveCount(0);
 });

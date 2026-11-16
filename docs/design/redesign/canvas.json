@@ -1,0 +1,184 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Accordion.dc.html": {
+      "h": 240,
+      "title": "Accordion (component)",
+      "w": 520,
+      "x": 2847,
+      "y": 7413
+    },
+    "Badge.dc.html": {
+      "h": 120,
+      "title": "Badge (component)",
+      "w": 240,
+      "x": 2067,
+      "y": 6893
+    },
+    "Button.dc.html": {
+      "h": 120,
+      "title": "Button (component)",
+      "w": 240,
+      "x": 1747,
+      "y": 6893
+    },
+    "Checkbox.dc.html": {
+      "h": 120,
+      "title": "Checkbox (component)",
+      "w": 240,
+      "x": 3707,
+      "y": 6893
+    },
+    "Components.dc.html": {
+      "expand": "fill",
+      "h": 6342,
+      "title": "Components",
+      "w": 1440,
+      "x": 0,
+      "y": 2240
+    },
+    "Drawer.dc.html": {
+      "h": 440,
+      "title": "Drawer (component)",
+      "w": 440,
+      "x": 4287,
+      "y": 7413
+    },
+    "Home.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "Dashboard",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "Input.dc.html": {
+      "h": 160,
+      "title": "Input (component)",
+      "w": 360,
+      "x": 2387,
+      "y": 6893
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "Workflow editor",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Popover.dc.html": {
+      "h": 220,
+      "title": "Popover (component)",
+      "w": 360,
+      "x": 3847,
+      "y": 7413
+    },
+    "Run.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "Run",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "Select.dc.html": {
+      "h": 160,
+      "title": "Select (component)",
+      "w": 360,
+      "x": 3267,
+      "y": 6893
+    },
+    "Sidebar.dc.html": {
+      "h": 440,
+      "title": "Sidebar (component)",
+      "w": 256,
+      "x": 4807,
+      "y": 7413
+    },
+    "Switch.dc.html": {
+      "h": 120,
+      "title": "Switch (component)",
+      "w": 240,
+      "x": 1747,
+      "y": 7413
+    },
+    "Tabs.dc.html": {
+      "h": 120,
+      "title": "Tabs (component)",
+      "w": 300,
+      "x": 2067,
+      "y": 7413
+    },
+    "Textarea.dc.html": {
+      "h": 200,
+      "title": "Textarea (component)",
+      "w": 360,
+      "x": 2827,
+      "y": 6893
+    },
+    "ToggleGroup.dc.html": {
+      "h": 120,
+      "title": "Toggle group (component)",
+      "w": 320,
+      "x": 2447,
+      "y": 7413
+    },
+    "Tooltip.dc.html": {
+      "h": 140,
+      "title": "Tooltip (component)",
+      "w": 320,
+      "x": 3447,
+      "y": 7413
+    },
+    "Workflow.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "radius": 12,
+      "title": "Workflow detail",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-13T00:35:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "file": "Home.dc.html",
+    "view": "focused"
+  },
+  "notes": {},
+  "order": [
+    "Main.dc.html",
+    "Home.dc.html",
+    "Workflow.dc.html",
+    "Run.dc.html",
+    "Components.dc.html",
+    "Button.dc.html",
+    "Badge.dc.html",
+    "Input.dc.html",
+    "Textarea.dc.html",
+    "Select.dc.html",
+    "Checkbox.dc.html",
+    "Switch.dc.html",
+    "Tabs.dc.html",
+    "ToggleGroup.dc.html",
+    "Accordion.dc.html",
+    "Tooltip.dc.html",
+    "Popover.dc.html",
+    "Drawer.dc.html",
+    "Sidebar.dc.html"
+  ],
+  "pages": [],
+  "title": "Smasher Workflow Editor Redesign"
+}

@@ -78,6 +78,8 @@ fn app_command_permissions() -> Vec<String> {
 #[test]
 fn remote_capabilities_grant_only_native_shim_permissions() {
     const ALLOWED_PREFIXES: [&str; 3] = ["notification:", "dialog:", "fs:"];
+    // The toolbar and sidebar header are `data-tauri-drag-region`s, which call start_dragging.
+    const ALLOWED_EXACT: [&str; 1] = ["core:window:allow-start-dragging"];
     let app_commands = app_command_permissions();
 
     for (path, cap) in capabilities() {
@@ -87,6 +89,7 @@ fn remote_capabilities_grant_only_native_shim_permissions() {
         for id in permission_ids(&cap) {
             assert!(
                 ALLOWED_PREFIXES.iter().any(|prefix| id.starts_with(prefix))
+                    || ALLOWED_EXACT.contains(&id.as_str())
                     || app_commands.contains(&id),
                 "{} grants {id} to a remote origin",
                 path.display()
@@ -100,12 +103,14 @@ fn served_origin_holds_the_permissions_the_native_shim_calls() {
     // frontend/src/lib/native/index.ts: saveFile -> dialog.save + fs.writeTextFile,
     // loadFile -> dialog.open + fs.readTextFile,
     // showNotification -> notification.sendNotification.
-    const NEEDED: [&str; 5] = [
+    // The drag regions in the toolbar and sidebar header -> window.start_dragging.
+    const NEEDED: [&str; 6] = [
         "dialog:allow-save",
         "fs:allow-write-text-file",
         "dialog:allow-open",
         "fs:allow-read-text-file",
         "notification:default",
+        "core:window:allow-start-dragging",
     ];
     let granted: Vec<String> = capabilities()
         .into_iter()
@@ -132,4 +137,41 @@ fn served_origin_may_invoke_every_settings_command() {
     for id in app_command_permissions() {
         assert!(granted.contains(&id), "served origin is missing {id}");
     }
+}
+
+#[test]
+fn served_origin_may_reveal_a_workflow_in_finder() {
+    let granted: Vec<String> = capabilities()
+        .into_iter()
+        .filter(|(_, cap)| !remote_urls(cap).is_empty())
+        .flat_map(|(_, cap)| permission_ids(&cap))
+        .collect();
+
+    assert!(granted.iter().any(|g| g == "allow-reveal-in-finder"));
+}
+
+#[test]
+fn served_origin_may_reveal_a_run_folder_in_finder() {
+    let granted: Vec<String> = capabilities()
+        .into_iter()
+        .filter(|(_, cap)| !remote_urls(cap).is_empty())
+        .flat_map(|(_, cap)| permission_ids(&cap))
+        .collect();
+
+    assert!(granted.iter().any(|g| g == "allow-reveal-run-folder"));
+}
+
+#[test]
+fn build_script_declares_exactly_the_app_commands() {
+    // build.rs can't import the crate, so it lists the commands again; the two lists must agree.
+    let build_rs =
+        std::fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("build.rs"))
+            .unwrap();
+    let start = build_rs
+        .find(".commands(&[")
+        .expect("build.rs declares its commands");
+    let end = start + build_rs[start..].find("])").unwrap();
+    let declared: Vec<&str> = build_rs[start..end].split('"').skip(1).step_by(2).collect();
+
+    assert_eq!(declared, smasher_desktop::commands::COMMANDS);
 }

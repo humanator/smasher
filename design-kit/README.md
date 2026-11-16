@@ -172,4 +172,4 @@ npx playwright test
 
 Both must pass, and `catalog.html` should be visually reviewed in a browser, before
 adding or changing a component. See `../docs/design-factory/SPEC-component-kit.md`
-for the full spec and `../tasks/todo.md` for the task-by-task build record.
+for the full spec and `../tasks/archive/todo-component-kit.md` for the task-by-task build record.

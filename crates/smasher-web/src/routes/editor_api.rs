@@ -72,7 +72,7 @@ pub(crate) struct EditorEdge {
     attrs: HashMap<String, serde_json::Value>,
 }
 
-fn node_type_to_str(nt: &NodeType) -> &'static str {
+pub(crate) fn node_type_to_str(nt: &NodeType) -> &'static str {
     match nt {
         NodeType::Start => "Start",
         NodeType::Exit => "Exit",

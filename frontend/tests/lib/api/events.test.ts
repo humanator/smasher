@@ -1,10 +1,11 @@
 // ABOUTME: Tests for the EventSource SSE client
 // ABOUTME: Tests run against a real smasher-web-api instance with a real pipeline execution
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import * as eventsModule from '../../../src/lib/api/events';
 import * as runsModule from '../../../src/lib/api/runs';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
+import { trackRun, cancelAll } from '../../fixtures/graphs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -25,6 +26,11 @@ describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
     setApiBaseUrl(API_URL);
   });
 
+  // Each run parks on the showcase's first human gate; cancel it.
+  afterEach(async () => {
+    await cancelAll();
+  });
+
   it(
     'should receive pipeline_started event via event replay on subscribe',
     async () => {
@@ -34,7 +40,7 @@ describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
         variables: { test: 'events' },
       });
 
-      const runId = submitResp.run_id;
+      const runId = trackRun(submitResp.run_id);
 
       // Track events received
       const events: eventsModule.PipelineEvent[] = [];
@@ -100,7 +106,7 @@ describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
         variables: { test: 'discrimination' },
       });
 
-      const runId = submitResp.run_id;
+      const runId = trackRun(submitResp.run_id);
 
       // Track events
       const events: eventsModule.PipelineEvent[] = [];
