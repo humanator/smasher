@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use axum::extract::{Path, State};
 use axum::routing::{get, post};
@@ -458,11 +459,34 @@ async fn cancel_run(
     }
 
     record.cancellation.cancel();
-    Ok(Json(CancelResponse {
-        success: true,
-        status: "Aborted".into(),
-    }))
+    drop(runs);
+
+    // The run's own task records how it stopped once the engine notices the
+    // cancel, a few milliseconds later. Answer only then, so this reply and any
+    // read after it agree, instead of a read still seeing `Running`.
+    let deadline = tokio::time::Instant::now() + CANCEL_SETTLE_TIMEOUT;
+    loop {
+        let status = state.runs.read().await.get(&id).map(|r| r.status.clone());
+        match status {
+            Some(RunStatus::Running) if tokio::time::Instant::now() < deadline => {
+                tokio::time::sleep(CANCEL_SETTLE_POLL).await;
+            }
+            // Still running at the deadline: the cancel stands, and the status says
+            // so truthfully; the run aborts when the engine next checks.
+            Some(status) => {
+                return Ok(Json(CancelResponse {
+                    success: true,
+                    status: format!("{status:?}"),
+                }));
+            }
+            None => return Err(WebError::NotFound(format!("run {id}"))),
+        }
+    }
 }
+
+/// How long a cancel waits for the run to record that it stopped.
+const CANCEL_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
+const CANCEL_SETTLE_POLL: Duration = Duration::from_millis(5);
 
 async fn resume_run(
     State(state): State<AppState>,
@@ -1182,7 +1206,15 @@ mod tests {
     #[tokio::test]
     async fn cancel_running_run_returns_success() {
         let state = test_state();
-        let _token = insert_test_record(&state, "run-cancel-1", RunStatus::Running).await;
+        let token = insert_test_record(&state, "run-cancel-1", RunStatus::Running).await;
+        // Stand in for the run's task, which records Aborted once the engine sees the cancel.
+        let runs = state.runs.clone();
+        tokio::spawn(async move {
+            token.cancelled().await;
+            if let Some(record) = runs.write().await.get_mut("run-cancel-1") {
+                record.status = RunStatus::Aborted;
+            }
+        });
         let app = router().with_state(state);
         let req = Request::builder()
             .method("POST")
