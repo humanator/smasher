@@ -1,6 +1,6 @@
 <script lang="ts">
   // ABOUTME: Run list page - polls GET /api/runs and shows real run status
-  // ABOUTME: Links each row to its run detail page at /runs/{id}
+  // ABOUTME: Links each row to its run detail page at /runs/{id}; finished runs can be deleted
 
   import { onMount, onDestroy } from 'svelte';
   import * as runsApi from '../../lib/api/runs';
@@ -26,6 +26,12 @@
     }
   }
 
+  async function deleteRuns(ids: string[]) {
+    await runsApi.deleteRuns(ids);
+    runs = runs.filter((run) => !ids.includes(run.id));
+    await refresh();
+  }
+
   onMount(() => {
     refresh();
     pollHandle = setInterval(refresh, POLL_INTERVAL_MS);
@@ -46,6 +52,6 @@
   {:else if runs.length === 0}
     <p class="p-8 text-center text-lg text-muted-foreground">No runs yet.</p>
   {:else}
-    <RunTable {runs} />
+    <RunTable {runs} ondelete={deleteRuns} />
   {/if}
 </div>

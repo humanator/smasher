@@ -48,6 +48,18 @@ export async function submitGraph(dot: string): Promise<string> {
   return run_id;
 }
 
+// Submits a graph, cancels it at its gate, and waits until it is Aborted,
+// giving a finished run that can be deleted.
+export async function submitAbortedGraph(dot: string): Promise<string> {
+  const { run_id } = await runsApi.submitRun({ dot_source: dot, variables: {} });
+  await runsApi.cancelRun(run_id);
+  for (let i = 0; i < 50; i++) {
+    if ((await runsApi.getRun(run_id)).status === 'Aborted') return run_id;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`run ${run_id} never reached Aborted`);
+}
+
 // Cancels every run submitted so far. Call it in afterEach.
 export async function cancelAll(): Promise<void> {
   const ids = submitted.splice(0);

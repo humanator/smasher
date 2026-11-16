@@ -391,6 +391,7 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/runs/{id}` | Get status of a specific run. |
 | `POST` | `/api/runs/{id}/cancel` | Cancel a running pipeline. |
 | `POST` | `/api/runs/{id}/resume` | Resume a completed/failed/aborted run from checkpoint. |
+| `POST` | `/api/runs/delete` | Permanently delete one or more finished runs and their artifacts. |
 | `GET` | `/api/runs/{id}/tokens` | Get input/output token counts for a run. |
 | `GET` | `/api/runs/{id}/graph` | Render the run's graph as SVG with node execution status. |
 | `GET` | `/api/runs/{id}/events` | Stream run events as Server-Sent Events (JSON). |
@@ -582,6 +583,40 @@ Response body (200 OK):
   "run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
   "status": "Running",
   "resumed_from_node": "node_id"
+}
+```
+
+### POST /api/runs/delete -- Delete Runs
+
+Permanently deletes runs: each run's whole `{data_dir}/artifacts/<run_id>/`
+tree and its record in the server's run list. There is no automatic
+retention; this (and `smasher prune-artifacts`) is how runs go away. It
+can't be undone.
+
+Request body:
+
+```json
+{
+  "run_ids": ["01arz3ndektsv4rrffq69g5fav", "01arz3ndektsv4rrffq69g5fb0"]
+}
+```
+
+The whole batch is checked before anything is deleted, so a refused request
+deletes nothing:
+
+| Status | When |
+|---|---|
+| `400` | `run_ids` is empty, or an id isn't a single path component (empty, `.`, or containing `/`, `\` or `..`). |
+| `404` | An id names no known run. |
+| `409` | A run is still `Running`; cancel it first. |
+
+A run whose artifacts tree is already missing is still removed from the list.
+
+Response body (200 OK), listing the deleted ids in request order:
+
+```json
+{
+  "deleted": ["01arz3ndektsv4rrffq69g5fav", "01arz3ndektsv4rrffq69g5fb0"]
 }
 ```
 
