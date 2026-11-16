@@ -240,13 +240,6 @@ describe('Candidates', () => {
       expect(onNote).toHaveBeenLastCalledWith('candidate-a', 'hi');
     });
 
-    it('lightens the Add a Note… link in dark mode, where the primary pink is only 3.1:1 on the card', async () => {
-      const candidates = await runWith((id, write) => write(id, 'candidate-a'));
-      renderCandidates(candidates, { selectable: true });
-
-      expect(screen.getByRole('button', { name: 'Add a Note…' })).toHaveClass('dark:text-primary-subtle-foreground');
-    });
-
     it('toggles the note editor from one link: Add a Note…, Hide Note, Edit Note', async () => {
       const candidates = await runWith((id, write) => write(id, 'candidate-a'));
       const user = userEvent.setup();

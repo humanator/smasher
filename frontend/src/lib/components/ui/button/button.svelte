@@ -12,7 +12,7 @@
 				secondary: "bg-secondary text-secondary-foreground hover:bg-fill-pressed aria-expanded:bg-fill-pressed",
 				ghost: "text-foreground-control hover:bg-accent hover:text-foreground aria-expanded:bg-fill-pressed aria-expanded:text-foreground aria-pressed:bg-fill-pressed aria-pressed:text-foreground",
 				destructive: "bg-control text-destructive shadow-push hover:bg-destructive-subtle",
-				link: "text-primary px-0! underline-offset-4 hover:underline",
+				link: "text-primary dark:text-primary-subtle-foreground px-0! underline-offset-4 hover:underline",
 			},
 			size: {
 				default: "h-[24px] px-[11px]",
