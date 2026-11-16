@@ -12,36 +12,15 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
    but tests only use mocks. Spends tokens, so only on request. (Test fixtures
    use `claude-sonnet-4-20250514` on purpose as sample data; leave them.)
 23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
-    - Manager (`house`) nodes fail under claude-cli: `LlmManagerBackend` runs
-      an agent session with tools, which `claude -p` single calls can't do.
-      They stay LLM nodes (decided 2026-10-13, closing #35), so route them
-      through `ClaudeCliBackend`. Workaround:
-      `provider="<other>"` on the node.
     - Checkpoints skipped before merge, waiting on Jobsworth's call: the
       `#[ignore]` real-CLI tests (including the `curl` denial), `smasher run` on
       hello-world and a codergen example, and hello-world in the desktop app.
     - Codergen agents are denied the shell, so they can't run the design-kit
       linter or open their pages. Decide whether to allow the linter command,
       or leave checking to the pipeline's `system_lint`/`render` nodes.
-    - Show `permission_denials` from the CLI's result event in the run view.
-    - Make the claude-cli codergen timeout configurable (fixed at 600s in
-      `smasher-web/src/run_launch.rs`).
-    - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
-      from `PATH`.
+
 ## P2: Robustness
 
-40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
-    #6: there's no automatic retention policy. Every run's artifacts are kept
-    until you delete the run yourself, and `smasher prune-artifacts` stays a
-    manual tool. So the run list (`RunList.svelte`/`RunTable.svelte`) needs a
-    way to delete runs: a delete action on one run, plus checkboxes to select
-    several and delete them in one action, with a confirmation that says how
-    many runs will go. The server has no delete endpoint yet, so add one (for
-    example `DELETE /api/runs/{id}`, or a batch form taking a list of ids). It
-    removes the whole `{data_dir}/artifacts/<run_id>/` tree, as
-    `prune_artifacts` does, and the in-memory record. Refuse runs that are
-    still running. Deleting is permanent, since the desktop app keeps runs in
-    `~/Documents/smasher`.
 43. **Fix the link button's dark-mode contrast at the source.** The Button
     `link` variant (`frontend/src/lib/components/ui/button/button.svelte`) uses
     `text-primary`, which is about 3:1 on dark surfaces. Screens have fixed it one

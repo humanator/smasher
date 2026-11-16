@@ -1,5 +1,5 @@
 // ABOUTME: REST client for run management routes
-// ABOUTME: Submit, list, get, cancel, resume, token counts, graph rendering, candidates
+// ABOUTME: Submit, list, get, cancel, resume, delete, token counts, graph rendering, candidates
 
 import { getApiUrl } from './client-config';
 import { errorFromResponse } from './errors';
@@ -56,6 +56,10 @@ export interface ResumeResponse {
 export interface StepsResponse {
   nodes: GraphNodeSummary[];
   edges: StepEdge[];
+}
+
+export interface DeleteRunsResponse {
+  deleted: string[];
 }
 
 export interface TokenResponse {
@@ -188,6 +192,17 @@ export async function resumeRun(id: string): Promise<string> {
 export async function getRunSteps(id: string): Promise<StepsResponse> {
   const response = await fetch(getApiUrl(`/runs/${encodeURIComponent(id)}/steps`));
   return handleResponse<StepsResponse>(response);
+}
+
+// Permanently deletes finished runs and their artifacts. The server checks
+// the whole batch first, so a refusal (404 unknown, 409 running) deletes nothing.
+export async function deleteRuns(runIds: string[]): Promise<DeleteRunsResponse> {
+  const response = await fetch(getApiUrl('/runs/delete'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ run_ids: runIds }),
+  });
+  return handleResponse<DeleteRunsResponse>(response);
 }
 
 export async function getTokens(id: string): Promise<TokenResponse> {

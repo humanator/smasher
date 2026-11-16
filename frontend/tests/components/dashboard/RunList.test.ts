@@ -1,5 +1,5 @@
 // ABOUTME: Tests for RunList, the dashboard's Recent runs: filter toggle with counts, ?runs= sync and empty states
-// ABOUTME: Fixture runs in a stand-in library for exact counts, plus one pass against the real library store
+// ABOUTME: Fixture runs in a stand-in library for exact counts, plus listing and deleting against the real store
 
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/svelte/svelte5';
@@ -7,8 +7,9 @@ import userEvent from '@testing-library/user-event';
 import RunList from '../../../src/components/dashboard/RunList.svelte';
 import { createLibraryStore } from '../../../src/stores/library.svelte';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
+import * as runsApi from '../../../src/lib/api/runs';
 import type { RunSummary } from '../../../src/lib/api/runs';
-import { ANONYMOUS_GATE, submitGraph, cancelAll } from '../../fixtures/graphs';
+import { ANONYMOUS_GATE, submitGraph, submitAbortedGraph, cancelAll } from '../../fixtures/graphs';
 
 function run(id: string, status: string, extra: Partial<RunSummary> = {}): RunSummary {
   return {
@@ -190,6 +191,9 @@ describe('RunList', () => {
     });
 
     afterEach(async () => {
+      // bits-ui's scroll lock clears this on a timer after the open dialog
+      // unmounts; reset it so the next test's clicks aren't blocked.
+      document.body.style.pointerEvents = '';
       stores.splice(0).forEach((s) => s.stop());
       await cancelAll();
     });
@@ -204,6 +208,33 @@ describe('RunList', () => {
 
       const link = await screen.findByRole('link', { name: id }, { timeout: 5000 });
       expect(link).toHaveAttribute('href', `/runs/${id}`);
+    });
+
+    it('deletes the selected runs on the server and drops them from the list', async () => {
+      const ids = [await submitAbortedGraph(ANONYMOUS_GATE), await submitAbortedGraph(ANONYMOUS_GATE)];
+      const keep = await submitGraph(ANONYMOUS_GATE);
+      const store = createLibraryStore();
+      stores.push(store);
+      store.start();
+      const user = userEvent.setup();
+
+      render(RunList, { props: { library: store } });
+
+      for (const id of ids) {
+        await user.click(await screen.findByRole('checkbox', { name: `Select run ${id}` }, { timeout: 5000 }));
+      }
+      await user.click(screen.getByRole('button', { name: /delete selected/i }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Delete 2 runs?')).toBeTruthy();
+      await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() => {
+        for (const id of ids) expect(screen.queryByRole('link', { name: id })).toBeNull();
+      });
+      expect(screen.getByRole('link', { name: keep })).toBeTruthy();
+      for (const id of ids) {
+        await expect(runsApi.getRun(id)).rejects.toMatchObject({ status: 404 });
+      }
     });
   });
 });

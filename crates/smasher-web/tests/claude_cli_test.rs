@@ -1,5 +1,5 @@
-// ABOUTME: Boots the web server with only a fake `claude` CLI configured and runs a codergen
-// ABOUTME: pipeline through it, checking the CLI's NDJSON events and token usage reach the run.
+// ABOUTME: Boots the web server with only a fake `claude` CLI configured and runs codergen and
+// ABOUTME: manager nodes through it, checking the CLI's NDJSON events and token usage reach the run.
 
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
@@ -23,7 +23,9 @@ fn fake_claude(dir: &std::path::Path) -> std::path::PathBuf {
     let result = json!({"type": "result", "subtype": "success", "is_error": false,
         "result": "Wrote index.html", "total_cost_usd": 0.0125,
         "usage": {"input_tokens": 18, "output_tokens": 161,
-                  "cache_read_input_tokens": 31730, "cache_creation_input_tokens": 15363}});
+                  "cache_read_input_tokens": 31730, "cache_creation_input_tokens": 15363},
+        "permission_denials": [{"tool_name": "Bash", "tool_use_id": "t2",
+                                "tool_input": {"command": "curl -sI https://example.com"}}]});
     std::fs::write(
         dir.join("out.ndjson"),
         format!("{tool_use}\n{text}\n{result}\n"),
@@ -105,8 +107,9 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
     let dot = r#"digraph CliCodergen {
         start [shape=circle];
         build [shape=box, prompt="Write index.html"];
+        plan [shape=house, task="Plan the next step"];
         done [shape=doublecircle];
-        start -> build -> done;
+        start -> build -> plan -> done;
     }"#;
     let submit: Value = reqwest::Client::new()
         .post(format!("{base}/api/runs"))
@@ -147,11 +150,34 @@ async fn server_runs_codergen_through_claude_cli_with_no_api_keys() {
         .expect("no agent_message event");
     assert!(message.contains("Wrote index.html"), "{message}");
 
-    // The result line's usage reaches the run totals, cache tokens excluded.
-    assert_eq!(run["input_tokens"], 18, "{run}");
-    assert_eq!(run["output_tokens"], 161, "{run}");
+    // The result line's permission denials reach the run's event stream.
+    let denial = events
+        .iter()
+        .find(|(n, v)| n == "agent_permission_denied" && v["node_id"] == "build")
+        .map(|(_, v)| v.clone())
+        .expect("no agent_permission_denied event");
+    assert_eq!(denial["tool_name"], "Bash", "{denial}");
+    assert_eq!(
+        denial["input_preview"], "curl -sI https://example.com",
+        "{denial}"
+    );
 
+    // The manager node ran through the CLI too, its events tagged with its id.
+    assert!(
+        events
+            .iter()
+            .any(|(n, v)| n == "agent_message" && v["node_id"] == "plan"),
+        "no agent_message from the manager: {events:?}"
+    );
+
+    // Each call's result-line usage (codergen, then manager) reaches the run
+    // totals, cache tokens excluded.
+    assert_eq!(run["input_tokens"], 36, "{run}");
+    assert_eq!(run["output_tokens"], 322, "{run}");
+
+    // argv.txt holds the last call's arguments: the manager's.
     let argv = std::fs::read_to_string(dir.path().join("argv.txt")).unwrap();
+    assert!(argv.contains("Task: Plan the next step"), "argv: {argv}");
     assert!(argv.contains("dontAsk"), "argv: {argv}");
     assert!(argv.contains("claude-sonnet-5"), "argv: {argv}");
 }

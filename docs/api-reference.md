@@ -391,6 +391,7 @@ The default server binds to `127.0.0.1:21541`.
 | `GET` | `/api/runs/{id}` | Get status of a specific run. |
 | `POST` | `/api/runs/{id}/cancel` | Cancel a running pipeline. |
 | `POST` | `/api/runs/{id}/resume` | Resume a completed/failed/aborted run from checkpoint. |
+| `POST` | `/api/runs/delete` | Permanently delete one or more finished runs and their artifacts. |
 | `GET` | `/api/runs/{id}/tokens` | Get input/output token counts for a run. |
 | `GET` | `/api/runs/{id}/graph` | Render the run's graph as SVG with node execution status. |
 | `GET` | `/api/runs/{id}/steps` | List the run graph's nodes and edges (editor-graph shape). |
@@ -583,7 +584,7 @@ data: {"field": "value", ...}
 
 The stream terminates when `pipeline_completed` or `pipeline_aborted` is received.
 
-All 17 event types listed in the [PipelineEvent Variants](#pipelineevent-variants) section below.
+All 18 event types listed in the [PipelineEvent Variants](#pipelineevent-variants) section below.
 
 ### POST /api/runs/{id}/cancel -- Cancel Run
 
@@ -609,6 +610,40 @@ Response body (200 OK):
   "run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
   "status": "Running",
   "resumed_from_node": "node_id"
+}
+```
+
+### POST /api/runs/delete -- Delete Runs
+
+Permanently deletes runs: each run's whole `{data_dir}/artifacts/<run_id>/`
+tree and its record in the server's run list. There is no automatic
+retention; this (and `smasher prune-artifacts`) is how runs go away. It
+can't be undone.
+
+Request body:
+
+```json
+{
+  "run_ids": ["01arz3ndektsv4rrffq69g5fav", "01arz3ndektsv4rrffq69g5fb0"]
+}
+```
+
+The whole batch is checked before anything is deleted, so a refused request
+deletes nothing:
+
+| Status | When |
+|---|---|
+| `400` | `run_ids` is empty, or an id isn't a single path component (empty, `.`, or containing `/`, `\` or `..`). |
+| `404` | An id names no known run. |
+| `409` | A run is still `Running`; cancel it first. |
+
+A run whose artifacts tree is already missing is still removed from the list.
+
+Response body (200 OK), listing the deleted ids in request order:
+
+```json
+{
+  "deleted": ["01arz3ndektsv4rrffq69g5fav", "01arz3ndektsv4rrffq69g5fb0"]
 }
 ```
 
@@ -997,6 +1032,7 @@ All events are emitted on `/api/runs/{id}/events` as SSE with JSON data payloads
 | `agent_tool_call_started` | `node_id`, `tool_name`, `tool_call_id`, `input_preview`, `timestamp` | Agent invoked a tool. |
 | `agent_tool_call_completed` | `node_id`, `tool_name`, `tool_call_id`, `duration_ms`, `is_error`, `result_preview`, `timestamp` | Tool execution completed. |
 | `agent_token_usage` | `node_id`, `input_tokens`, `output_tokens`, `cost_usd`, `timestamp` | LLM token usage recorded. |
+| `agent_permission_denied` | `node_id`, `tool_name`, `tool_call_id`, `input_preview`, `timestamp` | A `claude-cli` node was refused a tool call that isn't on its allowlist (one event per entry in the CLI result's `permission_denials`). The node carries on. Streaming runs only. |
 
 On web runs, `HttpInterviewer` emits `human_prompt_issued` when a gate asks its question and
 `human_response_received` when the waiting gate receives the answer. That covers gallery gates

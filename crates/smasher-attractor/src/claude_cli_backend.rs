@@ -1,4 +1,4 @@
-// ABOUTME: CodergenBackend that runs each codergen node through the local `claude` CLI.
+// ABOUTME: Codergen and manager backends that run nodes through the local `claude` CLI.
 // ABOUTME: Streams NDJSON events to the pipeline emitter and enforces a per-node timeout.
 
 use std::path::Path;
@@ -10,6 +10,7 @@ use smasher_llm::provider::claude_cli::process::{base_command, is_claude_model};
 
 use crate::events::{PipelineEvent, PipelineEventEmitter};
 use crate::handler::{CodergenBackend, HandlerError};
+use crate::manager_handler::ManagerBackend;
 use crate::state::{Context, Outcome};
 
 /// Tools a codergen run may use without asking: file tools, plus Bash limited to
@@ -57,6 +58,38 @@ pub fn parse_allowed_tools(value: Option<&str>) -> Vec<String> {
 /// The allowlist from [`ALLOWED_TOOLS_ENV`], or the default.
 pub fn allowed_tools_from_env() -> Vec<String> {
     parse_allowed_tools(std::env::var(ALLOWED_TOOLS_ENV).ok().as_deref())
+}
+
+/// Env var holding the wall-clock limit, in whole seconds, for one node run
+/// through `claude -p` in the web server.
+pub const TIMEOUT_ENV: &str = "SMASHER_CLAUDE_CLI_TIMEOUT_SECS";
+
+/// Per-node limit when [`TIMEOUT_ENV`] is unset, matching `smasher run --agent-timeout`.
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// Parse a timeout in whole seconds. Unset or blank gives [`DEFAULT_TIMEOUT`];
+/// anything else that isn't a positive whole number is warned about and also
+/// gives the default.
+pub fn parse_timeout(value: Option<&str>) -> Duration {
+    let Some(value) = value.map(str::trim).filter(|v| !v.is_empty()) else {
+        return DEFAULT_TIMEOUT;
+    };
+    match value.parse::<u64>() {
+        Ok(secs) if secs > 0 => Duration::from_secs(secs),
+        _ => {
+            tracing::warn!(
+                value,
+                default_secs = DEFAULT_TIMEOUT.as_secs(),
+                "{TIMEOUT_ENV} is not a positive whole number of seconds; using the default"
+            );
+            DEFAULT_TIMEOUT
+        }
+    }
+}
+
+/// The timeout from [`TIMEOUT_ENV`], or the default.
+pub fn timeout_from_env() -> Duration {
+    parse_timeout(std::env::var(TIMEOUT_ENV).ok().as_deref())
 }
 
 /// How a codergen run's tool use is permitted.
@@ -293,6 +326,28 @@ impl CodergenBackend for ClaudeCliBackend {
                                     timestamp: chrono::Utc::now(),
                                 });
                             }
+                            // Tool calls `dontAsk` refused. The run still succeeds.
+                            let denials = obj["permission_denials"].as_array();
+                            if let Some(ref emitter) = emitter {
+                                for denial in denials.into_iter().flatten() {
+                                    let tool_name =
+                                        denial["tool_name"].as_str().unwrap_or("").to_string();
+                                    emitter.emit(PipelineEvent::AgentPermissionDenied {
+                                        node_id: node_id.clone(),
+                                        input_preview:
+                                            smasher_agent::session::tool_input_preview_from_value(
+                                                &tool_name,
+                                                &denial["tool_input"],
+                                            ),
+                                        tool_name,
+                                        tool_call_id: denial["tool_use_id"]
+                                            .as_str()
+                                            .unwrap_or("")
+                                            .to_string(),
+                                        timestamp: chrono::Utc::now(),
+                                    });
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -490,7 +545,8 @@ impl ClaudeCliBackend {
         if self.max_consecutive_timeouts > 0 && count >= self.max_consecutive_timeouts {
             Err(HandlerError::Other(format!(
                 "aborting: {} consecutive timeouts ({}s each). \
-                 Consider increasing --agent-timeout or simplifying node prompts.",
+                 Consider increasing --agent-timeout (smasher run) or \
+                 SMASHER_CLAUDE_CLI_TIMEOUT_SECS (web server), or simplifying node prompts.",
                 count,
                 self.timeout.as_secs()
             )))
@@ -502,6 +558,44 @@ impl ClaudeCliBackend {
                 self.max_consecutive_timeouts
             )))
         }
+    }
+}
+
+/// Manager (`house`) nodes under the claude-cli provider. A manager's task runs as
+/// one `claude -p` agent session through `cli`, like a codergen node, except nodes
+/// whose config names another provider (e.g. `provider="openai"`), which go to
+/// `fallback`, the API agent.
+pub struct ClaudeCliManagerBackend {
+    cli: Arc<dyn CodergenBackend>,
+    fallback: Arc<dyn ManagerBackend>,
+}
+
+impl ClaudeCliManagerBackend {
+    pub fn new(cli: Arc<dyn CodergenBackend>, fallback: Arc<dyn ManagerBackend>) -> Self {
+        Self { cli, fallback }
+    }
+}
+
+#[async_trait::async_trait]
+impl ManagerBackend for ClaudeCliManagerBackend {
+    async fn coordinate(
+        &self,
+        task: &str,
+        config: &serde_json::Value,
+        context: &Context,
+    ) -> Result<Outcome, HandlerError> {
+        let provider = config.get("provider").and_then(serde_json::Value::as_str);
+        if provider.is_some_and(|p| p != "claude-cli") {
+            return self.fallback.coordinate(task, config, context).await;
+        }
+        let model = config.get("model").and_then(serde_json::Value::as_str);
+        // The CLI backend adds the pipeline context itself.
+        let prompt = format!(
+            "You are an AI coordination agent executing a manager task in a pipeline. \
+             Analyze the task, consider the configuration, and produce a clear result.\n\n\
+             Task: {task}\nConfig: {config}"
+        );
+        self.cli.generate(&prompt, model, provider, context).await
     }
 }
 
@@ -778,6 +872,81 @@ mod tests {
         assert_eq!(usage, vec![("node1".to_string(), 18, 161, 0.034722)]);
         assert_eq!(input_tokens.load(Ordering::Relaxed), 18);
         assert_eq!(output_tokens.load(Ordering::Relaxed), 161);
+    }
+
+    /// Shaped like a real `claude -p` result after a `dontAsk` denial: the run
+    /// succeeds and the refused call is listed in `permission_denials`.
+    #[tokio::test]
+    async fn claude_cli_backend_streaming_emits_permission_denials_from_the_result_line() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ndjson_file = tmp.path().join("output.ndjson");
+        std::fs::write(
+            &ndjson_file,
+            concat!(
+                "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\",\"permission_denials\":[",
+                "{\"tool_name\":\"Bash\",\"tool_use_id\":\"toolu_1\",\"tool_input\":{\"command\":\"curl -sI https://example.com\"}},",
+                "{\"tool_name\":\"WebFetch\",\"tool_use_id\":\"toolu_2\",\"tool_input\":{\"url\":\"https://example.com\"}}",
+                "]}\n"
+            ),
+        )
+        .unwrap();
+        let script_path = tmp.path().join("claude");
+        std::fs::write(
+            &script_path,
+            format!("#!/bin/sh\ncat {}\n", ndjson_file.display()),
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        let emitter = Arc::new(crate::events::PipelineEventEmitter::default());
+        let mut rx = emitter.subscribe();
+        let backend = ClaudeCliBackend::new(
+            tmp.path().display().to_string(),
+            std::time::Duration::from_secs(10),
+        )
+        .with_claude_path(script_path.display().to_string())
+        .with_streaming(true)
+        .with_emitter(Arc::clone(&emitter));
+
+        let ctx = crate::state::Context::new();
+        ctx.set("_current_node_id", serde_json::json!("build"));
+        let outcome = backend.generate("test", None, None, &ctx).await.unwrap();
+        drop(emitter);
+        assert!(outcome.is_success(), "{outcome:?}");
+
+        let mut denials = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            if let crate::events::PipelineEvent::AgentPermissionDenied {
+                node_id,
+                tool_name,
+                tool_call_id,
+                input_preview,
+                ..
+            } = event
+            {
+                denials.push((node_id, tool_name, tool_call_id, input_preview));
+            }
+        }
+        assert_eq!(
+            denials,
+            vec![
+                (
+                    "build".to_string(),
+                    "Bash".to_string(),
+                    "toolu_1".to_string(),
+                    "curl -sI https://example.com".to_string()
+                ),
+                (
+                    "build".to_string(),
+                    "WebFetch".to_string(),
+                    "toolu_2".to_string(),
+                    "https://example.com".to_string()
+                ),
+            ]
+        );
     }
 
     // ---- Backend flag tests ----
@@ -1262,6 +1431,26 @@ mod tests {
     }
 
     #[test]
+    fn timeout_unset_or_blank_uses_the_default() {
+        assert_eq!(DEFAULT_TIMEOUT, Duration::from_secs(600));
+        assert_eq!(parse_timeout(None), DEFAULT_TIMEOUT);
+        assert_eq!(parse_timeout(Some("  ")), DEFAULT_TIMEOUT);
+    }
+
+    #[test]
+    fn timeout_reads_whole_seconds() {
+        assert_eq!(parse_timeout(Some("1200")), Duration::from_secs(1200));
+        assert_eq!(parse_timeout(Some(" 90 ")), Duration::from_secs(90));
+    }
+
+    #[test]
+    fn invalid_timeout_falls_back_to_the_default() {
+        for value in ["abc", "0", "-5", "1.5", "10m"] {
+            assert_eq!(parse_timeout(Some(value)), DEFAULT_TIMEOUT, "{value:?}");
+        }
+    }
+
+    #[test]
     fn default_allowlist_matches_the_spike() {
         assert_eq!(
             DEFAULT_ALLOWED_TOOLS,
@@ -1312,5 +1501,113 @@ mod tests {
             append_arg(&recorded_argv(tmp.path())).as_deref(),
             Some(smasher_agent::prompt::DESIGN_FACTORY_CONVENTIONS.trim())
         );
+    }
+
+    // ---- ClaudeCliManagerBackend tests ----
+
+    type Calls = Arc<std::sync::Mutex<Vec<(String, Option<String>, Option<String>)>>>;
+
+    /// Records each codergen call's prompt, model and provider.
+    struct RecordingCodergen(Calls);
+
+    #[async_trait::async_trait]
+    impl CodergenBackend for RecordingCodergen {
+        async fn generate(
+            &self,
+            prompt: &str,
+            model: Option<&str>,
+            provider: Option<&str>,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
+            self.0.lock().unwrap().push((
+                prompt.to_string(),
+                model.map(String::from),
+                provider.map(String::from),
+            ));
+            Ok(Outcome::success_with(
+                serde_json::json!({"response": "cli"}),
+            ))
+        }
+    }
+
+    /// Records each task it coordinates.
+    struct RecordingManager(Arc<std::sync::Mutex<Vec<String>>>);
+
+    #[async_trait::async_trait]
+    impl ManagerBackend for RecordingManager {
+        async fn coordinate(
+            &self,
+            task: &str,
+            _config: &serde_json::Value,
+            _context: &Context,
+        ) -> Result<Outcome, HandlerError> {
+            self.0.lock().unwrap().push(task.to_string());
+            Ok(Outcome::success_with(
+                serde_json::json!({"response": "api"}),
+            ))
+        }
+    }
+
+    fn manager() -> (
+        ClaudeCliManagerBackend,
+        Calls,
+        Arc<std::sync::Mutex<Vec<String>>>,
+    ) {
+        let cli_calls = Calls::default();
+        let fallback_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let backend = ClaudeCliManagerBackend::new(
+            Arc::new(RecordingCodergen(Arc::clone(&cli_calls))),
+            Arc::new(RecordingManager(Arc::clone(&fallback_calls))),
+        );
+        (backend, cli_calls, fallback_calls)
+    }
+
+    #[tokio::test]
+    async fn manager_without_a_provider_runs_its_task_through_the_cli() {
+        let (backend, cli_calls, fallback_calls) = manager();
+        let config = serde_json::json!({"model": "claude-opus-5-5", "parallelism": 2});
+
+        let outcome = backend
+            .coordinate("Plan the build", &config, &Context::new())
+            .await
+            .unwrap();
+
+        assert!(outcome.is_success());
+        let calls = cli_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        let (prompt, model, provider) = &calls[0];
+        assert!(prompt.contains("Task: Plan the build"), "{prompt}");
+        assert!(prompt.contains("\"parallelism\":2"), "{prompt}");
+        assert_eq!(model.as_deref(), Some("claude-opus-5-5"));
+        assert_eq!(provider, &None);
+        assert!(fallback_calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn manager_naming_claude_cli_runs_through_the_cli() {
+        let (backend, cli_calls, fallback_calls) = manager();
+        let config = serde_json::json!({"provider": "claude-cli"});
+
+        backend
+            .coordinate("Plan", &config, &Context::new())
+            .await
+            .unwrap();
+
+        assert_eq!(cli_calls.lock().unwrap().len(), 1);
+        assert!(fallback_calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn manager_naming_another_provider_goes_to_the_fallback() {
+        let (backend, cli_calls, fallback_calls) = manager();
+        let config = serde_json::json!({"provider": "openai", "model": "gpt-5"});
+
+        backend
+            .coordinate("Plan", &config, &Context::new())
+            .await
+            .unwrap();
+
+        assert!(cli_calls.lock().unwrap().is_empty());
+        assert_eq!(*fallback_calls.lock().unwrap(), vec!["Plan"]);
     }
 }

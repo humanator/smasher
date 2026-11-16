@@ -6,7 +6,7 @@ import * as runs from '../../../src/lib/api/runs';
 import * as workflows from '../../../src/lib/api/workflows';
 import * as questions from '../../../src/lib/api/questions';
 import { setApiBaseUrl } from '../../../src/lib/api/client-config';
-import { trackRun, cancelAll, submitGraph, LOOP_CHECK } from '../../fixtures/graphs';
+import { trackRun, cancelAll, submitGraph, submitAbortedGraph, LOOP_CHECK } from '../../fixtures/graphs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -366,5 +366,41 @@ describe('runs API client - resumeRun', () => {
     expect(typeof newId).toBe('string');
     expect(newId).not.toBe(id);
     expect((await runs.getRun(newId)).id).toBe(newId);
+  });
+});
+
+describe('runs API client - deleteRuns', () => {
+  beforeAll(() => {
+    setApiBaseUrl(API_URL);
+  });
+
+  afterEach(async () => {
+    await cancelAll();
+  });
+
+  it('deletes finished runs so they are gone from the server', async () => {
+    const ids = [await submitAbortedGraph(gatedDot), await submitAbortedGraph(gatedDot)];
+
+    const result = await runs.deleteRuns(ids);
+
+    expect(result.deleted).toEqual(ids);
+    for (const id of ids) {
+      await expect(runs.getRun(id)).rejects.toMatchObject({ status: 404 });
+    }
+    const listed = (await runs.listRuns()).runs.map((r) => r.id);
+    expect(listed).not.toContain(ids[0]);
+    expect(listed).not.toContain(ids[1]);
+  });
+
+  it('refuses a running run with 409 and deletes nothing', async () => {
+    const finished = await submitAbortedGraph(gatedDot);
+    const running = await submitGraph(gatedDot);
+
+    await expect(runs.deleteRuns([finished, running])).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining(running),
+    });
+    expect((await runs.getRun(finished)).status).toBe('Aborted');
+    expect((await runs.getRun(running)).status).toBe('Running');
   });
 });

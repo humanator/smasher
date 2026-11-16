@@ -1,4 +1,4 @@
-// ABOUTME: Turns each of the 17 pipeline event kinds into one plain-worded event-log line
+// ABOUTME: Turns each of the 18 pipeline event kinds into one plain-worded event-log line
 // ABOUTME: Pure formatting only: icon, label, detail, tone and key/all level, no styling classes
 
 import type { PipelineEvent } from './api/events';
@@ -146,6 +146,15 @@ export function formatEvent(event: PipelineEvent, labels?: StepLabels): EventLin
           event.result_preview
         ),
         tone: event.is_error ? 'red' : 'green',
+      };
+    case 'agent_permission_denied':
+      return {
+        ...agent,
+        icon: '⊘',
+        label: 'Denied',
+        detail: join(event.node_id, event.tool_name, event.input_preview),
+        tone: 'amber',
+        tinted: true,
       };
     case 'agent_message':
       return {

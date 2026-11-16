@@ -1,9 +1,9 @@
 <script lang="ts">
   // ABOUTME: The dashboard's Recent runs: a filter with live counts over the library's runs, then the runs table
-  // ABOUTME: The filter follows ?runs= (replaceState, back/forward); ?runs=needs-you shows Active with waiting runs first
+  // ABOUTME: The filter follows ?runs= (replaceState, back/forward); finished runs can be deleted from the table
 
   import { onMount } from 'svelte';
-  import type { RunSummary } from '$lib/api/runs';
+  import { deleteRuns as deleteRunsApi, type RunSummary } from '$lib/api/runs';
   import type { WorkflowSummary } from '$lib/api/workflows';
   import * as ToggleGroup from '$lib/components/ui/toggle-group/index.js';
   import { parseRunFilter, runFilterHref, type RunFilter } from '$lib/runFilter';
@@ -15,6 +15,7 @@
     readonly runs: RunSummary[];
     readonly workflows: WorkflowSummary[];
     readonly loaded: boolean;
+    refresh?: () => Promise<void>;
   }
 
   let { library = libraryStore }: { library?: Library } = $props();
@@ -48,6 +49,11 @@
     filter = value as RunFilter;
     needsYouFirst = false;
     window.history.replaceState(window.history.state, '', runFilterHref(filter) + window.location.hash);
+  }
+
+  async function deleteRuns(ids: string[]) {
+    await deleteRunsApi(ids);
+    await library.refresh?.();
   }
 
   onMount(() => {
@@ -86,6 +92,6 @@
   {:else if shown.length === 0}
     <p class="m-0 rounded-lg border border-border px-3 py-4 text-body text-muted-foreground">No runs in this view.</p>
   {:else}
-    <RunTable runs={shown} workflows={library.workflows} />
+    <RunTable runs={shown} workflows={library.workflows} ondelete={deleteRuns} />
   {/if}
 </section>

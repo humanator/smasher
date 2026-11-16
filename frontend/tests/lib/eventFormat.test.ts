@@ -166,6 +166,27 @@ describe('formatEvent', () => {
     });
   });
 
+  it('agent_permission_denied', () => {
+    expect(
+      line({
+        kind: 'agent_permission_denied', node_id: 'build', tool_name: 'Bash',
+        tool_call_id: 't1', input_preview: 'curl -sI https://example.com',
+      })
+    ).toMatchObject({
+      icon: '⊘', label: 'Denied', detail: 'build · Bash · curl -sI https://example.com',
+      tone: 'amber', agent: true, faded: false, tinted: true,
+    });
+  });
+
+  it('leaves out an empty input preview on a denial', () => {
+    expect(
+      line({
+        kind: 'agent_permission_denied', node_id: 'build', tool_name: 'WebFetch',
+        tool_call_id: 't2', input_preview: '',
+      }).detail
+    ).toBe('build · WebFetch');
+  });
+
   it('shows the edge label only when set', () => {
     expect(line({ kind: 'edge_traversed', from: 'gate', to: 'exit', label: 'done' }).detail).toBe(
       'gate → exit [done]'

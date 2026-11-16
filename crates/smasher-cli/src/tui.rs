@@ -91,6 +91,7 @@ pub enum LogKind {
     AgentTurn,
     ToolCallStart,
     ToolCallComplete,
+    PermissionDenied,
     AgentText,
     HumanPrompt,
     HumanResponse,
@@ -600,6 +601,27 @@ impl PipelineTui {
                     node_id: Some(node_id.clone()),
                     kind: LogKind::AgentText,
                     content: format!("  [text] {truncated}"),
+                });
+                Command::none()
+            }
+
+            PipelineEvent::AgentPermissionDenied {
+                node_id,
+                tool_name,
+                input_preview,
+                timestamp,
+                ..
+            } => {
+                let content = if input_preview.is_empty() {
+                    format!("  [denied] {tool_name}")
+                } else {
+                    format!("  [denied] {tool_name} {input_preview}")
+                };
+                self.push_both(LogEntry {
+                    timestamp: *timestamp,
+                    node_id: Some(node_id.clone()),
+                    kind: LogKind::PermissionDenied,
+                    content,
                 });
                 Command::none()
             }
@@ -1200,6 +1222,7 @@ fn style_for_log_entry(entry: &LogEntry) -> Style {
                 Style::default().fg(Color::Green)
             }
         }
+        LogKind::PermissionDenied => Style::default().fg(Color::Yellow),
         LogKind::AgentText => Style::default().fg(Color::White),
         LogKind::HumanPrompt => Style::default().fg(Color::Magenta),
         LogKind::HumanResponse => Style::default().fg(Color::Magenta),
@@ -1626,6 +1649,24 @@ mod tests {
         });
         let entry = model.log_entries.last().unwrap();
         assert_eq!(entry.content, "  [tool] Read ok (12ms)");
+    }
+
+    #[test]
+    fn permission_denied_shows_the_refused_call() {
+        let (mut model, _) = PipelineTui::init(make_flags("test", &["node_a"]));
+        model.handle_pipeline_event(PipelineEvent::AgentPermissionDenied {
+            node_id: "node_a".into(),
+            tool_name: "Bash".into(),
+            tool_call_id: "call_001".into(),
+            input_preview: "curl -sI https://example.com".into(),
+            timestamp: Utc::now(),
+        });
+        let entry = model.log_entries.last().unwrap();
+        assert!(matches!(entry.kind, LogKind::PermissionDenied));
+        assert_eq!(
+            entry.content,
+            "  [denied] Bash curl -sI https://example.com"
+        );
     }
 
     #[test]

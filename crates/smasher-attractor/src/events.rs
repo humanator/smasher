@@ -150,6 +150,15 @@ pub enum PipelineEvent {
         cost_usd: f64,
         timestamp: DateTime<Utc>,
     },
+    /// The agent was refused a tool call (claude-cli's `permission_denials`:
+    /// the tool isn't on the allowlist). The node carries on without it.
+    AgentPermissionDenied {
+        node_id: String,
+        tool_name: String,
+        tool_call_id: String,
+        input_preview: String,
+        timestamp: DateTime<Utc>,
+    },
     /// An agent produced a text message within a codergen node.
     AgentMessage {
         node_id: String,
@@ -229,7 +238,8 @@ impl PipelineEvent {
             | Self::AgentToolCallCompleted { node_id, .. }
             | Self::AgentMessage { node_id, .. }
             | Self::AgentTurnStarted { node_id, .. }
-            | Self::AgentTokenUsage { node_id, .. } => Some(node_id),
+            | Self::AgentTokenUsage { node_id, .. }
+            | Self::AgentPermissionDenied { node_id, .. } => Some(node_id),
             Self::EdgeTraversed { .. }
             | Self::ContextUpdated { .. }
             | Self::PipelineStarted { .. }
@@ -258,7 +268,8 @@ impl PipelineEvent {
             | Self::AgentToolCallCompleted { timestamp, .. }
             | Self::AgentMessage { timestamp, .. }
             | Self::AgentTurnStarted { timestamp, .. }
-            | Self::AgentTokenUsage { timestamp, .. } => *timestamp,
+            | Self::AgentTokenUsage { timestamp, .. }
+            | Self::AgentPermissionDenied { timestamp, .. } => *timestamp,
         }
     }
 }
@@ -791,6 +802,26 @@ mod tests {
             restored,
             PipelineEvent::AgentTurnStarted { ref node_id, turn_number: 3, .. }
             if node_id == "coder1"
+        ));
+    }
+
+    #[test]
+    fn serde_roundtrip_agent_permission_denied() {
+        let event = PipelineEvent::AgentPermissionDenied {
+            node_id: "build".into(),
+            tool_name: "Bash".into(),
+            tool_call_id: "toolu_1".into(),
+            input_preview: "curl -sI https://example.com".into(),
+            timestamp: now(),
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        assert_eq!(json["kind"], "agent_permission_denied");
+        assert_eq!(event.node_id(), Some("build"));
+        let restored: PipelineEvent = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            restored,
+            PipelineEvent::AgentPermissionDenied { ref tool_name, ref input_preview, .. }
+            if tool_name == "Bash" && input_preview == "curl -sI https://example.com"
         ));
     }
 

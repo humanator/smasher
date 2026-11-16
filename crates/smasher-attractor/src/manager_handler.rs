@@ -87,6 +87,9 @@ impl Handler for ManagerHandler {
             }
         }
 
+        // Store the current node id so the backend can tag agent-level events.
+        context.set("_current_node_id", json!(node.id));
+
         let outcome = self.backend.coordinate(&task, &config, context).await?;
 
         // Store the result in context for downstream nodes.
@@ -321,6 +324,18 @@ mod tests {
             }
             other => panic!("expected success with data, got {other:?}"),
         }
+    }
+
+    /// Backends that stream agent events (the claude-cli one) tag them with this.
+    #[tokio::test]
+    async fn manager_handler_records_the_current_node_id() {
+        let handler = ManagerHandler::new(Arc::new(EchoManagerBackend));
+        let node = make_node_with_label("plan", NodeType::Manager, "Plan the work");
+
+        let ctx = Context::new();
+        handler.execute(&node, &ctx).await.unwrap();
+
+        assert_eq!(ctx.get_string("_current_node_id").as_deref(), Some("plan"));
     }
 
     // ---------------------------------------------------------------
