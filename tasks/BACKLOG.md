@@ -28,20 +28,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
       `smasher-web/src/run_launch.rs`).
     - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
       from `PATH`.
-## P2: Robustness
-
-40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing
-    #6: there's no automatic retention policy. Every run's artifacts are kept
-    until you delete the run yourself, and `smasher prune-artifacts` stays a
-    manual tool. So the run list (`RunList.svelte`/`RunTable.svelte`) needs a
-    way to delete runs: a delete action on one run, plus checkboxes to select
-    several and delete them in one action, with a confirmation that says how
-    many runs will go. The server has no delete endpoint yet, so add one (for
-    example `DELETE /api/runs/{id}`, or a batch form taking a list of ids). It
-    removes the whole `{data_dir}/artifacts/<run_id>/` tree, as
-    `prune_artifacts` does, and the in-memory record. Refuse runs that are
-    still running. Deleting is permanent, since the desktop app keeps runs in
-    `~/Documents/smasher`.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
