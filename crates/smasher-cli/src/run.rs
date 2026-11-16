@@ -38,6 +38,7 @@ use smasher_attractor::stylesheet::Stylesheet;
 use smasher_attractor::tool_command::{CancellationToken, CommandConfig, ctx_env_name};
 use smasher_attractor::tool_handler::{ToolBackend, ToolHandler, UnknownToolBackend};
 use smasher_attractor::transforms;
+use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
 
 use std::io::IsTerminal;
 
@@ -702,17 +703,22 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
     match args.backend.as_str() {
         "claude-cli" => {
             let client = client.as_ref().unwrap();
-            let claude_backend: Arc<dyn CodergenBackend> = Arc::new(
-                ClaudeCliBackend::new(
-                    effective_working_dir.clone(),
-                    Duration::from_secs(args.agent_timeout),
-                )
-                .with_streaming(tui_enabled)
-                .with_emitter(pipeline_emitter.clone())
-                .with_max_consecutive_timeouts(args.max_timeouts)
-                .with_default_model(Some(args.model.clone()))
-                .with_permissions(claude_permissions(&args)),
-            );
+            let claude_backend = ClaudeCliBackend::new(
+                effective_working_dir.clone(),
+                Duration::from_secs(args.agent_timeout),
+            )
+            .with_streaming(tui_enabled)
+            .with_emitter(pipeline_emitter.clone())
+            .with_max_consecutive_timeouts(args.max_timeouts)
+            .with_default_model(Some(args.model.clone()))
+            .with_permissions(claude_permissions(&args));
+            // The binary SMASHER_CLAUDE_CLI names, else the usual install locations.
+            let claude_backend: Arc<dyn CodergenBackend> = match resolve_binary_from_env(None) {
+                Some(binary) => {
+                    Arc::new(claude_backend.with_claude_path(binary.display().to_string()))
+                }
+                None => Arc::new(claude_backend),
+            };
             let agent_backend: Arc<dyn CodergenBackend> = Arc::new(AgentCodergenBackend::new(
                 Arc::clone(client),
                 args.model.clone(),

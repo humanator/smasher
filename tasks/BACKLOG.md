@@ -26,8 +26,6 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     - Show `permission_denials` from the CLI's result event in the run view.
     - Make the claude-cli codergen timeout configurable (fixed at 600s in
       `smasher-web/src/run_launch.rs`).
-    - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
-      from `PATH`.
 ## P2: Robustness
 
 40. **Delete runs from the UI, several at once.** *Decided 2026-10-13*, closing

@@ -50,7 +50,7 @@ give the node `provider="<other>"` with that provider's key configured.
 
 | Variable | Description |
 |----------|-------------|
-| `SMASHER_CLAUDE_CLI` | Registers the `claude-cli` provider. `1` finds the binary (in `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `PATH`); any other value is the path to it. |
+| `SMASHER_CLAUDE_CLI` | Registers the `claude-cli` provider. `1` finds the binary (in `~/.local/bin`, `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, then `PATH`); any other value is the path to it. `smasher run --backend claude-cli` runs the same binary. |
 | `SMASHER_PROVIDER=claude-cli` | Makes it the default provider (or choose it in Settings). The web server then sends codergen nodes to `claude -p` too, except nodes with an explicit `provider="<other>"`, which use that provider's API agent. |
 | `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` | Comma-separated tools codergen runs may use, replacing the default `Read,Edit,Write,Glob,Grep` plus `Bash(ls:*)`, `Bash(mkdir:*)`, `Bash(cp:*)`, `Bash(mv:*)`, `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(grep:*)`, `Bash(sort:*)`. Anything not listed is denied without prompting. |
 
