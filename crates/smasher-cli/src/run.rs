@@ -16,7 +16,7 @@ use smasher_agent::types::SessionConfig;
 
 use smasher_attractor::artifact::ArtifactStore;
 use smasher_attractor::claude_cli_backend::{
-    ClaudeCliBackend, ClaudeCliPermissions, allowed_tools_from_env,
+    ClaudeCliBackend, ClaudeCliManagerBackend, ClaudeCliPermissions, allowed_tools_from_env,
 };
 use smasher_attractor::dot::parser;
 use smasher_attractor::engine::{Engine, EngineConfig};
@@ -29,7 +29,7 @@ use smasher_attractor::interviewer::{
     AutoApproveInterviewer, ChannelInterviewer, ConsoleInterviewer, Interviewer,
     InterviewerHandler, TimeoutInterviewer,
 };
-use smasher_attractor::manager_handler::ManagerHandler;
+use smasher_attractor::manager_handler::{ManagerBackend, ManagerHandler};
 use smasher_attractor::parallel::ParallelHandler;
 use smasher_attractor::rendering::{CachedRenderer, GraphRenderer, GraphvizRenderer, RenderFormat};
 use smasher_attractor::state::Context;
@@ -38,6 +38,7 @@ use smasher_attractor::stylesheet::Stylesheet;
 use smasher_attractor::tool_command::{CancellationToken, CommandConfig, ctx_env_name};
 use smasher_attractor::tool_handler::{ToolBackend, ToolHandler, UnknownToolBackend};
 use smasher_attractor::transforms;
+use smasher_llm::provider::claude_cli::process::resolve_binary_from_env;
 
 use std::io::IsTerminal;
 
@@ -699,25 +700,33 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
     let pipeline_emitter = Arc::new(PipelineEventEmitter::new(256));
 
     let mut registry = default_registry();
+    // The `claude -p` backend, kept for manager nodes under --backend claude-cli.
+    let mut cli_backend: Option<Arc<dyn CodergenBackend>> = None;
     match args.backend.as_str() {
         "claude-cli" => {
             let client = client.as_ref().unwrap();
-            let claude_backend: Arc<dyn CodergenBackend> = Arc::new(
-                ClaudeCliBackend::new(
-                    effective_working_dir.clone(),
-                    Duration::from_secs(args.agent_timeout),
-                )
-                .with_streaming(tui_enabled)
-                .with_emitter(pipeline_emitter.clone())
-                .with_max_consecutive_timeouts(args.max_timeouts)
-                .with_default_model(Some(args.model.clone()))
-                .with_permissions(claude_permissions(&args)),
-            );
+            let claude_backend = ClaudeCliBackend::new(
+                effective_working_dir.clone(),
+                Duration::from_secs(args.agent_timeout),
+            )
+            .with_streaming(tui_enabled)
+            .with_emitter(pipeline_emitter.clone())
+            .with_max_consecutive_timeouts(args.max_timeouts)
+            .with_default_model(Some(args.model.clone()))
+            .with_permissions(claude_permissions(&args));
+            // The binary SMASHER_CLAUDE_CLI names, else the usual install locations.
+            let claude_backend: Arc<dyn CodergenBackend> = match resolve_binary_from_env(None) {
+                Some(binary) => {
+                    Arc::new(claude_backend.with_claude_path(binary.display().to_string()))
+                }
+                None => Arc::new(claude_backend),
+            };
             let agent_backend: Arc<dyn CodergenBackend> = Arc::new(AgentCodergenBackend::new(
                 Arc::clone(client),
                 args.model.clone(),
                 effective_working_dir.clone(),
             ));
+            cli_backend = Some(Arc::clone(&claude_backend));
             registry.register(Arc::new(CodergenHandler::with_backends(
                 claude_backend,
                 agent_backend,
@@ -799,11 +808,18 @@ pub async fn run(args: RunArgs) -> Result<(), CliError> {
 
     // Register the manager handler with an LLM backend (skipped for shell backend).
     if let Some(ref client) = client {
-        let manager_backend = Arc::new(crate::llm_backends::LlmManagerBackend::new(
-            Arc::clone(client),
-            args.model.clone(),
-            effective_working_dir.clone(),
-        ));
+        let llm_manager_backend: Arc<dyn ManagerBackend> =
+            Arc::new(crate::llm_backends::LlmManagerBackend::new(
+                Arc::clone(client),
+                args.model.clone(),
+                effective_working_dir.clone(),
+            ));
+        // Under --backend claude-cli, manager nodes run through `claude -p` too,
+        // except nodes that name another provider.
+        let manager_backend: Arc<dyn ManagerBackend> = match cli_backend {
+            Some(cli) => Arc::new(ClaudeCliManagerBackend::new(cli, llm_manager_backend)),
+            None => llm_manager_backend,
+        };
         registry.register(Arc::new(ManagerHandler::new(manager_backend)));
     }
 

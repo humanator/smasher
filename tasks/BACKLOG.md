@@ -12,22 +12,12 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
    but tests only use mocks. Spends tokens, so only on request. (Test fixtures
    use `claude-sonnet-4-20250514` on purpose as sample data; leave them.)
 23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
-    - Manager (`house`) nodes fail under claude-cli: `LlmManagerBackend` runs
-      an agent session with tools, which `claude -p` single calls can't do.
-      They stay LLM nodes (decided 2026-10-13, closing #35), so route them
-      through `ClaudeCliBackend`. Workaround:
-      `provider="<other>"` on the node.
     - Checkpoints skipped before merge, waiting on Jobsworth's call: the
       `#[ignore]` real-CLI tests (including the `curl` denial), `smasher run` on
       hello-world and a codergen example, and hello-world in the desktop app.
     - Codergen agents are denied the shell, so they can't run the design-kit
       linter or open their pages. Decide whether to allow the linter command,
       or leave checking to the pipeline's `system_lint`/`render` nodes.
-    - Show `permission_denials` from the CLI's result event in the run view.
-    - Make the claude-cli codergen timeout configurable (fixed at 600s in
-      `smasher-web/src/run_launch.rs`).
-    - Let `smasher run` use `SMASHER_CLAUDE_CLI`'s path instead of `claude`
-      from `PATH`.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 

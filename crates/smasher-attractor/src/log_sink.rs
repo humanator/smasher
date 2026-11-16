@@ -236,6 +236,7 @@ fn event_kind_str(event: &PipelineEvent) -> &'static str {
         PipelineEvent::AgentMessage { .. } => "agent_message",
         PipelineEvent::AgentTurnStarted { .. } => "agent_turn_started",
         PipelineEvent::AgentTokenUsage { .. } => "agent_token_usage",
+        PipelineEvent::AgentPermissionDenied { .. } => "agent_permission_denied",
     }
 }
 

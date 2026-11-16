@@ -300,6 +300,11 @@ trait ManagerBackend: Send + Sync {
 }
 ```
 
+The handler sets `_current_node_id` before calling the backend. The servers use
+`LlmManagerBackend` (an API agent session with tools), or, under the `claude-cli`
+provider, `ClaudeCliManagerBackend`, which runs the task as one `claude -p` agent
+session and sends nodes naming another `provider` to `LlmManagerBackend`.
+
 ### Context Storage
 
 Same structure as ToolHandler, stored under `_manager_{node_id}`.

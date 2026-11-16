@@ -1,5 +1,5 @@
 // ABOUTME: EventSource wrapper for SSE pipeline events
-// ABOUTME: All 17 PipelineEvent variants with auto-cleanup
+// ABOUTME: All 18 PipelineEvent variants with auto-cleanup
 
 import { getApiUrl } from './client-config';
 
@@ -136,6 +136,15 @@ interface AgentTokenUsageEvent extends BaseEvent {
   cost_usd?: number;
 }
 
+// 18. agent_permission_denied: a tool call the claude-cli allowlist refused
+interface AgentPermissionDeniedEvent extends BaseEvent {
+  kind: 'agent_permission_denied';
+  node_id: string;
+  tool_name: string;
+  tool_call_id: string;
+  input_preview?: string;
+}
+
 // Union type for all pipeline events
 export type PipelineEvent =
   | PipelineStartedEvent
@@ -154,7 +163,8 @@ export type PipelineEvent =
   | AgentMessageEvent
   | AgentToolCallStartedEvent
   | AgentToolCallCompletedEvent
-  | AgentTokenUsageEvent;
+  | AgentTokenUsageEvent
+  | AgentPermissionDeniedEvent;
 
 export interface PipelineEventStream {
   subscribe(callback: (event: PipelineEvent) => void): () => void;
@@ -311,6 +321,15 @@ function parseEvent(eventType: string | null, data: unknown): PipelineEvent | nu
         output_tokens: (dataObj.output_tokens as number) || 0,
         cost_usd: dataObj.cost_usd as number | undefined,
       };
+    case 'agent_permission_denied':
+      return {
+        kind: 'agent_permission_denied',
+        timestamp: dataObj.timestamp as string,
+        node_id: (dataObj.node_id as string) || '',
+        tool_name: (dataObj.tool_name as string) || '',
+        tool_call_id: (dataObj.tool_call_id as string) || '',
+        input_preview: dataObj.input_preview as string | undefined,
+      };
     default:
       console.warn('Unknown event type:', eventType);
       return null;
@@ -366,6 +385,7 @@ export function subscribeToPipelineEvents(
     'agent_tool_call_started',
     'agent_tool_call_completed',
     'agent_token_usage',
+    'agent_permission_denied',
   ];
 
   for (const eventType of eventTypes) {

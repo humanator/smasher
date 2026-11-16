@@ -95,6 +95,14 @@ fn print_event(event: &PipelineEvent) {
             }
         }
 
+        PipelineEvent::AgentPermissionDenied {
+            tool_name,
+            input_preview,
+            ..
+        } => {
+            eprintln!("    \x1b[33m[denied] {tool_name} {input_preview}\x1b[0m");
+        }
+
         PipelineEvent::AgentMessage { text, .. } => {
             // Show first line of agent message, truncated.
             let first_line = text.lines().next().unwrap_or("");

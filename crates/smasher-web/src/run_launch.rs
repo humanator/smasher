@@ -5,14 +5,14 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
-use std::time::Duration;
 
 use chrono::Utc;
 use tokio_util::sync::CancellationToken;
 
 use smasher_attractor::artifact::ArtifactStore;
 use smasher_attractor::claude_cli_backend::{
-    ClaudeCliBackend, ClaudeCliPermissions, allowed_tools_from_env,
+    ClaudeCliBackend, ClaudeCliManagerBackend, ClaudeCliPermissions, allowed_tools_from_env,
+    timeout_from_env,
 };
 use smasher_attractor::engine::{Engine, EngineConfig};
 use smasher_attractor::events::{PipelineEventEmitter, PipelineEventLog};
@@ -23,7 +23,7 @@ use smasher_attractor::handler::{
 use smasher_attractor::http_interviewer::HttpInterviewer;
 use smasher_attractor::interviewer::InterviewerHandler;
 use smasher_attractor::log_sink::LogSink;
-use smasher_attractor::manager_handler::ManagerHandler;
+use smasher_attractor::manager_handler::{ManagerBackend, ManagerHandler};
 use smasher_attractor::parallel::ParallelHandler;
 use smasher_attractor::state::{Checkpoint, Context, RunStatus};
 use smasher_attractor::tool_command::CommandConfig;
@@ -34,19 +34,16 @@ use crate::backend::{AgentCodergenBackend, ClaudeCliRouter, LlmManagerBackend};
 use crate::error::WebError;
 use crate::state::{AppState, RunRecord};
 
-/// Wall-clock limit for one codergen node run through `claude -p`, matching
-/// `smasher run --agent-timeout`'s default.
-const CLAUDE_CLI_NODE_TIMEOUT: Duration = Duration::from_secs(600);
-
 /// The `claude -p` codergen backend for a run: streams events to the run's
 /// emitter, uses the allowlist from `SMASHER_CLAUDE_CLI_ALLOWED_TOOLS` (or the
-/// default), and the binary `SMASHER_CLAUDE_CLI` resolves to.
+/// default), the per-node timeout from `SMASHER_CLAUDE_CLI_TIMEOUT_SECS` (or
+/// 600s), and the binary `SMASHER_CLAUDE_CLI` resolves to.
 fn claude_cli_backend(
     working_dir: &str,
     model: &str,
     emitter: Arc<PipelineEventEmitter>,
 ) -> ClaudeCliBackend {
-    let backend = ClaudeCliBackend::new(working_dir, CLAUDE_CLI_NODE_TIMEOUT)
+    let backend = ClaudeCliBackend::new(working_dir, timeout_from_env())
         .with_streaming(true)
         .with_emitter(emitter)
         .with_default_model(Some(model.to_string()))
@@ -234,26 +231,29 @@ pub async fn launch_pipeline(
             Arc::clone(&output_tokens),
             Arc::clone(&emitter),
         ));
-        let backend: Arc<dyn CodergenBackend> = if provider.as_deref() == Some("claude-cli") {
-            Arc::new(ClaudeCliRouter::new(
-                Arc::new(
-                    claude_cli_backend(&spawn_working_dir, &model, Arc::clone(&emitter))
-                        .with_token_counters(input_tokens, output_tokens),
-                ),
-                agent_backend,
-            ))
-        } else {
-            agent_backend
-        };
-        let interviewer_arc: Arc<dyn smasher_attractor::interviewer::Interviewer> =
-            Arc::new(interviewer);
-
-        let manager_backend = Arc::new(LlmManagerBackend::new(
+        let llm_manager_backend = Arc::new(LlmManagerBackend::new(
             Arc::clone(&client),
             model.clone(),
             provider.clone(),
             spawn_working_dir.clone(),
         ));
+        // Under claude-cli, codergen and manager nodes share one `claude -p`
+        // backend, except nodes that name another provider.
+        let (backend, manager_backend): (Arc<dyn CodergenBackend>, Arc<dyn ManagerBackend>) =
+            if provider.as_deref() == Some("claude-cli") {
+                let cli: Arc<dyn CodergenBackend> = Arc::new(
+                    claude_cli_backend(&spawn_working_dir, &model, Arc::clone(&emitter))
+                        .with_token_counters(input_tokens, output_tokens),
+                );
+                (
+                    Arc::new(ClaudeCliRouter::new(Arc::clone(&cli), agent_backend)),
+                    Arc::new(ClaudeCliManagerBackend::new(cli, llm_manager_backend)),
+                )
+            } else {
+                (agent_backend, llm_manager_backend)
+            };
+        let interviewer_arc: Arc<dyn smasher_attractor::interviewer::Interviewer> =
+            Arc::new(interviewer);
         // The built-in tool chain ends at UnknownToolBackend: a tool node never
         // reaches an LLM unless it names task_critic or synthesis.
         let unknown_tool_backend = Arc::new(UnknownToolBackend::new(
@@ -286,8 +286,7 @@ pub async fn launch_pipeline(
         // Build a child registry for ParallelHandler to dispatch within parallel nodes.
         // Clone the backends as trait object Arcs for the child registry.
         let child_codergen = Arc::clone(&backend);
-        let child_manager: Arc<dyn smasher_attractor::manager_handler::ManagerBackend> =
-            manager_backend.clone();
+        let child_manager = Arc::clone(&manager_backend);
         let child_tool: Arc<dyn smasher_attractor::tool_handler::ToolBackend> =
             tool_backend.clone();
         // tool_command nodes run in the run directory and stop with the run.

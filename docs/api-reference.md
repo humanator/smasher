@@ -557,7 +557,7 @@ data: {"field": "value", ...}
 
 The stream terminates when `pipeline_completed` or `pipeline_aborted` is received.
 
-All 17 event types listed in the [PipelineEvent Variants](#pipelineevent-variants) section below.
+All 18 event types listed in the [PipelineEvent Variants](#pipelineevent-variants) section below.
 
 ### POST /api/runs/{id}/cancel -- Cancel Run
 
@@ -1005,6 +1005,7 @@ All events are emitted on `/api/runs/{id}/events` as SSE with JSON data payloads
 | `agent_tool_call_started` | `node_id`, `tool_name`, `tool_call_id`, `input_preview`, `timestamp` | Agent invoked a tool. |
 | `agent_tool_call_completed` | `node_id`, `tool_name`, `tool_call_id`, `duration_ms`, `is_error`, `result_preview`, `timestamp` | Tool execution completed. |
 | `agent_token_usage` | `node_id`, `input_tokens`, `output_tokens`, `cost_usd`, `timestamp` | LLM token usage recorded. |
+| `agent_permission_denied` | `node_id`, `tool_name`, `tool_call_id`, `input_preview`, `timestamp` | A `claude-cli` node was refused a tool call that isn't on its allowlist (one event per entry in the CLI result's `permission_denials`). The node carries on. Streaming runs only. |
 
 On web runs, `HttpInterviewer` emits `human_prompt_issued` when a gate asks its question and
 `human_response_received` when the waiting gate receives the answer. That covers gallery gates

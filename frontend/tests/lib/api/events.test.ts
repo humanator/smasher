@@ -80,7 +80,7 @@ describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
           'human_prompt_issued', 'human_response_received',
           'agent_turn_started', 'agent_message',
           'agent_tool_call_started', 'agent_tool_call_completed',
-          'agent_token_usage',
+          'agent_token_usage', 'agent_permission_denied',
         ];
         expect(validKinds).toContain(event.kind);
       }
@@ -153,6 +153,7 @@ describe('events SSE client - REAL EVENT STREAM INTEGRATION TESTS', () => {
         'agent_tool_call_started',
         'agent_tool_call_completed',
         'agent_token_usage',
+        'agent_permission_denied',
       ];
 
       for (const event of events) {
