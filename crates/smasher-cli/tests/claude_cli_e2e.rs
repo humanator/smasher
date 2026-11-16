@@ -134,3 +134,32 @@ fn run_sends_manager_nodes_through_the_claude_cli() {
         describe(&output)
     );
 }
+
+#[test]
+fn run_without_keys_points_at_smasher_claude_cli() {
+    let dir = tempfile::tempdir().unwrap();
+    let dir = dir.path().canonicalize().unwrap();
+    let pipeline = dir.join("pipeline.dot");
+    std::fs::write(
+        &pipeline,
+        "digraph NoKeys { start [shape=circle]; done [shape=doublecircle]; start -> done; }",
+    )
+    .unwrap();
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_smasher"));
+    cmd.current_dir(&dir)
+        .env("HOME", &dir)
+        .env("PATH", decoy_path(&dir))
+        .env_remove("SMASHER_CLAUDE_CLI")
+        .args(["run", pipeline.to_str().unwrap(), "--no-tui"]);
+    for key in API_KEYS {
+        cmd.env_remove(key);
+    }
+    let output = cmd.output().expect("failed to run smasher binary");
+
+    assert!(!output.status.success(), "{}", describe(&output));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("SMASHER_CLAUDE_CLI=1"),
+        "{}",
+        describe(&output)
+    );
+}

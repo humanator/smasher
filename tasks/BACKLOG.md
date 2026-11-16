@@ -8,27 +8,17 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
 
 ## P1: Do next
 
-1. **Run one real pipeline on Sonnet 5.** `DEFAULT_MODEL` is `claude-sonnet-5`,
-   but tests only use mocks. Spends tokens, so only on request. (Test fixtures
-   use `claude-sonnet-4-20250514` on purpose as sample data; leave them.)
 23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
-    - Checkpoints skipped before merge, waiting on Jobsworth's call: the
-      `#[ignore]` real-CLI tests (including the `curl` denial), `smasher run` on
-      hello-world and a codergen example, and hello-world in the desktop app.
     - Codergen agents are denied the shell, so they can't run the design-kit
       linter or open their pages. Decide whether to allow the linter command,
       or leave checking to the pipeline's `system_lint`/`render` nodes.
 
 ## P2: Robustness
 
-43. **Fix the link button's dark-mode contrast at the source.** The Button
-    `link` variant (`frontend/src/lib/components/ui/button/button.svelte`) uses
-    `text-primary`, which is about 3:1 on dark surfaces. Screens have fixed it one
-    link at a time with `dark:text-primary-subtle-foreground` (7.89:1), but the
-    editor status bar's **Review** link (`node-editor/StatusBar.svelte`) still
-    misses it. Add that class to the variant itself so every link, including new
-    ones, passes 4.5:1, then drop the per-link copies. Cover it in
-    `tests/lib/tokens.test.ts`.
+44. **Keep workflow names readable in the run list.** With the delete column
+    added, an 800px-wide window squeezes the Workflow column until the names
+    are cut to one letter ("D…", "H…") beside the full run id. Shorten or drop
+    the run id at narrow widths so the name wins.
 
 ## P3: Design-factory features (wait until a real pipeline needs them)
 

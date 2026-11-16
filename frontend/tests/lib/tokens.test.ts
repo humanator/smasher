@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { contrastRatio } from '../../src/lib/contrast';
+import { buttonVariants } from '../../src/lib/components/ui/button/button.svelte';
 
 const css = readFileSync(join(process.cwd(), 'src', 'app.css'), 'utf-8');
 const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'));
@@ -104,6 +105,25 @@ describe.each(Object.entries(themes))('%s dashboard colours', (name, tokens) => 
   it.each(DASHBOARD_PAIRS)('%o on %s (over %s) meets 4.5:1', (fg, bg, surface) => {
     const token = typeof fg === 'string' ? fg : fg[name as keyof typeof ACCENT_TEXT];
     const ratio = contrastRatio(tokens[`--${token}`], tokens[`--${bg}`], tokens[`--${surface}`]);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+// The Button link variant's own text colour, read from its classes, so every link (the editor
+// status bar's Review, Settings' Reset to Default, Add a Note…) passes without a per-link override.
+const linkClasses = buttonVariants({ variant: 'link' }).split(' ');
+const linkColour = (prefix: string) =>
+  linkClasses
+    .filter((c) => c.startsWith(`${prefix}text-`))
+    .map((c) => c.slice(`${prefix}text-`.length))
+    .find((token) => themes.light[`--${token}`] !== undefined);
+const linkText = { light: linkColour(''), dark: linkColour('dark:') ?? linkColour('') };
+
+describe.each(Object.entries(themes))('%s link button', (name, tokens) => {
+  it.each(['background', 'card', 'popover', 'muted'])('link text on %s meets 4.5:1', (bg) => {
+    const token = linkText[name as keyof typeof linkText];
+    expect(token, 'link variant text colour').toBeDefined();
+    const ratio = contrastRatio(tokens[`--${token}`], tokens[`--${bg}`], tokens[`--${bg}`]);
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 });

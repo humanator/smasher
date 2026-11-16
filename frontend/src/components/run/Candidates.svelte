@@ -107,7 +107,7 @@
             <Button
               variant="link"
               size="xs"
-              class="self-start dark:text-primary-subtle-foreground"
+              class="self-start"
               aria-expanded={!!editing[id]}
               onclick={() => (editing[id] = !editing[id])}
             >

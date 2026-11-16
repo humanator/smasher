@@ -39,7 +39,7 @@ pub async fn run(args: ChatArgs) -> Result<(), CliError> {
     let client = smasher_llm::client::Client::from_env();
     if client.registered_providers().is_empty() {
         return Err(CliError::Other(
-            "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY.".into(),
+            "no API keys found. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY or OLLAMA_API_KEY, or set SMASHER_CLAUDE_CLI=1 to use the Claude CLI.".into(),
         ));
     }
     let client = Arc::new(client);
