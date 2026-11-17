@@ -1,7 +1,7 @@
-// ABOUTME: Tests for RunList, the dashboard's Recent runs: filter toggle with counts, ?runs= sync and empty states
+// ABOUTME: Tests for RunList, the Recent runs screen's table: filter toggle with counts, ?runs= sync and empty states
 // ABOUTME: Fixture runs in a stand-in library for exact counts, plus listing and deleting against the real store
 
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/svelte/svelte5';
 import userEvent from '@testing-library/user-event';
 import RunList from '../../../src/components/dashboard/RunList.svelte';
@@ -59,6 +59,10 @@ function shownIds(): string[] {
 }
 
 describe('RunList', () => {
+  beforeEach(() => {
+    visit('/runs');
+  });
+
   afterEach(() => {
     visit('/');
   });
@@ -69,7 +73,6 @@ describe('RunList', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Recent runs' })).toBeTruthy();
     expect(screen.getByText(/Every time a workflow runs, it shows up here\./)).toBeTruthy();
     expect(screen.getByRole('group', { name: 'Show runs' })).toBeTruthy();
-    expect(document.getElementById('runs')).toBeTruthy();
   });
 
   it('labels each filter with its live count', () => {
@@ -100,7 +103,7 @@ describe('RunList', () => {
   });
 
   it('drops ?runs= from the URL when going back to All', async () => {
-    visit('/?runs=failed');
+    visit('/runs?runs=failed');
     const user = userEvent.setup();
     render(RunList, { props: { library: library() } });
 
@@ -110,34 +113,26 @@ describe('RunList', () => {
     expect(shownIds()).toHaveLength(RUNS.length);
   });
 
-  it('keeps the #runs anchor when the filter changes', async () => {
-    visit('/#runs');
+  it('stays on /runs when the filter changes', async () => {
+    visit('/runs');
     const user = userEvent.setup();
     render(RunList, { props: { library: library() } });
 
     await user.click(screen.getByRole('radio', { name: /^Completed/ }));
 
-    expect(window.location.hash).toBe('#runs');
+    expect(window.location.pathname + window.location.search).toBe('/runs?runs=completed');
   });
 
   it('restores the filter from ?runs= on load', () => {
-    visit('/?runs=failed');
+    visit('/runs?runs=failed');
     render(RunList, { props: { library: library() } });
 
     expect(screen.getByRole('radio', { name: /^Failed or stopped/ })).toHaveAttribute('aria-checked', 'true');
     expect(shownIds()).toEqual(['failed-1', 'aborted-1']);
   });
 
-  it('selects Active with needs-you runs first for ?runs=needs-you', () => {
-    visit('/?runs=needs-you#runs');
-    render(RunList, { props: { library: library() } });
-
-    expect(screen.getByRole('radio', { name: /^Active/ })).toHaveAttribute('aria-checked', 'true');
-    expect(shownIds()).toEqual(['waiting-1', 'running-1']);
-  });
-
   it('falls back to All for an unknown ?runs= value', () => {
-    visit('/?runs=garbage');
+    visit('/runs?runs=garbage');
     render(RunList, { props: { library: library() } });
 
     expect(screen.getByRole('radio', { name: /^All/ })).toHaveAttribute('aria-checked', 'true');
@@ -146,7 +141,7 @@ describe('RunList', () => {
   it('follows back and forward', async () => {
     render(RunList, { props: { library: library() } });
 
-    window.history.pushState(null, '', '/?runs=completed');
+    window.history.pushState(null, '', '/runs?runs=completed');
     window.dispatchEvent(new PopStateEvent('popstate'));
 
     await waitFor(() => expect(shownIds()).toEqual(['done-1', 'done-2']));
@@ -170,7 +165,7 @@ describe('RunList', () => {
   });
 
   it('says the view is empty when the filter matches nothing', () => {
-    visit('/?runs=failed');
+    visit('/runs?runs=failed');
     render(RunList, { props: { library: library([run('done-1', 'Completed')]) } });
 
     expect(screen.getByText('No runs in this view.')).toBeTruthy();

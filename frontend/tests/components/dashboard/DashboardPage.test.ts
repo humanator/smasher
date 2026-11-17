@@ -1,4 +1,4 @@
-// ABOUTME: Tests for DashboardPage, the home page: toolbar controls, the workflows table, Run… and import
+// ABOUTME: Tests for DashboardPage, the Workflows screen: toolbar controls, the workflows table, Run… and import
 // ABOUTME: Runs against the real backend; ported from the WorkflowCatalog tests it replaces
 
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
@@ -54,6 +54,14 @@ describe('DashboardPage', () => {
     // the dev:backend server is configured against.
     const table = screen.getByRole('table', { name: 'All workflows' });
     expect(await within(table).findByText('Human Gate Showcase', {}, { timeout: 5000 })).toBeTruthy();
+  });
+
+  it('shows only the workflows: Recent runs has its own screen now', () => {
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 2, name: 'All workflows' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Recent runs' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Show runs' })).toBeNull();
   });
 
   it("links each workflow's name to its page", async () => {

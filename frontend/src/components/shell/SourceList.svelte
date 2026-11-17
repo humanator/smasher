@@ -26,7 +26,7 @@
     currentWorkflowId?: string | null;
     /** In the desktop app the real traffic lights sit in the header, so it reserves room for them. */
     native?: boolean;
-    /** The Library row for the page being shown (the dashboard and its runs views). */
+    /** The Library row for the screen being shown: Workflows, Recent runs or Needs you. */
     librarySection?: 'workflows' | 'runs' | 'needs-you' | null;
   } = $props();
 
@@ -90,7 +90,7 @@
         <Sidebar.MenuItem>
           <Sidebar.MenuButton isActive={librarySection === 'runs'}>
             {#snippet child({ props })}
-              <a {...props} href="/#runs" title="Recent runs" aria-current={current('runs')}>
+              <a {...props} href="/runs" title="Recent runs" aria-current={current('runs')}>
                 <ClockIcon aria-hidden="true" class="text-primary" />
                 {#if expanded}
                   <span class="truncate">Recent runs</span>
@@ -103,7 +103,7 @@
         <Sidebar.MenuItem>
           <Sidebar.MenuButton isActive={librarySection === 'needs-you'}>
             {#snippet child({ props })}
-              <a {...props} href="/?runs=needs-you#runs" title="Needs you" aria-current={current('needs-you')}>
+              <a {...props} href="/needs-you" title="Needs you" aria-current={current('needs-you')}>
                 <UserIcon aria-hidden="true" class="text-primary" />
                 {#if expanded}
                   <span class="truncate">Needs you</span>

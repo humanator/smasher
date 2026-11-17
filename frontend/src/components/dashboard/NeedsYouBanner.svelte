@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ABOUTME: The dashboard's "waiting for your decision" banner for the run that has waited on a person longest
+  // ABOUTME: The Workflows and Recent runs screens' "waiting for your decision" banner for the run that has waited on a person longest
   // ABOUTME: Words what it needs from its questions, how long it has waited, and links to it and to the rest
 
   import UserIcon from '@lucide/svelte/icons/user';
@@ -89,7 +89,7 @@
       <p class="m-0 text-xs text-primary-subtle-foreground">
         <span>{detail}</span>
         {#if others > 0}
-          <a href="/?runs=needs-you#runs" class="ml-1.5 underline underline-offset-2 hover:no-underline">
+          <a href="/needs-you" class="ml-1.5 underline underline-offset-2 hover:no-underline">
             + {others} more waiting
           </a>
         {/if}

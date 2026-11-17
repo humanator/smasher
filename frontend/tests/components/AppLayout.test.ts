@@ -1,5 +1,5 @@
 // ABOUTME: Tests for the App.svelte shell: the shared page header bar and each route's layout
-// ABOUTME: Dashboard (title, toolbar controls, workflows/runs sections), workflow editor and run detail headers
+// ABOUTME: Workflows, Recent runs and Needs you screens (titles, redirects, sidebar), workflow editor and run detail headers
 
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/svelte/svelte5';
@@ -98,11 +98,129 @@ describe('App dashboard layout', () => {
     );
   });
 
-  it('renders All workflows and the runs as sections under the single page heading', () => {
+  it('renders All workflows under the single page heading, without the runs', () => {
     render(App);
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 2, name: 'All workflows' })).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 2, name: /Runs|Recent runs/ })).toBeTruthy();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Recent runs' })).toBeNull();
+  });
+});
+
+describe('App Library screens', () => {
+  beforeAll(() => {
+    setApiBaseUrl('http://127.0.0.1:21541/api');
+  });
+
+  afterEach(async () => {
+    visit('/');
+    await cancelAll();
+  });
+
+  const library = () => screen.getByRole('navigation', { name: 'Library' });
+  const current = () =>
+    within(library())
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('aria-current') === 'page')
+      .map((link) => link.getAttribute('title'));
+
+  it.each([
+    ['/', 'Workflows'],
+    ['/runs', 'Recent runs'],
+    ['/needs-you', 'Needs you'],
+  ])('highlights only the matching sidebar item on %s', (path, item) => {
+    visit(path);
+    render(App);
+    expect(current()).toEqual([item]);
+  });
+
+  it.each(['/runs/some-run', '/workflows/some-id', '/design'])('highlights no Library item on %s', (path) => {
+    visit(path);
+    render(App);
+    expect(current()).toEqual([]);
+  });
+
+  it('shows the Recent runs screen at /runs: its title, the runs table, Settings and no back link', async () => {
+    visit('/runs');
+    render(App);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 1, name: 'Recent runs' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'AI model settings' })).toBeTruthy();
+    expect(within(header).queryByRole('link', { name: /^Back to / })).toBeNull();
+    expect(within(header).queryByRole('searchbox')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Show runs' })).toBeTruthy();
+    expect(screen.queryByRole('table', { name: 'All workflows' })).toBeNull();
+    await waitFor(() => expect(document.title).toBe('Recent runs — Smasher'));
+    const subtitle = await screen.findByTestId('toolbar-subtitle', {}, { timeout: 5000 });
+    expect(subtitle.textContent).toMatch(/^\d+ runs?( · \d+ needs? you)?$/);
+  });
+
+  it('shows the Needs you screen at /needs-you: its title, the waiting cards, Settings and no back link', async () => {
+    const runId = await submitGraph(
+      readFileSync(join(process.cwd(), 'e2e', 'fixtures', 'gate_only.dot'), 'utf-8')
+    );
+    visit('/needs-you');
+    render(App);
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 1, name: 'Needs you' })).toBeTruthy();
+    expect(within(header).getByRole('button', { name: 'AI model settings' })).toBeTruthy();
+    expect(within(header).queryByRole('link', { name: /^Back to / })).toBeNull();
+    await waitFor(() => expect(document.title).toBe('Needs you — Smasher'));
+    await waitFor(() => expect(document.querySelector(`[data-run-id="${runId}"]`)).not.toBeNull(), { timeout: 8000 });
+    expect(screen.getByTestId('toolbar-subtitle').textContent).toMatch(/^\d+ questions? waiting$/);
+    // The page itself lists what's waiting, so the banner would only repeat it.
+    expect(screen.queryByRole('region', { name: 'Waiting for you' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Running now' })).toBeNull();
+  });
+
+  it('keeps the needs-you banner on Workflows and Recent runs', async () => {
+    await submitGraph(readFileSync(join(process.cwd(), 'e2e', 'fixtures', 'gate_only.dot'), 'utf-8'));
+    for (const path of ['/', '/runs']) {
+      visit(path);
+      const { unmount } = render(App);
+      expect(await screen.findByRole('region', { name: 'Waiting for you' }, { timeout: 8000 }), path).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it.each([
+    ['/#runs', '/runs', ''],
+    ['/?runs=failed#runs', '/runs', '?runs=failed'],
+    ['/?runs=completed', '/runs', '?runs=completed'],
+    ['/?runs=needs-you#runs', '/needs-you', ''],
+  ])('redirects the old address %s to %s%s in place', (from, pathname, search) => {
+    visit(from);
+    const length = window.history.length;
+    render(App);
+    expect(window.location.pathname).toBe(pathname);
+    expect(window.location.search).toBe(search);
+    expect(window.location.hash).toBe('');
+    expect(window.history.length).toBe(length);
+    const title = pathname === '/runs' ? 'Recent runs' : 'Needs you';
+    expect(within(screen.getByRole('banner')).getByRole('heading', { level: 1, name: title })).toBeTruthy();
+    expect(current()).toEqual([title]);
+  });
+
+  it('opens the old filtered address on the matching filter', () => {
+    visit('/?runs=failed#runs');
+    render(App);
+    expect(screen.getByRole('radio', { name: /^Failed or stopped/ })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('follows back and forward between the screens', async () => {
+    visit('/runs');
+    render(App);
+    expect(current()).toEqual(['Recent runs']);
+
+    visit('/needs-you');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await waitFor(() => expect(current()).toEqual(['Needs you']));
+    expect(within(screen.getByRole('banner')).getByRole('heading', { level: 1, name: 'Needs you' })).toBeTruthy();
+    await waitFor(() => expect(document.title).toBe('Needs you — Smasher'));
+
+    visit('/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    await waitFor(() => expect(current()).toEqual(['Workflows']));
+    await waitFor(() => expect(document.title).toBe('Smasher'));
   });
 });
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // ABOUTME: The dashboard's "is running" banner for the newest active run, when nothing is waiting on a person
+  // ABOUTME: The Workflows and Recent runs screens' "is running" banner for the newest active run, when nothing is waiting on a person
   // ABOUTME: Says when it started and how long it has run, and links to it and to the other active runs
 
   import PlayIcon from '@lucide/svelte/icons/play';
@@ -7,6 +7,7 @@
   import type { WorkflowSummary } from '$lib/api/workflows';
   import { Button } from '$lib/components/ui/button/index.js';
   import { useNow } from '$lib/hooks/useNow.svelte';
+  import { runFilterHref } from '$lib/runFilter';
   import { isActive, latestRunning, runTitle } from '$lib/runStatus';
   import { formatDuration, formatWhenInline } from '$lib/timeFormat';
   import { libraryStore } from '../../stores/library.svelte';
@@ -58,7 +59,7 @@
       <p class="m-0 text-xs text-muted-foreground">
         <span>{detail}</span>
         {#if others > 0}
-          <a href="/?runs=active#runs" class="ml-1.5 underline underline-offset-2 hover:no-underline">
+          <a href={runFilterHref('active')} class="ml-1.5 underline underline-offset-2 hover:no-underline">
             + {others} more running
           </a>
         {/if}

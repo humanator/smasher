@@ -34,14 +34,12 @@ describe('SourceList landmarks', () => {
 });
 
 describe('SourceList Library nav', () => {
-  it('links to the catalog, the runs table and the needs-you filter', () => {
+  it('links to the Workflows, Recent runs and Needs you screens', () => {
     mount();
     const nav = screen.getByRole('navigation', { name: 'Library' });
     expect(within(nav).getByRole('link', { name: /^Workflows/ }).getAttribute('href')).toBe('/');
-    expect(within(nav).getByRole('link', { name: /^Recent runs/ }).getAttribute('href')).toBe('/#runs');
-    expect(within(nav).getByRole('link', { name: /^Needs you/ }).getAttribute('href')).toBe(
-      '/?runs=needs-you#runs'
-    );
+    expect(within(nav).getByRole('link', { name: /^Recent runs/ }).getAttribute('href')).toBe('/runs');
+    expect(within(nav).getByRole('link', { name: /^Needs you/ }).getAttribute('href')).toBe('/needs-you');
   });
 
   it('shows the workflow count, run count and a needs-you pill', () => {
