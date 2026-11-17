@@ -53,7 +53,7 @@ test('toasts each failing poll on a missing run once, not on every tick', async 
   await expect(toasts).toHaveCount(0);
 });
 
-test('sidebar links reach Workflows, Recent runs and a workflow page', async ({ page }) => {
+test('sidebar links reach Workflows, Recent runs, Needs you and a workflow page', async ({ page }) => {
   await page.goto('/runs/no-such-run');
   const library = page.getByRole('navigation', { name: 'Library' });
 
@@ -62,7 +62,14 @@ test('sidebar links reach Workflows, Recent runs and a workflow page', async ({ 
   await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible();
 
   await library.getByRole('link', { name: /^Recent runs/ }).click();
-  await expect(page).toHaveURL('/#runs');
+  await expect(page).toHaveURL('/runs');
+  await expect(page.getByRole('heading', { level: 1, name: 'Recent runs' })).toBeVisible();
+  await expect(library.getByRole('link', { name: /^Recent runs/ })).toHaveAttribute('aria-current', 'page');
+
+  await library.getByRole('link', { name: /^Needs you/ }).click();
+  await expect(page).toHaveURL('/needs-you');
+  await expect(page.getByRole('heading', { level: 1, name: 'Needs you' })).toBeVisible();
+  await expect(library.getByRole('link', { name: /^Needs you/ })).toHaveAttribute('aria-current', 'page');
 
   const workflows = page.getByRole('navigation', { name: 'Workflows' });
   await workflows.getByRole('link', { name: /Human Gate Showcase/ }).click();

@@ -19,6 +19,7 @@
     actions,
     titleAccessory = null,
     currentWorkflowId = null,
+    librarySection = null,
     sidebarCollapsed = false,
     children,
   }: {
@@ -30,6 +31,8 @@
     actions?: Snippet | null;
     titleAccessory?: Snippet | null;
     currentWorkflowId?: string | null;
+    /** The Library screen being shown, highlighted in the sidebar. */
+    librarySection?: 'workflows' | 'runs' | 'needs-you' | null;
     /** Start with the sidebar folded to its icon rail, as the editor does for its step library. */
     sidebarCollapsed?: boolean;
     children: Snippet;
@@ -43,25 +46,9 @@
     }))
   );
 
-  // The dashboard hosts all three Library views, told apart by the runs filter and #runs anchor.
-  type LibrarySection = 'workflows' | 'runs' | 'needs-you' | null;
-  function readSection(): LibrarySection {
-    if (window.location.pathname !== '/') return null;
-    if (new URLSearchParams(window.location.search).get('runs') === 'needs-you') return 'needs-you';
-    return window.location.hash === '#runs' ? 'runs' : 'workflows';
-  }
-  let librarySection = $state<LibrarySection>(readSection());
-
   onMount(() => {
     libraryStore.start();
-    const sync = () => (librarySection = readSection());
-    window.addEventListener('hashchange', sync);
-    window.addEventListener('popstate', sync);
-    return () => {
-      libraryStore.stop();
-      window.removeEventListener('hashchange', sync);
-      window.removeEventListener('popstate', sync);
-    };
+    return () => libraryStore.stop();
   });
 </script>
 

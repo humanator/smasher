@@ -81,7 +81,7 @@ describe('RunningBanner', () => {
 
     expect(screen.getByText('Graph newest is running')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Open Run' })).toHaveAttribute('href', '/runs/newest');
-    expect(screen.getByRole('link', { name: '+ 2 more running' })).toHaveAttribute('href', '/?runs=active#runs');
+    expect(screen.getByRole('link', { name: '+ 2 more running' })).toHaveAttribute('href', '/runs?runs=active');
   });
 
   describe('with its own clock', () => {

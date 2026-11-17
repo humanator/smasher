@@ -1,29 +1,39 @@
 <script lang="ts">
   // ABOUTME: Root app shell - routes to components based on URL path
-  // ABOUTME: Minimal manual routing: dashboard at /, run detail at /runs/{id}, workflow pages at /workflows/*
+  // ABOUTME: Minimal manual routing: Workflows at /, Recent runs at /runs, Needs you at /needs-you, run detail at /runs/{id}, workflow pages at /workflows/*
 
   import './app.css';
   import { onMount } from 'svelte';
   import DashboardPage from './components/dashboard/DashboardPage.svelte';
+  import NeedsYouPage from './components/dashboard/NeedsYouPage.svelte';
+  import RunsPage from './components/dashboard/RunsPage.svelte';
   import WorkflowDetailPage from './components/dashboard/WorkflowDetailPage.svelte';
   import AppShell from './components/shell/AppShell.svelte';
   import LazySettingsDialog from './components/dashboard/LazySettingsDialog.svelte';
   import { Toaster } from '$lib/components/ui/sonner/index.js';
   import { ModeWatcher } from 'mode-watcher';
   import { providePageHeader } from '$lib/page-header.svelte';
+  import { legacyRunsRedirect } from '$lib/runFilter';
 
   let runId = $state<string | null>(null);
   let designPage = $state(false);
   let workflowPageType = $state<'new' | 'edit' | 'detail' | null>(null);
   let workflowId = $state<string | null>(null);
+  // The two Library screens beside the catalog; null on the catalog and every other page.
+  let libraryPage = $state<'runs' | 'needs-you' | null>(null);
 
   // Pages below register their own controls (Save, Abort) into this header.
   const pageHeader = providePageHeader();
   const catalogBack = { label: 'Smasher Pipelines', href: '/' };
-  const isCatalog = $derived(!runId && !workflowPageType && !designPage);
+  const isCatalog = $derived(!runId && !workflowPageType && !designPage && !libraryPage);
+  const librarySection = $derived(isCatalog ? 'workflows' : libraryPage);
   const pageTitle = $derived(
     designPage
       ? 'Design system'
+      : libraryPage === 'runs'
+      ? 'Recent runs'
+      : libraryPage === 'needs-you'
+      ? 'Needs you'
       : workflowPageType === 'new'
       ? (pageHeader.title ?? 'New workflow')
       : workflowPageType === 'edit' || workflowPageType === 'detail'
@@ -36,6 +46,10 @@
   const documentTitle = $derived(
     designPage
       ? 'Design system — Smasher'
+      : libraryPage === 'runs'
+      ? 'Recent runs — Smasher'
+      : libraryPage === 'needs-you'
+      ? 'Needs you — Smasher'
       : workflowPageType === 'new'
       ? `${pageHeader.title ?? 'New workflow'} — Smasher`
       : workflowPageType === 'edit' || workflowPageType === 'detail'
@@ -62,10 +76,16 @@
   });
 
   function updatePath() {
+    // The runs used to live on the home page, under #runs and ?runs=; send
+    // those addresses to their own screens, in place of the old entry.
+    const redirect = legacyRunsRedirect(window.location.pathname, window.location.search, window.location.hash);
+    if (redirect) window.history.replaceState(window.history.state, '', redirect);
+
     const path = window.location.pathname;
 
+    libraryPage = path === '/runs' ? 'runs' : path === '/needs-you' ? 'needs-you' : null;
     designPage = path === '/design';
-    if (designPage) {
+    if (designPage || libraryPage) {
       runId = null;
       workflowPageType = null;
       workflowId = null;
@@ -135,7 +155,7 @@
 
 {#snippet headerActions()}
   {@render pageHeader.actions?.()}
-  <!-- The dashboard places its own settings button, between Import and New workflow. -->
+  <!-- The Workflows screen places its own settings button, between Import and New workflow. -->
   {#if !isCatalog}
     <LazySettingsDialog />
   {/if}
@@ -146,10 +166,11 @@
   subtitle={pageHeader.subtitle}
   subtitleDot={pageHeader.subtitleDot}
   subtitleLive={pageHeader.subtitleLive}
-  back={isCatalog ? null : (pageHeader.back ?? catalogBack)}
+  back={isCatalog || libraryPage ? null : (pageHeader.back ?? catalogBack)}
   actions={headerActions}
   titleAccessory={pageHeader.titleAccessory}
   currentWorkflowId={workflowPageType === 'detail' || workflowPageType === 'edit' ? workflowId : null}
+  {librarySection}
   sidebarCollapsed={workflowPageType === 'edit' || workflowPageType === 'new'}
 >
   <!-- The two editor pages are the only users of @xyflow/svelte and dagre,
@@ -191,6 +212,10 @@
         <p class="p-8 text-destructive">Couldn't load the run page. Reload the page to try again.</p>
       {/await}
     {/key}
+  {:else if libraryPage === 'runs'}
+    <RunsPage />
+  {:else if libraryPage === 'needs-you'}
+    <NeedsYouPage />
   {:else}
     <DashboardPage />
   {/if}
