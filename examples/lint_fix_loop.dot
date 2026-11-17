@@ -1,0 +1,55 @@
+// ABOUTME: Build a page, check it against the design system, and hand the findings back to the
+// ABOUTME: agent until every check passes. No human step: the loop routes on the check's exit code.
+
+// How the loop works:
+//   1. Build    — an AI Agent step writes ./candidate/index.html.
+//   2. Lint     — the built-in system_lint tool checks the page and writes
+//                 lint-report.json into the run's artifacts folder.
+//   3. Check    — a shell step copies that report to ./candidate-lint.json, where
+//                 the agent can read it, and fails if any check failed.
+//   4. Fix      — on failure, an AI Agent step reads the report, fixes the page,
+//                 and goes back to Lint. On success the run ends.
+//
+// The agent never runs the linter itself (its tools stay limited to reading and
+// writing files); the pipeline runs it and passes the result on. `--max-steps`
+// (1000 by default) stops a loop that never converges.
+//
+// Run it:
+//   smasher run examples/lint_fix_loop.dot --var page="a sign-up form"
+
+digraph LintFixLoop {
+    graph [goal="Build {{page}} from the design kit, and keep fixing it until the design-system check passes."];
+
+    start [shape=Mdiamond, label="Start"];
+    done  [shape=Msquare, label="Done"];
+
+    build [
+        shape=box,
+        label="Build page",
+        prompt="Build {{page}} as a single static page at ./candidate/index.html. Use only the design kit: link /design-kit/tokens.css and /design-kit/components.css, use its component classes, and use its CSS variables instead of raw colours or sizes."
+    ];
+
+    lint [
+        shape=parallelogram,
+        label="Design-system check",
+        tool="system_lint",
+        args="{\"candidate_dir\": \"./candidate\", \"candidate_id\": \"candidate\"}"
+    ];
+
+    check [
+        shape=parallelogram,
+        label="Did every check pass?",
+        tool_command="cp \"$SMASHER_RUN_DIR/artifacts/candidate/lint-report.json\" ./candidate-lint.json && ! grep -q '\"passed\": false' ./candidate-lint.json"
+    ];
+
+    fix [
+        shape=box,
+        label="Fix the findings",
+        prompt="The design-system check failed for ./candidate/index.html. Read ./candidate-lint.json: every check with \"passed\": false lists its violations. Fix each violation in ./candidate/index.html, keeping the page otherwise the same."
+    ];
+
+    start -> build -> lint -> check;
+    check -> done [label="passed", condition="outcome=success"];
+    check -> fix  [label="failed", condition="outcome=fail"];
+    fix -> lint;
+}

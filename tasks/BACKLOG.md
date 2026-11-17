@@ -6,13 +6,6 @@ Item numbers stay stable so cross-references keep working; gaps are finished
 items. For running the frontend tests, see "Frontend Tests and CI" in
 [`docs/quickstart.md`](../docs/quickstart.md).
 
-## P1: Do next
-
-23. **Claude CLI provider follow-ups.** Setup is in `docs/config-reference.md`.
-    - Codergen agents are denied the shell, so they can't run the design-kit
-      linter or open their pages. Decide whether to allow the linter command,
-      or leave checking to the pipeline's `system_lint`/`render` nodes.
-
 ## P2: Robustness
 
 44. **Keep workflow names readable in the run list.** With the delete column
