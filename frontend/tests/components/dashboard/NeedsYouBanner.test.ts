@@ -112,7 +112,7 @@ describe('NeedsYouBanner', () => {
 
     expect(screen.getByText('Graph oldest is waiting for your decision')).toBeTruthy();
     expect(await screen.findByText('Approve or reject · waiting 1 hour')).toBeTruthy();
-    expect(screen.getByRole('link', { name: '+ 2 more waiting' })).toHaveAttribute('href', '/?runs=needs-you#runs');
+    expect(screen.getByRole('link', { name: '+ 2 more waiting' })).toHaveAttribute('href', '/needs-you');
     expect(fetchQuestions).toHaveBeenCalledWith('oldest');
   });
 

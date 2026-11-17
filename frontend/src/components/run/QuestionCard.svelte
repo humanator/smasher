@@ -10,9 +10,8 @@
   import { renderMarkdown } from '../../lib/markdown';
   import { notifyError, pollFailureNotifier } from '$lib/notify';
   import { libraryStore } from '../../stores/library.svelte';
-  import { Button } from '$lib/components/ui/button/index.js';
-  import { Input } from '$lib/components/ui/input/index.js';
   import { Badge } from '$lib/components/ui/badge/index.js';
+  import QuestionAnswer from './QuestionAnswer.svelte';
 
   interface Props {
     runId: string;
@@ -25,24 +24,6 @@
     multiple_choice: 'Multiple Choice',
     approval: 'Approval',
   };
-
-  // Per-card UI state, keyed by question id. Cards read through card(), which
-  // falls back to EMPTY, so rendering never has to create an entry.
-  interface CardState {
-    text: string;
-    choice: string | null;
-    submitting: boolean;
-  }
-  const EMPTY: CardState = { text: '', choice: null, submitting: false };
-  let cards = $state<Record<string, CardState>>({});
-
-  function card(id: string): CardState {
-    return cards[id] ?? EMPTY;
-  }
-
-  function update(id: string, patch: Partial<CardState>) {
-    cards[id] = { ...card(id), ...patch };
-  }
 
   // Set by each successful fetch; the empty state waits for the first one and
   // stays hidden while a gallery gate card covers the pending question.
@@ -70,7 +51,6 @@
   $effect(() => {
     const id = pollRunId;
     questionStore.reset();
-    cards = {};
     loaded = false;
     galleryGateShowing = false;
     galleryGates = null;
@@ -105,21 +85,18 @@
     };
   });
 
-  async function handleAnswer(questionId: string, answer: string) {
-    if (!answer.trim() || card(questionId).submitting) return;
-    update(questionId, { submitting: true });
+  async function handleAnswer(questionId: string, answer: string): Promise<boolean> {
     try {
       const result = await questionsApi.answerQuestion(runId, questionId, answer);
       // The server reports some rejections (e.g. an unknown question) as a 200.
       if (!result.success) throw new Error(result.error ?? '');
       questionStore.answer(questionId);
       void libraryStore.refresh();
-      update(questionId, { text: '', choice: null });
+      return true;
     } catch (err) {
       // The question stays pending, with its text, so it can be answered again.
       notifyError(err, 'Failed to answer question');
-    } finally {
-      update(questionId, { submitting: false });
+      return false;
     }
   }
 </script>
@@ -136,90 +113,7 @@
             <Badge variant="secondary" class="uppercase">{KIND_LABELS[question.kind]}</Badge>
             <span class="font-mono text-xs text-muted-foreground break-all">{question.id}</span>
           </div>
-          <!-- Multiple choice shows the question as its fieldset's legend instead. -->
-          {#if question.kind !== 'multiple_choice'}
-            <p id="question-text-{question.id}" class="question-text mb-4 {textClass}">{question.question}</p>
-          {/if}
-
-          {#if question.kind === 'free_form'}
-            <!-- A form, so Enter in the input submits too. -->
-            <form
-              class="answer-form flex gap-2"
-              onsubmit={(e) => {
-                e.preventDefault();
-                handleAnswer(question.id, card(question.id).text);
-              }}
-            >
-              <Input
-                type="text"
-                aria-labelledby="question-text-{question.id}"
-                placeholder="Enter your answer"
-                bind:value={() => card(question.id).text, (text) => update(question.id, { text })}
-                disabled={card(question.id).submitting}
-              />
-              <Button
-                type="submit"
-                disabled={!card(question.id).text.trim() || card(question.id).submitting}
-              >
-                Submit
-              </Button>
-            </form>
-          {:else if question.kind === 'approval'}
-            <div
-              class="button-group flex flex-wrap gap-2"
-              role="group"
-              aria-labelledby="question-text-{question.id}"
-            >
-              <!-- Yes/No colors carry semantic meaning (approve/reject). -->
-              <Button
-                onclick={() => handleAnswer(question.id, 'yes')}
-                disabled={card(question.id).submitting}
-              >
-                Yes
-              </Button>
-              <Button
-                onclick={() => handleAnswer(question.id, 'no')}
-                disabled={card(question.id).submitting}
-                variant="destructive"
-              >
-                No
-              </Button>
-            </div>
-          {:else if question.kind === 'multiple_choice'}
-            <form
-              class="choices flex flex-col gap-4"
-              onsubmit={(e) => {
-                e.preventDefault();
-                handleAnswer(question.id, card(question.id).choice ?? '');
-              }}
-            >
-              <fieldset class="flex flex-col gap-2" disabled={card(question.id).submitting}>
-                <legend class="question-text mb-2 {textClass}">
-                  {question.question}
-                </legend>
-                {#each question.choices as choice (choice)}
-                  <label class="flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="radio"
-                      name="choice-{question.id}"
-                      value={choice}
-                      checked={card(question.id).choice === choice}
-                      onchange={() => update(question.id, { choice })}
-                      class="accent-primary"
-                    />
-                    {choice}
-                  </label>
-                {/each}
-              </fieldset>
-              <Button
-                type="submit"
-                class="self-start"
-                disabled={!card(question.id).choice || card(question.id).submitting}
-              >
-                Submit
-              </Button>
-            </form>
-          {/if}
+          <QuestionAnswer {question} {textClass} onanswer={(answer) => handleAnswer(question.id, answer)} />
         </div>
       {/each}
     {:else if loaded && !galleryGateShowing}

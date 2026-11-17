@@ -153,6 +153,12 @@ a denial. The default allowlist is `Read Edit Write Glob Grep` plus `Bash` for `
 `Read,Write,Bash(npm run build:*)`. `--claude-skip-permissions` turns the restriction
 off.
 
+Agents can't run the design-system check themselves. To have them fix its findings
+without a human step, let the pipeline run it and pass the report back, as
+`examples/lint_fix_loop.dot` does: a `system_lint` node, a `tool_command` that copies
+the report next to the page and fails if any check failed, and a fix node on the
+`outcome=fail` edge that leads back to the check.
+
 Each run also passes `--strict-mcp-config`, `--setting-sources ""` and
 `--no-session-persistence`, so your MCP servers, settings and `~/.claude/CLAUDE.md`
 stay out of pipeline runs and no session transcripts are saved.
