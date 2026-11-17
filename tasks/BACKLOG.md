@@ -13,6 +13,13 @@ items. For running the frontend tests, see "Frontend Tests and CI" in
     are cut to one letter ("D…", "H…") beside the full run id. Shorten or drop
     the run id at narrow widths so the name wins.
 
+45. **Fix the flaky RunPage Activity test.** "shows the run's events on
+    Activity, from the one stream the page follows"
+    (`frontend/tests/components/run/RunPage.test.ts`) sometimes can't find the
+    "Take a nap" line: 2 failures in 6 runs on 2026-11-17, with nothing in the
+    Activity log or its event stream changed. Find why the step's event can
+    miss the wait (a late stream subscribe?) rather than adding a retry.
+
 ## P3: Design-factory features (wait until a real pipeline needs them)
 
 10. **Support two gallery gates pending on one run at once.** Needs a mapping
