@@ -1,4 +1,4 @@
-// ABOUTME: Dashboard E2E: search, launching from the workflows table, the Recent runs filter and the needs-you banner
+// ABOUTME: Library screens E2E: Workflows search and launching, the Recent runs filter, the needs-you banner and Needs you cards
 // ABOUTME: Runs only gate-only workflows (run_launch_check and the gate_only fixture), so it spends no LLM tokens
 
 import { test, expect } from '@playwright/test';
@@ -52,24 +52,36 @@ test('Run… opens the run sheet, launches, and lands on the new run', async ({ 
 });
 
 test('the Recent runs filter and ?runs= follow each other, including the sidebar links', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/runs');
   const filters = page.getByRole('group', { name: 'Show runs' });
 
   await filters.getByRole('radio', { name: /^Completed/ }).click();
-  await expect(page).toHaveURL('/?runs=completed');
+  await expect(page).toHaveURL('/runs?runs=completed');
   await filters.getByRole('radio', { name: /^Failed or stopped/ }).click();
-  await expect(page).toHaveURL('/?runs=failed');
+  await expect(page).toHaveURL('/runs?runs=failed');
 
   await page.reload();
   await expect(filters.getByRole('radio', { name: /^Failed or stopped/ })).toHaveAttribute('aria-checked', 'true');
 
   await filters.getByRole('radio', { name: /^All/ }).click();
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL('/runs');
 
   const library = page.getByRole('navigation', { name: 'Library' });
   await library.getByRole('link', { name: /^Needs you/ }).click();
-  await expect(page).toHaveURL('/?runs=needs-you#runs');
-  await expect(filters.getByRole('radio', { name: /^Active/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page).toHaveURL('/needs-you');
+  await expect(page.getByRole('banner').getByRole('heading', { level: 1, name: 'Needs you' })).toBeVisible();
+});
+
+test('the old home-page runs addresses open the new screens', async ({ page }) => {
+  await page.goto('/?runs=failed#runs');
+  await expect(page).toHaveURL('/runs?runs=failed');
+  await expect(
+    page.getByRole('group', { name: 'Show runs' }).getByRole('radio', { name: /^Failed or stopped/ })
+  ).toHaveAttribute('aria-checked', 'true');
+
+  await page.goto('/?runs=needs-you#runs');
+  await expect(page).toHaveURL('/needs-you');
+  await expect(page.getByRole('banner').getByRole('heading', { level: 1, name: 'Needs you' })).toBeVisible();
 });
 
 test('a run waiting on a person raises the banner and shows as Needs you until it is answered', async ({
@@ -94,7 +106,7 @@ test('a run waiting on a person raises the banner and shows as Needs you until i
     const launched = await page.request.post(`${base}/api/workflows/${encodeURIComponent(id)}/run`, { data: {} });
     runId = (await launched.json()).run_id as string;
 
-    await page.goto('/?runs=needs-you#runs');
+    await page.goto('/runs');
     const banner = page.getByRole('region', { name: 'Waiting for you' });
     await expect(banner).toBeVisible(POLL);
     await expect(banner).toContainText('is waiting for your decision');
@@ -115,6 +127,34 @@ test('a run waiting on a person raises the banner and shows as Needs you until i
   } finally {
     if (runId) await page.request.post(`${base}/api/runs/${runId}/cancel`);
     if (workflowPath) rmSync(workflowPath, { force: true });
+  }
+});
+
+test('a Needs you card answers a waiting question in place and then goes', async ({ page, baseURL }) => {
+  test.setTimeout(45000);
+  const base = baseURL || 'http://127.0.0.1:5173';
+  let runId: string | undefined;
+
+  try {
+    const launched = await page.request.post(`${base}/api/runs`, { data: { dot_source: gateOnlyDot, variables: {} } });
+    runId = (await launched.json()).run_id as string;
+
+    await page.goto('/needs-you');
+    const card = page.locator(`[data-run-id="${runId}"]`);
+    await expect(card.getByRole('heading', { name: 'GateOnly' })).toBeVisible(POLL);
+    await expect(card.getByRole('link', { name: 'Open run' })).toHaveAttribute('href', `/runs/${runId}`);
+    // The page lists what's waiting itself, so the banner would only repeat it.
+    await expect(page.getByRole('region', { name: 'Waiting for you' })).toHaveCount(0);
+
+    await card.getByRole('textbox', { name: 'Proceed with the gate-only fixture?' }).fill('go ahead');
+    await card.getByRole('button', { name: 'Submit' }).click();
+
+    await expect(card).toHaveCount(0, POLL);
+    await expect
+      .poll(async () => (await (await page.request.get(`${base}/api/runs/${runId}`)).json()).status, POLL)
+      .toBe('Completed');
+  } finally {
+    if (runId) await page.request.post(`${base}/api/runs/${runId}/cancel`);
   }
 });
 
@@ -199,5 +239,13 @@ test.describe('at phone width', () => {
     await page.getByRole('button', { name: 'AI model settings' }).click();
     await expect(page.getByRole('dialog')).toBeVisible(LAZY);
     await expectNoSidewaysScroll(page, 'Settings open');
+  });
+
+  test('never scrolls sideways on Recent runs or Needs you', async ({ page }) => {
+    for (const path of ['/runs', '/needs-you']) {
+      await page.goto(path);
+      await expect(page.getByRole('banner').getByRole('heading', { level: 1 })).toBeVisible();
+      await expectNoSidewaysScroll(page, path);
+    }
   });
 });
